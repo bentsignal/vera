@@ -2,13 +2,13 @@
 
 <br />
 <div align="center">
-  <img src="https://raw.githubusercontent.com/bentsignal/hmmm.docs/refs/heads/main/assets/hmm-bumper-1-optimized.gif" alt="Animated GIF of advertisement for hmmm, showing off its search capability." width="500px">
+  <img src="https://raw.githubusercontent.com/bentsignal/vera.docs/refs/heads/main/assets/vera-bumper-1-optimized.gif" alt="Animated GIF of advertisement for Vera, showing off its search capability." width="500px">
   <br />
   <br />
   <br />
   <br />
-  <a href="https://www.hmmm.chat" target="_blank">
-    hmmm.chat
+  <a href="https://www.vera.chat" target="_blank">
+    vera.chat
   </a>
 </div>
 <br />
@@ -18,7 +18,7 @@
 
 A great starting point for building agentic applications for the web.
 
-For more information, head over to the [docs](https://docs.hmmm.chat)
+For more information, head over to the [docs](https://docs.vera.chat)
 
 <br />
 <br />

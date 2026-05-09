@@ -32,11 +32,11 @@ const MAX_FOR_SUBJECT = 3;
 const ORIGIN =
   env.ENVIRONMENT === "development"
     ? "http://localhost:3000"
-    : "https://hmmm.chat";
+    : "https://vera.chat";
 const ENDPOINT = "mail";
-const RESUBSCRIBE = "resubscribe@hmmm.chat";
-const UNSUBSCRIBE = "unsubscribe@hmmm.chat";
-const FROM = "hmmm... <newsletter@mail.hmmm.chat>";
+const RESUBSCRIBE = "resubscribe@vera.chat";
+const UNSUBSCRIBE = "unsubscribe@vera.chat";
+const FROM = "Vera <newsletter@mail.vera.chat>";
 
 async function fetchSuggestions(ctx: ActionCtx) {
   const suggestions = await ctx.runQuery(internal.ai.suggestions.getTopWeekly, {

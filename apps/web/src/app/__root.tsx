@@ -24,7 +24,7 @@ import { cookiesQueryOptions } from "~/lib/cookies";
 import { getThemeClass } from "~/lib/theme";
 import { ThemeProvider } from "~/providers/theme-provider";
 
-const SITE_TITLE = "hmmm...";
+const SITE_TITLE = "Vera";
 const SITE_DESCRIPTION = "How can I help you today?";
 const SITE_URL = env.VITE_APP_URL.replace(/\/$/, "");
 const OG_IMAGE_URL = `${SITE_URL}/opengraph-image.jpg`;

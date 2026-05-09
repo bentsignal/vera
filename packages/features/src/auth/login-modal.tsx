@@ -18,7 +18,7 @@ import { cn } from "@acme/ui/utils";
 import { SignInButton } from "./sign-in-button";
 import { Terms } from "./terms";
 
-const TITLE = "hmmm...";
+const TITLE = "Vera";
 
 const GLASS_CONTAINER =
   "bg-card supports-[backdrop-filter]:bg-card/20 backdrop-blur-sm border";
@@ -55,7 +55,7 @@ export function LoginModal({
           <DrawerHeader className="items-center pb-2 text-center">
             <DrawerTitle className="text-base font-medium">{TITLE}</DrawerTitle>
             <DrawerDescription className="sr-only">
-              Sign in to hmmm
+              Sign in to Vera
             </DrawerDescription>
           </DrawerHeader>
           <div className="flex flex-col gap-3 px-5 pb-5">
@@ -75,7 +75,7 @@ export function LoginModal({
         <DialogHeader className="items-center text-center">
           <DialogTitle className="text-base font-medium">{TITLE}</DialogTitle>
           <DialogDescription className="sr-only">
-            Sign in to hmmm
+            Sign in to Vera
           </DialogDescription>
         </DialogHeader>
         <SignInButton redirectUri={redirectUri} />

@@ -8,7 +8,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       tree={source.pageTree}
       {...baseOptions()}
-      githubUrl="https://github.com/bentsignal/hmmm"
+      githubUrl="https://github.com/bentsignal/vera"
     >
       {children}
     </DocsLayout>
