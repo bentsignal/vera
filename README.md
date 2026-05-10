@@ -2,7 +2,7 @@
 
 <br />
 <div align="center">
-  <img src="https://raw.githubusercontent.com/bentsignal/vera.docs/refs/heads/main/assets/vera-bumper-1-optimized.gi" alt="Animated GIF of advertisement for Vera, showing off its search capability." width="500px">
+  <img src="https://github.com/user-attachments/assets/c74389d4-faad-4af9-b4e0-d31115ea167f" alt="Animated GIF of advertisement for Vera, showing off its search capability." width="500px">
   <br />
   <br />
   <br />
