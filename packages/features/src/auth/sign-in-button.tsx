@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSignIn } from "@clerk/tanstack-react-start/legacy";
+import { useClerk } from "@clerk/tanstack-react-start";
 import { toast } from "sonner";
 
 import { cn } from "@acme/ui/utils";
@@ -13,20 +13,35 @@ export function SignInButton({
   className?: string;
   redirectUri?: string;
 }) {
-  const clerkSignIn = useSignIn();
+  const clerk = useClerk();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const disabled = !clerkSignIn.isLoaded || isSubmitting;
+  const disabled = !clerk.loaded || isSubmitting;
 
   async function handleClick() {
-    if (!clerkSignIn.isLoaded) return;
+    if (!clerk.loaded) return;
     setIsSubmitting(true);
     try {
-      await clerkSignIn.signIn.authenticateWithRedirect({
+      const result = await clerk.client.signIn.create({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
-        redirectUrlComplete: redirectUri ?? "/",
+        actionCompleteRedirectUrl: redirectUri ?? "/",
+        oidcPrompt: "select_account",
       });
+
+      const externalUrl =
+        result.firstFactorVerification.externalVerificationRedirectURL;
+
+      if (externalUrl) {
+        const url = new URL(externalUrl.toString());
+        if (!url.searchParams.has("prompt")) {
+          url.searchParams.set("prompt", "select_account");
+        }
+        window.location.href = url.toString();
+      } else {
+        toast.error("Failed to get Google sign-in URL");
+        setIsSubmitting(false);
+      }
     } catch (err) {
       console.error(err);
       toast.error("Failed to start Google sign-in");
