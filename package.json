@@ -10,7 +10,7 @@
     "build": "turbo run build",
     "clean": "git clean -xdf node_modules .turbo",
     "clean:all": "turbo run clean && pnpm run clean",
-    "dev": "turbo run dev --parallel --continue",
+    "dev": "portless proxy start && turbo run dev --parallel --continue",
     "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
@@ -28,6 +28,7 @@
     "@effect/language-service": "0.85.1",
     "@turbo/gen": "2.8.17",
     "dotenv-cli": "10.0.0",
+    "portless": "^0.12.0",
     "prettier": "catalog:",
     "turbo": "2.8.17",
     "typescript": "catalog:"

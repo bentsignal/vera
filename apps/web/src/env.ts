@@ -24,7 +24,8 @@ export const env = createEnv({
   },
   client: {
     VITE_NODE_ENV: z.enum(["development", "production"]).default("production"),
-    VITE_APP_URL: z.string().url(),
+    VITE_WORKTREE_ID: z.string().optional(),
+    VITE_DEV_ALLOWED_HOST: z.string().optional(),
     VITE_CLERK_PUBLISHABLE_KEY: z.string().min(1),
     VITE_CLERK_SIGN_IN_URL: z.string().min(1),
     VITE_CLERK_SIGN_UP_URL: z.string().min(1),

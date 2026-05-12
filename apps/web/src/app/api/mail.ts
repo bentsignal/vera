@@ -5,6 +5,7 @@ import { api } from "@acme/db/api";
 import { env } from "~/env";
 import { getConvexHttpClient } from "~/lib/convex-server";
 import { tryCatch } from "~/lib/utils";
+import { appUrls } from "~/urls";
 
 async function handleMailRequest(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +14,7 @@ async function handleMailRequest(request: Request) {
 
   if (!userId) {
     console.error("No userId provided");
-    return Response.redirect(env.VITE_APP_URL, 302);
+    return Response.redirect(appUrls.web, 302);
   }
 
   const convex = getConvexHttpClient();
@@ -42,7 +43,7 @@ export const Route = createFileRoute("/api/mail")({
             { status: 500, headers: { "Content-Type": "application/json" } },
           );
         }
-        return Response.redirect(env.VITE_APP_URL, 302);
+        return Response.redirect(appUrls.web, 302);
       },
       POST: async ({ request }) => {
         const { error } = await tryCatch(handleMailRequest(request));

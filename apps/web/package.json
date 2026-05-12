@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "pnpm with-env vite build",
-    "dev": "pnpm with-env vite dev",
+    "dev": "portless",
+    "dev:app": "pnpm with-env vite dev",
     "start": "node .output/server/index.mjs",
     "preview": "pnpm with-env vite preview",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
@@ -16,6 +17,7 @@
     "with-env": "dotenv -e ./.env -e ../../.env --"
   },
   "dependencies": {
+    "@acme/app-config": "workspace:*",
     "@acme/db": "workspace:*",
     "@acme/features": "workspace:*",
     "@acme/ui": "workspace:*",
@@ -76,5 +78,9 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-tsconfig-paths": "catalog:"
+  },
+  "portless": {
+    "name": "www.vera",
+    "script": "dev:app"
   }
 }

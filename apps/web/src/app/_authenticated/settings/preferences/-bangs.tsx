@@ -1,12 +1,12 @@
 import { Markdown } from "@acme/ui/markdown";
 
 import { InfoCard } from "~/components/info-card";
-import { env } from "~/env";
 import { CopyButton } from "~/features/messages/components/copy-button";
 import { markdownComponents } from "~/features/messages/components/markdown-components";
+import { appUrls } from "~/urls";
 
 export function Bangs() {
-  const bangURL = `${env.VITE_APP_URL}new?q=%s`;
+  const bangURL = `${appUrls.web}/new?q=%s`;
   const bang = `\`\n${bangURL}\n\`\n`;
   return (
     <InfoCard title="Search">

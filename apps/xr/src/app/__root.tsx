@@ -18,7 +18,7 @@ import { LoginModal } from "@acme/features/auth";
 
 import type { RouterContext } from "~/router";
 import appStyles from "~/app/styles.css?url";
-import { env } from "~/env";
+import { appUrls } from "~/urls";
 
 const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
   const { userId, getToken, isAuthenticated } = await auth();
@@ -128,8 +128,8 @@ function RootComponent() {
               open={!authState.isSignedIn && signin}
               onClose={closeLoginModal}
               redirectUri={redirectUrl}
-              tosURL={`${env.VITE_WEB_APP_URL}/terms-of-service`}
-              privacyURL={`${env.VITE_WEB_APP_URL}/privacy-policy`}
+              tosURL={`${appUrls.web}/terms-of-service`}
+              privacyURL={`${appUrls.web}/privacy-policy`}
             />
             <Toaster />
             <Scripts />

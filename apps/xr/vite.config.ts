@@ -6,13 +6,20 @@ import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-export default defineConfig(async () => {
-  await import("./src/env");
+export default defineConfig(async ({ mode }) => {
+  const { env } = await import("./src/env");
+
+  const isDevelopment =
+    mode === "development" || env.VITE_NODE_ENV === "development";
 
   return {
     server: {
+      port: process.env.PORT ? Number(process.env.PORT) : undefined,
       host: true,
-      port: 3011,
+      allowedHosts:
+        isDevelopment && env.VITE_DEV_ALLOWED_HOST
+          ? [env.VITE_DEV_ALLOWED_HOST]
+          : undefined,
     },
     plugins: [
       devtools({}),

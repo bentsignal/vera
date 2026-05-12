@@ -19,14 +19,14 @@ import { LoginModal } from "@acme/features/auth";
 
 import type { RouterContext } from "~/router";
 import appStyles from "~/app/styles.css?url";
-import { env } from "~/env";
 import { cookiesQueryOptions } from "~/lib/cookies";
 import { getThemeClass } from "~/lib/theme";
 import { ThemeProvider } from "~/providers/theme-provider";
+import { appUrls } from "~/urls";
 
 const SITE_TITLE = "Vera";
 const SITE_DESCRIPTION = "How can I help you today?";
-const SITE_URL = env.VITE_APP_URL.replace(/\/$/, "");
+const SITE_URL = appUrls.web;
 const OG_IMAGE_URL = `${SITE_URL}/opengraph-image.jpg`;
 const TWITTER_IMAGE_URL = `${SITE_URL}/twitter-image.jpg`;
 
@@ -61,7 +61,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "twitter:description", content: SITE_DESCRIPTION },
       { name: "twitter:image", content: TWITTER_IMAGE_URL },
       { name: "twitter:image:alt", content: SITE_TITLE },
-      { name: "twitter:url", content: env.VITE_APP_URL },
+      { name: "twitter:url", content: appUrls.web },
     ],
   }),
   beforeLoad: async ({ context }) => {
