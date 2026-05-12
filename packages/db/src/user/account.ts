@@ -59,7 +59,6 @@ export const ensureUserExists = mutation({
     await ctx.db.insert("users", {
       userId: identity.subject,
       email: identity.email ?? "",
-      newsletter: true,
     });
   },
 });

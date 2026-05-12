@@ -17,12 +17,6 @@ crons.monthly(
   internal.ai.suggestions.cleanup,
 );
 
-crons.weekly(
-  "send-newsletter",
-  { dayOfWeek: "thursday", hourUTC: 18, minuteUTC: 0 },
-  internal.mail.actions.sendNewsletter,
-);
-
 crons.interval(
   "Remove old emails from the resend component",
   { hours: 12 },
