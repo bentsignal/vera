@@ -14,7 +14,7 @@
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "clean": "git clean -xdf node_modules .cache .tanstack .turbo",
-    "with-env": "dotenv -e ./.env -e ../../.env --"
+    "with-env": "dotenv -e ./.env.local -e ./.env -e ../../.env --"
   },
   "dependencies": {
     "@acme/app-config": "workspace:*",
