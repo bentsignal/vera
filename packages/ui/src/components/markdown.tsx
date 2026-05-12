@@ -14,6 +14,10 @@ export interface MarkdownProps {
   components: Partial<Components>;
 }
 
+function escapeCurrencyDollarSigns(text: string): string {
+  return text.replace(/\$(?=\d)/g, "\\$");
+}
+
 function parseMarkdownIntoBlocks(markdown: string): string[] {
   const tokens = marked.lexer(markdown);
   return tokens.map((token) => token.raw);
@@ -33,7 +37,7 @@ const MemoizedMarkdownBlock = memo(
         rehypePlugins={[rehypeKatex]}
         components={components}
       >
-        {content}
+        {escapeCurrencyDollarSigns(content)}
       </ReactMarkdown>
     );
   },
