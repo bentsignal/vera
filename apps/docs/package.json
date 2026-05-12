@@ -9,7 +9,7 @@
     "dev:app": "next dev --turbo",
     "start": "next start",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "clean": "git clean -xdf node_modules .next .source .turbo .cache",

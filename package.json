@@ -27,6 +27,7 @@
     "@acme/prettier-config": "workspace:*",
     "@effect/language-service": "0.85.1",
     "@turbo/gen": "2.8.17",
+    "@typescript/native-preview": "catalog:",
     "dotenv-cli": "10.0.0",
     "portless": "^0.12.0",
     "prettier": "catalog:",

@@ -39,7 +39,7 @@
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "fomat:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
     "setup": "convex dev --until-success",
     "logs": "convex logs"
   },
