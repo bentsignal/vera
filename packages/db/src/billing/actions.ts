@@ -30,39 +30,37 @@ export const syncProducts = internalAction({
   handler: async (ctx) => {
     const polar = getPolarClient();
 
-    const allProducts = [];
-    const pages = await polar.products.list({});
+    const existingByName = new Map<string, string>();
+    const pages = await polar.products.list({ isArchived: false });
     for await (const page of pages) {
-      allProducts.push(
-        ...page.result.items.map((p) => ({ id: p.id, name: p.name })),
-      );
+      for (const p of page.result.items) {
+        existingByName.set(p.name, p.id);
+      }
     }
-    const existingByName = new Map(allProducts.map((p) => [p.name, p]));
+    console.log(
+      "[SYNC] Polar products found:",
+      Object.fromEntries(existingByName),
+    );
 
     for (const name of PURCHASABLE_PLANS) {
       const def = PLANS[name];
       const match = existingByName.get(name);
 
       if (match) {
+        console.log(`[SYNC] ${name}: updating existing product ${match}`);
         await polar.products.update({
-          id: match.id,
+          id: match,
           productUpdate: {
             name,
             description: def.description ?? undefined,
-            prices: [
-              {
-                amountType: "fixed",
-                priceAmount: def.price,
-                priceCurrency: "usd",
-              },
-            ],
           },
         });
         await ctx.runMutation(internal.billing.mutations.upsertPolarProduct, {
           planName: name,
-          polarProductId: match.id,
+          polarProductId: match,
         });
       } else {
+        console.log(`[SYNC] ${name}: creating new product`);
         const created = await polar.products.create({
           name,
           description: def.description ?? undefined,
@@ -75,6 +73,7 @@ export const syncProducts = internalAction({
             },
           ],
         });
+        console.log(`[SYNC] ${name}: created with id ${created.id}`);
         await ctx.runMutation(internal.billing.mutations.upsertPolarProduct, {
           planName: name,
           polarProductId: created.id,
