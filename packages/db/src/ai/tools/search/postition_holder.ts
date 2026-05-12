@@ -2,15 +2,9 @@ import { z } from "zod";
 
 import type { SearchReturnType } from "./schemas";
 import { createTool } from "../../../agent/tools";
-import { kv } from "../../../kv";
 import { getCurrentDateTime } from "../../../lib/date_time_utils";
 import { tryCatch } from "../../../lib/utils";
-import {
-  exaSearchAndContents,
-  formatCacheKey,
-  logSearchCost,
-} from "../tool_helpers";
-import { CachedSourceSchema } from "./schemas";
+import { exaSearchAndContents, logSearchCost } from "../tool_helpers";
 
 const NUM_RESULTS = 5;
 const MAX_CHARACTERS = 3000;
@@ -59,23 +53,6 @@ export const positionHolder = createTool({
       ),
   }),
   execute: async (ctx, args): Promise<SearchReturnType> => {
-    // check cache
-    const cacheKey = formatCacheKey("position-holder", [
-      args.position,
-      args.group,
-    ]);
-    const cachedData = await kv.get(cacheKey);
-    const cachedResult = await CachedSourceSchema.safeParseAsync(cachedData);
-    if (cachedResult.success) {
-      return {
-        sources: cachedResult.data.sources,
-        currentDateTime: {
-          timezone: "America/New_York",
-          dateTime: getCurrentDateTime({ timezone: "America/New_York" }),
-        },
-      };
-    }
-
     const { data: response, error: responseError } = await tryCatch(
       exaSearchAndContents(args.query, {
         numResults: NUM_RESULTS,
@@ -101,15 +78,6 @@ export const positionHolder = createTool({
       favicon: result.favicon,
       image: result.image,
     }));
-
-    // write to cache
-    await kv.set(
-      cacheKey,
-      {
-        sources,
-      },
-      { ex: 60 * 60 }, // 1 hour
-    );
 
     const dateTime = getCurrentDateTime({
       timezone: "America/New_York",

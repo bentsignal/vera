@@ -5,13 +5,11 @@ import {
   polar,
   resend,
   uploadthing,
-  upstash,
 } from "convex-env/presets";
 import { v } from "convex/values";
 
 export const env = createEnv({
   ...environment,
-  ...upstash,
   ...uploadthing,
   ...resend,
   ...polar,
