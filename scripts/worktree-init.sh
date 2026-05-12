@@ -47,13 +47,29 @@ rm -f "$TEMP_ENV"
 
 cd "$NEW_WT"
 
-# Update root .env with the new deployment's URL
+# Propagate all Convex env vars from packages/db/.env.local to root .env
+# The apps load server-side vars (CONVEX_DEPLOYMENT, CONVEX_DEPLOY_KEY) from root .env via with-env
+update_root_env() {
+  local key="$1" val="$2" target_key="${3:-$1}"
+  if [ -z "$val" ]; then return; fi
+  if grep -q "^${target_key}=" .env; then
+    sed -i '' "s|^${target_key}=.*|${target_key}=${val}|" .env
+  else
+    printf '%s=%s\n' "$target_key" "$val" >> .env
+  fi
+  echo "updated $target_key"
+}
+
 NEW_URL="$(grep '^CONVEX_URL=' packages/db/.env.local | cut -d= -f2-)"
-if [ -z "$NEW_URL" ]; then
-  echo "Could not find CONVEX_URL in packages/db/.env.local" >&2
-else
-  sed -i '' "s|^VITE_CONVEX_URL=.*|VITE_CONVEX_URL=$NEW_URL|" .env
-  echo "updated VITE_CONVEX_URL to $NEW_URL"
+NEW_DEPLOYMENT="$(grep '^CONVEX_DEPLOYMENT=' packages/db/.env.local | cut -d= -f2-)"
+NEW_DEPLOY_KEY="$(grep '^CONVEX_DEPLOY_KEY=' packages/db/.env.local | cut -d= -f2-)"
+
+update_root_env CONVEX_URL "$NEW_URL" VITE_CONVEX_URL
+update_root_env CONVEX_DEPLOYMENT "$NEW_DEPLOYMENT"
+update_root_env CONVEX_DEPLOY_KEY "$NEW_DEPLOY_KEY"
+
+if [ -z "$NEW_URL" ] && [ -z "$NEW_DEPLOYMENT" ]; then
+  echo "WARNING: Could not find CONVEX_URL or CONVEX_DEPLOYMENT in packages/db/.env.local" >&2
 fi
 
 # Sync products to the new deployment's database
