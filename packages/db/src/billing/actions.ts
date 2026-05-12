@@ -37,17 +37,12 @@ export const syncProducts = internalAction({
         existingByName.set(p.name, p.id);
       }
     }
-    console.log(
-      "[SYNC] Polar products found:",
-      Object.fromEntries(existingByName),
-    );
 
     for (const name of PURCHASABLE_PLANS) {
       const def = PLANS[name];
       const match = existingByName.get(name);
 
       if (match) {
-        console.log(`[SYNC] ${name}: updating existing product ${match}`);
         await polar.products.update({
           id: match,
           productUpdate: {
@@ -60,7 +55,6 @@ export const syncProducts = internalAction({
           polarProductId: match,
         });
       } else {
-        console.log(`[SYNC] ${name}: creating new product`);
         const created = await polar.products.create({
           name,
           description: def.description ?? undefined,
@@ -73,7 +67,6 @@ export const syncProducts = internalAction({
             },
           ],
         });
-        console.log(`[SYNC] ${name}: created with id ${created.id}`);
         await ctx.runMutation(internal.billing.mutations.upsertPolarProduct, {
           planName: name,
           polarProductId: created.id,
