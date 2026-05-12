@@ -46,14 +46,13 @@ rm -f "$TEMP_ENV"
 
 cd "$NEW_WT"
 
-# Update root .env with the new deployment's URL
-NEW_URL="$(grep '^CONVEX_URL=' packages/db/.env.local | cut -d= -f2-)"
-if [ -z "$NEW_URL" ]; then
-  echo "Could not find CONVEX_URL in packages/db/.env.local" >&2
-else
-  sed -i '' "s|^VITE_CONVEX_URL=.*|VITE_CONVEX_URL=$NEW_URL|" .env
-  echo "updated VITE_CONVEX_URL to $NEW_URL"
-fi
+# Derive the new deployment URL from CONVEX_DEPLOYMENT
+# --select reliably updates CONVEX_DEPLOYMENT but CONVEX_URL may stay stale
+NEW_DEPLOYMENT="$(grep '^CONVEX_DEPLOYMENT=' packages/db/.env.local | cut -d= -f2-)"
+SLUG="${NEW_DEPLOYMENT#*:}"
+NEW_URL="https://${SLUG}.convex.cloud"
+sed -i '' "s|^VITE_CONVEX_URL=.*|VITE_CONVEX_URL=$NEW_URL|" .env
+echo "updated VITE_CONVEX_URL to $NEW_URL"
 
 # Push schema and functions to the new deployment, then sync products
 pnpm --filter @acme/db run setup
