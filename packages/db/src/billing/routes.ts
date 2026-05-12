@@ -17,6 +17,17 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+function corsAction(handler: Parameters<typeof httpAction>[0]) {
+  return httpAction(async (ctx, req) => {
+    try {
+      return await handler(ctx, req);
+    } catch (error) {
+      console.error(`[HTTP] ${req.url} failed:`, error);
+      return jsonResponse({ error: "Internal server error" }, 500);
+    }
+  });
+}
+
 export const preflightHandler = httpAction(() =>
   Promise.resolve(new Response(null, { status: 204, headers: CORS_HEADERS })),
 );
@@ -45,7 +56,7 @@ export const webhookHandler = httpAction(async (ctx, req) => {
   return new Response("OK", { status: 200 });
 });
 
-export const checkoutHandler = httpAction(async (ctx, req) => {
+export const checkoutHandler = corsAction(async (ctx, req) => {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return jsonResponse({ error: "Unauthorized" }, 401);
 
@@ -76,16 +87,28 @@ export const checkoutHandler = httpAction(async (ctx, req) => {
   if (existing) {
     polarCustomerId = existing.polarCustomerId;
   } else {
-    const newCustomer = await polar.customers.create({
-      email: identity.email ?? "",
-      metadata: { userId: identity.subject },
-    });
+    const email = identity.email ?? "";
+    let customerId: string;
+    try {
+      const newCustomer = await polar.customers.create({
+        email,
+        metadata: { userId: identity.subject },
+      });
+      customerId = newCustomer.id;
+    } catch {
+      const { result } = await polar.customers.list({ email, page: 1 });
+      const existing = result.items.at(0);
+      if (!existing) {
+        throw new Error("Customer not found after create conflict");
+      }
+      customerId = existing.id;
+    }
     await ctx.runMutation(internal.billing.mutations.upsertCustomer, {
       userId: identity.subject,
-      polarCustomerId: newCustomer.id,
-      email: identity.email ?? "",
+      polarCustomerId: customerId,
+      email,
     });
-    polarCustomerId = newCustomer.id;
+    polarCustomerId = customerId;
   }
 
   const session = await polar.checkouts.create({
@@ -97,7 +120,7 @@ export const checkoutHandler = httpAction(async (ctx, req) => {
   return jsonResponse({ url: session.url });
 });
 
-export const customerPortalHandler = httpAction(async (ctx, _req) => {
+export const customerPortalHandler = corsAction(async (ctx, _req) => {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return jsonResponse({ error: "Unauthorized" }, 401);
 
@@ -117,7 +140,7 @@ export const customerPortalHandler = httpAction(async (ctx, _req) => {
   return jsonResponse({ url: session.customerPortalUrl });
 });
 
-export const planSyncHandler = httpAction(async (ctx, _req) => {
+export const planSyncHandler = corsAction(async (ctx, _req) => {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return jsonResponse({ error: "Unauthorized" }, 401);
 
