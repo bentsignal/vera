@@ -18,9 +18,9 @@ interface Plan {
 
 // IMPORTANT: This object should be the source of truth for plan data. You should
 // NOT EVER make changes to plan data inside the polar dashboard. You can use
-// billing/actions:syncProducts to sync this object with Polar. It will run at build
-// time in production, but you have to do it manually in dev. There should be a script
-// in package.json to do it in dev.
+// billing/actions:syncProducts to sync this object with Polar,. It will run at build
+// time in production, but you have to do it manually in dev. There is a script in
+// package.json to run it.
 export const PLANS = {
   Free: {
     tier: 0,
