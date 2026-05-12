@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 import { agentTables } from "./agent/schema";
+import { vPlanName } from "./billing/plans";
 
 export default defineSchema(
   {
@@ -47,6 +48,31 @@ export default defineSchema(
     suggestions: defineTable({
       prompt: v.string(),
     }),
+    products: defineTable({
+      planName: vPlanName,
+      polarProductId: v.string(),
+    })
+      .index("by_plan_name", ["planName"])
+      .index("by_polar_product_id", ["polarProductId"]),
+    customers: defineTable({
+      userId: v.string(),
+      polarCustomerId: v.string(),
+      email: v.string(),
+    })
+      .index("by_user_id", ["userId"])
+      .index("by_polar_id", ["polarCustomerId"]),
+    subscriptions: defineTable({
+      userId: v.string(),
+      planName: vPlanName,
+      polarSubscriptionId: v.string(),
+      polarCustomerId: v.string(),
+      status: v.string(),
+      currentPeriodEnd: v.number(),
+      cancelAtPeriodEnd: v.boolean(),
+      lastSynced: v.number(),
+    })
+      .index("by_user_id", ["userId"])
+      .index("by_polar_customer_id", ["polarCustomerId"]),
   },
   { schemaValidation: true },
 );

@@ -3,8 +3,8 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { v } from "convex/values";
 
+import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
-import { polar } from "../polar";
 
 export const deleteUser = internalAction({
   args: {
@@ -13,14 +13,10 @@ export const deleteUser = internalAction({
   handler: async (ctx, args) => {
     const { userId } = args;
 
-    // delete customer
-    const customer = await polar.getCustomerByUserId(ctx, userId);
-    if (!customer) {
-      throw new Error("No customer found");
-    }
-    await polar.sdk.customers.delete({ id: customer.id });
+    await ctx.runAction(internal.billing.actions.deleteCustomerAction, {
+      userId,
+    });
 
-    // delete user from clerk
     const clerk = await clerkClient();
     await clerk.users.deleteUser(userId);
   },

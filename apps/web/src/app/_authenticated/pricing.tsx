@@ -1,14 +1,15 @@
+import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckoutLink, CustomerPortalLink } from "@convex-dev/polar/react";
+import { useAuth } from "@clerk/tanstack-react-start";
 import ReactMarkdown from "react-markdown";
 
-import { api } from "@acme/db/api";
 import { billingQueries } from "@acme/features/billing";
 import { Button } from "@acme/ui/button";
 import * as Card from "@acme/ui/card";
 
 import { markdownComponents } from "~/features/messages/components/markdown-components";
+import { createCheckoutUrl, getCustomerPortalUrl } from "~/lib/billing";
 import { cn } from "~/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/pricing")({
@@ -56,12 +57,17 @@ function formatPrice(price: number, period: Product["period"]) {
 
 function ProductCard({
   product,
-  showUpgrade,
+  showCheckout,
+  onCheckout,
+  loading,
 }: {
   product: Product;
-  showUpgrade: boolean;
+  showCheckout: boolean;
+  onCheckout: (productId: string) => void;
+  loading: boolean;
 }) {
   const style = getPlanStyle(product.name);
+
   return (
     <Card.Card className={cn("w-full max-w-96 xl:w-96", style?.border)}>
       <Card.CardHeader className="sr-only">
@@ -81,16 +87,14 @@ function ProductCard({
             {product.description}
           </ReactMarkdown>
         </div>
-        {product.price !== 0 && showUpgrade && (
-          <CheckoutLink
-            polarApi={{
-              generateCheckoutLink: api.polar.generateCheckoutLink,
-            }}
-            productIds={[product.id]}
-            embed={false}
+        {product.price !== 0 && showCheckout && (
+          <Button
+            className="w-full"
+            onClick={() => onCheckout(product.id)}
+            disabled={loading}
           >
-            <Button className="w-full">Upgrade</Button>
-          </CheckoutLink>
+            Upgrade
+          </Button>
         )}
       </Card.CardContent>
     </Card.Card>
@@ -131,25 +135,51 @@ export function PricingCards() {
     ...billingQueries.currentPlan(),
     select: (data) => data,
   });
+  const { getToken } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  async function handleCheckout(productId?: string) {
+    setLoading(true);
+    const token = await getToken({ template: "convex" });
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    const url = await createCheckoutUrl(token, productId);
+    setLoading(false);
+    if (url) location.assign(url);
+  }
+
+  async function handleManageSubscription() {
+    setLoading(true);
+    const token = await getToken({ template: "convex" });
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    const url = await getCustomerPortalUrl(token);
+    setLoading(false);
+    if (url) location.assign(url);
+  }
+
+  const hasPlan = myPlan.name !== "Free";
 
   return (
     <div className="my-8 flex min-h-screen w-full flex-col items-center justify-center gap-4 xl:my-0">
       <span className="text-2xl font-bold">Pricing</span>
-      {myPlan.name !== "Free" ? (
+      {hasPlan ? (
         <div className="flex min-h-20 flex-col items-center gap-2">
           <span>
             Current plan:{" "}
             <span className="text-primary font-bold">{myPlan.name}</span>
           </span>
-          <CustomerPortalLink
-            polarApi={{
-              generateCustomerPortalUrl: api.polar.generateCustomerPortalUrl,
-            }}
+          <Button
+            className="animate-in fade-in duration-300"
+            onClick={handleManageSubscription}
+            disabled={loading}
           >
-            <Button className="animate-in fade-in duration-300">
-              Manage subscription
-            </Button>
-          </CustomerPortalLink>
+            Manage subscription
+          </Button>
         </div>
       ) : (
         <span className="text-muted-foreground mb-2">
@@ -162,7 +192,9 @@ export function PricingCards() {
             <ProductCard
               key={plan.id}
               product={plan}
-              showUpgrade={plan.name === "Free"}
+              showCheckout={!hasPlan}
+              onCheckout={handleCheckout}
+              loading={loading}
             />
           ))}
         </div>

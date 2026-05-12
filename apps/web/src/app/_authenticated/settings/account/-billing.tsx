@@ -1,44 +1,47 @@
+import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { CheckoutLink, CustomerPortalLink } from "@convex-dev/polar/react";
+import { useAuth } from "@clerk/tanstack-react-start";
 
-import { api } from "@acme/db/api";
 import { billingQueries } from "@acme/features/billing";
 import { Button } from "@acme/ui/button";
 
 import { InfoCard } from "~/components/info-card";
 import { QuickLink as Link } from "~/features/quick-link/quick-link";
+import { createCheckoutUrl, getCustomerPortalUrl } from "~/lib/billing";
 
-function useBilling() {
-  const { data: allPlans } = useSuspenseQuery({
-    ...billingQueries.listAllProducts(),
-    select: (data) =>
-      data.map((plan) => ({
-        id: plan.id,
-        name: plan.name,
-        description: plan.description,
-        prices: plan.prices,
-        isArchived: plan.isArchived,
-      })),
-  });
+export function Billing() {
   const { data: usersPlan } = useSuspenseQuery({
     ...billingQueries.currentPlan(),
     select: (data) => data,
   });
+  const { getToken } = useAuth();
+  const [loading, setLoading] = useState(false);
 
-  const plans = allPlans
-    .filter((plan) => plan.isArchived === false)
-    .map((plan) => ({
-      id: plan.id,
-      name: plan.name,
-      description: plan.description ?? "",
-      price: plan.prices[0]?.priceAmount ?? 0,
-    }));
+  async function handleUpgrade() {
+    setLoading(true);
+    const token = await getToken({ template: "convex" });
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    const url = await createCheckoutUrl(token);
+    setLoading(false);
+    if (url) location.assign(url);
+  }
 
-  return { plans, usersPlan };
-}
+  async function handleManage() {
+    setLoading(true);
+    const token = await getToken({ template: "convex" });
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    const url = await getCustomerPortalUrl(token);
+    setLoading(false);
+    if (url) location.assign(url);
+  }
 
-export function Billing() {
-  const { plans, usersPlan } = useBilling();
+  const hasPlan = usersPlan.name !== "Free";
 
   return (
     <InfoCard title="Billing">
@@ -51,24 +54,14 @@ export function Billing() {
           <Link to="/pricing">
             <Button variant="outline">View plans</Button>
           </Link>
-          {usersPlan.name === "Free" ? (
-            <CheckoutLink
-              polarApi={{
-                generateCheckoutLink: api.polar.generateCheckoutLink,
-              }}
-              productIds={plans.map((product) => product.id)}
-              embed={false}
-            >
-              <Button>Upgrade</Button>
-            </CheckoutLink>
+          {hasPlan ? (
+            <Button onClick={handleManage} disabled={loading}>
+              Manage subscription
+            </Button>
           ) : (
-            <CustomerPortalLink
-              polarApi={{
-                generateCustomerPortalUrl: api.polar.generateCustomerPortalUrl,
-              }}
-            >
-              <Button>Manage subscription</Button>
-            </CustomerPortalLink>
+            <Button onClick={handleUpgrade} disabled={loading}>
+              Upgrade
+            </Button>
           )}
         </div>
       </div>

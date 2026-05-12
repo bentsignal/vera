@@ -12,8 +12,8 @@ import { vStreamArgs } from "../../agent/validators";
 import { getPublicFile } from "../../app/file_helpers";
 import { authedQuery } from "../../convex_helpers";
 import { tryCatch } from "../../lib/utils";
-import { usageCheckedMutation } from "../../usage_checked_helpers";
 import { getPerferredModelIfAllowed } from "../../user/info";
+import { usageCheckedMutation } from "../../user/usage";
 import { ErrorCode } from "../stream/error_codes";
 import { emitThreadEvent, generateGenerationId } from "./events";
 import {

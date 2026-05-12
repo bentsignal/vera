@@ -1,7 +1,5 @@
 # AGENTS.md
 
-Guidance for coding agents working in `/Users/shawn/dev/projects/start-faster`.
-
 ## Repository Summary
 
 - AI chat app

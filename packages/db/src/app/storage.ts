@@ -8,9 +8,9 @@ import { v } from "convex/values";
 
 import type { DataModel } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import type { Plan } from "../user/subscription";
 import { components } from "../_generated/api";
 import { internalMutation, mutation } from "../_generated/server";
+import { PLANS } from "../billing/plans";
 import {
   apiMutation,
   authedMutation,
@@ -20,17 +20,6 @@ import {
 import { limiter } from "../limiter";
 import { getUserPlanHelper } from "../user/subscription";
 
-const GB = 1024 * 1024 * 1024;
-
-const storageLimits = {
-  Free: 0 * GB,
-  Light: 5 * GB,
-  Premium: 20 * GB,
-  Ultra: 50 * GB,
-  Unlimited: 100 * GB,
-} satisfies Record<Plan["name"], number>;
-
-// this table stores the total storage used by each user
 export const storage = new TableAggregate<{
   Namespace: string;
   Key: number;
@@ -42,12 +31,6 @@ export const storage = new TableAggregate<{
   sumValue: (doc) => doc.size,
 });
 
-/*
-
-  These custom mutations cause the aggregate table above to be updated.
-  The aggregate table will not be updated if a normal mutation is used.
-
-*/
 const triggers = new Triggers<DataModel>();
 triggers.register("files", storage.trigger());
 
@@ -80,12 +63,9 @@ export async function getStorageHelper(
   ctx: QueryCtx | MutationCtx,
   userId: string,
 ) {
-  // how much storage a user is allowed to user, based
-  // on their subscription tier
   const plan = await getUserPlanHelper(ctx, userId);
-  const storageLimit = storageLimits[plan.name];
+  const storageLimit = PLANS[plan.name].storageLimit;
 
-  // how much storage the user has actually used
   const bounds = {
     lower: { key: 0, inclusive: true },
     upper: { key: Date.now(), inclusive: true },
@@ -101,10 +81,6 @@ export async function getStorageHelper(
   };
 }
 
-/**
- * Called by uploadthing middleware (core.ts) to verify that the
- * user is allowed to upload.
- */
 export const verifyUpload = apiMutation({
   args: {
     userId: v.string(),
@@ -114,7 +90,6 @@ export const verifyUpload = apiMutation({
   handler: async (ctx, args) => {
     const { userId, payloadSize } = args;
 
-    // make sure user is not uploading too fast
     const { ok } = await limiter.limit(ctx, "upload", {
       key: userId,
     });
@@ -125,7 +100,6 @@ export const verifyUpload = apiMutation({
       };
     }
 
-    // make sure user is not exceeding their storage limit
     const { storageUsed, storageLimit } = await getStorageHelper(ctx, userId);
     if (storageUsed + payloadSize >= storageLimit) {
       return {

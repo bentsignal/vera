@@ -3,28 +3,30 @@ import { TableAggregate } from "@convex-dev/aggregate";
 import {
   customCtx,
   customMutation,
+  customQuery,
 } from "convex-helpers/server/customFunctions";
 import { Triggers } from "convex-helpers/server/triggers";
 import { v } from "convex/values";
 
 import type { DataModel } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { LanguageModel } from "../ai/models/types";
 import type { Plan } from "../user/subscription";
 import { components } from "../_generated/api";
-import { internalMutation, mutation } from "../_generated/server";
+import { internalMutation, mutation, query } from "../_generated/server";
 import { modelPresets } from "../ai/models/presets";
 import {
   GatewayProviderMetadata,
   OpenRouterProviderMetadata,
 } from "../ai/models/types";
-import { authedQuery, checkApiKey, checkAuth } from "../convex_helpers";
-import * as timeHelpers from "../lib/date_time_utils";
 import {
   ALLOWED_USAGE_PERCENTAGE,
   FREE_TIER_MAX_USAGE,
-  getUserPlanHelper,
-} from "../user/subscription";
+} from "../billing/plans";
+import { authedQuery, checkApiKey, checkAuth } from "../convex_helpers";
+import * as timeHelpers from "../lib/date_time_utils";
+import { getUserPlanHelper } from "../user/subscription";
+import { getUserInfoHelper } from "./info";
 
 const UsageType = v.union(
   v.literal("message"),
@@ -46,10 +48,6 @@ export const usage = new TableAggregate<{
 const triggers = new Triggers<DataModel>();
 triggers.register("usage", usage.trigger());
 
-// use these mutation types when logging usage, otherwise
-// the aggregate won't be updated. Don't use them for
-// deleting messages though, since we don't want to erase the
-// usage incurred by messages, even if they're deleted
 const usageTriggerInternalMutation = customMutation(
   internalMutation,
   customCtx(triggers.wrapDB),
@@ -67,14 +65,9 @@ const apiAuthedUsageTriggerMutation = customMutation(mutation, {
   },
 });
 
-export async function getUsageHelper(
-  ctx: QueryCtx,
-  userId: string,
-  plan?: Plan,
-) {
+async function getUsageHelper(ctx: QueryCtx, userId: string, plan?: Plan) {
   const resolvedPlan = plan ?? (await getUserPlanHelper(ctx, userId));
 
-  // free tier gets set amount per day, paid users get % of their price per month
   const limit =
     resolvedPlan.price === 0
       ? FREE_TIER_MAX_USAGE
@@ -117,9 +110,6 @@ export function calculateModelCost({
   usage: LanguageModelUsage;
   providerMetadata?: Record<string, Record<string, unknown>>;
 }) {
-  // attempt to get exact cost from provider metadata. if not available,
-  // calculate cost based on usage and model pricing. this fallback will
-  // not account for cached token discounts, but its better than nothing.
   const openRouterMetadata =
     OpenRouterProviderMetadata.safeParse(providerMetadata);
   if (openRouterMetadata.success) {
@@ -174,3 +164,29 @@ export const getUsage = authedQuery({
     return usage;
   },
 });
+
+// Pre-fetches userPlan, userInfo, and usage so helpers in the call graph can
+// read them from ctx instead of re-running `getUserPlanHelper` (and its
+// Polar + hasUnlimitedAccess reads) multiple times per invocation. Use this
+// only for hot paths that actually need all three fields (sendMessage, create);
+// cheaper mutations should stay on `authedMutation`.
+async function buildUsageCheckedCtx(ctx: QueryCtx | MutationCtx) {
+  const user = await checkAuth(ctx);
+  const userId = user.subject;
+  const [userPlan, userInfo] = await Promise.all([
+    getUserPlanHelper(ctx, userId),
+    getUserInfoHelper(ctx, userId),
+  ]);
+  const usage = await getUsageHelper(ctx, userId, userPlan);
+  return { user, userPlan, userInfo, usage };
+}
+
+export const usageCheckedMutation = customMutation(
+  mutation,
+  customCtx(buildUsageCheckedCtx),
+);
+
+export const usageCheckedQuery = customQuery(
+  query,
+  customCtx(buildUsageCheckedCtx),
+);

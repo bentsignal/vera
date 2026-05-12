@@ -14,6 +14,6 @@ export const billingQueries = {
     }),
   listAllProducts: () =>
     queryOptions({
-      ...convexQuery(api.polar.listAllProducts, {}),
+      ...convexQuery(api.billing.queries.listProducts, {}),
     }),
 };

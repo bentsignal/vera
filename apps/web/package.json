@@ -21,7 +21,6 @@
     "@acme/ui": "workspace:*",
     "@clerk/tanstack-react-start": "catalog:",
     "@clerk/themes": "catalog:",
-    "@convex-dev/polar": "catalog:",
     "@convex-dev/react-query": "catalog:",
     "@fal-ai/client": "catalog:",
     "@fal-ai/server-proxy": "catalog:",

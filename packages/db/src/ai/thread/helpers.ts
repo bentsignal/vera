@@ -11,7 +11,7 @@ import type {
   SystemError,
 } from "../../agent/validators";
 import type { authedMutation, authedQuery } from "../../convex_helpers";
-import type { usageCheckedMutation } from "../../usage_checked_helpers";
+import type { usageCheckedMutation } from "../../user/usage";
 import type { NoticeCode } from "../stream/notice_codes";
 import { saveMessage } from "../../../lib/agent-client";
 import { addMessagesHandler } from "../../agent/handlers/add_messages";

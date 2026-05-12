@@ -3,8 +3,8 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../../_generated/api";
 import { authedMutation } from "../../convex_helpers";
 import { tryCatch } from "../../lib/utils";
-import { usageCheckedMutation } from "../../usage_checked_helpers";
 import { getPerferredModelIfAllowed } from "../../user/info";
+import { usageCheckedMutation } from "../../user/usage";
 import { ErrorCode } from "../stream/error_codes";
 import { emitThreadEvent, generateGenerationId } from "./events";
 import {

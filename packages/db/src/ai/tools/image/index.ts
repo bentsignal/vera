@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { internal } from "../../../_generated/api";
 import { createTool } from "../../../agent/tools";
-import { PlanTier } from "../../../user/subscription";
+import { PLANS } from "../../../billing/plans";
 import { zAspectRatio } from "./types";
 
 interface InitImageResult {
@@ -67,7 +67,7 @@ export const generateImage = createTool({
     const plan = await ctx.runQuery(internal.user.subscription.getPlanTier, {
       userId: ctx.userId,
     });
-    if (plan < PlanTier.Premium) {
+    if (plan < PLANS.Premium.tier) {
       return {
         key: "You must be a premium or ultra user to generate images.",
       };
@@ -125,7 +125,7 @@ export const editImage = createTool({
     const plan = await ctx.runQuery(internal.user.subscription.getPlanTier, {
       userId: ctx.userId,
     });
-    if (plan < PlanTier.Premium) {
+    if (plan < PLANS.Premium.tier) {
       return {
         key: "You must be a premium or ultra user to generate images.",
       };
