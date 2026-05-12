@@ -48,10 +48,13 @@ cd "$NEW_WT"
 
 # Derive the new deployment URL from CONVEX_DEPLOYMENT
 # --select reliably updates CONVEX_DEPLOYMENT but CONVEX_URL may stay stale
-NEW_DEPLOYMENT="$(grep '^CONVEX_DEPLOYMENT=' packages/db/.env.local | cut -d= -f2-)"
+# Strip trailing comments/metadata (e.g. "dev:slug # team: X, project: Y")
+NEW_DEPLOYMENT="$(grep '^CONVEX_DEPLOYMENT=' packages/db/.env.local | cut -d= -f2- | awk '{print $1}')"
 SLUG="${NEW_DEPLOYMENT#*:}"
 NEW_URL="https://${SLUG}.convex.cloud"
+sed -i '' "s|^CONVEX_DEPLOYMENT=.*|CONVEX_DEPLOYMENT=$NEW_DEPLOYMENT|" .env
 sed -i '' "s|^VITE_CONVEX_URL=.*|VITE_CONVEX_URL=$NEW_URL|" .env
+echo "updated CONVEX_DEPLOYMENT to $NEW_DEPLOYMENT"
 echo "updated VITE_CONVEX_URL to $NEW_URL"
 
 # Push schema and functions to the new deployment, then sync products
