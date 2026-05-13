@@ -1,0 +1,42 @@
+---
+title: Finishing up
+description: Everything else you need to get the app running
+---
+
+## Setting up remaining dependencies
+
+You will need to set up accounts for the following services. All of these services offer either generous free tiers, or usage based pricing. The Convex and Next environments will
+need various API keys from each of them. See [the environment variables section](/getting-started/env) for more information on configuring Next and Convex environment variables.
+
+- [OpenAI](https://platform.openai.com/)
+- [Exa](https://exa.ai/)
+- [Fal](https://fal.ai/)
+- [Google](https://console.cloud.google.com/)
+- [Open Router](https://openrouter.ai/)
+- [Resend](https://resend.com/)
+- [Upstash](https://upstash.com/)
+- [UploadThing](https://uploadthing.com/)
+
+## Running the app locally
+
+Now that we've set up all of the remaining dependencies, we should be able to start the dev server. Go ahead and run:
+
+```bash
+pnpm run dev
+```
+
+This will start the Next.js development server, as well as the listener which will automatically deploy changes to the Convex development
+server as you make changes.
+
+Once the server is running, you should be able to access the app locally at `http://localhost:3000`.
+
+## Generating suggestions
+
+Once you get the app running, you will notice a large blank space in the center of the home screen. This is where the daily suggestions will be
+displayed. They're set to update every day at noon UTC (see `./convex/crons.ts`). To generate them manually, you can run the function `ai/suggestions:generate`
+from the Convex dashboard.
+
+## Deploying to production
+
+When any changes are detected on the `main` branch of your repository, Vercel will automatically create and deploy a new production build. Part of this build process includes deploying
+the latest changes to the Convex production server.

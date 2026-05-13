@@ -1,0 +1,73 @@
+---
+title: Setting up billing
+description: How to set up billing with Polar
+---
+
+import { LinkCard } from "@astrojs/starlight/components";
+
+## Overview
+
+This project is configured to use [Polar](https://polar.sh/) for managing billing for user subscriptions. The subscriptions are integrated through the Convex Polar component, so you
+shouldn't need to do much to the Next app to get things working.
+
+If you run into any issues, refer to the offical documentation provided by Convex.
+
+<LinkCard
+  title="Convex Polar Quickstart"
+  href="https://www.convex.dev/components/polar"
+/>
+
+## Setup
+
+**IMPORTANT**: You'll want to perform the setup on [sandbox.polar.sh](https://sandbox.polar.sh/) for development and [polar.sh](https://polar.sh/) for production.
+
+1. Login or sign up for a [Polar](https://polar.sh/) account
+2. Create a new organization. Skip the next js instructions they give you during onboarding.
+3. Create a new organization token with the following permissions:
+   - products:read
+   - products:write
+   - subscriptions:read
+   - subscriptions:write
+   - customers:read
+   - customers:write
+   - checkouts:read
+   - checkouts:write
+   - checkout_links:read
+   - checkout_links:write
+   - customer_portal:read
+   - customer_portal:write
+   - customer_sessions:write
+4. Set the following environment variables in Convex:
+   ```
+   POLAR_ORGANIZATION_TOKEN=<your-organization-token>
+   POLAR_SERVER=<production or sandbox>
+   ```
+5. Create your products in Polar
+
+   The app is configured to use the following three monthly subscriptions:
+   - **Light**: $4 / month
+   - **Premium**: $8 / month
+   - **Ultra**: $16 / month
+
+   These must be created as products in the Polar dashboard. Any changes you make to them should also be made in `./convex/user/subscription.ts`.
+
+6. Create a webhook for polar events
+   1. Grab your convex HTTP actions URL from the Convex dashboard
+
+      `Settings -> URL & Deploy Key`
+
+   2. In the Polar dashboard, go to
+
+      `Settings -> Webhooks -> Add endpoint`
+
+   3. Create a new endpoint:
+      - URL: `<your-convex-http-actions-url>/polar/events`
+      - Event type
+        - subscription.created
+        - subscription.updated
+        - product.created
+        - product.updated
+   4. Grab webhook secret from the Polar dashboard, and set it in the Convex environment variables.
+      ```bash
+      POLAR_WEBHOOK_SECRET=<your-webhook-secret>
+      ```

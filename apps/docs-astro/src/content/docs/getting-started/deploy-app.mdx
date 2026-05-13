@@ -1,0 +1,26 @@
+---
+title: Deploying the web app
+description: Getting the app live on Vercel
+---
+
+import { LinkCard } from "@astrojs/starlight/components";
+
+If you run into any trouble, refer to the official Next.js documentation.
+
+<LinkCard
+  title="Getting Started with Next.js"
+  href="https://nextjs.org/docs/app/getting-started"
+/>
+
+## Setup
+
+1. Login or sign up for a [Vercel](https://vercel.com/) account
+2. [Create a new project](https://vercel.com/new)
+3. Select your repository
+4. Override the build command to use the following:
+   ```bash
+   pnpx convex deploy --cmd='pnpm run build'
+   ```
+5. When you're ready, click **deploy**
+
+_Note_: The build should fail due to missing enviornment variables. This is expected, proceed on to the next step.

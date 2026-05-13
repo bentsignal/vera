@@ -1,0 +1,47 @@
+---
+title: Deploying the backend
+description: Getting set up with Convex
+---
+
+import { LinkCard } from "@astrojs/starlight/components";
+
+If you run into any trouble, refer to the official documentation from Convex.
+
+<LinkCard
+  title="Next.js Convex Quickstart"
+  href="https://docs.convex.dev/quickstart/nextjs"
+/>
+
+## Setup
+
+1. Login or sign up for a [Convex](https://www.convex.dev/) account
+2. Create a new project
+3. Install the Convex CLI
+   ```bash
+   pnpm add -g convex
+   ```
+4. Login to your Convex account
+   ```bash
+   pnpx convex login
+   ```
+5. Initialize your development environment
+
+   ```bash
+   pnpx convex dev
+   ```
+
+   _Note_: Make sure to choose the project you created in step 2
+
+   _Note_: This should fail due to missing environment variables. Once it fails, hit `Ctrl + C` to stop the server.
+
+6. Commit and push your changes
+
+7. Set production environment variables
+
+   Navigate to the project settings for your convex production deployment. You will need to generate a deployment key. Once you have this, set the following environment variables in the Vercel
+   dashboard.
+
+   ```
+   NEXT_PUBLIC_CONVEX_URL=<your-convex-deployment-url>
+   CONVEX_DEPLOYMENT=<your-deployment-key>
+   ```

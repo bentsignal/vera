@@ -1,0 +1,33 @@
+{
+  "name": "@acme/docs-astro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "dev": "portless",
+    "dev:app": "astro dev --host --port ${PORT:-4321}",
+    "start": "astro preview",
+    "lint": "echo 'no lint configured'",
+    "typecheck": "astro check",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "format:fix": "prettier --write . --ignore-path ../../.gitignore",
+    "clean": "git clean -xdf node_modules dist .astro .turbo"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/starlight": "^0.34.0",
+    "astro": "^5.8.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@acme/prettier-config": "workspace:*",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "portless": {
+    "name": "docs-astro.vera",
+    "script": "dev:app"
+  },
+  "prettier": "@acme/prettier-config"
+}
