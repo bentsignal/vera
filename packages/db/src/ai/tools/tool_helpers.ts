@@ -61,10 +61,3 @@ export async function logSearchCost(
     cost: totalCost,
   });
 }
-
-export function formatCacheKey(toolName: string, args: string[]) {
-  const formattedArgs = args.map((arg) =>
-    arg.replace(/[\s,]+/g, "-").toLowerCase(),
-  );
-  return `tool:${toolName}:${formattedArgs.join("_")}`;
-}

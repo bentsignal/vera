@@ -3,9 +3,7 @@ import { z } from "zod";
 import { internal } from "../../_generated/api";
 import { createTool } from "../../agent/tools";
 import { env } from "../../convex.env";
-import { kv } from "../../kv";
 import { tryCatch } from "../../lib/utils";
-import { formatCacheKey } from "./tool_helpers";
 
 const weatherArgs = z.object({
   location: z
@@ -77,19 +75,6 @@ function buildWeatherUrl(
   }
 }
 
-function getCacheTtl(queryType: QueryType) {
-  switch (queryType) {
-    case "current-conditions":
-      return 60 * 10; // 10 minutes
-    case "daily-forecast":
-      return 60 * 60; // 1 hour
-    case "hourly-forecast":
-      return 60 * 10; // 10 minutes
-    case "last-24-hours":
-      return 60 * 10; // 10 minutes
-  }
-}
-
 async function getCoordinates(location: string) {
   const geocodingResponse = await fetch(
     `https://maps.googleapis.com/maps/api/geocode/json?address=${location}&key=${env.GOOGLE_API_KEY}`,
@@ -118,19 +103,6 @@ export const weather = createTool({
   `,
   inputSchema: weatherArgs,
   execute: async (ctx, args) => {
-    // check cache
-    const cacheKey = formatCacheKey("weather", [
-      args.location,
-      args.queryType,
-      args.days.toString(),
-      args.unitSystem,
-    ]);
-    const cachedWeather = await kv.get(cacheKey);
-    if (cachedWeather) {
-      return cachedWeather;
-    }
-
-    // get lat and long for location
     const { data: coordinates, error: coordinatesError } = await tryCatch(
       getCoordinates(args.location),
     );
@@ -155,10 +127,6 @@ export const weather = createTool({
       );
       return null;
     }
-
-    // write to cache
-    const ttl = getCacheTtl(args.queryType);
-    await kv.set(cacheKey, weatherData, { ex: ttl });
 
     // log usage
     if (ctx.userId) {

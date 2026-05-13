@@ -58,7 +58,6 @@
     "@polar-sh/sdk": "catalog:",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.6",
-    "@upstash/redis": "^1.35.3",
     "ai": "catalog:",
     "convex": "catalog:",
     "convex-env": "^3.0.0",

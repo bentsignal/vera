@@ -9,9 +9,6 @@ export const SourceSchema = z.object({
   favicon: z.string().optional().nullable(),
   image: z.string().optional().nullable(),
 });
-export const CachedSourceSchema = z.object({
-  sources: z.array(SourceSchema),
-});
 export type Source = z.infer<typeof SourceSchema>;
 
 export type SearchReturnType = {

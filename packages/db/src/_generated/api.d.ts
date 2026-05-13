@@ -123,7 +123,6 @@ import type * as convex_helpers from "../convex_helpers.js";
 import type * as counter from "../counter.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
-import type * as kv from "../kv.js";
 import type * as lib_date_time_utils from "../lib/date_time_utils.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as limiter from "../limiter.js";
@@ -262,7 +261,6 @@ declare const fullApi: ApiFromModules<{
   counter: typeof counter;
   crons: typeof crons;
   http: typeof http;
-  kv: typeof kv;
   "lib/date_time_utils": typeof lib_date_time_utils;
   "lib/utils": typeof lib_utils;
   limiter: typeof limiter;
