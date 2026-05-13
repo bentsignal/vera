@@ -65,6 +65,11 @@ export function CustomAlert({
                 className="mt-2"
                 value={typeToConfirmValue}
                 onChange={(e) => setTypeToConfirmValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !disabled) {
+                    onConfirm();
+                  }
+                }}
               />
             </AlertDialogDescription>
           )}
