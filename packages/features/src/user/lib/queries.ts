@@ -16,8 +16,4 @@ export const userQueries = {
     queryOptions({
       ...convexQuery(api.user.subscription.showModelSelector, {}),
     }),
-  newsletterPreference: () =>
-    queryOptions({
-      ...convexQuery(api.mail.newsletter.getUserPreference, {}),
-    }),
 };
