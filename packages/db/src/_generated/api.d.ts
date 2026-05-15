@@ -107,6 +107,12 @@ import type * as ai_tools_search_postition_holder from "../ai/tools/search/posti
 import type * as ai_tools_search_schemas from "../ai/tools/search/schemas.js";
 import type * as ai_tools_tool_helpers from "../ai/tools/tool_helpers.js";
 import type * as ai_tools_weather from "../ai/tools/weather.js";
+import type * as ai_tools_x_get_user_posts from "../ai/tools/x/get_user_posts.js";
+import type * as ai_tools_x_helpers from "../ai/tools/x/helpers.js";
+import type * as ai_tools_x_lookup_post from "../ai/tools/x/lookup_post.js";
+import type * as ai_tools_x_lookup_user from "../ai/tools/x/lookup_user.js";
+import type * as ai_tools_x_search_posts from "../ai/tools/x/search_posts.js";
+import type * as ai_tools_x_search_posts_archive from "../ai/tools/x/search_posts_archive.js";
 import type * as app_actions from "../app/actions.js";
 import type * as app_file_helpers from "../app/file_helpers.js";
 import type * as app_library from "../app/library.js";
@@ -245,6 +251,12 @@ declare const fullApi: ApiFromModules<{
   "ai/tools/search/schemas": typeof ai_tools_search_schemas;
   "ai/tools/tool_helpers": typeof ai_tools_tool_helpers;
   "ai/tools/weather": typeof ai_tools_weather;
+  "ai/tools/x/get_user_posts": typeof ai_tools_x_get_user_posts;
+  "ai/tools/x/helpers": typeof ai_tools_x_helpers;
+  "ai/tools/x/lookup_post": typeof ai_tools_x_lookup_post;
+  "ai/tools/x/lookup_user": typeof ai_tools_x_lookup_user;
+  "ai/tools/x/search_posts": typeof ai_tools_x_search_posts;
+  "ai/tools/x/search_posts_archive": typeof ai_tools_x_search_posts_archive;
   "app/actions": typeof app_actions;
   "app/file_helpers": typeof app_file_helpers;
   "app/library": typeof app_library;
