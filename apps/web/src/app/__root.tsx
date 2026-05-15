@@ -7,7 +7,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { ReactScan } from "@/components/react-scan";
+// import { ReactScan } from "@/components/react-scan";
 import { clerkAuthQueryOptions } from "@/features/auth/auth-utils";
 import { ConvexClerkProvider } from "@/providers/convex-clerk-provider";
 import { ClerkProvider } from "@clerk/tanstack-react-start";
@@ -150,7 +150,7 @@ function RootComponent() {
                 },
               ]}
             />
-            <ReactScan />
+            {/* <ReactScan /> */}
             <Toaster />
             <Scripts />
           </body>
