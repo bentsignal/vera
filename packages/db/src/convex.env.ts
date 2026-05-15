@@ -22,4 +22,5 @@ export const env = createEnv({
   OPENROUTER_API_KEY: v.string(),
   AI_GATEWAY_API_KEY: v.string(),
   NEXT_CONVEX_INTERNAL_KEY: v.string(),
+  X_BEARER_TOKEN: v.string(),
 });
