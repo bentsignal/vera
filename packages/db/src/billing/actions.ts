@@ -48,6 +48,13 @@ export const syncProducts = internalAction({
           productUpdate: {
             name,
             description: def.description ?? undefined,
+            prices: [
+              {
+                amountType: "fixed",
+                priceAmount: def.price,
+                priceCurrency: "usd",
+              },
+            ],
           },
         });
         await ctx.runMutation(internal.billing.mutations.upsertPolarProduct, {

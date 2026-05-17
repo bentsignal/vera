@@ -31,17 +31,17 @@ export const PLANS = {
   },
   Light: {
     tier: 1,
-    price: 4_00,
+    price: 8_00,
     recurringInterval: "month",
     description: "Essential features for casual users",
-    storageLimit: 5 * GB,
+    storageLimit: 10 * GB,
   },
   Premium: {
     tier: 2,
-    price: 8_00,
+    price: 20_00,
     recurringInterval: "month",
     description: "Advanced features and model selection",
-    storageLimit: 20 * GB,
+    storageLimit: 100 * GB,
     scopes: {
       modelSelection: true,
       imageGeneration: true,
@@ -49,10 +49,10 @@ export const PLANS = {
   },
   Ultra: {
     tier: 3,
-    price: 16_00,
+    price: 60_00,
     recurringInterval: "month",
     description: "Maximum features and storage",
-    storageLimit: 50 * GB,
+    storageLimit: 1000 * GB,
     scopes: {
       modelSelection: true,
       imageGeneration: true,
