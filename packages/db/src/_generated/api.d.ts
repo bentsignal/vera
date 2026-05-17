@@ -102,6 +102,7 @@ import type * as ai_tools_image_index from "../ai/tools/image/index.js";
 import type * as ai_tools_image_types from "../ai/tools/image/types.js";
 import type * as ai_tools_index from "../ai/tools/index.js";
 import type * as ai_tools_search_current_events from "../ai/tools/search/current_events.js";
+import type * as ai_tools_search_get_page_contents from "../ai/tools/search/get_page_contents.js";
 import type * as ai_tools_search_index from "../ai/tools/search/index.js";
 import type * as ai_tools_search_postition_holder from "../ai/tools/search/postition_holder.js";
 import type * as ai_tools_search_schemas from "../ai/tools/search/schemas.js";
@@ -246,6 +247,7 @@ declare const fullApi: ApiFromModules<{
   "ai/tools/image/types": typeof ai_tools_image_types;
   "ai/tools/index": typeof ai_tools_index;
   "ai/tools/search/current_events": typeof ai_tools_search_current_events;
+  "ai/tools/search/get_page_contents": typeof ai_tools_search_get_page_contents;
   "ai/tools/search/index": typeof ai_tools_search_index;
   "ai/tools/search/postition_holder": typeof ai_tools_search_postition_holder;
   "ai/tools/search/schemas": typeof ai_tools_search_schemas;

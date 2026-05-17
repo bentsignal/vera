@@ -2,6 +2,7 @@ import { dateTime } from "./date_time";
 import { analyzeFiles } from "./files";
 import { editImage, generateImage, initImage } from "./image";
 import { currentEvents } from "./search/current_events";
+import { getPageContents } from "./search/get_page_contents";
 import { positionHolder } from "./search/postition_holder";
 import { weather } from "./weather";
 import { getXUserPosts } from "./x/get_user_posts";
@@ -15,6 +16,7 @@ export const tools = {
   currentEvents,
   weather,
   positionHolder,
+  getPageContents,
   analyzeFiles,
   generateImage,
   initImage,
