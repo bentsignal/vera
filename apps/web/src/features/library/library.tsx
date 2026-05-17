@@ -80,7 +80,7 @@ export function Library() {
       >
         <DialogContent
           showCloseButton={false}
-          className="h-full max-h-[600px] border-none bg-transparent md:max-w-[700px] xl:max-w-[900px]"
+          className="h-full max-h-[600px] gap-0 border-none bg-transparent p-0 shadow-none supports-[backdrop-filter]:bg-transparent md:max-w-[700px] xl:max-w-[900px]"
         >
           <DialogHeader className="sr-only">
             <DialogTitle>Library</DialogTitle>
