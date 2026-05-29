@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { Effect } from "effect";
 
 import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -10,9 +9,6 @@ import { isLanguageModelKey } from "./models/helpers";
 import { languageModels } from "./models/language";
 import { modelPresets } from "./models/presets";
 import { agentPrompt } from "./prompts";
-import { GenerateResponseError } from "./stream/errors";
-import { buildLayer } from "./stream/layer";
-import { makeProgram } from "./stream/program";
 import { tools } from "./tools";
 
 const agent = new Agent({
@@ -53,34 +49,32 @@ export async function generateResponse(
   title?: string,
   userId?: string,
 ) {
-  const program = Effect.gen(function* () {
-    const { threadId } = yield* Effect.tryPromise({
-      try: () =>
-        agent.createThread(ctx, { title: title ?? "Response", userId }),
-      catch: (cause) =>
-        new GenerateResponseError({ cause, phase: "createThread" }),
+  const { GenerateResponseError } = await import("./stream/errors");
+  let threadId: string;
+  try {
+    const createdThread = await agent.createThread(ctx, {
+      title: title ?? "Response",
+      userId,
     });
-    const { thread } = agent.continueThread(ctx, { threadId });
-    const result = yield* Effect.tryPromise({
-      try: () =>
-        thread.generateText({
-          prompt,
-          maxOutputTokens: 16000,
-          providerOptions: {
-            openrouter: { reasoning: { max_tokens: 8000 } },
-          },
-        }),
-      catch: (cause) =>
-        new GenerateResponseError({ cause, phase: "generateText" }),
+    threadId = createdThread.threadId;
+  } catch (cause) {
+    throw new GenerateResponseError({ cause, phase: "createThread" });
+  }
+
+  const { thread } = agent.continueThread(ctx, { threadId });
+  try {
+    const result = await thread.generateText({
+      prompt,
+      maxOutputTokens: 16000,
+      providerOptions: {
+        openrouter: { reasoning: { max_tokens: 8000 } },
+      },
     });
     return result.text;
-  }).pipe(
-    Effect.withSpan("generate.response"),
-    Effect.tapCause((cause) =>
-      Effect.logError("generate-response failed", { cause }),
-    ),
-  );
-  return Effect.runPromise(program);
+  } catch (cause) {
+    console.error("generate-response failed", { cause });
+    throw new GenerateResponseError({ cause, phase: "generateText" });
+  }
 }
 
 export const streamResponse = internalAction({
@@ -94,9 +88,7 @@ export const streamResponse = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const program = makeProgram(args).pipe(
-      Effect.provide(buildLayer(ctx, agent)),
-    );
-    await Effect.runPromise(program);
+    const { runStreamResponse } = await import("./stream/program");
+    await runStreamResponse(ctx, agent, args);
   },
 });
