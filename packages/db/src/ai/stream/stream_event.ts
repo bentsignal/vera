@@ -1,11 +1,11 @@
-import { Effect, Ref } from "effect";
+import type { StreamResponseArgs } from "./program";
 
-type TimingField =
+export type TimingField =
   | "initDurationMs"
   | "consumeDurationMs"
   | "followUpsDurationMs";
 
-interface EventDraft {
+export interface EventDraft {
   threadId: string;
   generationId: string;
   userId: string;
@@ -25,17 +25,21 @@ interface EventDraft {
   followUpsErrorMessage: string | null;
 }
 
-export type EventRef = Ref.Ref<EventDraft>;
+export function causeMessage(cause: unknown) {
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === "string") return cause;
+  return String(cause);
+}
 
-export function makeEventRef(args: {
-  threadId: string;
-  generationId: string;
-  userId: string;
-  userPlan: string | null;
-  model: string;
-}) {
-  return Ref.make<EventDraft>({
-    ...args,
+export function makeEventDraft(
+  args: StreamResponseArgs & { resolvedModel: string },
+) {
+  return {
+    threadId: args.threadId,
+    generationId: args.generationId,
+    userId: args.userId,
+    userPlan: args.userPlan ?? null,
+    model: args.resolvedModel,
     startedAt: Date.now(),
     initDurationMs: null,
     consumeDurationMs: null,
@@ -48,36 +52,28 @@ export function makeEventRef(args: {
     followUpsAttempted: false,
     followUpsSucceeded: false,
     followUpsErrorMessage: null,
-  });
+  } satisfies EventDraft;
 }
 
-export function updateEvent(ref: EventRef, updates: Partial<EventDraft>) {
-  return Ref.update(ref, (draft) => ({ ...draft, ...updates }));
+export function updateEvent(draft: EventDraft, updates: Partial<EventDraft>) {
+  Object.assign(draft, updates);
 }
 
-export function timed<A, E, R>(
-  ref: EventRef,
+export async function timed<T>(
+  draft: EventDraft,
   key: TimingField,
-  effect: Effect.Effect<A, E, R>,
+  work: () => Promise<T>,
 ) {
-  return Effect.suspend(() => {
-    const start = Date.now();
-    return effect.pipe(
-      Effect.ensuring(
-        Ref.update(ref, (draft) => ({ ...draft, [key]: Date.now() - start })),
-      ),
-    );
-  });
+  const start = Date.now();
+  try {
+    return await work();
+  } finally {
+    updateEvent(draft, { [key]: Date.now() - start });
+  }
 }
 
-export function emitStreamEvent(ref: EventRef) {
-  return Effect.gen(function* () {
-    const draft = yield* Ref.get(ref);
-    const totalDurationMs = Date.now() - draft.startedAt;
-    const level =
-      draft.outcome === "success" ? Effect.logInfo : Effect.logError;
-    yield* level("stream.generation").pipe(
-      Effect.annotateLogs({ ...draft, totalDurationMs }),
-    );
-  });
+export function emitStreamEvent(draft: EventDraft) {
+  const totalDurationMs = Date.now() - draft.startedAt;
+  const log = draft.outcome === "success" ? console.info : console.error;
+  log("stream.generation", { ...draft, totalDurationMs });
 }
