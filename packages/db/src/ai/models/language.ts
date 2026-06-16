@@ -228,6 +228,13 @@ export const languageModels = {
     cost: { in: 0.6, out: 1.2, other: 0 },
     available: false,
   },
+  "qwen-3.5-9b": {
+    provider: "Qwen",
+    name: "Qwen 3.5 9B",
+    model: openrouter("qwen/qwen3.5-9b"),
+    cost: { in: 0.1, out: 0.15, other: 0 },
+    available: true,
+  },
   "glm-4.5": {
     provider: "z-ai",
     name: "GLM 4.5",
