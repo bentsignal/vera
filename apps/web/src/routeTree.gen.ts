@@ -17,7 +17,6 @@ import { Route as PolicyRouteImport } from './app/_policy'
 import { Route as AuthenticatedRouteImport } from './app/_authenticated'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as ApiUploadthingRouteImport } from './app/api/uploadthing'
-import { Route as ApiMailRouteImport } from './app/api/mail'
 import { Route as PolicyTermsOfServiceRouteImport } from './app/_policy/terms-of-service'
 import { Route as PolicyPrivacyPolicyRouteImport } from './app/_policy/privacy-policy'
 import { Route as AuthenticatedSettingsRouteImport } from './app/_authenticated/settings'
@@ -67,11 +66,6 @@ const IndexRoute = IndexRouteImport.update({
 const ApiUploadthingRoute = ApiUploadthingRouteImport.update({
   id: '/api/uploadthing',
   path: '/api/uploadthing',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMailRoute = ApiMailRouteImport.update({
-  id: '/api/mail',
-  path: '/api/mail',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PolicyTermsOfServiceRoute = PolicyTermsOfServiceRouteImport.update({
@@ -151,7 +145,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/privacy-policy': typeof PolicyPrivacyPolicyRoute
   '/terms-of-service': typeof PolicyTermsOfServiceRoute
-  '/api/mail': typeof ApiMailRoute
   '/api/uploadthing': typeof ApiUploadthingRoute
   '/chat/$id': typeof AuthenticatedChatIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -171,7 +164,6 @@ export interface FileRoutesByTo {
   '/pricing': typeof AuthenticatedPricingRoute
   '/privacy-policy': typeof PolicyPrivacyPolicyRoute
   '/terms-of-service': typeof PolicyTermsOfServiceRoute
-  '/api/mail': typeof ApiMailRoute
   '/api/uploadthing': typeof ApiUploadthingRoute
   '/chat/$id': typeof AuthenticatedChatIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -195,7 +187,6 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_policy/privacy-policy': typeof PolicyPrivacyPolicyRoute
   '/_policy/terms-of-service': typeof PolicyTermsOfServiceRoute
-  '/api/mail': typeof ApiMailRoute
   '/api/uploadthing': typeof ApiUploadthingRoute
   '/_authenticated/chat/$id': typeof AuthenticatedChatIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -218,7 +209,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/privacy-policy'
     | '/terms-of-service'
-    | '/api/mail'
     | '/api/uploadthing'
     | '/chat/$id'
     | '/settings/account'
@@ -238,7 +228,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy-policy'
     | '/terms-of-service'
-    | '/api/mail'
     | '/api/uploadthing'
     | '/chat/$id'
     | '/settings/account'
@@ -261,7 +250,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_policy/privacy-policy'
     | '/_policy/terms-of-service'
-    | '/api/mail'
     | '/api/uploadthing'
     | '/_authenticated/chat/$id'
     | '/_authenticated/settings/account'
@@ -279,7 +267,6 @@ export interface RootRouteChildren {
   SigningInRoute: typeof SigningInRoute
   SigningOutRoute: typeof SigningOutRoute
   SsoCallbackRoute: typeof SsoCallbackRoute
-  ApiMailRoute: typeof ApiMailRoute
   ApiUploadthingRoute: typeof ApiUploadthingRoute
   ApiFalProxyRoute: typeof ApiFalProxyRoute
 }
@@ -340,13 +327,6 @@ declare module '@tanstack/react-router' {
       path: '/api/uploadthing'
       fullPath: '/api/uploadthing'
       preLoaderRoute: typeof ApiUploadthingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/mail': {
-      id: '/api/mail'
-      path: '/api/mail'
-      fullPath: '/api/mail'
-      preLoaderRoute: typeof ApiMailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_policy/terms-of-service': {
@@ -496,7 +476,6 @@ const rootRouteChildren: RootRouteChildren = {
   SigningInRoute: SigningInRoute,
   SigningOutRoute: SigningOutRoute,
   SsoCallbackRoute: SsoCallbackRoute,
-  ApiMailRoute: ApiMailRoute,
   ApiUploadthingRoute: ApiUploadthingRoute,
   ApiFalProxyRoute: ApiFalProxyRoute,
 }

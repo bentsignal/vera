@@ -1,17 +1,10 @@
 import { createEnv } from "convex-env";
-import {
-  clerk,
-  environment,
-  polar,
-  resend,
-  uploadthing,
-} from "convex-env/presets";
+import { clerk, environment, polar, uploadthing } from "convex-env/presets";
 import { v } from "convex/values";
 
 export const env = createEnv({
   ...environment,
   ...uploadthing,
-  ...resend,
   ...polar,
   ...clerk,
   CLERK_SECRET_KEY: v.string(),
