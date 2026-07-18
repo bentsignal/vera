@@ -14,7 +14,7 @@ export const languageModels = {
   "gemini-2.5-flash-lite": {
     provider: "Google",
     name: "Gemini 2.5 Flash Lite",
-    model: openrouter("google/gemini-2.5-flash-lite-preview-09-2025"),
+    model: openrouter("google/gemini-2.5-flash-lite"),
     cost: { in: 0.1, out: 0.4, other: 0 },
     available: false,
   },
@@ -37,6 +37,13 @@ export const languageModels = {
     name: "Gemini 3 Flash",
     model: openrouter("google/gemini-3-flash-preview"),
     cost: { in: 0.5, out: 3, other: 0 },
+    available: false,
+  },
+  "gemini-3.5-flash": {
+    provider: "Google",
+    name: "Gemini 3.5 Flash",
+    model: openrouter("google/gemini-3.5-flash"),
+    cost: { in: 1.5, out: 9, other: 0 },
     available: true,
   },
   "gemini-3-pro": {
@@ -107,6 +114,13 @@ export const languageModels = {
     name: "GPT 5.3",
     model: openrouter("openai/gpt-5.3-chat"),
     cost: { in: 1.75, out: 14, other: 0 },
+    available: false,
+  },
+  "gpt-5.6": {
+    provider: "OpenAI",
+    name: "GPT 5.6",
+    model: openrouter("openai/gpt-5.6-terra"),
+    cost: { in: 2.5, out: 15, other: 0 },
     available: true,
   },
   "claude-4.5-haiku": {
@@ -128,6 +142,13 @@ export const languageModels = {
     name: "Claude Sonnet 4.6",
     model: openrouter("anthropic/claude-sonnet-4.6"),
     cost: { in: 3, out: 15, other: 0 },
+    available: false,
+  },
+  "claude-5-sonnet": {
+    provider: "Anthropic",
+    name: "Claude Sonnet 5",
+    model: openrouter("anthropic/claude-sonnet-5"),
+    cost: { in: 2, out: 10, other: 0 },
     available: true,
   },
   "claude-opus-4.5": {
@@ -141,6 +162,13 @@ export const languageModels = {
     provider: "Anthropic",
     name: "Claude Opus 4.6",
     model: openrouter("anthropic/claude-opus-4.6"),
+    cost: { in: 5, out: 25, other: 0 },
+    available: false,
+  },
+  "claude-opus-4.8": {
+    provider: "Anthropic",
+    name: "Claude Opus 4.8",
+    model: openrouter("anthropic/claude-opus-4.8"),
     cost: { in: 5, out: 25, other: 0 },
     available: true,
   },
@@ -184,6 +212,13 @@ export const languageModels = {
     name: "Grok 4.3",
     model: gateway("xai/grok-4.3"),
     cost: { in: 1.25, out: 2.5, other: 0 },
+    available: false,
+  },
+  "grok-4.5": {
+    provider: "xAI",
+    name: "Grok 4.5",
+    model: openrouter("x-ai/grok-4.5"),
+    cost: { in: 2, out: 6, other: 0 },
     available: true,
   },
   sonar: {
