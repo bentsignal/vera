@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f1eee7" />
+    <meta
+      name="description"
+      content="Vera is being rebuilt. Check back soon."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='24' fill='%23e04b2f'/%3E%3C/svg%3E"
+    />
+    <title>Vera — Rebuilding</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino,
+          serif;
+        color: #171713;
+        background: #f1eee7;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        min-height: 100svh;
+        overflow: hidden;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        content: "";
+        opacity: 0.16;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+        mix-blend-mode: multiply;
+      }
+
+      main {
+        position: relative;
+        display: grid;
+        min-height: 100svh;
+        place-items: center;
+        padding: clamp(1.5rem, 5vw, 5rem);
+        isolation: isolate;
+      }
+
+      .halo {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: min(74vw, 54rem);
+        aspect-ratio: 1;
+        border: 1px solid rgb(23 23 19 / 14%);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        animation: breathe 8s ease-in-out infinite;
+      }
+
+      .halo::before,
+      .halo::after {
+        position: absolute;
+        border-radius: inherit;
+        content: "";
+      }
+
+      .halo::before {
+        inset: 8%;
+        border: 1px solid rgb(23 23 19 / 8%);
+      }
+
+      .halo::after {
+        inset: 20%;
+        background: radial-gradient(
+          circle at 46% 42%,
+          rgb(255 255 255 / 66%),
+          rgb(233 226 211 / 22%) 57%,
+          transparent 72%
+        );
+        box-shadow: inset 0 0 5rem rgb(255 255 255 / 38%);
+      }
+
+      .message {
+        position: relative;
+        z-index: 1;
+        width: min(100%, 42rem);
+        text-align: center;
+        animation: arrive 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+
+      .eyebrow {
+        margin: 0 0 1.4rem;
+        font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+        font-size: 0.68rem;
+        font-weight: 500;
+        letter-spacing: 0.24em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(4.5rem, 16vw, 10rem);
+        font-weight: 400;
+        letter-spacing: -0.075em;
+        line-height: 0.82;
+      }
+
+      p {
+        max-width: 25rem;
+        margin: 2.5rem auto 0;
+        font-size: clamp(1.05rem, 2vw, 1.3rem);
+        letter-spacing: -0.015em;
+        line-height: 1.5;
+      }
+
+      .mark {
+        display: inline-block;
+        width: 0.42em;
+        height: 0.42em;
+        margin-left: 0.12em;
+        border-radius: 50%;
+        vertical-align: 0.08em;
+        background: #e04b2f;
+      }
+
+      footer {
+        position: absolute;
+        right: clamp(1.5rem, 5vw, 5rem);
+        bottom: clamp(1.5rem, 4vw, 3.5rem);
+        left: clamp(1.5rem, 5vw, 5rem);
+        display: flex;
+        justify-content: space-between;
+        font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      @keyframes arrive {
+        from {
+          opacity: 0;
+          transform: translateY(1.2rem);
+        }
+      }
+
+      @keyframes breathe {
+        0%,
+        100% {
+          opacity: 0.72;
+          transform: translate(-50%, -50%) scale(0.985);
+        }
+
+        50% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1.015);
+        }
+      }
+
+      @media (max-width: 36rem) {
+        .halo {
+          width: 112vw;
+        }
+
+        footer span:last-child {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .halo,
+        .message {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="halo" aria-hidden="true"></div>
+      <section class="message" aria-labelledby="title">
+        <div class="eyebrow">A brief intermission</div>
+        <h1 id="title">Vera<span class="mark" aria-hidden="true"></span></h1>
+        <p>Vera is being rebuilt. Check back soon.</p>
+      </section>
+      <footer aria-hidden="true">
+        <span>Still thinking</span>
+        <span>vera.chat</span>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -274,7 +274,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  apps/web:
+  apps/legacy-web:
     dependencies:
       '@acme/app-config':
         specifier: workspace:*
@@ -432,7 +432,7 @@ importers:
         version: 9.39.4(jiti@2.6.1)
       nitro:
         specifier: 'catalog:'
-        version: 3.0.1-alpha.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@upstash/redis@1.37.0)(chokidar@4.0.3)(lru-cache@11.3.5)(rollup@4.60.1)(uploadthing@7.7.4(tailwindcss@4.2.2))(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3))
+        version: 3.0.1-alpha.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@upstash/redis@1.37.0)(chokidar@4.0.3)(lru-cache@11.3.5)(rollup@4.60.1)(uploadthing@7.7.4(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(tailwindcss@4.2.2))(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3))
       prettier:
         specifier: 'catalog:'
         version: 3.8.2
@@ -454,6 +454,15 @@ importers:
       vite-tsconfig-paths:
         specifier: 'catalog:'
         version: 5.1.4(typescript@5.9.3)(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  apps/web:
+    devDependencies:
+      prettier:
+        specifier: 'catalog:'
+        version: 3.8.2
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3)
 
   apps/xr:
     dependencies:
@@ -11148,14 +11157,21 @@ snapshots:
       rou3: 0.7.12
       srvx: 0.11.15
     optionalDependencies:
-      crossws: 0.4.5(srvx@0.11.15)
+      crossws: 0.4.5(srvx@0.10.1)
+
+  h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.10.1)):
+    dependencies:
+      rou3: 0.8.1
+      srvx: 0.11.15
+    optionalDependencies:
+      crossws: 0.4.5(srvx@0.10.1)
 
   h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)):
     dependencies:
       rou3: 0.8.1
       srvx: 0.11.15
     optionalDependencies:
-      crossws: 0.4.5(srvx@0.10.1)
+      crossws: 0.4.5(srvx@0.11.15)
 
   has-bigints@1.1.0: {}
 
@@ -12219,6 +12235,56 @@ snapshots:
       - babel-plugin-macros
 
   nf3@0.3.16: {}
+
+  nitro@3.0.1-alpha.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@upstash/redis@1.37.0)(chokidar@4.0.3)(lru-cache@11.3.5)(rollup@4.60.1)(uploadthing@7.7.4(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(tailwindcss@4.2.2))(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3)):
+    dependencies:
+      consola: 3.4.2
+      crossws: 0.4.5(srvx@0.10.1)
+      db0: 0.3.4
+      h3: 2.0.1-rc.20(crossws@0.4.5(srvx@0.10.1))
+      jiti: 2.6.1
+      nf3: 0.3.16
+      ofetch: 2.0.0-alpha.3
+      ohash: 2.0.11
+      oxc-minify: 0.110.0(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      oxc-transform: 0.110.0(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      srvx: 0.10.1
+      undici: 7.24.7
+      unenv: 2.0.0-rc.24
+      unstorage: 2.0.0-alpha.7(@upstash/redis@1.37.0)(chokidar@4.0.3)(db0@0.3.4)(lru-cache@11.3.5)(ofetch@2.0.0-alpha.3)(uploadthing@7.7.4(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(tailwindcss@4.2.2))
+    optionalDependencies:
+      rollup: 4.60.1
+      vite: 7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3)
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@electric-sql/pglite'
+      - '@emnapi/core'
+      - '@emnapi/runtime'
+      - '@libsql/client'
+      - '@netlify/blobs'
+      - '@planetscale/database'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/functions'
+      - '@vercel/kv'
+      - aws4fetch
+      - better-sqlite3
+      - chokidar
+      - drizzle-orm
+      - idb-keyval
+      - ioredis
+      - lru-cache
+      - mongodb
+      - mysql2
+      - sqlite3
+      - uploadthing
 
   nitro@3.0.1-alpha.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@upstash/redis@1.37.0)(chokidar@4.0.3)(lru-cache@11.3.5)(rollup@4.60.1)(uploadthing@7.7.4(tailwindcss@4.2.2))(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3)):
     dependencies:
@@ -13354,7 +13420,7 @@ snapshots:
       picomatch: 4.0.4
       webpack-virtual-modules: 0.6.2
 
-  unstorage@2.0.0-alpha.7(@upstash/redis@1.37.0)(chokidar@4.0.3)(db0@0.3.4)(lru-cache@11.3.5)(ofetch@2.0.0-alpha.3)(uploadthing@7.7.4(tailwindcss@4.2.2)):
+  unstorage@2.0.0-alpha.7(@upstash/redis@1.37.0)(chokidar@4.0.3)(db0@0.3.4)(lru-cache@11.3.5)(ofetch@2.0.0-alpha.3)(uploadthing@7.7.4(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(tailwindcss@4.2.2)):
     optionalDependencies:
       '@upstash/redis': 1.37.0
       chokidar: 4.0.3
@@ -13362,6 +13428,15 @@ snapshots:
       lru-cache: 11.3.5
       ofetch: 2.0.0-alpha.3
       uploadthing: 7.7.4(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(tailwindcss@4.2.2)
+
+  unstorage@2.0.0-alpha.7(@upstash/redis@1.37.0)(chokidar@4.0.3)(db0@0.3.4)(lru-cache@11.3.5)(ofetch@2.0.0-alpha.3)(uploadthing@7.7.4(tailwindcss@4.2.2)):
+    optionalDependencies:
+      '@upstash/redis': 1.37.0
+      chokidar: 4.0.3
+      db0: 0.3.4
+      lru-cache: 11.3.5
+      ofetch: 2.0.0-alpha.3
+      uploadthing: 7.7.4(next@16.2.3(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(tailwindcss@4.2.2)
 
   update-browserslist-db@1.2.3(browserslist@4.28.2):
     dependencies:
