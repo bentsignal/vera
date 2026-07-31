@@ -14,7 +14,7 @@ else
 fi
 echo "updated VITE_WORKTREE_ID to $PORTLESS_WORKTREE_ID"
 
-cd "$NEW_WT/packages/db"
+cd "$NEW_WT/legacy/packages/db"
 
 # Pull env vars from the main deployment before switching
 TEMP_ENV=$(mktemp)
@@ -33,7 +33,7 @@ rm -f "$TEMP_ENV"
 cd "$NEW_WT"
 
 # Derive the new deployment URL from CONVEX_DEPLOYMENT
-NEW_DEPLOYMENT="$(grep '^CONVEX_DEPLOYMENT=' packages/db/.env.local | cut -d= -f2- | awk '{print $1}')"
+NEW_DEPLOYMENT="$(grep '^CONVEX_DEPLOYMENT=' legacy/packages/db/.env.local | cut -d= -f2- | awk '{print $1}')"
 SLUG="${NEW_DEPLOYMENT#*:}"
 NEW_URL="https://${SLUG}.convex.cloud"
 sed -i '' "s|^CONVEX_DEPLOYMENT=.*|CONVEX_DEPLOYMENT=$NEW_DEPLOYMENT|" .env
