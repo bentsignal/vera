@@ -2,8 +2,7 @@
 
 ## Repository Summary
 
-- AI chat app
-- Uses turbo repo to house apps for various platforms + the convex database
+This project was initally an AI chat app, and is now being rebuilt as a decentralized, easily self-hostable messaing & email platform.
 
 ## Required Validation After Changes
 
@@ -17,8 +16,3 @@ If all of these succeed, run:
 4. `pnpm run format:fix`
 
 Then summarize changes for the user.
-
-## Preferences
-
-- Do **_NOT_** leave excessive comments when writing code. Only leave comments when
-  the code itself does not clearly explain what it does
