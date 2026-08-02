@@ -1,30 +1,31 @@
-<a name="readme-top"></a>
+# Vera
 
-<br />
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/c74389d4-faad-4af9-b4e0-d31115ea167f" alt="Animated GIF of advertisement for Vera, showing off its search capability." width="500px">
-  <br />
-  <br />
-  <br />
-  <br />
-  <a href="https://www.vera.chat" target="_blank">
-    vera.chat
-  </a>
-</div>
-<br />
-<br />
-<br />
-<div align="center">
+Vera is a decentralized messaging application built on independently hosted
+Convex deployments. The active application also serves as the real-world
+incubator for the decentralized Convex toolkit while its API is still changing
+quickly.
 
-A great starting point for building agentic applications for the web.
+## Workspace
 
-For more information, head over to the [docs](https://docs.vera.chat)
+- `apps/web` — the TanStack Start Vera client
+- `services/backend` — the Convex backend deployed to each Vera server
+- `packages/decentralized-convex-*` — reusable federation packages
+- `shared` — private code shared by Vera workspace projects
+- `deps` — source dependencies that Vera may need to maintain directly
+- `legacy` — the archived centralized Vera application
 
-<br />
-<br />
+The standalone decentralized-convex repository remains intact as a milestone.
+During incubation, changes are developed and exercised here without an npm
+publish/install cycle.
 
-[x.com/bentsignal](https://x.com/bentsignal)
+## Development
 
-<br />
+Install dependencies and start the active app:
 
-</div>
+```sh
+pnpm install
+pnpm --filter @vera/web dev
+```
+
+The web app runs at `http://localhost:5173`. Copy the checked-in environment
+examples before connecting different Convex deployments.

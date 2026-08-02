@@ -10,9 +10,9 @@
       "outputs": [".cache/tsbuildinfo.json", "dist/**"]
     },
     "dev": {
-      "dependsOn": ["^topo", "^dev"],
+      "dependsOn": ["^topo"],
       "cache": false,
-      "persistent": false
+      "persistent": true
     },
     "format": {
       "outputs": [".cache/.prettiercache"],
@@ -55,8 +55,16 @@
 
     "VITE_CONVEX_URL",
     "CONVEX_DEPLOYMENT",
+    "CONVEX_CLOUD_URL",
+    "CONVEX_SITE_URL",
     "CONVEX_INTERNAL_KEY",
     "CONVEX_DEPLOY_KEY",
+    "FEDERATION_DOMAIN",
+    "SITE_URL",
+    "VITE_HOME_A_CONVEX_URL",
+    "VITE_HOME_A_SITE_URL",
+    "VITE_HOME_B_CONVEX_URL",
+    "VITE_HOME_B_SITE_URL",
 
     "OPENROUTER_API_KEY",
     "OPENAI_API_KEY",

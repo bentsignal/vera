@@ -21,7 +21,7 @@
     "check": "pnpm run lint && pnpm run typecheck",
     "ui-add": "turbo run ui-add",
     "create-package": "turbo gen init",
-    "loc": "cloc --exclude-dir=_generated --not-match-f=routeTree.gen.ts apps/*/src packages/*/src"
+    "loc": "cloc --exclude-dir=_generated --not-match-f=routeTree.gen.ts apps/*/src packages/*/src services/*/convex shared/*/src"
   },
   "devDependencies": {
     "@acme/prettier-config": "workspace:*",

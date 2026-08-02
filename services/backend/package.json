@@ -1,0 +1,34 @@
+{
+  "name": "@vera/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": "./convex/_generated/api.js"
+  },
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo node_modules",
+    "deploy:a": "convex dev --once --env-file .env.a.local",
+    "deploy:b": "convex dev --once --env-file .env.b.local",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "format:fix": "prettier --write . --ignore-path ../../.gitignore",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "typecheck": "tsgo --noEmit -p convex/tsconfig.json"
+  },
+  "dependencies": {
+    "@convex-dev/better-auth": "0.12.5",
+    "@decentralized-convex/server": "workspace:*",
+    "better-auth": "~1.6.15",
+    "convex": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@acme/prettier-config"
+}
