@@ -1,40 +1,26 @@
+import type { DiscoveredPds } from "@decentralized-convex/client";
+
 export interface HomeServer {
   convexUrl: string;
   domain: string;
-  id: "a" | "b";
+  id: string;
+  manifestUrl: string;
   siteUrl: string;
 }
 
-export const homes: readonly HomeServer[] = [
-  createHome(
-    "a",
-    import.meta.env.VITE_HOME_A_CONVEX_URL,
-    import.meta.env.VITE_HOME_A_SITE_URL,
-  ),
-  createHome(
-    "b",
-    import.meta.env.VITE_HOME_B_CONVEX_URL,
-    import.meta.env.VITE_HOME_B_SITE_URL,
-  ),
-];
+export const testHomeDomains = ["a.vera.chat", "b.vera.chat"] as const;
 
 export const conversation = {
-  id: "room:general",
-  targets: homes.map((home) => ({
-    id: `member@${home.domain}`,
-    url: home.convexUrl,
-  })),
+  id: "conversation:direct:a.vera.chat:b.vera.chat",
+  participantDomains: testHomeDomains,
 };
 
-function createHome(
-  id: HomeServer["id"],
-  convexUrl: string,
-  siteUrl: string,
-): HomeServer {
+export function homeFromDiscovery(discovery: DiscoveredPds): HomeServer {
   return {
-    convexUrl,
-    domain: new URL(convexUrl).hostname,
-    id,
-    siteUrl,
+    convexUrl: discovery.manifest.deploymentUrl,
+    domain: discovery.domain,
+    id: discovery.domain,
+    manifestUrl: discovery.manifestUrl,
+    siteUrl: discovery.manifest.httpUrl,
   };
 }

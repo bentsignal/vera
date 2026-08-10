@@ -35,7 +35,7 @@ export function ConnectionDiagnostics({
           </div>
           <div>
             <dt>Remote reads</dt>
-            <dd>Public during federation development</dd>
+            <dd>Authenticated per home server</dd>
           </div>
         </dl>
       </div>

@@ -15,9 +15,6 @@
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "typecheck": "tsgo --noEmit"
   },
-  "dependencies": {
-    "@decentralized-convex/client": "workspace:*"
-  },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",
     "@acme/prettier-config": "workspace:*",

@@ -8,22 +8,24 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as federationAuth from "../federationAuth.js";
+import type * as http from "../http.js";
+import type * as lib from "../lib.js";
+import type * as pds from "../pds.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-import type * as auth from "../auth.js";
-import type * as http from "../http.js";
-import type * as lib from "../lib.js";
-import type * as messages from "../messages.js";
-
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  federationAuth: typeof federationAuth;
   http: typeof http;
   lib: typeof lib;
-  messages: typeof messages;
+  pds: typeof pds;
 }>;
 
 /**
@@ -54,4 +56,6 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
+  accounts: import("@decentralized-convex/accounts/_generated/component.js").ComponentApi<"accounts">;
+  messages: import("@decentralized-convex/messages/_generated/component.js").ComponentApi<"messages">;
 };

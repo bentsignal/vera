@@ -1,6 +1,7 @@
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { ConvexClient } from "convex/browser";
 
+import type { PdsConnection } from "./pds.ts";
 import type {
   FederationAuthTokenFetcher,
   FederationConnection,
@@ -52,5 +53,12 @@ export function createConvexFederationConnection(
   url: string,
   getAuthToken?: FederationAuthTokenFetcher,
 ): FederationConnection {
+  return new ConvexFederationConnection(url, getAuthToken);
+}
+
+export function createConvexPdsConnection(
+  url: string,
+  getAuthToken?: FederationAuthTokenFetcher,
+): PdsConnection {
   return new ConvexFederationConnection(url, getAuthToken);
 }

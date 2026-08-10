@@ -1,5 +1,3 @@
-import type { FederationTarget } from "@decentralized-convex/client";
-
 export interface DecentralizedAddress {
   domain: string;
   username: string;
@@ -24,7 +22,7 @@ export function formatAddress(address: DecentralizedAddress) {
     .toLowerCase()}`;
 }
 
-export function addressToTarget(value: string): FederationTarget {
+export function addressToTarget(value: string) {
   const address = parseAddress(value);
   return {
     id: formatAddress(address),

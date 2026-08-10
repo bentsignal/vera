@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { DecentralizedConvexClient } from "@decentralized-convex/client";
+import {
+  DecentralizedConvexClient,
+  discoverPds,
+} from "@decentralized-convex/client";
 import {
   DecentralizedConvexProvider,
   useQuery,
@@ -8,6 +11,8 @@ import { api } from "@vera/backend/api";
 
 import type { HomeAuthClient } from "../auth-client.ts";
 import type { HomeServer } from "../live/config.ts";
+import { createFederationAuthTokenFetcher } from "../federation-auth.ts";
+import { conversation, homeFromDiscovery } from "../live/config.ts";
 import { ChatRoom } from "./ChatRoom.tsx";
 import { ServerLoading } from "./ServerLoading.tsx";
 
@@ -19,15 +24,34 @@ interface AuthenticatedSessionProps {
 
 export function AuthenticatedSession(props: AuthenticatedSessionProps) {
   const user = useQuery(api.auth.currentUser);
-  const client = useFederationClient(props.authClient, props.home);
+  const federation = useFederationClient(props.authClient, props.home);
 
-  if (user === undefined || user === null || client === undefined) {
+  if (federation !== undefined && "error" in federation) {
+    return (
+      <main className="account-shell">
+        <section className="account-panel auth-panel">
+          <h1>Could not connect to the conversation</h1>
+          <p className="auth-error">{federation.error.message}</p>
+          <button
+            className="primary-button"
+            onClick={props.onChooseServer}
+            type="button"
+          >
+            Back
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (user === undefined || user === null || federation === undefined) {
     return <ServerLoading home={props.home} />;
   }
 
   return (
-    <DecentralizedConvexProvider client={client}>
+    <DecentralizedConvexProvider client={federation.client}>
       <ChatRoom
+        conversationHomes={federation.homes}
         home={props.home}
         onChooseServer={props.onChooseServer}
         onSignOut={() => props.authClient.signOut()}
@@ -38,27 +62,45 @@ export function AuthenticatedSession(props: AuthenticatedSessionProps) {
 }
 
 function useFederationClient(authClient: HomeAuthClient, home: HomeServer) {
-  const [client, setClient] = useState<DecentralizedConvexClient>();
+  const [federation, setFederation] = useState<
+    | { client: DecentralizedConvexClient; homes: readonly HomeServer[] }
+    | { error: Error }
+  >();
 
   useEffect(() => {
     let active = true;
-    const nextClient = new DecentralizedConvexClient({
-      getAuthToken: async ({ url }) => {
-        if (url !== home.convexUrl) return null;
-        const token = await authClient.convex.token({
-          fetchOptions: { throw: false },
+    let nextClient: DecentralizedConvexClient | undefined;
+    void Promise.all(
+      conversation.participantDomains.map(async (domain) =>
+        domain === home.domain
+          ? home
+          : homeFromDiscovery(await discoverPds(domain)),
+      ),
+    )
+      .then((homes) => {
+        if (!active) return;
+        const client = new DecentralizedConvexClient({
+          getAuthToken: createFederationAuthTokenFetcher({
+            authClient,
+            home,
+            homes,
+          }),
         });
-        return token.data?.token ?? null;
-      },
-    });
-    queueMicrotask(() => {
-      if (active) setClient(nextClient);
-    });
+        nextClient = client;
+        setFederation({ client, homes });
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setFederation({
+          error:
+            cause instanceof Error ? cause : new Error("PDS discovery failed"),
+        });
+      });
     return () => {
       active = false;
-      void nextClient.close();
+      if (nextClient !== undefined) void nextClient.close();
     };
-  }, [authClient, home.convexUrl]);
+  }, [authClient, home]);
 
-  return client;
+  return federation;
 }

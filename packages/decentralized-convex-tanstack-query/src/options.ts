@@ -1,5 +1,8 @@
 import type {
+  AnyPdsQueryRequest,
+  DefaultCombinedPdsResult,
   DefaultCombinedResult,
+  FederatedPdsQueryOptions,
   FederatedQueryOptions,
   FederationQueryReference,
 } from "@decentralized-convex/client";
@@ -20,5 +23,22 @@ export function federatedQueryOptions<
 >(
   options: FederatedTanStackQueryOptions<Query, Combined>,
 ): FederatedTanStackQueryOptions<Query, Combined> {
+  return options;
+}
+
+export interface FederatedPdsTanStackQueryOptions<
+  Request extends AnyPdsQueryRequest,
+  Combined = DefaultCombinedPdsResult<Request>,
+> extends FederatedPdsQueryOptions<Request, Combined> {
+  enabled?: boolean;
+  queryKey: QueryKey;
+}
+
+export function federatedPdsQueryOptions<
+  Request extends AnyPdsQueryRequest,
+  Combined = DefaultCombinedPdsResult<Request>,
+>(
+  options: FederatedPdsTanStackQueryOptions<Request, Combined>,
+): FederatedPdsTanStackQueryOptions<Request, Combined> {
   return options;
 }

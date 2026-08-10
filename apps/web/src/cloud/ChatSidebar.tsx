@@ -25,10 +25,10 @@ export function ChatSidebar({
           <small>Federated messaging</small>
         </div>
       </div>
-      <nav className="room-list" aria-label="Rooms">
-        <span>Rooms</span>
+      <nav className="room-list" aria-label="Conversations">
+        <span>Conversations</span>
         <button aria-current="page" type="button">
-          <span>#</span> general
+          <span>↔</span> Test conversation
         </button>
       </nav>
       <div className="sidebar-account">
@@ -41,7 +41,7 @@ export function ChatSidebar({
           <summary aria-label="Account options">•••</summary>
           <div>
             <button onClick={onChooseServer} type="button">
-              Change server
+              Change account
             </button>
             <button onClick={() => void onSignOut()} type="button">
               Sign out

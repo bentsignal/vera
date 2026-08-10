@@ -627,6 +627,27 @@ summary:focus-visible {
   padding: 22px 24px;
 }
 
+.federation-warning {
+  display: grid;
+  gap: 4px;
+  margin: 0 6px 14px;
+  padding: 12px 14px;
+  border: 1px solid #e2c273;
+  border-radius: 8px;
+  color: #5f4818;
+  background: #fff8df;
+}
+
+.federation-warning strong {
+  font-size: 12px;
+}
+
+.federation-warning p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .message {
   display: grid;
   gap: 11px;
@@ -852,8 +873,7 @@ summary:focus-visible {
     padding: 10px 14px;
   }
 
-  .channel-header p,
-  .connection-summary {
+  .channel-header p {
     display: none;
   }
 

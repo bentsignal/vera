@@ -1,25 +1,35 @@
-import type { FunctionReturnType } from "convex/server";
-import { federatedQueryOptions } from "@decentralized-convex/tanstack-query";
-import { api } from "@vera/backend/api";
+import type { Message } from "@decentralized-convex/messages";
+import { definePdsApi } from "@decentralized-convex/client";
+import { messagesProtocol } from "@decentralized-convex/messages";
+import { federatedPdsQueryOptions } from "@decentralized-convex/tanstack-query";
 
+import type { HomeServer } from "./config.ts";
 import { conversation } from "./config.ts";
 
-export type ChatMessage = FunctionReturnType<typeof api.messages.list>[number];
+export type ChatMessage = Message;
 
-export function messagesQueryOptions() {
-  return federatedQueryOptions({
-    args: { roomId: conversation.id },
+export const pdsApi = definePdsApi({ messages: messagesProtocol });
+
+export function messagesQueryOptions(homes: readonly HomeServer[]) {
+  return federatedPdsQueryOptions({
     combine: (sources) =>
       combineMessages(sources.flatMap((source) => source.data)),
-    query: api.messages.list,
     queryKey: ["messages", conversation.id],
-    targets: conversation.targets,
+    request: pdsApi.messages.queries.list({
+      conversationId: conversation.id,
+    }),
+    targets: homes.map((home) => ({
+      id: `member@${home.domain}`,
+      url: home.convexUrl,
+    })),
   });
 }
 
 function combineMessages(messages: readonly ChatMessage[]) {
-  const byId = new Map(messages.map((message) => [message.eventId, message]));
+  const byId = new Map(messages.map((message) => [message.messageId, message]));
   return [...byId.values()].sort(
-    (a, b) => a.sentAt - b.sentAt || a.eventId.localeCompare(b.eventId),
+    (left, right) =>
+      left.sentAt - right.sentAt ||
+      left.messageId.localeCompare(right.messageId),
   );
 }

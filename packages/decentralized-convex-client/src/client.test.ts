@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
+import {
+  defineOperation,
+  definePluginProtocol,
+} from "@decentralized-convex/plugin";
 import { makeFunctionReference } from "convex/server";
+import { v } from "convex/values";
 
 import type {
   FederationConnection,
@@ -9,6 +14,7 @@ import type {
   FederationQueryReference,
 } from "./types.ts";
 import { DecentralizedConvexClient } from "./client.ts";
+import { definePdsApi } from "./pds.ts";
 
 const listItems = makeFunctionReference<
   "query",
@@ -46,6 +52,44 @@ void test("groups identities by deployment and combines native query results", a
   await client.close();
 });
 
+void test("federates typed PDS requests without a generated backend API", async () => {
+  const notes = definePluginProtocol({
+    name: "notes",
+    mutations: {
+      create: defineOperation({
+        args: v.object({ body: v.string() }),
+        returns: v.object({ id: v.string() }),
+      }),
+    },
+    queries: {
+      list: defineOperation({
+        args: v.object({}),
+        returns: v.array(v.object({ body: v.string() })),
+      }),
+    },
+    version: "1",
+  });
+  const api = definePdsApi({ notes });
+  const client = new DecentralizedConvexClient({
+    connectionFactory: (url) => new MemoryConnection(url),
+  });
+
+  const snapshot = await client.pdsQuery({
+    request: api.notes.queries.list({}),
+    targets: [
+      { id: "alice@a.test", url: "https://a.test" },
+      { id: "bob@b.test", url: "https://b.test" },
+    ],
+  });
+
+  assert.equal(snapshot.status, "success");
+  assert.deepEqual(snapshot.data, [
+    { body: "https://a.test" },
+    { body: "https://b.test" },
+  ]);
+  await client.close();
+});
+
 class MemoryConnection implements FederationConnection {
   readonly #url;
 
@@ -67,11 +111,12 @@ class MemoryConnection implements FederationConnection {
     _query: Query,
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
+    const result = isPdsRequest(args)
+      ? [{ body: this.#url }]
+      : [{ id: this.#url, value: getScope(args) }];
     // The fake connection cannot derive a concrete return type from an arbitrary test reference.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return Promise.resolve([
-      { id: this.#url, value: getScope(args) },
-    ]) as Promise<FunctionReturnType<Query>>;
+    return Promise.resolve(result) as Promise<FunctionReturnType<Query>>;
   }
 
   subscribe<Query extends FederationQueryReference>(
@@ -82,6 +127,15 @@ class MemoryConnection implements FederationConnection {
     void this.query(query, args).then(onResult);
     return () => undefined;
   }
+}
+
+function isPdsRequest(args: unknown) {
+  return (
+    typeof args === "object" &&
+    args !== null &&
+    "plugin" in args &&
+    typeof args.plugin === "string"
+  );
 }
 
 function getScope(args: unknown) {

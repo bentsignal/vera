@@ -9,6 +9,7 @@ import { ServerLoading } from "./ServerLoading.tsx";
 interface SessionGateProps {
   authClient: HomeAuthClient;
   home: HomeServer;
+  initialUsername: string;
   onChooseServer: () => void;
 }
 

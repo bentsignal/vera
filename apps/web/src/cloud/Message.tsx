@@ -2,13 +2,16 @@ import type { ChatMessage } from "../live/queries.ts";
 import { ActorAvatar, actorUsername } from "./actor.tsx";
 
 export function Message({ message }: { message: ChatMessage }) {
+  const domain = message.authorId.split("@")[1] ?? message.authorId;
   return (
     <article className="message">
-      <ActorAvatar actor={message.author} />
+      <ActorAvatar actor={message.authorId} />
       <div>
         <header>
-          <strong>{actorUsername(message.author)}</strong>
-          <span>@{message.origin}</span>
+          <strong>
+            {message.authorName || actorUsername(message.authorId)}
+          </strong>
+          <span>@{domain}</span>
           <time dateTime={new Date(message.sentAt).toISOString()}>
             {formatTime(message.sentAt)}
           </time>

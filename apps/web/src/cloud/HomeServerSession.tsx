@@ -9,14 +9,18 @@ import { SessionGate } from "./SessionGate.tsx";
 
 interface HomeServerSessionProps {
   home: HomeServer;
+  initialUsername: string;
   onChooseServer: () => void;
 }
 
 export function HomeServerSession({
   home,
+  initialUsername,
   onChooseServer,
 }: HomeServerSessionProps) {
-  const [authClient] = useState(() => createHomeAuthClient(home.siteUrl));
+  const [authClient] = useState(() =>
+    createHomeAuthClient(home.siteUrl, `vera-${home.id}`),
+  );
   const [convex] = useState(
     () => new ConvexReactClient(home.convexUrl, { expectAuth: true }),
   );
@@ -29,6 +33,7 @@ export function HomeServerSession({
       <SessionGate
         authClient={authClient}
         home={home}
+        initialUsername={initialUsername}
         onChooseServer={onChooseServer}
       />
     </ConvexBetterAuthProvider>

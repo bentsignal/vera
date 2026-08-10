@@ -9,3 +9,9 @@ export type {
   FederationDescriptor,
   RegisterFederationRoutesOptions,
 } from "./descriptor.ts";
+export { defineComponentDispatchers, definePdsRouter } from "./dispatcher.ts";
+export type {
+  DispatcherIdentity,
+  OperationHandlerContext,
+  OperationHandlers,
+} from "./dispatcher.ts";

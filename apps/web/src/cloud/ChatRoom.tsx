@@ -10,6 +10,7 @@ interface CurrentUser {
 }
 
 interface ChatRoomProps {
+  conversationHomes: readonly HomeServer[];
   home: HomeServer;
   onChooseServer: () => void;
   onSignOut: () => Promise<unknown>;
@@ -17,7 +18,11 @@ interface ChatRoomProps {
 }
 
 export function ChatRoom(props: ChatRoomProps) {
-  const chat = useChatRoom({ home: props.home, user: props.user });
+  const chat = useChatRoom({
+    homes: props.conversationHomes,
+    home: props.home,
+    user: props.user,
+  });
 
   return (
     <main className="chat-app">

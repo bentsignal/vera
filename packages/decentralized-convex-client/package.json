@@ -16,6 +16,8 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@decentralized-convex/address": "workspace:*",
+    "@decentralized-convex/plugin": "workspace:*",
     "convex": "catalog:"
   },
   "devDependencies": {

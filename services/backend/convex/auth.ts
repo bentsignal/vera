@@ -7,6 +7,7 @@ import type { DataModel } from "./_generated/dataModel";
 import { components } from "./_generated/api";
 import { query } from "./_generated/server";
 import authConfig from "./auth.config";
+import { pdsFederationAuth } from "./federationAuth";
 import { actorFromEmail, requireEnvironment } from "./lib";
 
 export const authComponent = createClient<DataModel>(components.betterAuth);
@@ -22,7 +23,21 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
     },
     plugins: [
       crossDomain({ siteUrl }),
-      convex({ authConfig, jwksRotateOnTokenGenerationError: true }),
+      convex({
+        authConfig,
+        jwksRotateOnTokenGenerationError: true,
+        jwt: {
+          definePayload: ({ user }) => ({
+            accountId: actorFromEmail(user.email),
+            email: user.email,
+            name: user.name,
+          }),
+        },
+      }),
+      pdsFederationAuth({
+        accountDomain: requireEnvironment("FEDERATION_DOMAIN"),
+        issuer: requireEnvironment("CONVEX_SITE_URL"),
+      }),
     ],
     trustedOrigins: [siteUrl],
   });

@@ -17,9 +17,14 @@
   },
   "dependencies": {
     "@convex-dev/better-auth": "0.12.5",
+    "@decentralized-convex/accounts": "workspace:*",
+    "@decentralized-convex/address": "workspace:*",
+    "@decentralized-convex/messages": "workspace:*",
     "@decentralized-convex/server": "workspace:*",
     "better-auth": "~1.6.15",
-    "convex": "catalog:"
+    "convex": "catalog:",
+    "jose": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",

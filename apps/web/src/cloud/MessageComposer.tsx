@@ -18,7 +18,7 @@ export function MessageComposer({
   return (
     <form className="composer" onSubmit={(event) => void submit(event)}>
       <label>
-        <span className="sr-only">Message #general</span>
+        <span className="sr-only">Message conversation</span>
         <textarea
           maxLength={4_000}
           onChange={(event) => setDraft(event.target.value)}
@@ -28,7 +28,7 @@ export function MessageComposer({
               event.currentTarget.form?.requestSubmit();
             }
           }}
-          placeholder="Message #general"
+          placeholder="Write a message"
           rows={1}
           value={draft}
         />

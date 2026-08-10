@@ -1,21 +1,21 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useDecentralizedConvex } from "@decentralized-convex/react";
-import { useFederatedQuery } from "@decentralized-convex/tanstack-query";
-import { api } from "@vera/backend/api";
+import { useFederatedPdsQuery } from "@decentralized-convex/tanstack-query";
 
 import type { HomeServer } from "../live/config.ts";
 import { conversation } from "../live/config.ts";
-import { messagesQueryOptions } from "../live/queries.ts";
+import { messagesQueryOptions, pdsApi } from "../live/queries.ts";
 
 interface UseChatRoomOptions {
   home: HomeServer;
+  homes: readonly HomeServer[];
   user: { actor: string };
 }
 
-export function useChatRoom({ home, user }: UseChatRoomOptions) {
+export function useChatRoom({ home, homes, user }: UseChatRoomOptions) {
   const client = useDecentralizedConvex();
-  const messages = useFederatedQuery(messagesQueryOptions());
+  const messages = useFederatedPdsQuery(messagesQueryOptions(homes));
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string>();
   const [sending, setSending] = useState(false);
@@ -28,15 +28,13 @@ export function useChatRoom({ home, user }: UseChatRoomOptions) {
     setError(undefined);
     setSending(true);
     try {
-      await client.mutation(
+      await client.pdsMutation(
         { id: user.actor, url: home.convexUrl },
-        api.messages.send,
-        {
+        pdsApi.messages.mutations.send({
           body,
-          eventId: crypto.randomUUID(),
-          roomId: conversation.id,
-          sentAt: Date.now(),
-        },
+          conversationId: conversation.id,
+          messageId: crypto.randomUUID(),
+        }),
       );
       setDraft("");
     } catch (cause) {

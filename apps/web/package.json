@@ -9,7 +9,8 @@
   "scripts": {
     "build": "vite build",
     "clean": "git clean -xdf .cache .turbo .output node_modules",
-    "dev": "vite --port 5173 --strictPort",
+    "dev": "portless",
+    "dev:app": "vite",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore",
     "generate-routes": "tsr generate",
@@ -20,6 +21,7 @@
   "dependencies": {
     "@convex-dev/better-auth": "0.12.5",
     "@decentralized-convex/client": "workspace:*",
+    "@decentralized-convex/messages": "workspace:*",
     "@decentralized-convex/react": "workspace:*",
     "@decentralized-convex/tanstack-query": "workspace:*",
     "@tanstack/react-query": "catalog:",
@@ -45,6 +47,10 @@
     "prettier": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
+  },
+  "portless": {
+    "name": "www.vera",
+    "script": "dev:app"
   },
   "prettier": "@acme/prettier-config"
 }

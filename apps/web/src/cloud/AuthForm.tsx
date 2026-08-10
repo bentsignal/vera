@@ -7,6 +7,7 @@ import type { HomeServer } from "../live/config.ts";
 interface AuthFormProps {
   authClient: HomeAuthClient;
   home: HomeServer;
+  initialUsername: string;
   onChooseServer: () => void;
 }
 
@@ -22,7 +23,7 @@ export function AuthForm(props: AuthFormProps) {
           onClick={props.onChooseServer}
           type="button"
         >
-          ← Servers
+          ← Back
         </button>
         <header className="account-header">
           <span className="app-icon" aria-hidden="true">
@@ -91,12 +92,12 @@ export function AuthForm(props: AuthFormProps) {
   );
 }
 
-function useAuthForm({ authClient, home }: AuthFormProps) {
+function useAuthForm({ authClient, home, initialUsername }: AuthFormProps) {
   const [error, setError] = useState<string>();
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-up");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(initialUsername);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

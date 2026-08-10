@@ -13,9 +13,11 @@ export interface FederationAuthDescriptor {
 }
 
 export interface FederationDescriptor {
+  accountDomain: string;
   auth?: FederationAuthDescriptor;
   capabilities?: readonly FederationCapability[];
   deploymentUrl: string;
+  httpUrl: string;
   protocolVersion: "0.1";
 }
 
