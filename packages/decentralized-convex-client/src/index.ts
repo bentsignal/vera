@@ -27,6 +27,8 @@ export {
 } from "./pds.ts";
 export { FederatedQueryObserver } from "./observer.ts";
 export { FederatedPdsQueryObserver } from "./pds-observer.ts";
+export { mapPdsQueryData, pdsQueryDataFromSnapshot } from "./query-data.ts";
+export type { PdsQueryData } from "./query-data.ts";
 export { defaultCombine } from "./snapshot.ts";
 export { groupFederationTargets, normalizeFederationUrl } from "./targets.ts";
 export type {

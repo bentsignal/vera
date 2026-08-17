@@ -4,6 +4,7 @@ import type {
   DecentralizedConvexClient,
   DefaultCombinedPdsResult,
   FederatedQuerySnapshot,
+  PdsQueryData,
   PdsRequest,
   PdsRequestResult,
 } from "@decentralized-convex/client";
@@ -20,6 +21,7 @@ import {
   queryOptions,
   useQueryClient,
 } from "@tanstack/react-query";
+import { pdsQueryDataFromSnapshot } from "@decentralized-convex/client";
 
 const PDS_QUERY_META_KEY = "decentralizedConvexPdsQuery";
 const connectedClients = new WeakMap<QueryClient, PdsQueryClient>();
@@ -107,11 +109,14 @@ export class PdsQueryClient {
   async query<Request extends AnyPdsQueryRequest>(
     request: Request,
     queryKey: QueryKey,
-  ): Promise<DefaultCombinedPdsResult<Request>> {
-    const snapshot = await this.#client.pdsQuery(request);
-    this.#publish(hashKey(queryKey), snapshot);
-    if (snapshot.status === "error") throw allTargetsFailed(snapshot);
-    return snapshot.data;
+  ): Promise<PdsQueryData<DefaultCombinedPdsResult<Request>>> {
+    try {
+      const snapshot = await this.#client.pdsQuery(request);
+      this.#publish(hashKey(queryKey), snapshot);
+      return pdsQueryDataFromSnapshot(snapshot);
+    } catch (error) {
+      return { error: toError(error), status: "error" };
+    }
   }
 
   async mutate<Request extends AnyPdsMutationRequest>(
@@ -174,9 +179,10 @@ export class PdsQueryClient {
     const publish = () => {
       const snapshot = observer.getSnapshot();
       this.#publish(hashKey(query.queryKey), snapshot);
-      if (snapshot.status === "success" || snapshot.status === "partial") {
-        queryClient.setQueryData(query.queryKey, snapshot.data);
-      }
+      queryClient.setQueryData(
+        query.queryKey,
+        pdsQueryDataFromSnapshot(snapshot),
+      );
     };
     const unsubscribe = observer.subscribe(publish);
     active.close = () => {
@@ -213,12 +219,17 @@ export function pdsQuery<Args, Result>(
     "query",
     request,
   ];
+  const initialData: PdsQueryData<DefaultCombinedPdsResult<typeof request>> = {
+    status: "loading",
+  };
   return queryOptions({
+    initialData,
     meta: { [PDS_QUERY_META_KEY]: request },
     queryFn: ({ client }) =>
       connectedPdsClient(client).query(request, queryKey),
     queryKey,
-    staleTime: Infinity,
+    staleTime: (query) =>
+      query.state.data?.status === "loading" ? 0 : Infinity,
   });
 }
 
@@ -270,9 +281,6 @@ function pdsRequestFromMeta(meta: QueryMeta | undefined) {
   return request as AnyPdsQueryRequest;
 }
 
-function allTargetsFailed(snapshot: UnknownSnapshot) {
-  return new AggregateError(
-    snapshot.sources.flatMap((source) => source.error ?? []),
-    "Every PDS query target failed",
-  );
+function toError(error: unknown) {
+  return error instanceof Error ? error : new Error(String(error));
 }

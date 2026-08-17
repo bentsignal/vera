@@ -1,4 +1,6 @@
 export { decentralizedConvexPackage } from "../metadata.ts";
+export { mapPdsQueryData } from "@decentralized-convex/client";
+export type { PdsQueryData } from "@decentralized-convex/client";
 export { federatedQueryOptions } from "./options.ts";
 export type { FederatedTanStackQueryOptions } from "./options.ts";
 export {

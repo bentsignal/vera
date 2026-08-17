@@ -1,6 +1,7 @@
 import type {
   FederatedQueryStatus,
   FederationSourceSnapshot,
+  PdsQueryData,
 } from "@decentralized-convex/client";
 import type { Message as ChatMessage } from "@decentralized-convex/messages";
 import type { FormEvent } from "react";
@@ -157,12 +158,11 @@ function MessageList({
 }: {
   home: HomePds;
   messages: {
-    data?: readonly ChatMessage[];
+    data: PdsQueryData<readonly ChatMessage[]>;
     federation: {
       sources: readonly FederationSourceSnapshot<ChatMessage[]>[];
       status: FederatedQueryStatus;
     };
-    isPending: boolean;
   };
 }) {
   const live = messages.federation.sources.filter(
@@ -181,19 +181,26 @@ function MessageList({
           </p>
         </aside>
       ) : null}
-      {messages.isPending ? (
+      {messages.data.status === "loading" ? (
         <p className="empty-state">Connecting to participant servers…</p>
       ) : null}
-      {messages.data?.length === 0 ? (
+      {messages.data.status === "error" ? (
+        <p className="empty-state">{messages.data.error.message}</p>
+      ) : null}
+      {(messages.data.status === "partial" ||
+        messages.data.status === "success") &&
+      messages.data.result.length === 0 ? (
         <div className="empty-state">
           <span>#</span>
           <strong>No messages yet</strong>
           <p>Start the conversation from {home.domain}.</p>
         </div>
       ) : null}
-      {messages.data?.map((message) => (
-        <Message key={message.messageId} message={message} />
-      ))}
+      {messages.data.status === "partial" || messages.data.status === "success"
+        ? messages.data.result.map((message) => (
+            <Message key={message.messageId} message={message} />
+          ))
+        : null}
     </div>
   );
 }

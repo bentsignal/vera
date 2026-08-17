@@ -138,12 +138,14 @@ export class RoutedPdsQueryObserver<
 
   #update(
     url: string,
-    patch: Partial<FederationSourceSnapshot<PdsRequestResult<Request>>>,
+    update:
+      | { data: PdsRequestResult<Request>; status: "live" }
+      | { error: Error; status: "error" },
   ) {
     if (this.#closed) return;
     const source = this.#sources.get(url);
     if (source === undefined) return;
-    this.#sources.set(url, { ...source, ...patch });
+    this.#sources.set(url, { ...update, target: source.target });
     this.#publish();
   }
 

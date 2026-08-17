@@ -33,12 +33,21 @@ export interface FederationTargetGroup {
 export type FederationSourceStatus = "pending" | "live" | "error";
 export type FederatedQueryStatus = "pending" | "success" | "partial" | "error";
 
-export interface FederationSourceSnapshot<Result> {
-  data?: Result;
-  error?: Error;
-  status: FederationSourceStatus;
-  target: FederationTargetGroup;
-}
+export type FederationSourceSnapshot<Result> =
+  | {
+      data: Result;
+      status: "live";
+      target: FederationTargetGroup;
+    }
+  | {
+      error: Error;
+      status: "error";
+      target: FederationTargetGroup;
+    }
+  | {
+      status: "pending";
+      target: FederationTargetGroup;
+    };
 
 export interface FederatedQuerySnapshot<Combined, Result> {
   data: Combined;

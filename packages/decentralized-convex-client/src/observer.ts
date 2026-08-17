@@ -71,12 +71,14 @@ export class FederatedQueryObserver<
 
   #update(
     url: string,
-    patch: Partial<FederationSourceSnapshot<FunctionReturnType<Query>>>,
+    update:
+      | { data: FunctionReturnType<Query>; status: "live" }
+      | { error: Error; status: "error" },
   ) {
     if (this.#closed) return;
     const source = this.#sources.get(url);
     if (source === undefined) return;
-    this.#sources.set(url, { ...source, ...patch });
+    this.#sources.set(url, { ...update, target: source.target });
     this.#snapshot = createFederatedSnapshot(
       [...this.#sources.values()],
       this.#options.combine,

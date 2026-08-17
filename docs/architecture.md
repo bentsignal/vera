@@ -108,6 +108,10 @@ The default path intentionally needs only:
 - `useQuery(pdsQuery(operation, args))` for reactive reads;
 - `useMutation(pdsMutation(operation))` for writes.
 
+PDS query `data` is a discriminated `loading`, `partial`, `success`, or `error`
+object. Partial and successful states carry the operation value as `result`;
+loading is never represented by an ambiguous `undefined` value.
+
 Applications may override:
 
 - ordinary Component install names and HTTP prefixes;

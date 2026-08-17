@@ -55,7 +55,9 @@ export function useFederatedQuery<
       const snapshot = await client.query(options);
       if (snapshot.status === "error") {
         throw new AggregateError(
-          snapshot.sources.flatMap((source) => source.error ?? []),
+          snapshot.sources.flatMap((source) =>
+            source.status === "error" ? [source.error] : [],
+          ),
           "Every federation target failed",
         );
       }

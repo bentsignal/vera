@@ -77,5 +77,9 @@ import { pds } from "@vera/backend/pds";
 
 const messages = useQuery(pdsQuery(pds.messages.list, { conversationId }));
 
+if (messages.data.status === "success") {
+  messages.data.result; // Message[]
+}
+
 const sendMessage = useMutation(pdsMutation(pds.messages.send));
 ```

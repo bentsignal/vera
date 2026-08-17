@@ -12,7 +12,7 @@ export function createFederatedSnapshot<Result, Combined>(
   ) => Combined,
 ): FederatedQuerySnapshot<Combined, Result> {
   const successful = sources.flatMap((source) =>
-    source.status === "live" && source.data !== undefined
+    source.status === "live"
       ? [{ data: source.data, target: source.target }]
       : [],
   );

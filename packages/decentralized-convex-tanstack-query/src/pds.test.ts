@@ -4,6 +4,7 @@ import type {
   FederationConnection,
   FederationMutationReference,
   FederationQueryReference,
+  PdsQueryData,
   PdsRequest,
 } from "@decentralized-convex/client";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
@@ -11,6 +12,7 @@ import {
   MutationObserver,
   QueryClient,
   QueryObserver,
+  useQuery,
 } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
@@ -61,20 +63,31 @@ void test("produces native TanStack query and mutation options", async () => {
   const disconnect = adapter.connect(queryClient);
 
   const query = pdsQuery(listNotes, { owner: "alice" });
-  assert.deepEqual(await queryClient.fetchQuery(query), [
-    { body: "https://a.test", id: "alice" },
-    { body: "https://b.test", id: "alice" },
-  ]);
+  const initialObserver = new QueryObserver(new QueryClient(), query);
+  assert.deepEqual(initialObserver.getCurrentResult().data, {
+    status: "loading",
+  });
+
+  assert.deepEqual(await queryClient.fetchQuery(query), {
+    result: [
+      { body: "https://a.test", id: "alice" },
+      { body: "https://b.test", id: "alice" },
+    ],
+    status: "success",
+  });
 
   const observer = new QueryObserver(queryClient, query);
   const unsubscribe = observer.subscribe(() => undefined);
   await nextTask();
   connections.get("https://a.test")?.emit("updated");
   await nextTask();
-  assert.deepEqual(queryClient.getQueryData(query.queryKey), [
-    { body: "updated", id: "alice" },
-    { body: "https://b.test", id: "alice" },
-  ]);
+  assert.deepEqual(queryClient.getQueryData(query.queryKey), {
+    result: [
+      { body: "updated", id: "alice" },
+      { body: "https://b.test", id: "alice" },
+    ],
+    status: "success",
+  });
 
   const mutation = new MutationObserver(queryClient, pdsMutation(createNote));
   assert.deepEqual(await mutation.mutate({ body: "hello" }), {
@@ -86,6 +99,14 @@ void test("produces native TanStack query and mutation options", async () => {
   disconnect();
   await transport.close();
 });
+
+function usePdsQueryTypeTest() {
+  const query = useQuery(pdsQuery(listNotes, { owner: "alice" }));
+  const data: PdsQueryData<Note[]> = query.data;
+  return data;
+}
+
+void usePdsQueryTypeTest;
 
 class MemoryConnection implements FederationConnection {
   readonly #publishers = new Set<(body: string) => void>();

@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useEffect, useEffectEvent, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  mapPdsQueryData,
   pdsMutation,
   pdsQuery,
   usePdsQueryState,
@@ -19,7 +20,7 @@ export function useConversation() {
   const query = useQuery({
     ...messageOptions,
     enabled: conversation.isSuccess,
-    select: combineMessages,
+    select: (data) => mapPdsQueryData(data, combineMessages),
   });
   const federation = usePdsQueryState(messageOptions);
   const sendMessage = useMutation(pdsMutation(pds.messages.send));
