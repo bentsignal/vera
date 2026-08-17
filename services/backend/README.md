@@ -1,12 +1,35 @@
 # Vera backend
 
-This is the thin PDS host used by Vera. It installs reusable Components from the
-workspace packages instead of owning product data in its root database:
+This is the thin PDS host used by Vera. Its complete plugin installation is the
+single declaration in `convex/convex.config.ts`:
 
 ```ts
-app.use(accounts);
-app.use(messages);
+export default definePdsApp({
+  components: [betterAuth],
+  plugins: [accounts, messages],
+});
 ```
+
+Messages explicitly requires Accounts. The app definition fails type-checking
+if that dependency is absent or incompatible. No custom development or deploy
+command is required; this is a normal Convex app definition.
+
+The browser-facing API is derived from that same app declaration:
+
+```ts
+import { definePdsApi } from "@decentralized-convex/client";
+import { protocolsFromPdsApp } from "@decentralized-convex/server";
+
+import app from "./convex/convex.config";
+
+export const protocols = protocolsFromPdsApp(app);
+export const pds = definePdsApi(...protocols);
+```
+
+Applications consume it through `@vera/backend/pds`; adding or removing a
+plugin changes the client API without editing this stable module. The public
+discovery manifest derives its capability list from this same `protocols`
+tuple, so it cannot drift from the installed app.
 
 The root exposes Better Auth plus one generic PDS query and mutation. Message
 schema and behavior live entirely in `@decentralized-convex/messages`; account

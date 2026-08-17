@@ -23,16 +23,21 @@ const messaging = definePluginProtocol({
       returns: v.array(v.object({ body: v.string() })),
     }),
   },
+  requires: {},
   version: "1",
 });
 
-const api = definePdsApi({ messaging });
+const api = definePdsApi(messaging);
 declare const client: PdsClient;
 const bound = client.bind(api);
 const send = api.messaging.mutations.sendMessage({ body: "hello" });
 const list = api.messaging.queries.listMessages({ conversationId: "general" });
+const conciseSend = api.messaging.sendMessage({ body: "hello" });
+const conciseList = api.messaging.listMessages({ conversationId: "general" });
 void send;
 void list;
+void conciseSend;
+void conciseList;
 
 const boundSendResult: Promise<{ messageId: string }> =
   bound.messaging.mutation.sendMessage({ body: "hello" });

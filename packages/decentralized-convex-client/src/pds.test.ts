@@ -24,11 +24,12 @@ const notes = definePluginProtocol({
       returns: v.array(v.object({ body: v.string(), id: v.string() })),
     }),
   },
+  requires: {},
   version: "1",
 });
 
 void test("builds serializable PDS dispatcher requests", () => {
-  const api = definePdsApi({ notes });
+  const api = definePdsApi(notes);
 
   assert.deepEqual(api.notes.queries.list({ owner: "shawn" }), {
     operation: { args: { owner: "shawn" }, type: "list" },
@@ -36,6 +37,16 @@ void test("builds serializable PDS dispatcher requests", () => {
     version: "1",
   });
   assert.deepEqual(api.notes.mutations.create({ body: "hello" }), {
+    operation: { args: { body: "hello" }, type: "create" },
+    plugin: "notes",
+    version: "1",
+  });
+  assert.deepEqual(api.notes.list({ owner: "shawn" }), {
+    operation: { args: { owner: "shawn" }, type: "list" },
+    plugin: "notes",
+    version: "1",
+  });
+  assert.deepEqual(api.notes.create({ body: "hello" }), {
     operation: { args: { body: "hello" }, type: "create" },
     plugin: "notes",
     version: "1",
@@ -61,7 +72,7 @@ void test("binds protocols to canonical typed PDS calls", async () => {
     },
   };
   const client = new PdsClient({ connection });
-  const api = client.bind(definePdsApi({ notes }));
+  const api = client.bind(definePdsApi(notes));
 
   assert.equal(getFunctionName(pdsFunctions.query), "pds:dispatchQuery");
   assert.equal(getFunctionName(pdsFunctions.mutation), "pds:dispatchMutation");

@@ -67,9 +67,10 @@ void test("federates typed PDS requests without a generated backend API", async 
         returns: v.array(v.object({ body: v.string() })),
       }),
     },
+    requires: {},
     version: "1",
   });
-  const api = definePdsApi({ notes });
+  const api = definePdsApi(notes);
   const client = new DecentralizedConvexClient({
     connectionFactory: (url) => new MemoryConnection(url),
   });

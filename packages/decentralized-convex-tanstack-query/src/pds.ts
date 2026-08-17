@@ -1,0 +1,324 @@
+import type {
+  AnyPdsMutationRequest,
+  AnyPdsQueryRequest,
+  DecentralizedConvexClient,
+  DefaultCombinedPdsResult,
+  FederatedQuerySnapshot,
+  FederationTarget,
+  PdsRequest,
+  PdsRequestResult,
+} from "@decentralized-convex/client";
+import type {
+  Query,
+  QueryClient,
+  QueryKey,
+  QueryMeta,
+} from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
+import {
+  hashKey,
+  mutationOptions,
+  queryOptions,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { groupFederationTargets } from "@decentralized-convex/client";
+
+const PDS_QUERY_META_KEY = "decentralizedConvexPdsQuery";
+const connectedClients = new WeakMap<QueryClient, PdsQueryClient>();
+
+type MaybePromise<Value> = Promise<Value> | Value;
+
+export type PdsQueryTargetResolver = (
+  request: AnyPdsQueryRequest,
+) => MaybePromise<readonly FederationTarget[]>;
+
+export type PdsMutationTargetResolver = (
+  request: AnyPdsMutationRequest,
+) => MaybePromise<FederationTarget>;
+
+export interface PdsQueryClientOptions {
+  client: DecentralizedConvexClient;
+  mutationTarget: FederationTarget | PdsMutationTargetResolver;
+  queryTargets: readonly FederationTarget[] | PdsQueryTargetResolver;
+}
+
+interface ActiveQuery {
+  cancelled: boolean;
+  close?: () => void;
+}
+
+type UnknownSnapshot = FederatedQuerySnapshot<unknown, unknown>;
+
+/**
+ * Connects decentralized Convex transport to an application-owned TanStack
+ * QueryClient. Application queries still use TanStack's own hooks.
+ */
+export class PdsQueryClient {
+  readonly #activeQueries = new Map<string, ActiveQuery>();
+  readonly #client;
+  readonly #connections = new Map<QueryClient, () => void>();
+  readonly #listeners = new Map<string, Set<() => void>>();
+  readonly #mutationTarget;
+  readonly #queryTargets;
+  readonly #snapshots = new Map<string, UnknownSnapshot>();
+
+  constructor(options: PdsQueryClientOptions) {
+    this.#client = options.client;
+    this.#mutationTarget = options.mutationTarget;
+    this.#queryTargets = options.queryTargets;
+  }
+
+  connect(queryClient: QueryClient) {
+    const connected = connectedClients.get(queryClient);
+    if (connected !== undefined && connected !== this) {
+      throw new Error(
+        "This TanStack QueryClient is already connected to another PdsQueryClient",
+      );
+    }
+    if (this.#connections.has(queryClient)) return () => undefined;
+    if (this.#connections.size > 0) {
+      throw new Error(
+        "A PdsQueryClient can connect to only one TanStack QueryClient",
+      );
+    }
+
+    connectedClients.set(queryClient, this);
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (
+        (event.type === "observerAdded" ||
+          event.type === "observerOptionsUpdated") &&
+        event.query.isActive()
+      ) {
+        // TanStack's cache event intentionally erases each query's generics.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        this.#startQuery(queryClient, event.query);
+      }
+      if (
+        ((event.type === "observerRemoved" ||
+          event.type === "observerOptionsUpdated") &&
+          !event.query.isActive()) ||
+        event.type === "removed"
+      ) {
+        this.#stopQuery(event.query.queryHash);
+      }
+    });
+    this.#connections.set(queryClient, unsubscribe);
+
+    for (const query of queryClient.getQueryCache().getAll()) {
+      if (query.isActive()) this.#startQuery(queryClient, query);
+    }
+
+    return () => this.disconnect(queryClient);
+  }
+
+  disconnect(queryClient: QueryClient) {
+    const unsubscribe = this.#connections.get(queryClient);
+    if (unsubscribe === undefined) return;
+    unsubscribe();
+    this.#connections.delete(queryClient);
+    if (connectedClients.get(queryClient) === this) {
+      connectedClients.delete(queryClient);
+    }
+    if (this.#connections.size === 0) {
+      for (const queryHash of this.#activeQueries.keys()) {
+        this.#stopQuery(queryHash);
+      }
+    }
+  }
+
+  async query<Request extends AnyPdsQueryRequest>(
+    request: Request,
+    queryKey: QueryKey,
+  ): Promise<DefaultCombinedPdsResult<Request>> {
+    const targets = await this.#resolveQueryTargets(request);
+    const snapshot = await this.#client.pdsQuery({ request, targets });
+    this.#publish(hashKey(queryKey), snapshot);
+    if (snapshot.status === "error") throw allTargetsFailed(snapshot);
+    return snapshot.data;
+  }
+
+  async mutate<Request extends AnyPdsMutationRequest>(
+    request: Request,
+  ): Promise<PdsRequestResult<Request>> {
+    const target =
+      typeof this.#mutationTarget === "function"
+        ? await this.#mutationTarget(request)
+        : this.#mutationTarget;
+    return this.#client.pdsMutation(target, request);
+  }
+
+  getSnapshot<Request extends AnyPdsQueryRequest>(
+    request: Request,
+    queryKey: QueryKey,
+  ): FederatedQuerySnapshot<
+    DefaultCombinedPdsResult<Request>,
+    PdsRequestResult<Request>
+  > {
+    const queryHash = hashKey(queryKey);
+    let snapshot = this.#snapshots.get(queryHash);
+    if (snapshot === undefined) {
+      const targets = Array.isArray(this.#queryTargets)
+        ? groupFederationTargets(this.#queryTargets)
+        : [];
+      snapshot = {
+        data: [],
+        sources: targets.map((target) => ({
+          status: "pending" as const,
+          target,
+        })),
+        status: "pending",
+      };
+      this.#snapshots.set(queryHash, snapshot);
+    }
+
+    // Snapshots originate from the same typed request stored in this query key.
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    return snapshot as FederatedQuerySnapshot<
+      DefaultCombinedPdsResult<Request>,
+      PdsRequestResult<Request>
+    >;
+  }
+
+  subscribe(queryKey: QueryKey, listener: () => void) {
+    const queryHash = hashKey(queryKey);
+    const listeners = this.#listeners.get(queryHash) ?? new Set<() => void>();
+    listeners.add(listener);
+    this.#listeners.set(queryHash, listeners);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) this.#listeners.delete(queryHash);
+    };
+  }
+
+  async #resolveQueryTargets(request: AnyPdsQueryRequest) {
+    return typeof this.#queryTargets === "function"
+      ? await this.#queryTargets(request)
+      : this.#queryTargets;
+  }
+
+  #publish(queryHash: string, snapshot: UnknownSnapshot) {
+    this.#snapshots.set(queryHash, snapshot);
+    for (const listener of this.#listeners.get(queryHash) ?? []) listener();
+  }
+
+  #startQuery(queryClient: QueryClient, query: Query) {
+    const request = pdsRequestFromMeta(query.meta);
+    if (request === undefined || this.#activeQueries.has(query.queryHash)) {
+      return;
+    }
+
+    const active: ActiveQuery = { cancelled: false };
+    this.#activeQueries.set(query.queryHash, active);
+    void this.#resolveQueryTargets(request)
+      .then((targets) => {
+        if (active.cancelled) return;
+        const observer = this.#client.watchPdsQuery({ request, targets });
+        const publish = () => {
+          const snapshot = observer.getSnapshot();
+          this.#publish(hashKey(query.queryKey), snapshot);
+          if (snapshot.status === "success" || snapshot.status === "partial") {
+            queryClient.setQueryData(query.queryKey, snapshot.data);
+          }
+        };
+        const unsubscribe = observer.subscribe(publish);
+        active.close = () => {
+          unsubscribe();
+          observer.close();
+        };
+        publish();
+      })
+      .catch(() => {
+        // The ordinary TanStack query function owns and exposes routing errors.
+      });
+  }
+
+  #stopQuery(queryHash: string) {
+    const active = this.#activeQueries.get(queryHash);
+    if (active === undefined) return;
+    active.cancelled = true;
+    active.close?.();
+    this.#activeQueries.delete(queryHash);
+  }
+}
+
+export type PdsQueryKey<Request extends AnyPdsQueryRequest> = readonly [
+  "decentralized-convex",
+  "pds",
+  "query",
+  Request,
+];
+
+export function pdsQuery<Args, Result>(
+  operation: (args: Args) => PdsRequest<Result, "query">,
+  args: Args,
+) {
+  const request = operation(args);
+  const queryKey: PdsQueryKey<typeof request> = [
+    "decentralized-convex",
+    "pds",
+    "query",
+    request,
+  ];
+  return queryOptions({
+    meta: { [PDS_QUERY_META_KEY]: request },
+    queryFn: ({ client }) =>
+      connectedPdsClient(client).query(request, queryKey),
+    queryKey,
+    staleTime: Infinity,
+  });
+}
+
+export function pdsMutation<Args, Result>(
+  operation: (args: Args) => PdsRequest<Result, "mutation">,
+) {
+  return mutationOptions({
+    mutationFn: (args: Args, { client }) =>
+      connectedPdsClient(client).mutate(operation(args)),
+  });
+}
+
+export function usePdsQueryState<Request extends AnyPdsQueryRequest>(options: {
+  queryKey: PdsQueryKey<Request>;
+}) {
+  const queryClient = useQueryClient();
+  const client = connectedPdsClient(queryClient);
+  const request = options.queryKey[3];
+  return useSyncExternalStore(
+    (listener) => client.subscribe(options.queryKey, listener),
+    () => client.getSnapshot(request, options.queryKey),
+    () => client.getSnapshot(request, options.queryKey),
+  );
+}
+
+function connectedPdsClient(queryClient: QueryClient) {
+  const client = connectedClients.get(queryClient);
+  if (client === undefined) {
+    throw new Error(
+      "Connect a PdsQueryClient to this TanStack QueryClient before using PDS options",
+    );
+  }
+  return client;
+}
+
+function pdsRequestFromMeta(meta: QueryMeta | undefined) {
+  const request = meta?.[PDS_QUERY_META_KEY];
+  if (
+    typeof request !== "object" ||
+    request === null ||
+    !("plugin" in request) ||
+    !("version" in request) ||
+    !("operation" in request)
+  ) {
+    return undefined;
+  }
+  // Only pdsQuery writes this private metadata entry.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  return request as AnyPdsQueryRequest;
+}
+
+function allTargetsFailed(snapshot: UnknownSnapshot) {
+  return new AggregateError(
+    snapshot.sources.flatMap((source) => source.error ?? []),
+    "Every PDS query target failed",
+  );
+}

@@ -1,11 +1,16 @@
 # `@decentralized-convex/accounts`
 
-The product-agnostic account profile Component for a decentralized Convex PDS.
-The authenticated identity comes from the host PDS; this package stores only
-the shared account profile that other products can build on.
+First-party Accounts protocol and Convex Component. It owns canonical account
+profiles and has no PDS plugin dependencies.
+
+Install the default Component with:
 
 ```ts
 import accounts from "@decentralized-convex/accounts/convex.config";
-
-app.use(accounts);
 ```
+
+The default export is a normal Convex Component whose TypeScript type also
+carries the Accounts protocol and dependency metadata.
+
+The host supplies authenticated `accountId` identity through the generic PDS
+router; Accounts does not choose or depend on an authentication provider.

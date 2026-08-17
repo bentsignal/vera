@@ -429,9 +429,6 @@ importers:
       '@decentralized-convex/react':
         specifier: workspace:*
         version: link:../decentralized-convex-react
-      '@tanstack/react-query':
-        specifier: 'catalog:'
-        version: 5.101.4(react@19.2.5)
       convex:
         specifier: 'catalog:'
         version: 1.38.0(react@19.2.5)
@@ -445,6 +442,9 @@ importers:
       '@acme/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.101.4(react@19.2.5)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
@@ -475,6 +475,9 @@ importers:
       '@decentralized-convex/address':
         specifier: workspace:*
         version: link:../../packages/decentralized-convex-address
+      '@decentralized-convex/client':
+        specifier: workspace:*
+        version: link:../../packages/decentralized-convex-client
       '@decentralized-convex/messages':
         specifier: workspace:*
         version: link:../../packages/decentralized-convex-messages

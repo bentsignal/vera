@@ -1,104 +1,43 @@
 # `@decentralized-convex/plugin`
 
-Shared plugin composition and operation protocols for decentralized Convex
-applications.
-
-Plugins provide versioned capability contracts and may require contracts from
-other plugins. The final composition boundary reports missing or incompatible
-providers at type-check time and validates the complete dependency graph before
-running plugin setup.
+Defines the contract shared by plugin authors, PDS hosts, and clients.
 
 ```ts
-interface AccountsService {
-  getAccount(address: string): { address: string; displayName: string };
-}
-
-const Accounts = defineCapability<AccountsService>()({
-  id: "org.decentralized-convex.accounts",
-  version: "1",
-});
-
-const accountsPlugin = definePlugin({
-  name: "accounts",
-  provides: [Accounts],
-  requires: [],
-  setup: () => [accountsService],
-});
-
-const messagesPlugin = definePlugin({
-  name: "messages",
-  provides: [Messaging],
-  requires: [Accounts],
-  setup: ({ get }) => {
-    const accounts = get(Accounts);
-    return [createMessagingService(accounts)];
-  },
-});
-
-const app = composePlugins(messagesPlugin, accountsPlugin);
-const messaging = app.get(Messaging);
-```
-
-Plugin order does not matter. Dependencies determine setup order. Omitting the
-accounts provider produces a TypeScript error at `composePlugins`.
-
-A product profile is another dependent capability rather than a mutation of the
-accounts contract. For example, a `VeraProfiles` plugin can require `Accounts`,
-inherit the account display name and avatar, and provide Vera-specific overrides.
-Ruby or Sync can install separate profile capabilities over the same account.
-
-## Component operation protocols
-
-A Component can define all of its client-facing behavior as typed operations.
-Each operation owns its argument and return validators, and a plugin protocol
-groups them into query and mutation maps:
-
-```ts
-const messages = definePluginProtocol({
+export const messagesProtocol = definePluginProtocol({
   name: "messages",
   version: "1",
+  requires: { accounts: "1" },
   queries: {
-    listMessages: defineOperation({
+    list: defineOperation({
       args: v.object({ conversationId: v.string() }),
       returns: v.array(message),
     }),
   },
   mutations: {
-    sendMessage: defineOperation({
-      args: message,
+    send: defineOperation({
+      args: v.object({
+        body: v.string(),
+        conversationId: v.string(),
+        messageId: v.string(),
+      }),
       returns: message,
     }),
   },
 });
 ```
 
-`defineComponentDispatchers` from `@decentralized-convex/server` turns those
-maps into one real Convex query and one real mutation. `definePdsRouter` exposes
-one root query and mutation for every installed Component. The client SDK uses
-the same protocol to restore operation-specific argument and return types even
-though the root Convex functions are intentionally generic.
-
-The Component uses its protocol name as its Convex name:
+`requires` maps plugin names to exact protocol versions. A complete protocol
+set rejects missing dependencies, incompatible versions, duplicate names, and
+cycles both statically and at runtime:
 
 ```ts
-export default defineComponent(messages.name);
+defineProtocolSet(accountsProtocol, messagesProtocol);
 ```
 
-Installing it into a PDS is one line:
+The same operation definitions generate discriminated request/response
+validators and preserve operation-specific argument and result types through
+the intentionally generic PDS dispatcher.
 
-```ts
-app.use(messagesComponent);
-```
-
-The shared root router resolves that install name dynamically, so installing a
-plugin does not require adding wrapper functions or a second router registry.
-
-Once bound, client calls stay small and contain only application arguments:
-
-```ts
-const client = new PdsClient({ connection });
-const pds = client.bind(definePdsApi({ messages }));
-
-const result = await pds.messages.query.listMessages({ conversationId });
-await pds.messages.mutation.sendMessage(message);
-```
+Version ranges, optional dependencies, and migration policy are deliberately
+not hidden behind premature abstractions. Version `1` currently means exact
+compatibility.

@@ -16,15 +16,19 @@ export type AnyOperation = Operation<
 
 export type OperationMap = Readonly<Record<string, AnyOperation>>;
 
+export type PluginRequirements = Readonly<Record<string, string>>;
+
 export interface PluginProtocol<
   Name extends string,
   Version extends string,
   Queries extends OperationMap,
   Mutations extends OperationMap,
+  Requirements extends PluginRequirements,
 > {
   readonly name: Name;
   readonly mutations: Mutations;
   readonly queries: Queries;
+  readonly requires: Requirements;
   readonly version: Version;
 }
 
@@ -32,8 +36,12 @@ export type AnyPluginProtocol = PluginProtocol<
   string,
   string,
   OperationMap,
-  OperationMap
+  OperationMap,
+  PluginRequirements
 >;
+
+export type ProtocolRequirements<Value extends AnyPluginProtocol> =
+  Value["requires"];
 
 export type OperationArgs<Value extends AnyOperation> = Infer<Value["args"]>;
 export type OperationResult<Value extends AnyOperation> = Infer<
@@ -73,9 +81,14 @@ export function definePluginProtocol<
   const Version extends string,
   const Queries extends OperationMap,
   const Mutations extends OperationMap,
->(protocol: PluginProtocol<Name, Version, Queries, Mutations>) {
+  const Requirements extends PluginRequirements,
+>(protocol: PluginProtocol<Name, Version, Queries, Mutations, Requirements>) {
   assertOperations(protocol.name, "query", protocol.queries);
   assertOperations(protocol.name, "mutation", protocol.mutations);
+  assertDistinctOperationNames(protocol);
+  if (Object.hasOwn(protocol.requires, protocol.name)) {
+    throw new Error(`Plugin ${protocol.name} cannot require itself.`);
+  }
   return Object.freeze(protocol);
 }
 
@@ -118,6 +131,28 @@ export function operationResponseValidator<
     "required",
     string
   >;
+}
+
+function assertDistinctOperationNames(protocol: AnyPluginProtocol) {
+  const reserved = ["mutations", "queries"];
+  for (const name of reserved) {
+    if (
+      Object.hasOwn(protocol.queries, name) ||
+      Object.hasOwn(protocol.mutations, name)
+    ) {
+      throw new Error(
+        `Plugin ${protocol.name} cannot use reserved operation name ${name}.`,
+      );
+    }
+  }
+
+  for (const name of Object.keys(protocol.queries)) {
+    if (Object.hasOwn(protocol.mutations, name)) {
+      throw new Error(
+        `Plugin ${protocol.name} cannot define ${name} as both a query and mutation.`,
+      );
+    }
+  }
 }
 
 function assertOperations(

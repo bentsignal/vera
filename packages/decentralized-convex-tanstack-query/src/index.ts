@@ -1,9 +1,16 @@
-export { federatedPdsQueryOptions, federatedQueryOptions } from "./options.ts";
+export { federatedQueryOptions } from "./options.ts";
+export type { FederatedTanStackQueryOptions } from "./options.ts";
+export {
+  pdsMutation,
+  pdsQuery,
+  PdsQueryClient,
+  usePdsQueryState,
+} from "./pds.ts";
 export type {
-  FederatedPdsTanStackQueryOptions,
-  FederatedTanStackQueryOptions,
-} from "./options.ts";
-export { useFederatedPdsQuery } from "./useFederatedPdsQuery.ts";
-export type { FederatedPdsTanStackQueryResult } from "./useFederatedPdsQuery.ts";
+  PdsMutationTargetResolver,
+  PdsQueryClientOptions,
+  PdsQueryKey,
+  PdsQueryTargetResolver,
+} from "./pds.ts";
 export { useFederatedQuery } from "./useFederatedQuery.ts";
 export type { FederatedTanStackQueryResult } from "./useFederatedQuery.ts";

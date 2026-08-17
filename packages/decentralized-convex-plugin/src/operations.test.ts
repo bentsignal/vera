@@ -4,6 +4,7 @@ import { v } from "convex/values";
 
 import {
   defineOperation,
+  definePluginProtocol,
   operationResponseValidator,
   operationValidator,
 } from "./operations.ts";
@@ -43,5 +44,31 @@ void test("builds discriminated request and response validators", () => {
       return member.fields.type?.kind;
     }),
     ["literal", "literal"],
+  );
+});
+
+void test("rejects operation names that cannot be flattened safely", () => {
+  assert.throws(
+    () =>
+      definePluginProtocol({
+        name: "notes",
+        mutations: { create: operations.create },
+        queries: { create: operations.create },
+        requires: {},
+        version: "1",
+      }),
+    /cannot define create as both a query and mutation/,
+  );
+
+  assert.throws(
+    () =>
+      definePluginProtocol({
+        name: "notes",
+        mutations: { create: operations.create },
+        queries: { queries: operations.remove },
+        requires: {},
+        version: "1",
+      }),
+    /cannot use reserved operation name queries/,
   );
 });

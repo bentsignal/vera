@@ -1,12 +1,28 @@
 import type { FederationAuthTokenFetcher } from "@decentralized-convex/client";
+import {
+  convexClient,
+  crossDomainClient,
+} from "@convex-dev/better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
 
-import type { HomeAuthClient } from "./auth-client.ts";
-import type { HomeServer } from "./live/config.ts";
+import type { PdsHome } from "./model.ts";
+
+export function createHomeAuthClient(home: PdsHome) {
+  return createAuthClient({
+    baseURL: home.siteUrl,
+    plugins: [
+      convexClient(),
+      crossDomainClient({ storagePrefix: `vera-${home.domain}` }),
+    ],
+  });
+}
+
+export type HomeAuthClient = ReturnType<typeof createHomeAuthClient>;
 
 interface FederationAuthOptions {
   authClient: HomeAuthClient;
-  home: HomeServer;
-  homes: readonly HomeServer[];
+  home: PdsHome;
+  homes: readonly PdsHome[];
 }
 
 interface CachedToken {
@@ -14,6 +30,10 @@ interface CachedToken {
   token: string;
 }
 
+/**
+ * Uses the local Better Auth session for the account's home and exchanges a
+ * short-lived home assertion for credentials scoped to every remote PDS.
+ */
 export function createFederationAuthTokenFetcher({
   authClient,
   home,
@@ -23,10 +43,7 @@ export function createFederationAuthTokenFetcher({
   const homesByUrl = new Map(homes.map((server) => [server.convexUrl, server]));
 
   return async ({ forceRefreshToken, url }) => {
-    if (url === home.convexUrl) {
-      return getHomeToken(authClient);
-    }
-
+    if (url === home.convexUrl) return getHomeToken(authClient);
     const target = homesByUrl.get(url);
     if (target === undefined) return null;
     return getRemoteToken({
@@ -58,8 +75,8 @@ async function getRemoteToken({
   authClient: HomeAuthClient;
   cache: Map<string, CachedToken>;
   forceRefreshToken: boolean;
-  home: HomeServer;
-  target: HomeServer;
+  home: PdsHome;
+  target: PdsHome;
   url: string;
 }) {
   const cached = cache.get(url);
@@ -74,6 +91,7 @@ async function getRemoteToken({
   const session = await authClient.getSession();
   const sessionToken = session.data?.session.token;
   if (sessionToken === undefined) return null;
+
   const assertionResponse = await postJson(
     `${home.siteUrl}/api/auth/federation/assertion`,
     { audience: target.domain },
@@ -84,6 +102,7 @@ async function getRemoteToken({
       `Home PDS could not create an identity proof (${assertionResponse.status})`,
     );
   }
+
   const assertionPayload = await readJson(assertionResponse);
   const assertion = requireString(
     readProperty(assertionPayload, "assertion"),
@@ -98,6 +117,7 @@ async function getRemoteToken({
       `Remote PDS rejected the identity proof (${exchangeResponse.status})`,
     );
   }
+
   const exchange = await readJson(exchangeResponse);
   const result = {
     expiresAt: requireNumber(readProperty(exchange, "expiresAt"), "expiresAt"),
@@ -120,7 +140,6 @@ function postJson(
 }
 
 async function readJson(response: Response): Promise<unknown> {
-  // The DOM library types Response.json() as `any`; treat the untrusted payload as unknown.
   return response.json();
 }
 

@@ -1,6 +1,10 @@
-import { registerFederationRoutes } from "@decentralized-convex/server";
+import {
+  protocolCapabilities,
+  registerFederationRoutes,
+} from "@decentralized-convex/server";
 import { httpRouter } from "convex/server";
 
+import { protocols } from "../pds";
 import { httpAction } from "./_generated/server";
 import { authComponent, createAuth } from "./auth";
 import { requireEnvironment } from "./lib";
@@ -15,10 +19,7 @@ registerFederationRoutes(http, httpAction, {
       issuer: requireEnvironment("CONVEX_SITE_URL"),
       jwksUrl: `${requireEnvironment("CONVEX_SITE_URL")}/api/auth/convex/jwks`,
     },
-    capabilities: [
-      { id: "accounts", versions: ["1"] },
-      { id: "messages", versions: ["1"] },
-    ],
+    capabilities: protocolCapabilities(...protocols),
     deploymentUrl: requireEnvironment("CONVEX_CLOUD_URL"),
     httpUrl: requireEnvironment("CONVEX_SITE_URL"),
     protocolVersion: "0.1",

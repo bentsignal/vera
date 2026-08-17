@@ -1,128 +1,24 @@
-import type {
-  AnyPluginProtocol,
-  OperationArgs,
-  OperationMap,
-  OperationResult,
-} from "@decentralized-convex/plugin";
 import type { FunctionReference, FunctionReturnType } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 
 import type {
-  FederationTarget,
-  FederationTargetGroup,
-  SuccessfulFederationSource,
-} from "./types.ts";
+  AnyPdsMutationRequest,
+  AnyPdsQueryRequest,
+  PdsRequestResult,
+  SerializedPdsRequest,
+} from "./api.ts";
 
-declare const PdsResultType: unique symbol;
-
-interface SerializedPdsRequest {
-  readonly [key: string]: unknown;
-  readonly operation: {
-    readonly args: Record<string, unknown>;
-    readonly type: string;
-  };
-  readonly plugin: string;
-  readonly version: string;
-}
-
-export interface PdsRequest<
-  Result,
-  Kind extends "mutation" | "query",
-> extends SerializedPdsRequest {
-  readonly [PdsResultType]?: {
-    readonly kind: Kind;
-    readonly result: Result;
-  };
-}
-
-export type AnyPdsQueryRequest = PdsRequest<unknown, "query">;
-export type AnyPdsMutationRequest = PdsRequest<unknown, "mutation">;
-
-export type PdsRequestResult<Request> =
-  Request extends PdsRequest<infer Result, "mutation" | "query">
-    ? Result
-    : never;
-
-export type DefaultCombinedPdsResult<Request extends AnyPdsQueryRequest> =
-  PdsRequestResult<Request> extends readonly (infer Item)[]
-    ? Item[]
-    : PdsRequestResult<Request>[];
-
-export interface FederatedPdsQueryOptions<
-  Request extends AnyPdsQueryRequest,
-  Combined = DefaultCombinedPdsResult<Request>,
-> {
-  combine?: (
-    sources: readonly SuccessfulFederationSource<PdsRequestResult<Request>>[],
-  ) => Combined;
-  request: Request | ((target: FederationTargetGroup) => Request);
-  targets: readonly FederationTarget[];
-}
-
-type OperationRequestBuilders<
-  PluginName extends string,
-  PluginVersion extends string,
-  Operations extends OperationMap,
-  Kind extends "mutation" | "query",
-> = {
-  readonly [Name in keyof Operations]: (
-    args: OperationArgs<Operations[Name]>,
-  ) => PdsRequest<OperationResult<Operations[Name]>, Kind> & {
-    readonly operation: {
-      readonly args: OperationArgs<Operations[Name]>;
-      readonly type: Name;
-    };
-    readonly plugin: PluginName;
-    readonly version: PluginVersion;
-  };
-};
-
-export interface PdsPluginApi<Protocol extends AnyPluginProtocol> {
-  readonly mutations: OperationRequestBuilders<
-    Protocol["name"],
-    Protocol["version"],
-    Protocol["mutations"],
-    "mutation"
-  >;
-  readonly queries: OperationRequestBuilders<
-    Protocol["name"],
-    Protocol["version"],
-    Protocol["queries"],
-    "query"
-  >;
-}
-
-export type PdsApi<
-  Protocols extends Readonly<Record<string, AnyPluginProtocol>>,
-> = {
-  readonly [Name in keyof Protocols]: PdsPluginApi<Protocols[Name]>;
-};
-
-export function definePdsApi<
-  const Protocols extends Readonly<Record<string, AnyPluginProtocol>>,
->(protocols: Protocols): PdsApi<Protocols> {
-  const api = Object.fromEntries(
-    Object.entries(protocols).map(([name, protocol]) => [
-      name,
-      {
-        mutations: defineRequestBuilders(
-          protocol.name,
-          protocol.version,
-          protocol.mutations,
-        ),
-        queries: defineRequestBuilders(
-          protocol.name,
-          protocol.version,
-          protocol.queries,
-        ),
-      },
-    ]),
-  );
-
-  // The runtime object is constructed from the exact protocol map supplied by the caller.
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  return api as PdsApi<Protocols>;
-}
+export { definePdsApi } from "./api.ts";
+export type {
+  AnyPdsMutationRequest,
+  AnyPdsQueryRequest,
+  DefaultCombinedPdsResult,
+  FederatedPdsQueryOptions,
+  PdsApi,
+  PdsPluginApi,
+  PdsRequest,
+  PdsRequestResult,
+} from "./api.ts";
 
 type RootQuery = FunctionReference<
   "query",
@@ -234,27 +130,6 @@ export class PdsClient {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     return erased as BoundPdsApi<Api>;
   }
-}
-
-function defineRequestBuilders(
-  plugin: string,
-  version: string,
-  operations: OperationMap,
-): Readonly<
-  Record<string, (args: Record<string, unknown>) => SerializedPdsRequest>
-> {
-  return Object.freeze(
-    Object.fromEntries(
-      Object.keys(operations).map((type) => [
-        type,
-        (args: Record<string, unknown>) => ({
-          operation: { args, type },
-          plugin,
-          version,
-        }),
-      ]),
-    ),
-  );
 }
 
 type MutationRequestBuilder = (...args: never[]) => AnyPdsMutationRequest;

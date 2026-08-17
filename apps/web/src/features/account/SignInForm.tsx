@@ -1,18 +1,18 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 
-import type { HomeAuthClient } from "../auth-client.ts";
-import type { HomeServer } from "../live/config.ts";
+import type { HomeAuthClient } from "../pds/auth.ts";
+import type { PdsHome } from "../pds/model.ts";
 
-interface AuthFormProps {
+interface SignInFormProps {
   authClient: HomeAuthClient;
-  home: HomeServer;
+  home: PdsHome;
   initialUsername: string;
-  onChooseServer: () => void;
+  onBack: () => void;
 }
 
-export function AuthForm(props: AuthFormProps) {
-  const form = useAuthForm(props);
+export function SignInForm(props: SignInFormProps) {
+  const form = useSignInForm(props);
   const isSignUp = form.mode === "sign-up";
 
   return (
@@ -20,7 +20,7 @@ export function AuthForm(props: AuthFormProps) {
       <section className="account-panel auth-panel">
         <button
           className="text-button back-button"
-          onClick={props.onChooseServer}
+          onClick={props.onBack}
           type="button"
         >
           ← Back
@@ -92,7 +92,7 @@ export function AuthForm(props: AuthFormProps) {
   );
 }
 
-function useAuthForm({ authClient, home, initialUsername }: AuthFormProps) {
+function useSignInForm({ authClient, home, initialUsername }: SignInFormProps) {
   const [error, setError] = useState<string>();
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-up");
   const [password, setPassword] = useState("");
@@ -115,7 +115,11 @@ function useAuthForm({ authClient, home, initialUsername }: AuthFormProps) {
       const email = `${normalized}@${home.domain}`;
       const result =
         mode === "sign-up"
-          ? await authClient.signUp.email({ email, name: normalized, password })
+          ? await authClient.signUp.email({
+              email,
+              name: normalized,
+              password,
+            })
           : await authClient.signIn.email({ email, password });
       if (result.error !== null) {
         setError(result.error.message ?? "Authentication failed");
@@ -133,7 +137,7 @@ function useAuthForm({ authClient, home, initialUsername }: AuthFormProps) {
     setUsername,
     submit,
     submitting,
-    toggleMode: () => setMode(mode === "sign-in" ? "sign-up" : "sign-in"),
+    toggleMode: () => setMode(mode === "sign-up" ? "sign-in" : "sign-up"),
     username,
   };
 }

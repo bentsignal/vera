@@ -34,5 +34,6 @@ export const messagesProtocol = definePluginProtocol({
       returns: v.array(message),
     }),
   },
+  requires: { accounts: "1" },
   version: "1",
 });

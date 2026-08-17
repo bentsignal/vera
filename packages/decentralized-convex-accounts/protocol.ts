@@ -34,5 +34,6 @@ export const accountsProtocol = definePluginProtocol({
       returns: v.union(v.null(), accountProfile),
     }),
   },
+  requires: {},
   version: "1",
 });

@@ -5,6 +5,7 @@ import type {
   OperationResponse,
   OperationResult,
   PluginProtocol,
+  PluginRequirements,
 } from "@decentralized-convex/plugin";
 import type {
   Auth,
@@ -66,6 +67,7 @@ export function defineComponentDispatchers<
   const Version extends string,
   const Queries extends OperationMap,
   const Mutations extends OperationMap,
+  const Requirements extends PluginRequirements,
 >({
   handlers,
   mutation,
@@ -80,7 +82,13 @@ export function defineComponentDispatchers<
     readonly queries: OperationHandlers<Queries, GenericQueryCtx<DataModel>>;
   };
   readonly mutation: MutationBuilder<DataModel, "public">;
-  readonly protocol: PluginProtocol<Name, Version, Queries, Mutations>;
+  readonly protocol: PluginProtocol<
+    Name,
+    Version,
+    Queries,
+    Mutations,
+    Requirements
+  >;
   readonly query: QueryBuilder<DataModel, "public">;
 }) {
   const queryOperation = operationValidator(protocol.queries);

@@ -3,6 +3,16 @@
 A TanStack Start messaging client that reads one private conversation across
 independent Convex PDS deployments.
 
+## Code tour
+
+- `features/account/AccountEntry.tsx` discovers a PDS from `username@domain`.
+- `features/account/AccountSession.tsx` owns the local auth session and creates
+  the decentralized client.
+- `features/pds/auth.ts` is the replaceable Better Auth federation adapter.
+- `features/pds/model.ts` contains the explicitly temporary two-home fixture.
+- `features/conversation/useConversation.ts` is the complete data path.
+- `features/conversation/Conversation.tsx` is presentation only.
+
 ```sh
 pnpm --filter @vera/web dev
 ```
@@ -31,6 +41,19 @@ the same `convex/` backend to each target and set `SITE_URL` and
 record described in the backend README. Free and Pro Convex deployments use the
 same discovery flow; Convex custom domains are optional.
 
-The web app imports only the product-agnostic Messages protocol. It does not
-import either deployment's generated message API; both homes expose the same
-canonical `pds:dispatchQuery` and `pds:dispatchMutation` functions.
+The web app imports the typed `pds` API derived from Vera's backend app
+definition. It does not declare a second plugin list or import either
+deployment's generated message API; both homes expose the same canonical
+`pds:dispatchQuery` and `pds:dispatchMutation` functions.
+
+The common read and write paths use the application's own TanStack hooks:
+
+```ts
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
+import { pds } from "@vera/backend/pds";
+
+const messages = useQuery(pdsQuery(pds.messages.list, { conversationId }));
+
+const sendMessage = useMutation(pdsMutation(pds.messages.send));
+```

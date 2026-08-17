@@ -1,31 +1,14 @@
-export { defineCapability } from "./capability.ts";
-export type {
-  AnyCapability,
-  Capability,
-  CapabilityKey,
-  CapabilityService,
-} from "./capability.ts";
-export { composePlugins } from "./compose.ts";
-export type {
-  PluginApp,
-  PluginManifestCapability,
-  PluginManifestEntry,
-} from "./compose.ts";
 export {
-  assertPluginGraph,
-  inspectPluginGraph,
-  PluginGraphError,
-} from "./graph.ts";
-export type { PluginGraphIssue } from "./graph.ts";
-export { definePlugin } from "./plugin.ts";
+  assertProtocolGraph,
+  defineProtocolSet,
+  inspectProtocolGraph,
+  ProtocolGraphError,
+} from "./protocol-graph.ts";
 export type {
-  AnyPlugin,
-  CapabilityServices,
-  Plugin,
-  PluginContext,
-  PluginProvisions,
-  PluginRequirements,
-} from "./plugin.ts";
+  ProtocolGraphConstraint,
+  ProtocolGraphIssue,
+  ProtocolGraphNode,
+} from "./protocol-graph.ts";
 export {
   defineOperation,
   definePluginProtocol,
@@ -43,4 +26,6 @@ export type {
   OperationResult,
   OperationReturn,
   PluginProtocol,
+  PluginRequirements,
+  ProtocolRequirements,
 } from "./operations.ts";

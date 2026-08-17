@@ -17,16 +17,17 @@
   "dependencies": {
     "@decentralized-convex/client": "workspace:*",
     "@decentralized-convex/react": "workspace:*",
-    "@tanstack/react-query": "catalog:",
     "convex": "catalog:"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "catalog:",
     "react": "catalog:react19"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",
     "@acme/prettier-config": "workspace:*",
     "@acme/tsconfig": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "eslint": "catalog:",

@@ -1,30 +1,26 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import type { HomeServer } from "../live/config.ts";
-import { HomeServerSession } from "../cloud/HomeServerSession.tsx";
-import { ServerPicker } from "../server-picker/ServerPicker.tsx";
+import type { PdsHome } from "../features/pds/model.ts";
+import { AccountEntry } from "../features/account/AccountEntry.tsx";
+import { AccountSession } from "../features/account/AccountSession.tsx";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   const [selection, setSelection] = useState<{
-    home: HomeServer;
+    home: PdsHome;
     username: string;
   }>();
   if (selection !== undefined) {
     return (
-      <HomeServerSession
+      <AccountSession
         home={selection.home}
         initialUsername={selection.username}
-        onChooseServer={() => setSelection(undefined)}
+        onBack={() => setSelection(undefined)}
       />
     );
   }
 
-  return (
-    <ServerPicker
-      onChoose={(home, username) => setSelection({ home, username })}
-    />
-  );
+  return <AccountEntry onSelect={setSelection} />;
 }

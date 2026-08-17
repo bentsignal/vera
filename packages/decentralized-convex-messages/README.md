@@ -1,11 +1,15 @@
 # `@decentralized-convex/messages`
 
-The product-agnostic messaging Component used by Vera and any other compatible
-decentralized Convex client. The host PDS owns authentication; the Component
-owns message storage and derives authorship from the forwarded identity.
+First-party authenticated Messages protocol and Convex Component.
+
+The protocol explicitly requires `accounts@1`, so a host cannot install
+Messages without a compatible Accounts plugin. Messages receives canonical
+identity from the root PDS router and keeps its hot read/write path inside one
+Component boundary.
 
 ```ts
 import messages from "@decentralized-convex/messages/convex.config";
-
-app.use(messages);
 ```
+
+The default export is a normal Convex Component whose TypeScript type also
+carries the Messages protocol and its `accounts@1` requirement.
