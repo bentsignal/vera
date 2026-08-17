@@ -5,11 +5,11 @@ import type {
 import type { Message as ChatMessage } from "@decentralized-convex/messages";
 import type { FormEvent } from "react";
 
-import type { PdsHome } from "../pds/model.ts";
+import type { HomePds } from "../pds/model.ts";
 import { useConversation } from "./useConversation.ts";
 
 interface ConversationProps {
-  home: PdsHome;
+  home: HomePds;
   onChangeAccount: () => void;
   onSignOut: () => Promise<unknown>;
   user: { actor: string };
@@ -83,7 +83,7 @@ function ConversationHeader({
   home,
   messages,
 }: {
-  home: PdsHome;
+  home: HomePds;
   messages: ConversationMessages;
 }) {
   const { sources, status } = messages.federation;
@@ -115,7 +115,7 @@ function ConnectionDiagnostics({
   home,
   sources,
 }: {
-  home: PdsHome;
+  home: HomePds;
   sources: readonly FederationSourceSnapshot<ChatMessage[]>[];
 }) {
   return (
@@ -155,7 +155,7 @@ function MessageList({
   home,
   messages,
 }: {
-  home: PdsHome;
+  home: HomePds;
   messages: {
     data?: readonly ChatMessage[];
     federation: {

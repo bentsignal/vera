@@ -12,7 +12,7 @@ import { api } from "@vera/backend/api";
 import { ConvexReactClient, useConvexAuth } from "convex/react";
 
 import type { HomeAuthClient } from "../pds/auth.ts";
-import type { PdsHome } from "../pds/model.ts";
+import type { HomePds } from "../pds/model.ts";
 import { Conversation } from "../conversation/Conversation.tsx";
 import {
   createFederationAuthTokenFetcher,
@@ -21,7 +21,7 @@ import {
 import { SignInForm } from "./SignInForm.tsx";
 
 interface AccountSessionProps {
-  home: PdsHome;
+  home: HomePds;
   initialUsername: string;
   onBack: () => void;
 }
@@ -29,7 +29,10 @@ interface AccountSessionProps {
 export function AccountSession(props: AccountSessionProps) {
   const [authClient] = useState(() => createHomeAuthClient(props.home));
   const [convex] = useState(
-    () => new ConvexReactClient(props.home.convexUrl, { expectAuth: true }),
+    () =>
+      new ConvexReactClient(props.home.manifest.deploymentUrl, {
+        expectAuth: true,
+      }),
   );
   // Better Auth's provider erases the concrete plugins returned by createAuthClient.
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -98,7 +101,7 @@ function AuthenticatedAccount({
   );
 }
 
-function useConversationFederation(authClient: HomeAuthClient, home: PdsHome) {
+function useConversationFederation(authClient: HomeAuthClient, home: HomePds) {
   const queryClient = useQueryClient();
   const [federation, setFederation] = useState<
     { client: DecentralizedConvexClient } | { error: Error }
@@ -113,7 +116,7 @@ function useConversationFederation(authClient: HomeAuthClient, home: PdsHome) {
       try {
         const client = new DecentralizedConvexClient({
           getAuthToken: createFederationAuthTokenFetcher({ authClient, home }),
-          pds: { home: home.discovery },
+          pds: { home },
         });
         nextClient = client;
         const pdsQueryClient = new PdsQueryClient(client);
@@ -135,7 +138,7 @@ function useConversationFederation(authClient: HomeAuthClient, home: PdsHome) {
   return federation;
 }
 
-function Connecting({ home }: { home: PdsHome }) {
+function Connecting({ home }: { home: HomePds }) {
   return (
     <main className="account-shell">
       <section className="account-panel loading-panel">

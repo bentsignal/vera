@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import type { PdsHome } from "../features/pds/model.ts";
+import type { HomePds } from "../features/pds/model.ts";
 import { AccountEntry } from "../features/account/AccountEntry.tsx";
 import { AccountSession } from "../features/account/AccountSession.tsx";
 
@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   const [selection, setSelection] = useState<{
-    home: PdsHome;
+    home: HomePds;
     username: string;
   }>();
   if (selection !== undefined) {

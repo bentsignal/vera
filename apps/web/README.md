@@ -24,6 +24,23 @@ Open `https://www.vera.localhost` and:
 3. Send messages. Vera reads the conversation from both development PDSs with
    the one home login.
 
+Home discovery happens before sign-in. The address entry screen resolves the
+account domain and keeps that verified descriptor as `home`; both auth and the
+decentralized client use the same value:
+
+```ts
+const home = await discoverPds("alice@a.vera.chat");
+
+const authClient = createHomeAuthClient(home);
+const client = new DecentralizedConvexClient({
+  getAuthToken,
+  pds: { home },
+});
+```
+
+Signing in creates the authenticated session on that already-discovered home.
+It does not produce or replace the `home` value.
+
 Each signup and outgoing message is stored only on the selected home
 deployment. Each home keeps its own isolated Better Auth and Messages Component
 data. The home PDS issues a short-lived, destination-bound identity proof; the

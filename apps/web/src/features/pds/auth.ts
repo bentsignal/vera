@@ -5,12 +5,11 @@ import {
 } from "@convex-dev/better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-import type { PdsHome } from "./model.ts";
-import { pdsHomeFromDiscovery } from "./model.ts";
+import type { HomePds } from "./model.ts";
 
-export function createHomeAuthClient(home: PdsHome) {
+export function createHomeAuthClient(home: HomePds) {
   return createAuthClient({
-    baseURL: home.siteUrl,
+    baseURL: home.manifest.httpUrl,
     plugins: [
       convexClient(),
       crossDomainClient({ storagePrefix: `vera-${home.domain}` }),
@@ -22,7 +21,7 @@ export type HomeAuthClient = ReturnType<typeof createHomeAuthClient>;
 
 interface FederationAuthOptions {
   authClient: HomeAuthClient;
-  home: PdsHome;
+  home: HomePds;
 }
 
 interface CachedToken {
@@ -41,14 +40,14 @@ export function createFederationAuthTokenFetcher({
   const cache = new Map<string, CachedToken>();
 
   return async ({ forceRefreshToken, pds, url }) => {
-    if (url === home.convexUrl) return getHomeToken(authClient);
+    if (url === home.manifest.deploymentUrl) return getHomeToken(authClient);
     if (pds === undefined) return null;
     return getRemoteToken({
       authClient,
       cache,
       forceRefreshToken,
       home,
-      target: pdsHomeFromDiscovery(pds),
+      target: pds,
       url,
     });
   };
@@ -72,8 +71,8 @@ async function getRemoteToken({
   authClient: HomeAuthClient;
   cache: Map<string, CachedToken>;
   forceRefreshToken: boolean;
-  home: PdsHome;
-  target: PdsHome;
+  home: HomePds;
+  target: HomePds;
   url: string;
 }) {
   const cached = cache.get(url);
@@ -90,7 +89,7 @@ async function getRemoteToken({
   if (sessionToken === undefined) return null;
 
   const assertionResponse = await postJson(
-    `${home.siteUrl}/api/auth/federation/assertion`,
+    `${home.manifest.httpUrl}/api/auth/federation/assertion`,
     { audience: target.domain },
     { authorization: `Bearer ${sessionToken}` },
   );
@@ -106,7 +105,7 @@ async function getRemoteToken({
     "assertion",
   );
   const exchangeResponse = await postJson(
-    `${target.siteUrl}/api/auth/federation/exchange`,
+    `${target.manifest.httpUrl}/api/auth/federation/exchange`,
     { assertion },
   );
   if (!exchangeResponse.ok) {

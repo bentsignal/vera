@@ -2,11 +2,11 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 
 import type { HomeAuthClient } from "../pds/auth.ts";
-import type { PdsHome } from "../pds/model.ts";
+import type { HomePds } from "../pds/model.ts";
 
 interface SignInFormProps {
   authClient: HomeAuthClient;
-  home: PdsHome;
+  home: HomePds;
   initialUsername: string;
   onBack: () => void;
 }

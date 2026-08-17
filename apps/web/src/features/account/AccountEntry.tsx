@@ -2,11 +2,10 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { discoverPds } from "@decentralized-convex/client";
 
-import type { PdsHome } from "../pds/model.ts";
-import { pdsHomeFromDiscovery } from "../pds/model.ts";
+import type { HomePds } from "../pds/model.ts";
 
 interface AccountEntryProps {
-  onSelect: (selection: { home: PdsHome; username: string }) => void;
+  onSelect: (selection: { home: HomePds; username: string }) => void;
 }
 
 export function AccountEntry({ onSelect }: AccountEntryProps) {
@@ -27,8 +26,8 @@ export function AccountEntry({ onSelect }: AccountEntryProps) {
 
     setLoading(true);
     try {
-      const discovery = await discoverPds(normalized);
-      onSelect({ home: pdsHomeFromDiscovery(discovery), username });
+      const home = await discoverPds(normalized);
+      onSelect({ home, username });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "PDS discovery failed");
     } finally {
