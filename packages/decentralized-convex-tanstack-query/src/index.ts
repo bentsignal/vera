@@ -1,3 +1,4 @@
+export { decentralizedConvexPackage } from "../metadata.ts";
 export { federatedQueryOptions } from "./options.ts";
 export type { FederatedTanStackQueryOptions } from "./options.ts";
 export {

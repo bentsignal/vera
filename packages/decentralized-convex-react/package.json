@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./metadata": "./metadata.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@decentralized-convex/client": "workspace:0.1.0",
+    "@decentralized-convex/core": "workspace:0.1.0",
     "convex": "catalog:"
   },
   "peerDependencies": {

@@ -6,16 +6,31 @@ Every official `@decentralized-convex/*` npm package, plugin protocol, client
 request, and server release uses one exact version. The initial release is
 `0.1.0`. If any constituent changes, every package is republished together.
 
-The source of truth is
-`packages/decentralized-convex-core/src/index.ts`. It contains:
+The global release source of truth is
+`packages/decentralized-convex-core/src/release.ts`. It contains only:
 
 - the current ecosystem version;
 - the ordered set of known releases;
-- `lastChanged`, recording the ecosystem release in which each package or wire
-  contract last actually changed.
+- the factory and TypeScript type for standardized package metadata.
+
+Each package owns its own root `metadata.ts` and exposes it through the same
+`./metadata` package export:
+
+```ts
+export const decentralizedConvexPackage =
+  defineDecentralizedConvexPackage({
+    name: "@decentralized-convex/messages",
+    lastChanged: "0.1.0",
+  });
+```
+
+That local `lastChanged` records the ecosystem release in which that package
+last actually changed. Core does not import, enumerate, or store metadata for
+the other packages.
 
 `scripts/check-decentralized-convex-release.ts` verifies every official package
-version and every internal dependency. It runs as part of `pnpm run lint`.
+version, discovers and validates every local metadata export, and checks every
+internal dependency. It runs as part of `pnpm run lint`.
 `definePluginProtocol` injects the ecosystem version, so plugin authors cannot
 accidentally publish a different protocol version.
 
@@ -51,7 +66,7 @@ For a future release:
 2. Set every official package version to that exact release.
 3. Set every internal decentralized Convex dependency to
    `workspace:<release>`.
-4. Update `DECENTRALIZED_CONVEX_LAST_CHANGED` only for constituents that
+4. Update `lastChanged` in the local `metadata.ts` of only the packages that
    actually changed.
 5. Add required Component migrations and compatibility tests.
 6. Run `pnpm run decentralized-convex:check`, followed by the repository's

@@ -1,3 +1,4 @@
+export { decentralizedConvexPackage } from "../metadata.ts";
 export { addressToTarget, formatAddress, parseAddress } from "./address.ts";
 export type { DecentralizedAddress } from "./address.ts";
 export {

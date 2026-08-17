@@ -1,3 +1,4 @@
+export { decentralizedConvexPackage } from "../metadata.ts";
 export * from "convex/react";
 export {
   DecentralizedConvexProvider,

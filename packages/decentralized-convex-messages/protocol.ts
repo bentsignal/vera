@@ -1,13 +1,12 @@
 import type { Infer } from "convex/values";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import {
   defineOperation,
   definePluginProtocol,
 } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
+
+import { decentralizedConvexPackage } from "./metadata.ts";
 
 export const message = v.object({
   authorId: v.string(),
@@ -26,7 +25,7 @@ export const conversation = v.object({
 });
 
 export const messagesProtocol = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.messages,
+  lastChanged: decentralizedConvexPackage.lastChanged,
   name: "messages",
   mutations: {
     putConversation: defineOperation({

@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
   definePluginProtocol,
@@ -15,7 +13,7 @@ import type { PdsConnection } from "./pds.ts";
 import { definePdsApi, PdsClient, pdsFunctions } from "./pds.ts";
 
 const notes = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+  lastChanged: corePackage.lastChanged,
   name: "notes",
   mutations: {
     create: defineOperation({
@@ -36,25 +34,25 @@ void test("builds serializable PDS dispatcher requests", () => {
   const api = definePdsApi(notes);
 
   assert.deepEqual(api.notes.queries.list({ owner: "shawn" }), {
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     operation: { args: { owner: "shawn" }, type: "list" },
     plugin: "notes",
     version: DECENTRALIZED_CONVEX_VERSION,
   });
   assert.deepEqual(api.notes.mutations.create({ body: "hello" }), {
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     operation: { args: { body: "hello" }, type: "create" },
     plugin: "notes",
     version: DECENTRALIZED_CONVEX_VERSION,
   });
   assert.deepEqual(api.notes.list({ owner: "shawn" }), {
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     operation: { args: { owner: "shawn" }, type: "list" },
     plugin: "notes",
     version: DECENTRALIZED_CONVEX_VERSION,
   });
   assert.deepEqual(api.notes.create({ body: "hello" }), {
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     operation: { args: { body: "hello" }, type: "create" },
     plugin: "notes",
     version: DECENTRALIZED_CONVEX_VERSION,

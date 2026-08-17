@@ -3,8 +3,15 @@
 Defines the contract shared by plugin authors, PDS hosts, and clients.
 
 ```ts
+// metadata.ts
+export const decentralizedConvexPackage = defineDecentralizedConvexPackage({
+  name: "@decentralized-convex/messages",
+  lastChanged: "0.1.0",
+});
+
+// protocol.ts
 export const messagesProtocol = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.messages,
+  lastChanged: decentralizedConvexPackage.lastChanged,
   name: "messages",
   requires: { accounts: DECENTRALIZED_CONVEX_VERSION },
   queries: {
@@ -28,8 +35,10 @@ export const messagesProtocol = definePluginProtocol({
 
 `definePluginProtocol` injects the one decentralized Convex ecosystem version;
 plugins cannot select independent versions. `lastChanged` comes from the
-central release manifest and changes only when this plugin's wire contract
-actually changes.
+standardized metadata owned by this package and changes only when this package
+actually changes. Every package exposes that object as
+`@decentralized-convex/<name>/metadata`; core does not maintain a package
+registry.
 
 `requires` maps plugin names to the ecosystem version. A complete protocol
 set rejects missing dependencies, incompatible versions, duplicate names, and

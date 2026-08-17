@@ -398,6 +398,9 @@ importers:
       '@decentralized-convex/client':
         specifier: workspace:0.1.0
         version: link:../decentralized-convex-client
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       convex:
         specifier: 'catalog:'
         version: 1.38.0(react@19.2.5)

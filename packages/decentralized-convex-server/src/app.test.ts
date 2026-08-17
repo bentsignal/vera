@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
   definePluginProtocol,
@@ -21,7 +19,7 @@ import {
 void test("a typed PDS plugin remains the original Convex Component", () => {
   const component = defineComponent("notes");
   const protocol = definePluginProtocol({
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     name: "notes",
     mutations: {
       create: defineOperation({ args: v.object({}), returns: v.null() }),
@@ -40,7 +38,7 @@ void test("a typed PDS plugin remains the original Convex Component", () => {
 
 void test("derives client protocols from the same local app declaration", () => {
   const accountsProtocol = definePluginProtocol({
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.accounts,
+    lastChanged: corePackage.lastChanged,
     name: "accounts",
     mutations: {
       write: defineOperation({ args: v.object({}), returns: v.null() }),
@@ -61,10 +59,10 @@ void test("derives client protocols from the same local app declaration", () => 
     capabilities: [
       {
         id: "accounts",
-        lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.accounts,
+        lastChanged: corePackage.lastChanged,
       },
     ],
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     version: DECENTRALIZED_CONVEX_VERSION,
   });
 });

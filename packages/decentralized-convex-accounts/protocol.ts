@@ -1,10 +1,11 @@
 import type { Infer } from "convex/values";
-import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
 import {
   defineOperation,
   definePluginProtocol,
 } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
+
+import { decentralizedConvexPackage } from "./metadata.ts";
 
 export const accountProfile = v.object({
   accountId: v.string(),
@@ -15,7 +16,7 @@ export const accountProfile = v.object({
 export type AccountProfile = Infer<typeof accountProfile>;
 
 export const accountsProtocol = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.accounts,
+  lastChanged: decentralizedConvexPackage.lastChanged,
   name: "accounts",
   mutations: {
     upsertMyProfile: defineOperation({

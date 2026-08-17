@@ -13,10 +13,8 @@ import {
   QueryObserver,
 } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
 import { pdsMutation, pdsQuery, PdsQueryClient } from "./pds.ts";
 
@@ -29,7 +27,7 @@ function listNotes(args: {
   owner: string;
 }): PdsRequest<readonly Note[], "query"> {
   return {
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     operation: { args, type: "list" },
     plugin: "notes",
     version: DECENTRALIZED_CONVEX_VERSION,
@@ -38,7 +36,7 @@ function listNotes(args: {
 
 function createNote(args: { body: string }): PdsRequest<Note, "mutation"> {
   return {
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     operation: { args, type: "create" },
     plugin: "notes",
     version: DECENTRALIZED_CONVEX_VERSION,
@@ -160,7 +158,7 @@ function discoveredPds(domain: string) {
       capabilities: [
         {
           id: "notes",
-          lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+          lastChanged: corePackage.lastChanged,
         },
       ],
       deploymentUrl: `https://${domain}`,

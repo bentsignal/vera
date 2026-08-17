@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
-import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
   definePluginProtocol,
@@ -55,7 +55,7 @@ void test("groups identities by deployment and combines native query results", a
 
 void test("federates typed PDS requests without a generated backend API", async () => {
   const notes = definePluginProtocol({
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     name: "notes",
     mutations: {
       create: defineOperation({

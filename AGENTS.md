@@ -21,13 +21,16 @@ Then summarize changes for the user.
 
 All official `@decentralized-convex/*` packages and the wire protocol use one
 exact ecosystem version. The source of truth is
-`packages/decentralized-convex-core/src/index.ts`.
+`packages/decentralized-convex-core/src/release.ts`.
 
 - Never version one decentralized Convex package independently.
 - On every release, bump every `@decentralized-convex/*` `package.json` and
   every internal `workspace:<version>` dependency together.
-- Update `DECENTRALIZED_CONVEX_LAST_CHANGED` only for packages or wire
-  contracts that actually changed in that release.
+- Every package owns a root `metadata.ts` and exports its
+  `decentralizedConvexPackage` object from `./metadata`. Update that package's
+  `lastChanged` only when the package actually changes.
+- Never add a registry of package metadata to core. Release tooling discovers
+  and validates the standardized package exports.
 - Do not write a plugin protocol version manually; `definePluginProtocol`
   injects the ecosystem version.
 - Run `pnpm run decentralized-convex:check`; it is also enforced by lint.

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
 import { v } from "convex/values";
 
+import { decentralizedConvexPackage } from "../metadata.ts";
 import {
   defineOperation,
   definePluginProtocol,
@@ -52,7 +52,7 @@ void test("rejects operation names that cannot be flattened safely", () => {
   assert.throws(
     () =>
       definePluginProtocol({
-        lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+        lastChanged: decentralizedConvexPackage.lastChanged,
         name: "notes",
         mutations: { create: operations.create },
         queries: { create: operations.create },
@@ -64,7 +64,7 @@ void test("rejects operation names that cannot be flattened safely", () => {
   assert.throws(
     () =>
       definePluginProtocol({
-        lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+        lastChanged: decentralizedConvexPackage.lastChanged,
         name: "notes",
         mutations: { create: operations.create },
         queries: { queries: operations.remove },

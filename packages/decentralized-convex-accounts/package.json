@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
-    "./convex.config": "./convex.config.ts"
+    "./convex.config": "./convex.config.ts",
+    "./metadata": "./metadata.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

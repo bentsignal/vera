@@ -2,11 +2,18 @@
 
 ## One concept from package to wire
 
-A plugin protocol is the source of truth for four things:
+A package owns its release metadata, and its plugin protocol consumes that
+local export:
 
 ```ts
+export const decentralizedConvexPackage =
+  defineDecentralizedConvexPackage({
+    name: "@decentralized-convex/messages",
+    lastChanged: "0.1.0",
+  });
+
 export const messagesProtocol = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.messages,
+  lastChanged: decentralizedConvexPackage.lastChanged,
   name: "messages",
   requires: { accounts: DECENTRALIZED_CONVEX_VERSION },
   queries: { list: defineOperation(/* validators */) },
@@ -16,7 +23,8 @@ export const messagesProtocol = definePluginProtocol({
 
 - `name` is the Convex Component install name and wire plugin discriminator.
 - the ecosystem `version` is injected from one release source of truth;
-- `lastChanged` records when this plugin's wire contract actually changed;
+- `lastChanged` comes from the package that owns the plugin and records when
+  that package actually changed;
 - `requires` is validated against the complete deployment at type-check and
   Convex config evaluation time.
 - operation validators produce client argument/result types and enforce the

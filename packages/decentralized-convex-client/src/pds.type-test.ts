@@ -1,4 +1,4 @@
-import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
   definePluginProtocol,
@@ -11,7 +11,7 @@ import type { FederatedQuerySnapshot } from "./types.ts";
 import { definePdsApi } from "./pds.ts";
 
 const messaging = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+  lastChanged: corePackage.lastChanged,
   name: "messaging",
   mutations: {
     sendMessage: defineOperation({

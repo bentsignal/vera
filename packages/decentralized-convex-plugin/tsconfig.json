@@ -5,5 +5,5 @@
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["metadata.ts", "src/**/*.ts"]
 }

@@ -1,3 +1,4 @@
+export { decentralizedConvexPackage } from "../metadata.ts";
 export {
   assertProtocolGraph,
   defineProtocolSet,

@@ -1,5 +1,5 @@
 import type { DiscoveredPds } from "@decentralized-convex/address";
-import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
 import type { SerializedPdsRequest } from "./api.ts";
 import { pdsApiRequirements } from "./api.ts";
@@ -25,7 +25,7 @@ export function assertPdsRequestCompatibility(
   pds: DiscoveredPds,
   request: SerializedPdsRequest,
 ): DiscoveredPds {
-  assertRequirements(pds, DECENTRALIZED_CONVEX_LAST_CHANGED.protocol, [
+  assertRequirements(pds, corePackage.lastChanged, [
     { id: request.plugin, lastChanged: request.lastChanged },
   ]);
   return pds;

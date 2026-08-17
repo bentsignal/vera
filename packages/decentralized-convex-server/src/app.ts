@@ -3,10 +3,8 @@ import type {
   ProtocolGraphConstraint,
 } from "@decentralized-convex/plugin";
 import type { ComponentDefinition } from "convex/server";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import { defineProtocolSet } from "@decentralized-convex/plugin";
 import { defineApp } from "convex/server";
 
@@ -165,7 +163,7 @@ export function pdsReleaseFromApp<
       id: name,
       lastChanged,
     })),
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     version: DECENTRALIZED_CONVEX_VERSION,
   });
 }

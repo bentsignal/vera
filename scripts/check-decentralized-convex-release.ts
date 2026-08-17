@@ -1,38 +1,62 @@
 import { readdir, readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 
 import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
   DECENTRALIZED_CONVEX_RELEASES,
   DECENTRALIZED_CONVEX_VERSION,
-} from "../packages/decentralized-convex-core/src/index.ts";
-
-const packages = {
-  accounts: "decentralized-convex-accounts",
-  address: "decentralized-convex-address",
-  client: "decentralized-convex-client",
-  core: "decentralized-convex-core",
-  messages: "decentralized-convex-messages",
-  plugin: "decentralized-convex-plugin",
-  react: "decentralized-convex-react",
-  server: "decentralized-convex-server",
-  tanstackQuery: "decentralized-convex-tanstack-query",
-} as const;
+} from "../packages/decentralized-convex-core/src/release.ts";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
+const packagesRoot = `${repoRoot}packages`;
 const problems: string[] = [];
+const packageDirectories = (await readdir(packagesRoot, {
+  withFileTypes: true,
+}))
+  .filter(
+    (entry) =>
+      entry.isDirectory() && entry.name.startsWith("decentralized-convex-"),
+  )
+  .map((entry) => entry.name);
 
-for (const [part, directory] of Object.entries(packages)) {
-  const manifest = await readJson(`${repoRoot}packages/${directory}/package.json`);
+for (const directory of packageDirectories) {
+  const packageRoot = `${packagesRoot}/${directory}`;
+  const manifest = await readJson(`${packageRoot}/package.json`);
+  const packageName = manifest.name ?? directory;
+
   if (manifest.version !== DECENTRALIZED_CONVEX_VERSION) {
     problems.push(
-      `${manifest.name ?? directory} is ${String(manifest.version)}, expected ${DECENTRALIZED_CONVEX_VERSION}`,
+      `${String(packageName)} is ${String(manifest.version)}, expected ${DECENTRALIZED_CONVEX_VERSION}`,
     );
   }
-  if (!(part in DECENTRALIZED_CONVEX_LAST_CHANGED)) {
-    problems.push(`${part} is missing lastChanged metadata`);
+
+  const exports = manifest.exports;
+  if (!isRecord(exports) || exports["./metadata"] !== "./metadata.ts") {
+    problems.push(
+      `${String(packageName)} must export ./metadata from ./metadata.ts`,
+    );
   }
 
+  const metadata = await readPackageMetadata(`${packageRoot}/metadata.ts`);
+  if (metadata.name !== packageName) {
+    problems.push(
+      `${String(packageName)} metadata identifies itself as ${String(metadata.name)}`,
+    );
+  }
+  if (metadata.version !== DECENTRALIZED_CONVEX_VERSION) {
+    problems.push(
+      `${String(packageName)} metadata reports ${String(metadata.version)}, expected ${DECENTRALIZED_CONVEX_VERSION}`,
+    );
+  }
+  if (
+    !DECENTRALIZED_CONVEX_RELEASES.some(
+      (release) => release === metadata.lastChanged,
+    )
+  ) {
+    problems.push(
+      `${String(packageName)} last changed in unknown release ${String(metadata.lastChanged)}`,
+    );
+  }
 }
 
 for (const root of ["apps", "packages", "services", "shared", "tooling"]) {
@@ -47,20 +71,10 @@ for (const root of ["apps", "packages", "services", "shared", "tooling"]) {
   }
 }
 
-if (!("protocol" in DECENTRALIZED_CONVEX_LAST_CHANGED)) {
-  problems.push("protocol is missing lastChanged metadata");
-}
 if (
   DECENTRALIZED_CONVEX_RELEASES.at(-1) !== DECENTRALIZED_CONVEX_VERSION
 ) {
   problems.push("the current version is not the latest known release");
-}
-for (const [part, lastChanged] of Object.entries(
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-)) {
-  if (!DECENTRALIZED_CONVEX_RELEASES.includes(lastChanged)) {
-    problems.push(`${part} last changed in unknown release ${lastChanged}`);
-  }
 }
 
 if (problems.length > 0) {
@@ -70,13 +84,23 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `Decentralized Convex ${DECENTRALIZED_CONVEX_VERSION}: package versions and internal dependencies are in sync.`,
+  `Decentralized Convex ${DECENTRALIZED_CONVEX_VERSION}: ${packageDirectories.length} package metadata exports and internal dependencies are in sync.`,
 );
 
 async function readJson(path: string): Promise<Record<string, unknown>> {
   const value: unknown = JSON.parse(await readFile(path, "utf8"));
   if (!isRecord(value)) throw new Error(`${path} is not a JSON object`);
   return value;
+}
+
+async function readPackageMetadata(path: string) {
+  const module: unknown = await import(pathToFileURL(path).href);
+  if (!isRecord(module) || !isRecord(module.decentralizedConvexPackage)) {
+    throw new Error(
+      `${path} must export a decentralizedConvexPackage metadata object`,
+    );
+  }
+  return module.decentralizedConvexPackage;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

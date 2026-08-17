@@ -1,8 +1,6 @@
 import type { DecentralizedConvexVersion } from "@decentralized-convex/core";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
   definePluginProtocol,
@@ -20,7 +18,7 @@ function protocol<
   >,
 >(name: Name, requires: Requirements) {
   return definePluginProtocol({
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     name,
     mutations: {
       write: defineOperation({ args: v.object({}), returns: v.null() }),

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DiscoveredPds } from "@decentralized-convex/address";
-import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
   definePluginProtocol,
@@ -15,7 +15,7 @@ import {
 } from "./compatibility.ts";
 
 const notes = definePluginProtocol({
-  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+  lastChanged: corePackage.lastChanged,
   name: "notes",
   mutations: {
     write: defineOperation({ args: v.object({}), returns: v.null() }),
@@ -65,12 +65,12 @@ function discoveredPds({
   capabilities = [
     {
       id: "notes",
-      lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+      lastChanged: corePackage.lastChanged,
     },
   ],
   capabilityLastChanged,
   ecosystemVersion = "0.1.0",
-  protocolLastChanged = DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+  protocolLastChanged = corePackage.lastChanged,
 }: {
   capabilities?: { id: string; lastChanged: string }[];
   capabilityLastChanged?: string;

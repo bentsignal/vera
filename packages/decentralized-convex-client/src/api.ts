@@ -4,10 +4,8 @@ import type {
   OperationMap,
   OperationResult,
 } from "@decentralized-convex/plugin";
-import {
-  DECENTRALIZED_CONVEX_LAST_CHANGED,
-  DECENTRALIZED_CONVEX_VERSION,
-} from "@decentralized-convex/core";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
+import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
 import type {
   FederationTarget,
@@ -160,7 +158,7 @@ export function definePdsApi<
       id: name,
       lastChanged,
     })),
-    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    lastChanged: corePackage.lastChanged,
     version: DECENTRALIZED_CONVEX_VERSION,
   });
 
