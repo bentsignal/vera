@@ -2,10 +2,7 @@ import type { AuthClient } from "@convex-dev/better-auth/react";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
-import {
-  DecentralizedConvexClient,
-  discoverPds,
-} from "@decentralized-convex/client";
+import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import {
   DecentralizedConvexProvider,
   useQuery,
@@ -21,7 +18,6 @@ import {
   createFederationAuthTokenFetcher,
   createHomeAuthClient,
 } from "../pds/auth.ts";
-import { pdsHomeFromDiscovery, prototypeConversation } from "../pds/model.ts";
 import { SignInForm } from "./SignInForm.tsx";
 
 interface AccountSessionProps {
@@ -94,7 +90,6 @@ function AuthenticatedAccount({
     <DecentralizedConvexProvider client={federation.client}>
       <Conversation
         home={home}
-        homes={federation.homes}
         onChangeAccount={onBack}
         onSignOut={() => authClient.signOut()}
         user={user}
@@ -106,50 +101,30 @@ function AuthenticatedAccount({
 function useConversationFederation(authClient: HomeAuthClient, home: PdsHome) {
   const queryClient = useQueryClient();
   const [federation, setFederation] = useState<
-    | { client: DecentralizedConvexClient; homes: readonly PdsHome[] }
-    | { error: Error }
+    { client: DecentralizedConvexClient } | { error: Error }
   >();
 
   useEffect(() => {
     let active = true;
     let nextClient: DecentralizedConvexClient | undefined;
     let nextDisconnect: (() => void) | undefined;
-    void Promise.all(
-      prototypeConversation.participantDomains.map(async (domain) =>
-        domain === home.domain
-          ? home
-          : pdsHomeFromDiscovery(await discoverPds(domain)),
-      ),
-    )
-      .then((homes) => {
-        if (!active) return;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      try {
         const client = new DecentralizedConvexClient({
-          getAuthToken: createFederationAuthTokenFetcher({
-            authClient,
-            home,
-            homes,
-          }),
+          getAuthToken: createFederationAuthTokenFetcher({ authClient, home }),
+          pds: { home: home.discovery },
         });
         nextClient = client;
-        const pdsQueryClient = new PdsQueryClient({
-          client,
-          mutationTarget: { id: home.domain, url: home.convexUrl },
-          queryTargets: homes.map((server) => ({
-            id: `member@${server.domain}`,
-            url: server.convexUrl,
-          })),
-        });
-        const disconnect = pdsQueryClient.connect(queryClient);
-        nextDisconnect = disconnect;
-        setFederation({ client, homes });
-      })
-      .catch((cause: unknown) => {
-        if (!active) return;
+        const pdsQueryClient = new PdsQueryClient(client);
+        nextDisconnect = pdsQueryClient.connect(queryClient);
+        setFederation({ client });
+      } catch (cause) {
         setFederation({
-          error:
-            cause instanceof Error ? cause : new Error("PDS discovery failed"),
+          error: cause instanceof Error ? cause : new Error("PDS setup failed"),
         });
-      });
+      }
+    });
     return () => {
       active = false;
       nextDisconnect?.();

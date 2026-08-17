@@ -36,23 +36,38 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             subject: string;
             tokenIdentifier: string;
           };
-          operation: {
-            args: { body: string; conversationId: string; messageId: string };
-            type: "send";
-          };
+          operation:
+            | {
+                args: { conversationId: string; participants: Array<string> };
+                type: "putConversation";
+              }
+            | {
+                args: {
+                  body: string;
+                  conversationId: string;
+                  messageId: string;
+                };
+                type: "send";
+              };
           version: "1";
         },
-        {
-          type: "send";
-          value: {
-            authorId: string;
-            authorName: string;
-            body: string;
-            conversationId: string;
-            messageId: string;
-            sentAt: number;
-          };
-        },
+        | {
+            routes?: Array<string>;
+            type: "putConversation";
+            value: { conversationId: string; participants: Array<string> };
+          }
+        | {
+            routes?: Array<string>;
+            type: "send";
+            value: {
+              authorId: string;
+              authorName: string;
+              body: string;
+              conversationId: string;
+              messageId: string;
+              sentAt: number;
+            };
+          },
         Name
       >;
       dispatchQuery: FunctionReference<
@@ -71,6 +86,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           version: "1";
         },
         {
+          routes?: Array<string>;
           type: "list";
           value: Array<{
             authorId: string;

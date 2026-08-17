@@ -47,16 +47,13 @@ void test("produces native TanStack query and mutation options", async () => {
       connections.set(url, connection);
       return connection;
     },
+    pds: {
+      discover: (domain) => Promise.resolve(discoveredPds(domain)),
+      home: discoveredPds("a.test"),
+    },
   });
   const queryClient = new QueryClient();
-  const adapter = new PdsQueryClient({
-    client: transport,
-    mutationTarget: { id: "alice@a.test", url: "https://a.test" },
-    queryTargets: [
-      { id: "alice@a.test", url: "https://a.test" },
-      { id: "bob@b.test", url: "https://b.test" },
-    ],
-  });
+  const adapter = new PdsQueryClient(transport);
   const disconnect = adapter.connect(queryClient);
 
   const query = pdsQuery(listNotes, { owner: "alice" });
@@ -114,7 +111,10 @@ class MemoryConnection implements FederationConnection {
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
     const owner = operationArgs(args).owner;
-    const result = [{ body: this.#url, id: owner }];
+    const result = {
+      routes: this.#url === "https://a.test" ? ["a.test", "b.test"] : [],
+      value: [{ body: this.#url, id: owner }],
+    };
     // The fake connection cannot derive a concrete result from an arbitrary reference.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     return Promise.resolve(result) as Promise<FunctionReturnType<Query>>;
@@ -125,9 +125,13 @@ class MemoryConnection implements FederationConnection {
     args: FunctionArgs<Query>,
     onResult: (result: FunctionReturnType<Query>) => void,
   ) {
+    const routes = this.#url === "https://a.test" ? ["a.test", "b.test"] : [];
     function publish(body: string) {
       const owner = operationArgs(args).owner;
-      const result = [{ body, id: owner }];
+      const result = {
+        routes,
+        value: [{ body, id: owner }],
+      };
       // The fake connection cannot derive a concrete result from an arbitrary reference.
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       onResult(result as FunctionReturnType<Query>);
@@ -140,6 +144,19 @@ class MemoryConnection implements FederationConnection {
   emit(body: string) {
     for (const publish of this.#publishers) publish(body);
   }
+}
+
+function discoveredPds(domain: string) {
+  return {
+    domain,
+    manifest: {
+      accountDomain: domain,
+      deploymentUrl: `https://${domain}`,
+      httpUrl: `https://${domain}`,
+      protocolVersion: "0.1" as const,
+    },
+    manifestUrl: `https://${domain}/.well-known/pds.json`,
+  };
 }
 
 function nextTask() {

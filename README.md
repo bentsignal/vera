@@ -44,15 +44,15 @@ Messages declares `requires: { accounts: "1" }`. Removing Accounts or
 installing an incompatible version fails type-checking. The normal
 `convex dev`, `convex deploy`, and `convex codegen` commands remain unchanged.
 
-The common client path is similarly small:
+The common client path uses the application's own TanStack hooks:
 
 ```ts
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-const messages = usePdsQuery({
-  request: pds.messages.list({ conversationId }),
-  targets,
-});
+const messages = useQuery(pdsQuery(pds.messages.list, { conversationId }));
+const sendMessage = useMutation(pdsMutation(pds.messages.send));
 ```
 
 The backend's `pds` export derives its plugin names, versions, operations, and
@@ -60,10 +60,11 @@ types from the same `definePdsApp` declaration. The web app never repeats the
 installed plugin list, and the discovery manifest derives its capabilities
 from the same protocol tuple.
 
-`usePdsQuery` supplies a stable query key, connection reuse, realtime
-subscriptions, array merging, and per-PDS status by default. `combine`,
-`queryKey`, `enabled`, connection factories, and destination-aware auth remain
-available when an application needs control.
+The query starts at the signed-in account's home PDS, reads routing identities
+stored with the conversation, discovers their current deployments, and merges
+live results. Mutations automatically target home. Ordinary TanStack options,
+connection factories, explicit lower-level federation, and destination-aware
+authentication remain available when an application needs control.
 
 ## Workspace
 
@@ -74,7 +75,7 @@ available when an application needs control.
 - `packages/decentralized-convex-client` — discovery, connections, typed calls,
   federation, and subscriptions
 - `packages/decentralized-convex-react` — client provider
-- `packages/decentralized-convex-tanstack-query` — reactive query hooks
+- `packages/decentralized-convex-tanstack-query` — native TanStack option builders
 - `packages/decentralized-convex-accounts` and `-messages` — first-party plugins
 - `services/backend` — Vera's thin Better Auth PDS host
 - `apps/web` — the Vera reference client

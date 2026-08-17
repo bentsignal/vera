@@ -63,16 +63,23 @@ void test("binds protocols to canonical typed PDS calls", async () => {
     },
     query: (_query, args) => {
       calls.push(args);
-      return Promise.resolve([{ body: "hello", id: "note-1" }]);
+      return Promise.resolve({
+        routes: ["a.test", "b.test"],
+        value: [{ body: "hello", id: "note-1" }],
+      });
     },
     subscribe: (_query, args, onResult) => {
       calls.push(args);
-      onResult([{ body: "live", id: "note-2" }]);
+      onResult({
+        routes: ["a.test", "b.test"],
+        value: [{ body: "live", id: "note-2" }],
+      });
       return () => undefined;
     },
   };
   const client = new PdsClient({ connection });
-  const api = client.bind(definePdsApi(notes));
+  const requests = definePdsApi(notes);
+  const api = client.bind(requests);
 
   assert.equal(getFunctionName(pdsFunctions.query), "pds:dispatchQuery");
   assert.equal(getFunctionName(pdsFunctions.mutation), "pds:dispatchMutation");
@@ -82,6 +89,13 @@ void test("binds protocols to canonical typed PDS calls", async () => {
   assert.deepEqual(await api.notes.query.list({ owner: "shawn" }), [
     { body: "hello", id: "note-1" },
   ]);
+  assert.deepEqual(
+    await client.queryWithRouting(requests.notes.list({ owner: "shawn" })),
+    {
+      data: [{ body: "hello", id: "note-1" }],
+      routes: ["a.test", "b.test"],
+    },
+  );
 
   let live: unknown;
   api.notes.watch.list(
@@ -92,5 +106,5 @@ void test("binds protocols to canonical typed PDS calls", async () => {
     assert.fail,
   );
   assert.deepEqual(live, [{ body: "live", id: "note-2" }]);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
 });

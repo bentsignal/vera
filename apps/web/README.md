@@ -28,7 +28,9 @@ Each signup and outgoing message is stored only on the selected home
 deployment. Each home keeps its own isolated Better Auth and Messages Component
 data. The home PDS issues a short-lived, destination-bound identity proof; the
 other PDS verifies it through discovery and returns a local Convex credential.
-The client opens an authenticated subscription to each home and reconciles both
+The selected account stores its conversation routing identities on its own PDS.
+The client first subscribes there, discovers the current participant PDSs from
+that response, then opens authenticated subscriptions and reconciles the
 results through TanStack Query.
 
 The account address uses the PDS's public account domain, never its internal

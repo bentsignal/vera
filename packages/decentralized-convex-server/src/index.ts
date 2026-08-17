@@ -31,4 +31,7 @@ export type {
   DispatcherIdentity,
   OperationHandlerContext,
   OperationHandlers,
+  QueryOperationHandlers,
 } from "./dispatcher.ts";
+export { routedQueryResult } from "./routed-query.ts";
+export type { RoutedQueryResult } from "./routed-query.ts";

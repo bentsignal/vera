@@ -6,6 +6,7 @@ import {
 import { createAuthClient } from "better-auth/react";
 
 import type { PdsHome } from "./model.ts";
+import { pdsHomeFromDiscovery } from "./model.ts";
 
 export function createHomeAuthClient(home: PdsHome) {
   return createAuthClient({
@@ -22,7 +23,6 @@ export type HomeAuthClient = ReturnType<typeof createHomeAuthClient>;
 interface FederationAuthOptions {
   authClient: HomeAuthClient;
   home: PdsHome;
-  homes: readonly PdsHome[];
 }
 
 interface CachedToken {
@@ -37,21 +37,18 @@ interface CachedToken {
 export function createFederationAuthTokenFetcher({
   authClient,
   home,
-  homes,
 }: FederationAuthOptions): FederationAuthTokenFetcher {
   const cache = new Map<string, CachedToken>();
-  const homesByUrl = new Map(homes.map((server) => [server.convexUrl, server]));
 
-  return async ({ forceRefreshToken, url }) => {
+  return async ({ forceRefreshToken, pds, url }) => {
     if (url === home.convexUrl) return getHomeToken(authClient);
-    const target = homesByUrl.get(url);
-    if (target === undefined) return null;
+    if (pds === undefined) return null;
     return getRemoteToken({
       authClient,
       cache,
       forceRefreshToken,
       home,
-      target,
+      target: pdsHomeFromDiscovery(pds),
       url,
     });
   };

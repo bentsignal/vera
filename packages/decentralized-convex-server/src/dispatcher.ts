@@ -24,6 +24,9 @@ import {
 } from "@decentralized-convex/plugin";
 import { ConvexError, v } from "convex/values";
 
+import type { RoutedQueryResult } from "./routed-query.ts";
+import { isRoutedQueryResult } from "./routed-query.ts";
+
 export interface DispatcherIdentity {
   readonly accountId?: string;
   readonly email?: string;
@@ -61,6 +64,16 @@ export type OperationHandlers<Operations extends OperationMap, Context> = {
   ) => MaybePromise<OperationResult<Operations[Name]>>;
 };
 
+export type QueryOperationHandlers<Operations extends OperationMap, Context> = {
+  readonly [Name in keyof Operations]: (
+    ctx: Context,
+    request: OperationHandlerContext<OperationArgs<Operations[Name]>>,
+  ) => MaybePromise<
+    | OperationResult<Operations[Name]>
+    | RoutedQueryResult<OperationResult<Operations[Name]>>
+  >;
+};
+
 export function defineComponentDispatchers<
   DataModel extends GenericDataModel,
   const Name extends string,
@@ -79,7 +92,10 @@ export function defineComponentDispatchers<
       Mutations,
       GenericMutationCtx<DataModel>
     >;
-    readonly queries: OperationHandlers<Queries, GenericQueryCtx<DataModel>>;
+    readonly queries: QueryOperationHandlers<
+      Queries,
+      GenericQueryCtx<DataModel>
+    >;
   };
   readonly mutation: MutationBuilder<DataModel, "public">;
   readonly protocol: PluginProtocol<
@@ -124,18 +140,21 @@ export function defineComponentDispatchers<
         version: v.literal(protocol.version),
       },
       returns: queryReturns,
-      handler: async (ctx, { identity, operation }) =>
+      handler: async (ctx, { identity, operation }) => {
+        const result = await invokeQueryOperation(
+          handlers.queries,
+          ctx,
+          identity,
+          operation,
+        );
         // Convex applies a top-level nullability transform that cannot be proven for an open union.
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        ({
+        return {
+          ...(isRoutedQueryResult(result) ? { routes: result.routes } : {}),
           type: operation.type,
-          value: await invokeOperation(
-            handlers.queries,
-            ctx,
-            identity,
-            operation,
-          ),
-        }) as ValidatorTypeToReturnType<OperationResponse<Queries>>,
+          value: isRoutedQueryResult(result) ? result.data : result,
+        } as ValidatorTypeToReturnType<OperationResponse<Queries>>;
+      },
     }),
   } as const;
 }
@@ -159,6 +178,7 @@ type ComponentMutation = FunctionReference<
 >;
 
 interface DispatcherResponse {
+  readonly routes?: readonly string[];
   readonly type: string;
   readonly value: Value;
 }
@@ -201,10 +221,36 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
           operation: request.operation,
           version: request.version,
         });
-        return response.value;
+        return {
+          routes: response.routes ?? [],
+          value: response.value,
+        };
       },
     }),
   } as const;
+}
+
+function invokeQueryOperation<Operations extends OperationMap, Context>(
+  handlers: QueryOperationHandlers<Operations, Context>,
+  ctx: Context,
+  identity: DispatcherIdentity | null,
+  operation: OperationRequest<Operations>,
+): MaybePromise<
+  | OperationResult<Operations[keyof Operations]>
+  | RoutedQueryResult<OperationResult<Operations[keyof Operations]>>
+> {
+  const handler = handlers[operation.type];
+  if (typeof handler !== "function") {
+    throw new ConvexError({
+      code: "UNKNOWN_PLUGIN_OPERATION",
+      operation: operation.type,
+    });
+  }
+
+  return Reflect.apply(handler, undefined, [
+    ctx,
+    { args: operation.args, identity },
+  ]);
 }
 
 function invokeOperation<Operations extends OperationMap, Context>(

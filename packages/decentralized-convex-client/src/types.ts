@@ -1,3 +1,4 @@
+import type { DiscoveredPds } from "@decentralized-convex/address";
 import type {
   DefaultFunctionArgs,
   FunctionArgs,
@@ -71,6 +72,7 @@ export interface FederatedQueryOptions<
 
 export interface FederationAuthRequest {
   forceRefreshToken: boolean;
+  pds?: DiscoveredPds;
   url: string;
 }
 
@@ -104,4 +106,8 @@ export type FederationConnectionFactory = (
 export interface FederationClientOptions {
   connectionFactory?: FederationConnectionFactory;
   getAuthToken?: FederationAuthTokenFetcher;
+  pds?: {
+    discover?: (addressOrDomain: string) => Promise<DiscoveredPds>;
+    home: DiscoveredPds;
+  };
 }

@@ -10,7 +10,6 @@ import { useConversation } from "./useConversation.ts";
 
 interface ConversationProps {
   home: PdsHome;
-  homes: readonly PdsHome[];
   onChangeAccount: () => void;
   onSignOut: () => Promise<unknown>;
   user: { actor: string };

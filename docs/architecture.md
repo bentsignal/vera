@@ -58,14 +58,16 @@ the generated API of any particular independently hosted backend.
 A Messages read follows this path:
 
 ```text
-usePdsQuery
-  -> DecentralizedConvexClient connection for each target
-  -> pds:dispatchQuery on each deployment
+useQuery(pdsQuery(...))
+  -> pds:dispatchQuery on the signed-in account's home
+  -> typed data plus hidden conversation routing identities
+  -> current PDS discovery for those identities
+  -> pds:dispatchQuery on each discovered deployment
   -> root authentication and plugin selection
   -> messages.dispatcher.dispatchQuery
   -> exact operation/version/argument validation
   -> list handler and Component database
-  -> per-source results merged in the client
+  -> per-source results merged into the application's TanStack cache
 ```
 
 A write follows the same path through `pds:dispatchMutation`, targeting only the
@@ -94,15 +96,15 @@ The default path intentionally needs only:
 
 - `definePdsApp` on the server;
 - one stable backend `pds` export inferred from that app definition;
-- `usePdsQuery({ request, targets })` for reactive reads;
-- `client.pdsMutation(target, request)` for writes.
+- `useQuery(pdsQuery(operation, args))` for reactive reads;
+- `useMutation(pdsMutation(operation))` for writes.
 
 Applications may override:
 
 - ordinary Component install names and HTTP prefixes;
 - the root app HTTP prefix;
 - connection creation and destination-aware token fetching;
-- target-specific requests;
+- explicit lower-level federation targets;
 - result combination and deduplication;
 - TanStack query keys and enablement;
 - the canonical root query and mutation references through `PdsClient`.
@@ -115,8 +117,10 @@ updates, root dispatch, exact Component validation, and author-home storage.
 
 Still prototype-only:
 
-- the web app uses one explicit two-domain conversation fixture;
-- conversation membership and routing are not discovered from product data;
+- the web app uses one explicit two-domain conversation fixture, but its
+  routing is stored on each account's home and discovered through product data;
+- the initial loading grace period and partial-result reveal policy are not yet
+  implemented;
 - the UI holds one active account rather than concurrent accounts;
 - auth lacks scopes, revocation, replay limits, and resource-specific policy;
 - plugin version ranges, migrations, upgrades, and large plugin graphs need a

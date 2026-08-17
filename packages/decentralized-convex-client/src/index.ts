@@ -46,6 +46,7 @@ export type {
   PdsApi,
   PdsConnection,
   PdsPluginApi,
+  PdsQueryResult,
   PdsRequest,
   PdsRequestResult,
 } from "./pds.ts";

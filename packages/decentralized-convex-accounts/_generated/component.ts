@@ -43,6 +43,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           version: "1";
         },
         {
+          routes?: Array<string>;
           type: "upsertMyProfile";
           value: {
             accountId: string;
@@ -70,6 +71,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           version: "1";
         },
         | {
+            routes?: Array<string>;
             type: "getMyProfile";
             value: null | {
               accountId: string;
@@ -78,6 +80,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            routes?: Array<string>;
             type: "getProfile";
             value: null | {
               accountId: string;

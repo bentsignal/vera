@@ -3,6 +3,7 @@ import type { DiscoveredPds } from "@decentralized-convex/client";
 /** Everything the client learns about one account's home PDS. */
 export interface PdsHome {
   convexUrl: string;
+  discovery: DiscoveredPds;
   domain: string;
   manifestUrl: string;
   siteUrl: string;
@@ -14,12 +15,13 @@ export interface PdsHome {
  */
 export const prototypeConversation = {
   id: "conversation:direct:a.vera.chat:b.vera.chat",
-  participantDomains: ["a.vera.chat", "b.vera.chat"],
+  participants: ["a.vera.chat", "b.vera.chat"],
 } as const;
 
 export function pdsHomeFromDiscovery(discovery: DiscoveredPds): PdsHome {
   return {
     convexUrl: discovery.manifest.deploymentUrl,
+    discovery,
     domain: discovery.domain,
     manifestUrl: discovery.manifestUrl,
     siteUrl: discovery.manifest.httpUrl,

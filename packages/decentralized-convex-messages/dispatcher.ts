@@ -1,4 +1,7 @@
-import { defineComponentDispatchers } from "@decentralized-convex/server";
+import {
+  defineComponentDispatchers,
+  routedQueryResult,
+} from "@decentralized-convex/server";
 import { ConvexError } from "convex/values";
 
 import { mutation, query } from "./_generated/server.js";
@@ -7,6 +10,29 @@ import { messagesProtocol } from "./protocol.ts";
 export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
   handlers: {
     mutations: {
+      putConversation: async (ctx, { args, identity }) => {
+        const accountId = requireAccountId(identity);
+        const participants = normalizeParticipants(args.participants);
+        const existing = await ctx.db
+          .query("conversations")
+          .withIndex("by_account_conversation", (index) =>
+            index
+              .eq("accountId", accountId)
+              .eq("conversationId", args.conversationId),
+          )
+          .unique();
+        const conversation = {
+          accountId,
+          conversationId: args.conversationId,
+          participants,
+        };
+        if (existing === null) {
+          await ctx.db.insert("conversations", conversation);
+        } else {
+          await ctx.db.patch(existing._id, conversation);
+        }
+        return { conversationId: args.conversationId, participants };
+      },
       send: async (ctx, { args, identity }) => {
         const authorId = requireAccountId(identity);
         const body = args.body.trim();
@@ -37,20 +63,31 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
     },
     queries: {
       list: async (ctx, { args, identity }) => {
-        requireAccountId(identity);
+        const accountId = requireAccountId(identity);
+        const conversation = await ctx.db
+          .query("conversations")
+          .withIndex("by_account_conversation", (index) =>
+            index
+              .eq("accountId", accountId)
+              .eq("conversationId", args.conversationId),
+          )
+          .unique();
         const messages = await ctx.db
           .query("messages")
           .withIndex("by_conversation", (index) =>
             index.eq("conversationId", args.conversationId),
           )
           .collect();
-        return messages
-          .map(toMessage)
-          .sort(
-            (left, right) =>
-              left.sentAt - right.sentAt ||
-              left.messageId.localeCompare(right.messageId),
-          );
+        return routedQueryResult(
+          messages
+            .map(toMessage)
+            .sort(
+              (left, right) =>
+                left.sentAt - right.sentAt ||
+                left.messageId.localeCompare(right.messageId),
+            ),
+          conversation?.participants ?? [],
+        );
       },
     },
   },
@@ -69,6 +106,18 @@ function requireAccountId(
     throw new ConvexError({ code: "AUTHENTICATED_ACCOUNT_REQUIRED" });
   }
   return accountId;
+}
+
+function normalizeParticipants(participants: readonly string[]) {
+  const normalized = [
+    ...new Set(
+      participants.map((participant) => participant.trim().toLowerCase()),
+    ),
+  ].filter(Boolean);
+  if (normalized.length === 0) {
+    throw new ConvexError({ code: "CONVERSATION_PARTICIPANTS_REQUIRED" });
+  }
+  return normalized.sort();
 }
 
 function toMessage(message: {

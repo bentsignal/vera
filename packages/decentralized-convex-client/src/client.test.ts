@@ -75,7 +75,7 @@ void test("federates typed PDS requests without a generated backend API", async 
     connectionFactory: (url) => new MemoryConnection(url),
   });
 
-  const snapshot = await client.pdsQuery({
+  const snapshot = await client.federatedPdsQuery({
     request: api.notes.queries.list({}),
     targets: [
       { id: "alice@a.test", url: "https://a.test" },
@@ -113,7 +113,7 @@ class MemoryConnection implements FederationConnection {
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
     const result = isPdsRequest(args)
-      ? [{ body: this.#url }]
+      ? { routes: [], value: [{ body: this.#url }] }
       : [{ id: this.#url, value: getScope(args) }];
     // The fake connection cannot derive a concrete return type from an arbitrary test reference.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions

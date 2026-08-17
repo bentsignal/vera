@@ -28,16 +28,12 @@ const messages = useQuery({
 Connect the decentralized transport once when creating an account session:
 
 ```ts
-const pdsQueryClient = new PdsQueryClient({
-  client,
-  mutationTarget: home,
-  queryTargets: conversationHomes,
-});
+const pdsQueryClient = new PdsQueryClient(client);
 
 const disconnect = pdsQueryClient.connect(queryClient);
 ```
 
-`PdsQueryClient` updates TanStack's cache from live Convex subscriptions. Static
-targets are sufficient for the current prototype; the resolver forms of
-`queryTargets` and `mutationTarget` are the extension point for automatic
-home-first routing.
+`PdsQueryClient` updates TanStack's cache from live Convex subscriptions. The
+core client owns home-first routing, PDS discovery, connection reuse, and
+author-home mutations; the TanStack adapter only bridges those results into the
+application's cache.

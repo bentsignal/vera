@@ -20,11 +20,16 @@ export type {
   PdsRequestResult,
 } from "./api.ts";
 
+interface SerializedPdsQueryResult {
+  readonly routes: readonly string[];
+  readonly value: unknown;
+}
+
 type RootQuery = FunctionReference<
   "query",
   "public",
   SerializedPdsRequest,
-  unknown
+  SerializedPdsQueryResult
 >;
 
 type RootMutation = FunctionReference<
@@ -38,10 +43,17 @@ export const pdsFunctions = Object.freeze({
   mutation: makeFunctionReference<"mutation", SerializedPdsRequest, unknown>(
     "pds:dispatchMutation",
   ),
-  query: makeFunctionReference<"query", SerializedPdsRequest, unknown>(
-    "pds:dispatchQuery",
-  ),
+  query: makeFunctionReference<
+    "query",
+    SerializedPdsRequest,
+    SerializedPdsQueryResult
+  >("pds:dispatchQuery"),
 });
+
+export interface PdsQueryResult<Result> {
+  readonly data: Result;
+  readonly routes: readonly string[];
+}
 
 export interface PdsConnection {
   close(): Promise<void>;
@@ -86,14 +98,20 @@ export class PdsClient {
     >;
   }
 
-  query<Request extends AnyPdsQueryRequest>(
+  async query<Request extends AnyPdsQueryRequest>(
     request: Request,
   ): Promise<PdsRequestResult<Request>> {
+    return (await this.queryWithRouting(request)).data;
+  }
+
+  async queryWithRouting<Request extends AnyPdsQueryRequest>(
+    request: Request,
+  ): Promise<PdsQueryResult<PdsRequestResult<Request>>> {
+    const result = await this.#connection.query(this.#query, request);
     // The request's phantom result is defined by the same protocol that created its payload.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return this.#connection.query(this.#query, request) as Promise<
-      PdsRequestResult<Request>
-    >;
+    const data = result.value as PdsRequestResult<Request>;
+    return { data, routes: result.routes };
   }
 
   watchQuery<Request extends AnyPdsQueryRequest>(
@@ -101,12 +119,27 @@ export class PdsClient {
     onResult: (result: PdsRequestResult<Request>) => void,
     onError: (error: Error) => void,
   ) {
+    return this.watchQueryWithRouting(
+      request,
+      (result) => onResult(result.data),
+      onError,
+    );
+  }
+
+  watchQueryWithRouting<Request extends AnyPdsQueryRequest>(
+    request: Request,
+    onResult: (result: PdsQueryResult<PdsRequestResult<Request>>) => void,
+    onError: (error: Error) => void,
+  ) {
     return this.#connection.subscribe(
       this.#query,
       request,
-      // The subscription uses the same typed request and root query as the point query path.
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      (result) => onResult(result as PdsRequestResult<Request>),
+      (result) => {
+        // The request's phantom result is defined by the same protocol that created its payload.
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        const data = result.value as PdsRequestResult<Request>;
+        onResult({ data, routes: result.routes });
+      },
       onError,
     );
   }

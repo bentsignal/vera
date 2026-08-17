@@ -16,9 +16,21 @@ export const message = v.object({
 
 export type Message = Infer<typeof message>;
 
+export const conversation = v.object({
+  conversationId: v.string(),
+  participants: v.array(v.string()),
+});
+
 export const messagesProtocol = definePluginProtocol({
   name: "messages",
   mutations: {
+    putConversation: defineOperation({
+      args: v.object({
+        conversationId: v.string(),
+        participants: v.array(v.string()),
+      }),
+      returns: conversation,
+    }),
     send: defineOperation({
       args: v.object({
         body: v.string(),

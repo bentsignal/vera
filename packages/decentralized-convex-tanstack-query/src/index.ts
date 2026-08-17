@@ -6,11 +6,6 @@ export {
   PdsQueryClient,
   usePdsQueryState,
 } from "./pds.ts";
-export type {
-  PdsMutationTargetResolver,
-  PdsQueryClientOptions,
-  PdsQueryKey,
-  PdsQueryTargetResolver,
-} from "./pds.ts";
+export type { PdsQueryKey } from "./pds.ts";
 export { useFederatedQuery } from "./useFederatedQuery.ts";
 export type { FederatedTanStackQueryResult } from "./useFederatedQuery.ts";

@@ -34,8 +34,8 @@ void test("builds discriminated request and response validators", () => {
       return Object.keys(member.fields);
     }),
     [
-      ["type", "value"],
-      ["type", "value"],
+      ["routes", "type", "value"],
+      ["routes", "type", "value"],
     ],
   );
   assert.deepEqual(

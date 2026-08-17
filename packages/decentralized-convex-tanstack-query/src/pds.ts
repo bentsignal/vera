@@ -4,7 +4,6 @@ import type {
   DecentralizedConvexClient,
   DefaultCombinedPdsResult,
   FederatedQuerySnapshot,
-  FederationTarget,
   PdsRequest,
   PdsRequestResult,
 } from "@decentralized-convex/client";
@@ -21,26 +20,9 @@ import {
   queryOptions,
   useQueryClient,
 } from "@tanstack/react-query";
-import { groupFederationTargets } from "@decentralized-convex/client";
 
 const PDS_QUERY_META_KEY = "decentralizedConvexPdsQuery";
 const connectedClients = new WeakMap<QueryClient, PdsQueryClient>();
-
-type MaybePromise<Value> = Promise<Value> | Value;
-
-export type PdsQueryTargetResolver = (
-  request: AnyPdsQueryRequest,
-) => MaybePromise<readonly FederationTarget[]>;
-
-export type PdsMutationTargetResolver = (
-  request: AnyPdsMutationRequest,
-) => MaybePromise<FederationTarget>;
-
-export interface PdsQueryClientOptions {
-  client: DecentralizedConvexClient;
-  mutationTarget: FederationTarget | PdsMutationTargetResolver;
-  queryTargets: readonly FederationTarget[] | PdsQueryTargetResolver;
-}
 
 interface ActiveQuery {
   cancelled: boolean;
@@ -58,14 +40,10 @@ export class PdsQueryClient {
   readonly #client;
   readonly #connections = new Map<QueryClient, () => void>();
   readonly #listeners = new Map<string, Set<() => void>>();
-  readonly #mutationTarget;
-  readonly #queryTargets;
   readonly #snapshots = new Map<string, UnknownSnapshot>();
 
-  constructor(options: PdsQueryClientOptions) {
-    this.#client = options.client;
-    this.#mutationTarget = options.mutationTarget;
-    this.#queryTargets = options.queryTargets;
+  constructor(client: DecentralizedConvexClient) {
+    this.#client = client;
   }
 
   connect(queryClient: QueryClient) {
@@ -130,8 +108,7 @@ export class PdsQueryClient {
     request: Request,
     queryKey: QueryKey,
   ): Promise<DefaultCombinedPdsResult<Request>> {
-    const targets = await this.#resolveQueryTargets(request);
-    const snapshot = await this.#client.pdsQuery({ request, targets });
+    const snapshot = await this.#client.pdsQuery(request);
     this.#publish(hashKey(queryKey), snapshot);
     if (snapshot.status === "error") throw allTargetsFailed(snapshot);
     return snapshot.data;
@@ -140,11 +117,7 @@ export class PdsQueryClient {
   async mutate<Request extends AnyPdsMutationRequest>(
     request: Request,
   ): Promise<PdsRequestResult<Request>> {
-    const target =
-      typeof this.#mutationTarget === "function"
-        ? await this.#mutationTarget(request)
-        : this.#mutationTarget;
-    return this.#client.pdsMutation(target, request);
+    return this.#client.pdsMutation(request);
   }
 
   getSnapshot<Request extends AnyPdsQueryRequest>(
@@ -157,15 +130,9 @@ export class PdsQueryClient {
     const queryHash = hashKey(queryKey);
     let snapshot = this.#snapshots.get(queryHash);
     if (snapshot === undefined) {
-      const targets = Array.isArray(this.#queryTargets)
-        ? groupFederationTargets(this.#queryTargets)
-        : [];
       snapshot = {
         data: [],
-        sources: targets.map((target) => ({
-          status: "pending" as const,
-          target,
-        })),
+        sources: [],
         status: "pending",
       };
       this.#snapshots.set(queryHash, snapshot);
@@ -190,12 +157,6 @@ export class PdsQueryClient {
     };
   }
 
-  async #resolveQueryTargets(request: AnyPdsQueryRequest) {
-    return typeof this.#queryTargets === "function"
-      ? await this.#queryTargets(request)
-      : this.#queryTargets;
-  }
-
   #publish(queryHash: string, snapshot: UnknownSnapshot) {
     this.#snapshots.set(queryHash, snapshot);
     for (const listener of this.#listeners.get(queryHash) ?? []) listener();
@@ -209,27 +170,20 @@ export class PdsQueryClient {
 
     const active: ActiveQuery = { cancelled: false };
     this.#activeQueries.set(query.queryHash, active);
-    void this.#resolveQueryTargets(request)
-      .then((targets) => {
-        if (active.cancelled) return;
-        const observer = this.#client.watchPdsQuery({ request, targets });
-        const publish = () => {
-          const snapshot = observer.getSnapshot();
-          this.#publish(hashKey(query.queryKey), snapshot);
-          if (snapshot.status === "success" || snapshot.status === "partial") {
-            queryClient.setQueryData(query.queryKey, snapshot.data);
-          }
-        };
-        const unsubscribe = observer.subscribe(publish);
-        active.close = () => {
-          unsubscribe();
-          observer.close();
-        };
-        publish();
-      })
-      .catch(() => {
-        // The ordinary TanStack query function owns and exposes routing errors.
-      });
+    const observer = this.#client.watchPdsQuery(request);
+    const publish = () => {
+      const snapshot = observer.getSnapshot();
+      this.#publish(hashKey(query.queryKey), snapshot);
+      if (snapshot.status === "success" || snapshot.status === "partial") {
+        queryClient.setQueryData(query.queryKey, snapshot.data);
+      }
+    };
+    const unsubscribe = observer.subscribe(publish);
+    active.close = () => {
+      unsubscribe();
+      observer.close();
+    };
+    publish();
   }
 
   #stopQuery(queryHash: string) {

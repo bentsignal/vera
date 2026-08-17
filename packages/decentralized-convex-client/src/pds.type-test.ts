@@ -49,7 +49,7 @@ void boundListResult;
 declare const federationClient: DecentralizedConvexClient;
 const federatedListResult: Promise<
   FederatedQuerySnapshot<{ body: string }[], { body: string }[]>
-> = federationClient.pdsQuery({
+> = federationClient.federatedPdsQuery({
   request: list,
   targets: [{ id: "shawn@example.com", url: "https://pds.example.com" }],
 });

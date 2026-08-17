@@ -64,6 +64,7 @@ export type OperationReturn<
 
 export type OperationResponse<Operations extends OperationMap> = {
   readonly [Name in keyof Operations & string]: {
+    readonly routes?: readonly string[];
     readonly type: Name;
     readonly value: OperationResult<Operations[Name]>;
   };
@@ -118,7 +119,11 @@ export function operationResponseValidator<
   operations: Operations,
 ): Validator<OperationResponse<Operations>, "required", string> {
   const members = Object.entries(operations).map(([type, operation]) =>
-    v.object({ type: v.literal(type), value: operation.returns }),
+    v.object({
+      routes: v.optional(v.array(v.string())),
+      type: v.literal(type),
+      value: operation.returns,
+    }),
   );
   if (members.length === 0) {
     throw new Error("A dispatcher must define at least one operation.");
