@@ -1,21 +1,49 @@
-import type { FederatedQuerySnapshot } from "./types.ts";
+import type {
+  FederatedQuerySnapshot,
+  FederatedQueryStatus,
+  FederationSourceSnapshot,
+} from "./types.ts";
 
-export type PdsQueryData<Result> =
-  | { readonly status: "loading" }
-  | { readonly result: Result; readonly status: "partial" }
-  | { readonly result: Result; readonly status: "success" }
-  | { readonly error: Error; readonly status: "error" };
+export interface PdsQueryFederation<SourceResult> {
+  readonly sources: readonly FederationSourceSnapshot<SourceResult>[];
+  readonly status: FederatedQueryStatus;
+}
 
-export function pdsQueryDataFromSnapshot<Result>(
-  snapshot: FederatedQuerySnapshot<Result, unknown>,
-): PdsQueryData<Result> {
+export type PdsQueryData<Result, SourceResult = Result> =
+  | {
+      readonly federation: PdsQueryFederation<SourceResult>;
+      readonly status: "loading";
+    }
+  | {
+      readonly federation: PdsQueryFederation<SourceResult>;
+      readonly result: Result;
+      readonly status: "partial";
+    }
+  | {
+      readonly federation: PdsQueryFederation<SourceResult>;
+      readonly result: Result;
+      readonly status: "success";
+    }
+  | {
+      readonly error: Error;
+      readonly federation: PdsQueryFederation<SourceResult>;
+      readonly status: "error";
+    };
+
+export function pdsQueryDataFromSnapshot<Result, SourceResult>(
+  snapshot: FederatedQuerySnapshot<Result, SourceResult>,
+): PdsQueryData<Result, SourceResult> {
+  const federation = {
+    sources: snapshot.sources,
+    status: snapshot.status,
+  };
   switch (snapshot.status) {
     case "pending":
-      return { status: "loading" };
+      return { federation, status: "loading" };
     case "partial":
-      return { result: snapshot.data, status: "partial" };
+      return { federation, result: snapshot.data, status: "partial" };
     case "success":
-      return { result: snapshot.data, status: "success" };
+      return { federation, result: snapshot.data, status: "success" };
     case "error":
       return {
         error: new AggregateError(
@@ -24,22 +52,31 @@ export function pdsQueryDataFromSnapshot<Result>(
           ),
           "Every PDS query target failed",
         ),
+        federation,
         status: "error",
       };
   }
 }
 
-export function mapPdsQueryData<Input, Output>(
-  data: PdsQueryData<Input>,
+export function mapPdsQueryData<Input, Output, SourceResult>(
+  data: PdsQueryData<Input, SourceResult>,
   map: (result: Input) => Output,
-): PdsQueryData<Output> {
+): PdsQueryData<Output, SourceResult> {
   switch (data.status) {
     case "loading":
     case "error":
       return data;
     case "partial":
-      return { result: map(data.result), status: "partial" };
+      return {
+        federation: data.federation,
+        result: map(data.result),
+        status: "partial",
+      };
     case "success":
-      return { result: map(data.result), status: "success" };
+      return {
+        federation: data.federation,
+        result: map(data.result),
+        status: "success",
+      };
   }
 }

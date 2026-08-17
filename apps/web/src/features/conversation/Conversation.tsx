@@ -1,5 +1,4 @@
 import type {
-  FederatedQueryStatus,
   FederationSourceSnapshot,
   PdsQueryData,
 } from "@decentralized-convex/client";
@@ -87,7 +86,7 @@ function ConversationHeader({
   home: HomePds;
   messages: ConversationMessages;
 }) {
-  const { sources, status } = messages.federation;
+  const { sources, status } = messages.data.federation;
   const live = sources.filter((source) => source.status === "live").length;
   const complete = live === sources.length;
 
@@ -158,17 +157,13 @@ function MessageList({
 }: {
   home: HomePds;
   messages: {
-    data: PdsQueryData<readonly ChatMessage[]>;
-    federation: {
-      sources: readonly FederationSourceSnapshot<ChatMessage[]>[];
-      status: FederatedQueryStatus;
-    };
+    data: PdsQueryData<readonly ChatMessage[], readonly ChatMessage[]>;
   };
 }) {
-  const live = messages.federation.sources.filter(
+  const live = messages.data.federation.sources.filter(
     (source) => source.status === "live",
   ).length;
-  const total = messages.federation.sources.length;
+  const total = messages.data.federation.sources.length;
 
   return (
     <div className="message-list" aria-live="polite">

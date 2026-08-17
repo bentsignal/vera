@@ -72,21 +72,22 @@ The common read and write paths use the PDS query adapter with the
 application's TanStack Query instance:
 
 ```ts
-import { useMutation } from "@tanstack/react-query";
-import {
-  pdsMutation,
-  pdsQuery,
-  useQuery,
-} from "@decentralized-convex/tanstack-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-const messages = useQuery({
-  query: pdsQuery(pds.messages.list, { conversationId }),
-});
+const messages = useQuery(
+  pdsQuery({
+    query: pds.messages.list,
+    args: { conversationId },
+  }),
+);
 
 if (messages.data.status === "success") {
   messages.data.result; // Message[]
 }
 
-const sendMessage = useMutation(pdsMutation(pds.messages.send));
+messages.data.federation.sources;
+
+const sendMessage = useMutation(pdsMutation({ mutation: pds.messages.send }));
 ```

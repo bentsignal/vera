@@ -1,27 +1,33 @@
 import type { Message } from "@decentralized-convex/messages";
 import type { FormEvent } from "react";
 import { useEffect, useEffectEvent, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   mapPdsQueryData,
   pdsMutation,
   pdsQuery,
-  useQuery,
 } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { prototypeConversation } from "../pds/model.ts";
 
 export function useConversation() {
-  const conversation = useMutation(pdsMutation(pds.messages.putConversation));
-  const query = useQuery({
-    enabled: conversation.isSuccess,
-    query: pdsQuery(pds.messages.list, {
-      conversationId: prototypeConversation.id,
+  const conversation = useMutation(
+    pdsMutation({ mutation: pds.messages.putConversation }),
+  );
+  const query = useQuery(
+    pdsQuery({
+      args: {
+        conversationId: prototypeConversation.id,
+      },
+      options: {
+        enabled: conversation.isSuccess,
+        select: (data) => mapPdsQueryData(data, combineMessages),
+      },
+      query: pds.messages.list,
     }),
-    select: (data) => mapPdsQueryData(data, combineMessages),
-  });
-  const sendMessage = useMutation(pdsMutation(pds.messages.send));
+  );
+  const sendMessage = useMutation(pdsMutation({ mutation: pds.messages.send }));
   const [draft, setDraft] = useState("");
   const saveConversation = useEffectEvent(() => {
     conversation.mutate({

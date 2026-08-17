@@ -12,13 +12,13 @@ import {
   MutationObserver,
   QueryClient,
   QueryObserver,
+  useQuery,
 } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
 import { pdsMutation, pdsQuery, PdsQueryClient } from "./pds.ts";
-import { useQuery } from "./useQuery.ts";
 
 interface Note {
   body: string;
@@ -62,34 +62,48 @@ void test("produces native TanStack query and mutation options", async () => {
   const adapter = new PdsQueryClient(transport);
   const disconnect = adapter.connect(queryClient);
 
-  const query = pdsQuery(listNotes, { owner: "alice" });
+  const query = pdsQuery({
+    args: { owner: "alice" },
+    query: listNotes,
+  });
   const initialObserver = new QueryObserver(new QueryClient(), query);
   assert.deepEqual(initialObserver.getCurrentResult().data, {
+    federation: { sources: [], status: "pending" },
     status: "loading",
   });
 
-  assert.deepEqual(await queryClient.fetchQuery(query), {
-    result: [
-      { body: "https://a.test", id: "alice" },
-      { body: "https://b.test", id: "alice" },
-    ],
-    status: "success",
-  });
+  const initial = await queryClient.fetchQuery(query);
+  assert.equal(initial.status, "success");
+  assert.deepEqual(initial.result, [
+    { body: "https://a.test", id: "alice" },
+    { body: "https://b.test", id: "alice" },
+  ]);
+  assert.equal(initial.federation.status, "success");
+  assert.deepEqual(
+    initial.federation.sources.map((source) => source.status),
+    ["live", "live"],
+  );
 
   const observer = new QueryObserver(queryClient, query);
   const unsubscribe = observer.subscribe(() => undefined);
   await nextTask();
   connections.get("https://a.test")?.emit("updated");
   await nextTask();
-  assert.deepEqual(queryClient.getQueryData(query.queryKey), {
-    result: [
-      { body: "updated", id: "alice" },
-      { body: "https://b.test", id: "alice" },
-    ],
-    status: "success",
-  });
+  const updated = queryClient.getQueryData<
+    PdsQueryData<Note[], readonly Note[]>
+  >(query.queryKey);
+  assert.ok(updated);
+  assert.equal(updated.status, "success");
+  assert.deepEqual(updated.result, [
+    { body: "updated", id: "alice" },
+    { body: "https://b.test", id: "alice" },
+  ]);
+  assert.equal(updated.federation.status, "success");
 
-  const mutation = new MutationObserver(queryClient, pdsMutation(createNote));
+  const mutation = new MutationObserver(
+    queryClient,
+    pdsMutation({ mutation: createNote }),
+  );
   assert.deepEqual(await mutation.mutate({ body: "hello" }), {
     body: "hello",
     id: "https://a.test",
@@ -101,11 +115,15 @@ void test("produces native TanStack query and mutation options", async () => {
 });
 
 function usePdsQueryTypeTest() {
-  const query = useQuery({
-    query: pdsQuery(listNotes, { owner: "alice" }),
-  });
-  const data: PdsQueryData<Note[]> = query.data;
-  const source = query.federation.sources[0];
+  const query = useQuery(
+    pdsQuery({
+      args: { owner: "alice" },
+      options: { enabled: true },
+      query: listNotes,
+    }),
+  );
+  const data: PdsQueryData<Note[], readonly Note[]> = query.data;
+  const source = query.data.federation.sources[0];
   if (source?.status === "live") {
     const notes: readonly Note[] = source.data;
     void notes;

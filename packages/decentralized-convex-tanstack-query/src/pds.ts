@@ -3,7 +3,6 @@ import type {
   AnyPdsQueryRequest,
   DecentralizedConvexClient,
   DefaultCombinedPdsResult,
-  FederatedQuerySnapshot,
   PdsQueryData,
   PdsRequest,
   PdsRequestResult,
@@ -12,15 +11,10 @@ import type {
   DefinedInitialDataOptions,
   Query,
   QueryClient,
-  QueryKey,
   QueryMeta,
+  UseMutationOptions,
 } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
-import {
-  hashKey,
-  mutationOptions,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { mutationOptions } from "@tanstack/react-query";
 import { pdsQueryDataFromSnapshot } from "@decentralized-convex/client";
 
 const PDS_QUERY_META_KEY = "decentralizedConvexPdsQuery";
@@ -31,8 +25,6 @@ interface ActiveQuery {
   close?: () => void;
 }
 
-type UnknownSnapshot = FederatedQuerySnapshot<unknown, unknown>;
-
 /**
  * Connects decentralized Convex transport to an application-owned TanStack
  * QueryClient. Application queries still use TanStack's own hooks.
@@ -41,8 +33,6 @@ export class PdsQueryClient {
   readonly #activeQueries = new Map<string, ActiveQuery>();
   readonly #client;
   readonly #connections = new Map<QueryClient, () => void>();
-  readonly #listeners = new Map<string, Set<() => void>>();
-  readonly #snapshots = new Map<string, UnknownSnapshot>();
 
   constructor(client: DecentralizedConvexClient) {
     this.#client = client;
@@ -108,14 +98,18 @@ export class PdsQueryClient {
 
   async query<Request extends AnyPdsQueryRequest>(
     request: Request,
-    queryKey: QueryKey,
-  ): Promise<PdsQueryData<DefaultCombinedPdsResult<Request>>> {
+  ): Promise<
+    PdsQueryData<DefaultCombinedPdsResult<Request>, PdsRequestResult<Request>>
+  > {
     try {
       const snapshot = await this.#client.pdsQuery(request);
-      this.#publish(hashKey(queryKey), snapshot);
       return pdsQueryDataFromSnapshot(snapshot);
     } catch (error) {
-      return { error: toError(error), status: "error" };
+      return {
+        error: toError(error),
+        federation: { sources: [], status: "error" },
+        status: "error",
+      };
     }
   }
 
@@ -123,48 +117,6 @@ export class PdsQueryClient {
     request: Request,
   ): Promise<PdsRequestResult<Request>> {
     return this.#client.pdsMutation(request);
-  }
-
-  getSnapshot<Request extends AnyPdsQueryRequest>(
-    request: Request,
-    queryKey: QueryKey,
-  ): FederatedQuerySnapshot<
-    DefaultCombinedPdsResult<Request>,
-    PdsRequestResult<Request>
-  > {
-    const queryHash = hashKey(queryKey);
-    let snapshot = this.#snapshots.get(queryHash);
-    if (snapshot === undefined) {
-      snapshot = {
-        data: [],
-        sources: [],
-        status: "pending",
-      };
-      this.#snapshots.set(queryHash, snapshot);
-    }
-
-    // Snapshots originate from the same typed request stored in this query key.
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return snapshot as FederatedQuerySnapshot<
-      DefaultCombinedPdsResult<Request>,
-      PdsRequestResult<Request>
-    >;
-  }
-
-  subscribe(queryKey: QueryKey, listener: () => void) {
-    const queryHash = hashKey(queryKey);
-    const listeners = this.#listeners.get(queryHash) ?? new Set<() => void>();
-    listeners.add(listener);
-    this.#listeners.set(queryHash, listeners);
-    return () => {
-      listeners.delete(listener);
-      if (listeners.size === 0) this.#listeners.delete(queryHash);
-    };
-  }
-
-  #publish(queryHash: string, snapshot: UnknownSnapshot) {
-    this.#snapshots.set(queryHash, snapshot);
-    for (const listener of this.#listeners.get(queryHash) ?? []) listener();
   }
 
   #startQuery(queryClient: QueryClient, query: Query) {
@@ -176,14 +128,13 @@ export class PdsQueryClient {
     const active: ActiveQuery = { cancelled: false };
     this.#activeQueries.set(query.queryHash, active);
     const observer = this.#client.watchPdsQuery(request);
-    const publish = () => {
+    function publish() {
       const snapshot = observer.getSnapshot();
-      this.#publish(hashKey(query.queryKey), snapshot);
       queryClient.setQueryData(
         query.queryKey,
         pdsQueryDataFromSnapshot(snapshot),
       );
-    };
+    }
     const unsubscribe = observer.subscribe(publish);
     active.close = () => {
       unsubscribe();
@@ -208,67 +159,102 @@ export type PdsQueryKey<Request extends AnyPdsQueryRequest> = readonly [
   Request,
 ];
 
-export type PdsQueryOptions<Request extends AnyPdsQueryRequest> = ReturnType<
-  typeof pdsQueryOptions<Request>
+type QueryData<Request extends AnyPdsQueryRequest> = PdsQueryData<
+  DefaultCombinedPdsResult<Request>,
+  PdsRequestResult<Request>
 >;
 
-export function pdsQuery<Args, Result>(
-  operation: (args: Args) => PdsRequest<Result, "query">,
-  args: Args,
-) {
-  return pdsQueryOptions(operation(args));
+export type PdsQueryOptions<
+  Request extends AnyPdsQueryRequest,
+  Data = QueryData<Request>,
+> = DefinedInitialDataOptions<
+  QueryData<Request>,
+  Error,
+  Data,
+  PdsQueryKey<Request>
+>;
+
+export interface PdsQueryConfig<
+  Args,
+  Request extends AnyPdsQueryRequest,
+  Data = QueryData<Request>,
+> {
+  readonly args: Args;
+  readonly options?: Omit<
+    PdsQueryOptions<Request, Data>,
+    "initialData" | "meta" | "queryFn" | "queryKey"
+  >;
+  readonly query: (args: Args) => Request;
 }
 
-function pdsQueryOptions<Request extends AnyPdsQueryRequest>(request: Request) {
+export function pdsQuery<
+  Args,
+  Request extends PdsRequest<unknown, "query">,
+  Data = QueryData<Request>,
+>({ args, options, query }: PdsQueryConfig<Args, Request, Data>) {
+  return pdsQueryOptions(query(args), options);
+}
+
+function pdsQueryOptions<
+  Request extends AnyPdsQueryRequest,
+  Data = QueryData<Request>,
+>(
+  request: Request,
+  options?: PdsQueryConfig<unknown, Request, Data>["options"],
+): PdsQueryOptions<Request, Data> {
   const queryKey: PdsQueryKey<typeof request> = [
     "decentralized-convex",
     "pds",
     "query",
     request,
   ];
-  const initialData =
-    loadingPdsQueryData<DefaultCombinedPdsResult<typeof request>>();
+  const initialData = loadingPdsQueryData<
+    DefaultCombinedPdsResult<Request>,
+    PdsRequestResult<Request>
+  >();
   return {
     initialData,
     meta: { [PDS_QUERY_META_KEY]: request },
-    queryFn: ({ client }) =>
-      connectedPdsClient(client).query(request, queryKey),
+    queryFn: ({ client }) => connectedPdsClient(client).query(request),
     queryKey,
     staleTime: (query) =>
       query.state.data?.status === "loading" ? 0 : Infinity,
-  } satisfies DefinedInitialDataOptions<
-    PdsQueryData<DefaultCombinedPdsResult<Request>>,
-    Error,
-    PdsQueryData<DefaultCombinedPdsResult<Request>>,
-    PdsQueryKey<Request>
+    ...options,
+  };
+}
+
+function loadingPdsQueryData<Result, SourceResult>(): PdsQueryData<
+  Result,
+  SourceResult
+> {
+  return {
+    federation: { sources: [], status: "pending" },
+    status: "loading",
+  };
+}
+
+export interface PdsMutationConfig<
+  Args,
+  Request extends AnyPdsMutationRequest,
+  Context = unknown,
+> {
+  readonly mutation: (args: Args) => Request;
+  readonly options?: Omit<
+    UseMutationOptions<PdsRequestResult<Request>, Error, Args, Context>,
+    "mutationFn"
   >;
 }
 
-function loadingPdsQueryData<Result>(): PdsQueryData<Result> {
-  return { status: "loading" };
-}
-
-export function pdsMutation<Args, Result>(
-  operation: (args: Args) => PdsRequest<Result, "mutation">,
-) {
-  return mutationOptions({
+export function pdsMutation<
+  Args,
+  Request extends PdsRequest<unknown, "mutation">,
+  Context = unknown,
+>({ mutation, options }: PdsMutationConfig<Args, Request, Context>) {
+  return mutationOptions<PdsRequestResult<Request>, Error, Args, Context>({
+    ...options,
     mutationFn: (args: Args, { client }) =>
-      connectedPdsClient(client).mutate(operation(args)),
+      connectedPdsClient(client).mutate(mutation(args)),
   });
-}
-
-export function usePdsQueryState<Request extends AnyPdsQueryRequest>(
-  options: { queryKey: PdsQueryKey<Request> },
-  queryClientOverride?: QueryClient,
-) {
-  const queryClient = useQueryClient(queryClientOverride);
-  const client = connectedPdsClient(queryClient);
-  const request = options.queryKey[3];
-  return useSyncExternalStore(
-    (listener) => client.subscribe(options.queryKey, listener),
-    () => client.getSnapshot(request, options.queryKey),
-    () => client.getSnapshot(request, options.queryKey),
-  );
 }
 
 function connectedPdsClient(queryClient: QueryClient) {
