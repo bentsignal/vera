@@ -68,14 +68,21 @@ definition. It does not declare a second plugin list or import either
 deployment's generated message API; both homes expose the same canonical
 `pds:dispatchQuery` and `pds:dispatchMutation` functions.
 
-The common read and write paths use the application's own TanStack hooks:
+The common read and write paths use the PDS query adapter with the
+application's TanStack Query instance:
 
 ```ts
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
+import { useMutation } from "@tanstack/react-query";
+import {
+  pdsMutation,
+  pdsQuery,
+  useQuery,
+} from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-const messages = useQuery(pdsQuery(pds.messages.list, { conversationId }));
+const messages = useQuery({
+  query: pdsQuery(pds.messages.list, { conversationId }),
+});
 
 if (messages.data.status === "success") {
   messages.data.result; // Message[]

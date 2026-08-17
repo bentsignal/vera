@@ -1,32 +1,39 @@
 # `@decentralized-convex/tanstack-query`
 
-A thin adapter for using typed PDS operations with an application's own
-TanStack Query hooks and version:
+A thin adapter for using typed PDS operations with an application's installed
+TanStack Query version:
 
 ```ts
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   mapPdsQueryData,
   pdsMutation,
   pdsQuery,
+  useQuery,
 } from "@decentralized-convex/tanstack-query";
 
-const messages = useQuery(pdsQuery(pds.messages.list, { conversationId }));
+const messages = useQuery({
+  query: pdsQuery(pds.messages.list, { conversationId }),
+});
 
 if (messages.data.status === "success") {
   messages.data.result; // Message[]
 }
 
+messages.federation.status;
+messages.federation.sources;
+
 const sendMessage = useMutation(pdsMutation(pds.messages.send));
 await sendMessage.mutateAsync({ body, conversationId, messageId });
 ```
 
-Both helpers return normal TanStack options, so every TanStack override remains
-available:
+The adapter's `useQuery` delegates to the application's installed TanStack
+Query version. The nested `query` field carries the PDS query while the rest of
+the object accepts normal TanStack options:
 
 ```ts
 const messages = useQuery({
-  ...pdsQuery(pds.messages.list, { conversationId }),
+  query: pdsQuery(pds.messages.list, { conversationId }),
   retry: 3,
   select: (data) =>
     mapPdsQueryData(data, (messages) =>
@@ -52,4 +59,5 @@ const disconnect = pdsQueryClient.connect(queryClient);
 `PdsQueryClient` updates TanStack's cache from live Convex subscriptions. The
 core client owns home-first routing, PDS discovery, connection reuse, and
 author-home mutations; the TanStack adapter only bridges those results into the
-application's cache.
+application's cache. The adapter hook also returns the query's federation
+status and per-source diagnostics, so applications do not need a second hook.

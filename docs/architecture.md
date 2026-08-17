@@ -67,7 +67,7 @@ the generated API of any particular independently hosted backend.
 A Messages read follows this path:
 
 ```text
-useQuery(pdsQuery(...))
+useQuery({ query: pdsQuery(...) })
   -> pds:dispatchQuery on the signed-in account's home
   -> typed data plus hidden conversation routing identities
   -> current PDS discovery for those identities
@@ -105,7 +105,8 @@ The default path intentionally needs only:
 
 - `definePdsApp` on the server;
 - one stable backend `pds` export inferred from that app definition;
-- `useQuery(pdsQuery(operation, args))` for reactive reads;
+- `useQuery({ query: pdsQuery(operation, args) })` for reactive reads and
+  federation diagnostics in one result;
 - `useMutation(pdsMutation(operation))` for writes.
 
 PDS query `data` is a discriminated `loading`, `partial`, `success`, or `error`

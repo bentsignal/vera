@@ -1,12 +1,12 @@
 import type { Message } from "@decentralized-convex/messages";
 import type { FormEvent } from "react";
 import { useEffect, useEffectEvent, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   mapPdsQueryData,
   pdsMutation,
   pdsQuery,
-  usePdsQueryState,
+  useQuery,
 } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
@@ -14,15 +14,13 @@ import { prototypeConversation } from "../pds/model.ts";
 
 export function useConversation() {
   const conversation = useMutation(pdsMutation(pds.messages.putConversation));
-  const messageOptions = pdsQuery(pds.messages.list, {
-    conversationId: prototypeConversation.id,
-  });
   const query = useQuery({
-    ...messageOptions,
     enabled: conversation.isSuccess,
+    query: pdsQuery(pds.messages.list, {
+      conversationId: prototypeConversation.id,
+    }),
     select: (data) => mapPdsQueryData(data, combineMessages),
   });
-  const federation = usePdsQueryState(messageOptions);
   const sendMessage = useMutation(pdsMutation(pds.messages.send));
   const [draft, setDraft] = useState("");
   const saveConversation = useEffectEvent(() => {
@@ -62,7 +60,7 @@ export function useConversation() {
       setDraft,
       submit: send,
     },
-    messages: { ...query, federation },
+    messages: query,
   };
 }
 

@@ -9,6 +9,7 @@ import type {
   PdsRequestResult,
 } from "@decentralized-convex/client";
 import type {
+  DefinedInitialDataOptions,
   Query,
   QueryClient,
   QueryKey,
@@ -18,7 +19,6 @@ import { useSyncExternalStore } from "react";
 import {
   hashKey,
   mutationOptions,
-  queryOptions,
   useQueryClient,
 } from "@tanstack/react-query";
 import { pdsQueryDataFromSnapshot } from "@decentralized-convex/client";
@@ -208,21 +208,27 @@ export type PdsQueryKey<Request extends AnyPdsQueryRequest> = readonly [
   Request,
 ];
 
+export type PdsQueryOptions<Request extends AnyPdsQueryRequest> = ReturnType<
+  typeof pdsQueryOptions<Request>
+>;
+
 export function pdsQuery<Args, Result>(
   operation: (args: Args) => PdsRequest<Result, "query">,
   args: Args,
 ) {
-  const request = operation(args);
+  return pdsQueryOptions(operation(args));
+}
+
+function pdsQueryOptions<Request extends AnyPdsQueryRequest>(request: Request) {
   const queryKey: PdsQueryKey<typeof request> = [
     "decentralized-convex",
     "pds",
     "query",
     request,
   ];
-  const initialData: PdsQueryData<DefaultCombinedPdsResult<typeof request>> = {
-    status: "loading",
-  };
-  return queryOptions({
+  const initialData =
+    loadingPdsQueryData<DefaultCombinedPdsResult<typeof request>>();
+  return {
     initialData,
     meta: { [PDS_QUERY_META_KEY]: request },
     queryFn: ({ client }) =>
@@ -230,7 +236,16 @@ export function pdsQuery<Args, Result>(
     queryKey,
     staleTime: (query) =>
       query.state.data?.status === "loading" ? 0 : Infinity,
-  });
+  } satisfies DefinedInitialDataOptions<
+    PdsQueryData<DefaultCombinedPdsResult<Request>>,
+    Error,
+    PdsQueryData<DefaultCombinedPdsResult<Request>>,
+    PdsQueryKey<Request>
+  >;
+}
+
+function loadingPdsQueryData<Result>(): PdsQueryData<Result> {
+  return { status: "loading" };
 }
 
 export function pdsMutation<Args, Result>(
@@ -242,10 +257,11 @@ export function pdsMutation<Args, Result>(
   });
 }
 
-export function usePdsQueryState<Request extends AnyPdsQueryRequest>(options: {
-  queryKey: PdsQueryKey<Request>;
-}) {
-  const queryClient = useQueryClient();
+export function usePdsQueryState<Request extends AnyPdsQueryRequest>(
+  options: { queryKey: PdsQueryKey<Request> },
+  queryClientOverride?: QueryClient,
+) {
+  const queryClient = useQueryClient(queryClientOverride);
   const client = connectedPdsClient(queryClient);
   const request = options.queryKey[3];
   return useSyncExternalStore(

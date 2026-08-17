@@ -12,13 +12,13 @@ import {
   MutationObserver,
   QueryClient,
   QueryObserver,
-  useQuery,
 } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
 import { pdsMutation, pdsQuery, PdsQueryClient } from "./pds.ts";
+import { useQuery } from "./useQuery.ts";
 
 interface Note {
   body: string;
@@ -101,8 +101,15 @@ void test("produces native TanStack query and mutation options", async () => {
 });
 
 function usePdsQueryTypeTest() {
-  const query = useQuery(pdsQuery(listNotes, { owner: "alice" }));
+  const query = useQuery({
+    query: pdsQuery(listNotes, { owner: "alice" }),
+  });
   const data: PdsQueryData<Note[]> = query.data;
+  const source = query.federation.sources[0];
+  if (source?.status === "live") {
+    const notes: readonly Note[] = source.data;
+    void notes;
+  }
   return data;
 }
 
