@@ -1,4 +1,6 @@
+import type { DecentralizedConvexVersion } from "@decentralized-convex/core";
 import type { Infer, Validator } from "convex/values";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { v } from "convex/values";
 
 export interface Operation<
@@ -25,6 +27,7 @@ export interface PluginProtocol<
   Mutations extends OperationMap,
   Requirements extends PluginRequirements,
 > {
+  readonly lastChanged: DecentralizedConvexVersion;
   readonly name: Name;
   readonly mutations: Mutations;
   readonly queries: Queries;
@@ -79,18 +82,38 @@ export function defineOperation<
 
 export function definePluginProtocol<
   const Name extends string,
-  const Version extends string,
   const Queries extends OperationMap,
   const Mutations extends OperationMap,
   const Requirements extends PluginRequirements,
->(protocol: PluginProtocol<Name, Version, Queries, Mutations, Requirements>) {
-  assertOperations(protocol.name, "query", protocol.queries);
-  assertOperations(protocol.name, "mutation", protocol.mutations);
-  assertDistinctOperationNames(protocol);
+>(
+  protocol: Omit<
+    PluginProtocol<
+      Name,
+      typeof DECENTRALIZED_CONVEX_VERSION,
+      Queries,
+      Mutations,
+      Requirements
+    >,
+    "version"
+  >,
+): PluginProtocol<
+  Name,
+  typeof DECENTRALIZED_CONVEX_VERSION,
+  Queries,
+  Mutations,
+  Requirements
+> {
+  const versioned = {
+    ...protocol,
+    version: DECENTRALIZED_CONVEX_VERSION,
+  };
+  assertOperations(versioned.name, "query", versioned.queries);
+  assertOperations(versioned.name, "mutation", versioned.mutations);
+  assertDistinctOperationNames(versioned);
   if (Object.hasOwn(protocol.requires, protocol.name)) {
     throw new Error(`Plugin ${protocol.name} cannot require itself.`);
   }
-  return Object.freeze(protocol);
+  return Object.freeze(versioned);
 }
 
 export function operationValidator<const Operations extends OperationMap>(

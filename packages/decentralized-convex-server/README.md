@@ -46,5 +46,6 @@ authenticates once, selects the installed plugin, and crosses one Component
 boundary. `defineComponentDispatchers` performs exact operation validation and
 invokes the plugin handler.
 
-`protocolCapabilities(...)` derives discovery-manifest capability entries from
-the same protocol definitions rather than duplicating names and versions.
+`pdsDescriptorFromApp(app, host)` derives the ecosystem release and installed
+plugin `lastChanged` metadata from the same app declaration. This is the PDS
+management boundary that future Component migration controls will extend.

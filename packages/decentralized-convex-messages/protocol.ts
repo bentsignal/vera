@@ -1,5 +1,9 @@
 import type { Infer } from "convex/values";
 import {
+  DECENTRALIZED_CONVEX_LAST_CHANGED,
+  DECENTRALIZED_CONVEX_VERSION,
+} from "@decentralized-convex/core";
+import {
   defineOperation,
   definePluginProtocol,
 } from "@decentralized-convex/plugin";
@@ -22,6 +26,7 @@ export const conversation = v.object({
 });
 
 export const messagesProtocol = definePluginProtocol({
+  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.messages,
   name: "messages",
   mutations: {
     putConversation: defineOperation({
@@ -46,6 +51,5 @@ export const messagesProtocol = definePluginProtocol({
       returns: v.array(message),
     }),
   },
-  requires: { accounts: "1" },
-  version: "1",
+  requires: { accounts: DECENTRALIZED_CONVEX_VERSION },
 });

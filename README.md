@@ -22,6 +22,8 @@ Read these files in order to follow one request end to end:
    client API used for reactive reads and writes.
 
 The longer explanation is in [docs/architecture.md](docs/architecture.md).
+The lockstep `0.1.0` release and upgrade rules are in
+[docs/versioning.md](docs/versioning.md).
 
 ## The default setup
 
@@ -40,7 +42,8 @@ export default definePdsApp({
 });
 ```
 
-Messages declares `requires: { accounts: "1" }`. Removing Accounts or
+Messages declares an exact dependency on Accounts at the shared ecosystem
+version. Removing Accounts or
 installing an incompatible version fails type-checking. The normal
 `convex dev`, `convex deploy`, and `convex codegen` commands remain unchanged.
 
@@ -70,6 +73,8 @@ authentication remain available when an application needs control.
 
 - `packages/decentralized-convex-plugin` — operation protocols and dependency
   graph validation
+- `packages/decentralized-convex-core` — the single ecosystem version and
+  last-changed release metadata
 - `packages/decentralized-convex-server` — PDS installation, root dispatch,
   Component dispatch, and discovery descriptors
 - `packages/decentralized-convex-client` — discovery, connections, typed calls,

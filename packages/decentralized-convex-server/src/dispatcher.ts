@@ -9,7 +9,6 @@ import type {
 } from "@decentralized-convex/plugin";
 import type {
   Auth,
-  FunctionReference,
   GenericDataModel,
   GenericMutationCtx,
   GenericQueryCtx,
@@ -17,17 +16,18 @@ import type {
   QueryBuilder,
   ValidatorTypeToReturnType,
 } from "convex/server";
-import type { Value } from "convex/values";
 import {
   operationResponseValidator,
   operationValidator,
 } from "@decentralized-convex/plugin";
 import { ConvexError, v } from "convex/values";
 
+import type { DispatcherComponents } from "./dispatcher-types.ts";
 import type { RoutedQueryResult } from "./routed-query.ts";
 import { isRoutedQueryResult } from "./routed-query.ts";
 
 export interface DispatcherIdentity {
+  readonly [key: string]: string | undefined;
   readonly accountId?: string;
   readonly email?: string;
   readonly issuer: string;
@@ -116,8 +116,9 @@ export function defineComponentDispatchers<
     dispatchMutation: mutation({
       args: {
         identity: componentDispatcherArgs.identity,
+        lastChanged: v.literal(protocol.lastChanged),
         operation: mutationOperation,
-        version: v.literal(protocol.version),
+        version: v.string(),
       },
       returns: mutationReturns,
       handler: async (ctx, { identity, operation }) =>
@@ -136,8 +137,9 @@ export function defineComponentDispatchers<
     dispatchQuery: query({
       args: {
         identity: componentDispatcherArgs.identity,
+        lastChanged: v.literal(protocol.lastChanged),
         operation: queryOperation,
-        version: v.literal(protocol.version),
+        version: v.string(),
       },
       returns: queryReturns,
       handler: async (ctx, { identity, operation }) => {
@@ -159,30 +161,6 @@ export function defineComponentDispatchers<
   } as const;
 }
 
-type ComponentQuery = FunctionReference<
-  "query",
-  "internal" | "public",
-  // Component operation unions differ by plugin and are erased only inside the trusted router.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  { identity: DispatcherIdentity | null; operation: any; version: string },
-  DispatcherResponse
->;
-
-type ComponentMutation = FunctionReference<
-  "mutation",
-  "internal" | "public",
-  // Component operation unions differ by plugin and are erased only inside the trusted router.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  { identity: DispatcherIdentity | null; operation: any; version: string },
-  DispatcherResponse
->;
-
-interface DispatcherResponse {
-  readonly routes?: readonly string[];
-  readonly type: string;
-  readonly value: Value;
-}
-
 export function definePdsRouter<DataModel extends GenericDataModel>({
   components,
   mutation,
@@ -195,13 +173,19 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
   const installed = readDispatcherComponents(components);
   return {
     dispatchMutation: mutation({
-      args: { operation: v.any(), plugin: v.string(), version: v.string() },
+      args: {
+        lastChanged: v.string(),
+        operation: v.any(),
+        plugin: v.string(),
+        version: v.string(),
+      },
       returns: v.any(),
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
         const identity = await resolveIdentity(ctx);
         const response = await ctx.runMutation(component.mutation, {
           identity,
+          lastChanged: request.lastChanged,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           operation: request.operation,
           version: request.version,
@@ -210,13 +194,19 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       },
     }),
     dispatchQuery: query({
-      args: { operation: v.any(), plugin: v.string(), version: v.string() },
+      args: {
+        lastChanged: v.string(),
+        operation: v.any(),
+        plugin: v.string(),
+        version: v.string(),
+      },
       returns: v.any(),
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
         const identity = await resolveIdentity(ctx);
         const response = await ctx.runQuery(component.query, {
           identity,
+          lastChanged: request.lastChanged,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           operation: request.operation,
           version: request.version,
@@ -273,15 +263,6 @@ function invokeOperation<Operations extends OperationMap, Context>(
     { args: operation.args, identity },
   ]);
 }
-
-interface DispatcherComponent {
-  readonly dispatcher: {
-    readonly dispatchMutation: ComponentMutation;
-    readonly dispatchQuery: ComponentQuery;
-  };
-}
-
-type DispatcherComponents = Readonly<Record<string, DispatcherComponent>>;
 
 function readDispatcherComponents(components: unknown): DispatcherComponents {
   // Convex generates `components` as a lazy proxy. Computed property access creates the same

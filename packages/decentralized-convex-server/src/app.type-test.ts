@@ -1,3 +1,8 @@
+import type { DecentralizedConvexVersion } from "@decentralized-convex/core";
+import {
+  DECENTRALIZED_CONVEX_LAST_CHANGED,
+  DECENTRALIZED_CONVEX_VERSION,
+} from "@decentralized-convex/core";
 import {
   defineOperation,
   definePluginProtocol,
@@ -10,10 +15,12 @@ import { definePdsApp, definePdsPluginComponent } from "./app.ts";
 
 function protocol<
   const Name extends string,
-  const Version extends string,
-  const Requirements extends Readonly<Record<string, string>>,
->(name: Name, version: Version, requires: Requirements) {
+  const Requirements extends Readonly<
+    Record<string, DecentralizedConvexVersion>
+  >,
+>(name: Name, requires: Requirements) {
   return definePluginProtocol({
+    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
     name,
     mutations: {
       write: defineOperation({ args: v.object({}), returns: v.null() }),
@@ -22,21 +29,16 @@ function protocol<
       read: defineOperation({ args: v.object({}), returns: v.null() }),
     },
     requires,
-    version,
   });
 }
 
 const accounts = definePdsPluginComponent(
   defineComponent("accounts"),
-  protocol("accounts", "1", {}),
-);
-const accountsV2 = definePdsPluginComponent(
-  defineComponent("accounts_v2"),
-  protocol("accounts", "2", {}),
+  protocol("accounts", {}),
 );
 const messages = definePdsPluginComponent(
   defineComponent("messages"),
-  protocol("messages", "1", { accounts: "1" }),
+  protocol("messages", { accounts: DECENTRALIZED_CONVEX_VERSION }),
 );
 
 const _app = definePdsApp({ plugins: [accounts, messages] });
@@ -51,9 +53,6 @@ void unknownInstalledName;
 
 // @ts-expect-error -- messages requires the accounts plugin.
 definePdsApp({ plugins: [messages] });
-
-// @ts-expect-error -- accounts@2 does not satisfy messages' requirement.
-definePdsApp({ plugins: [accountsV2, messages] });
 
 // @ts-expect-error -- plugin names must be unique within a PDS.
 definePdsApp({ plugins: [accounts, accounts] });

@@ -1,6 +1,6 @@
 {
   "name": "@decentralized-convex/accounts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -16,8 +16,9 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@decentralized-convex/plugin": "workspace:*",
-    "@decentralized-convex/server": "workspace:*",
+    "@decentralized-convex/core": "workspace:0.1.0",
+    "@decentralized-convex/plugin": "workspace:0.1.0",
+    "@decentralized-convex/server": "workspace:0.1.0",
     "convex": "catalog:"
   },
   "devDependencies": {

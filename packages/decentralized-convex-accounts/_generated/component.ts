@@ -36,11 +36,12 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             subject: string;
             tokenIdentifier: string;
           };
+          lastChanged: "0.1.0";
           operation: {
             args: { avatarUrl: null | string; displayName: string };
             type: "upsertMyProfile";
           };
-          version: "1";
+          version: string;
         },
         {
           routes?: Array<string>;
@@ -65,10 +66,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             subject: string;
             tokenIdentifier: string;
           };
+          lastChanged: "0.1.0";
           operation:
             | { args: {}; type: "getMyProfile" }
             | { args: { accountId: string }; type: "getProfile" };
-          version: "1";
+          version: string;
         },
         | {
             routes?: Array<string>;

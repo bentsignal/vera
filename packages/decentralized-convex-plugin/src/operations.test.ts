@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DECENTRALIZED_CONVEX_LAST_CHANGED } from "@decentralized-convex/core";
 import { v } from "convex/values";
 
 import {
@@ -51,11 +52,11 @@ void test("rejects operation names that cannot be flattened safely", () => {
   assert.throws(
     () =>
       definePluginProtocol({
+        lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
         name: "notes",
         mutations: { create: operations.create },
         queries: { create: operations.create },
         requires: {},
-        version: "1",
       }),
     /cannot define create as both a query and mutation/,
   );
@@ -63,11 +64,11 @@ void test("rejects operation names that cannot be flattened safely", () => {
   assert.throws(
     () =>
       definePluginProtocol({
+        lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
         name: "notes",
         mutations: { create: operations.create },
         queries: { queries: operations.remove },
         requires: {},
-        version: "1",
       }),
     /cannot use reserved operation name queries/,
   );

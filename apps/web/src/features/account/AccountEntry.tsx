@@ -1,6 +1,10 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { discoverPds } from "@decentralized-convex/client";
+import {
+  assertPdsCompatibility,
+  discoverPds,
+} from "@decentralized-convex/client";
+import { pds } from "@vera/backend/pds";
 
 import type { HomePds } from "../pds/model.ts";
 
@@ -26,7 +30,7 @@ export function AccountEntry({ onSelect }: AccountEntryProps) {
 
     setLoading(true);
     try {
-      const home = await discoverPds(normalized);
+      const home = assertPdsCompatibility(await discoverPds(normalized), pds);
       onSelect({ home, username });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "PDS discovery failed");

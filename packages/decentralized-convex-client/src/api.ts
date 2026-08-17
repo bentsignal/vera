@@ -4,6 +4,10 @@ import type {
   OperationMap,
   OperationResult,
 } from "@decentralized-convex/plugin";
+import {
+  DECENTRALIZED_CONVEX_LAST_CHANGED,
+  DECENTRALIZED_CONVEX_VERSION,
+} from "@decentralized-convex/core";
 
 import type {
   FederationTarget,
@@ -13,8 +17,22 @@ import type {
 
 declare const PdsResultType: unique symbol;
 
+export interface PdsApiRequirement {
+  readonly id: string;
+  readonly lastChanged: string;
+}
+
+export interface PdsApiRequirements {
+  readonly capabilities: readonly PdsApiRequirement[];
+  readonly lastChanged: string;
+  readonly version: string;
+}
+
+const requirementsByApi = new WeakMap<object, PdsApiRequirements>();
+
 export interface SerializedPdsRequest {
   readonly [key: string]: unknown;
+  readonly lastChanged: string;
   readonly operation: {
     readonly args: Record<string, unknown>;
     readonly type: string;
@@ -60,6 +78,7 @@ export interface FederatedPdsQueryOptions<
 type OperationRequestBuilders<
   PluginName extends string,
   PluginVersion extends string,
+  PluginLastChanged extends string,
   Operations extends OperationMap,
   Kind extends "mutation" | "query",
 > = {
@@ -70,6 +89,7 @@ type OperationRequestBuilders<
       readonly args: OperationArgs<Operations[Name]>;
       readonly type: Name;
     };
+    readonly lastChanged: PluginLastChanged;
     readonly plugin: PluginName;
     readonly version: PluginVersion;
   };
@@ -79,24 +99,28 @@ export type PdsPluginApi<Protocol extends AnyPluginProtocol> = {
   readonly mutations: OperationRequestBuilders<
     Protocol["name"],
     Protocol["version"],
+    Protocol["lastChanged"],
     Protocol["mutations"],
     "mutation"
   >;
   readonly queries: OperationRequestBuilders<
     Protocol["name"],
     Protocol["version"],
+    Protocol["lastChanged"],
     Protocol["queries"],
     "query"
   >;
 } & OperationRequestBuilders<
   Protocol["name"],
   Protocol["version"],
+  Protocol["lastChanged"],
   Protocol["queries"],
   "query"
 > &
   OperationRequestBuilders<
     Protocol["name"],
     Protocol["version"],
+    Protocol["lastChanged"],
     Protocol["mutations"],
     "mutation"
   >;
@@ -117,11 +141,13 @@ export function definePdsApi<
   const api = Object.fromEntries(
     protocols.map((protocol) => {
       const mutations = defineRequestBuilders(
+        protocol.lastChanged,
         protocol.name,
         protocol.version,
         protocol.mutations,
       );
       const queries = defineRequestBuilders(
+        protocol.lastChanged,
         protocol.name,
         protocol.version,
         protocol.queries,
@@ -129,6 +155,14 @@ export function definePdsApi<
       return [protocol.name, { ...queries, ...mutations, mutations, queries }];
     }),
   );
+  requirementsByApi.set(api, {
+    capabilities: protocols.map(({ lastChanged, name }) => ({
+      id: name,
+      lastChanged,
+    })),
+    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    version: DECENTRALIZED_CONVEX_VERSION,
+  });
 
   // The runtime object is constructed from the exact protocol map supplied by the caller.
   const erased: unknown = api;
@@ -136,7 +170,16 @@ export function definePdsApi<
   return erased as PdsApi<ProtocolsByName<Protocols>>;
 }
 
+export function pdsApiRequirements(api: object): PdsApiRequirements {
+  const requirements = requirementsByApi.get(api);
+  if (requirements === undefined) {
+    throw new Error("PDS API requirements are unavailable");
+  }
+  return requirements;
+}
+
 function defineRequestBuilders(
+  lastChanged: string,
   plugin: string,
   version: string,
   operations: OperationMap,
@@ -148,6 +191,7 @@ function defineRequestBuilders(
       Object.keys(operations).map((type) => [
         type,
         (args: Record<string, unknown>) => ({
+          lastChanged,
           operation: { args, type },
           plugin,
           version,

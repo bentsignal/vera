@@ -17,6 +17,7 @@ import type {
   FederationQueryReference,
   FederationTarget,
 } from "./types.ts";
+import { assertPdsRequestCompatibility } from "./compatibility.ts";
 import { createConvexFederationConnection } from "./connection.ts";
 import { FederatedQueryObserver } from "./observer.ts";
 import { FederatedPdsQueryObserver } from "./pds-observer.ts";
@@ -63,11 +64,12 @@ export class DecentralizedConvexClient {
 
   watchPdsQuery<Request extends AnyPdsQueryRequest>(request: Request) {
     const home = this.#requireHome();
+    assertPdsRequestCompatibility(home, request);
     return new RoutedPdsQueryObserver({
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
       request,
-      resolveRoutes: (routes) => this.#resolveRoutes(routes),
+      resolveRoutes: (routes) => this.#resolveRoutes(routes, request),
     });
   }
 
@@ -135,6 +137,7 @@ export class DecentralizedConvexClient {
 
   async pdsQuery<Request extends AnyPdsQueryRequest>(request: Request) {
     const home = this.#requireHome();
+    assertPdsRequestCompatibility(home, request);
     const homeTarget = pdsTarget(home.domain, home);
     const homeGroup = groupFederationTargets([homeTarget])[0];
     if (homeGroup === undefined) throw new Error("PDS home is invalid");
@@ -143,7 +146,7 @@ export class DecentralizedConvexClient {
     }).queryWithRouting(request);
     const targets = groupFederationTargets([
       homeTarget,
-      ...(await this.#resolveRoutes(homeResult.routes)),
+      ...(await this.#resolveRoutes(homeResult.routes, request)),
     ]);
     const settled = await Promise.all(
       targets.map(async (target) => {
@@ -189,6 +192,7 @@ export class DecentralizedConvexClient {
 
   pdsMutation<Request extends AnyPdsMutationRequest>(request: Request) {
     const home = this.#requireHome();
+    assertPdsRequestCompatibility(home, request);
     return new PdsClient({
       connection: this.#getConnection(home.manifest.deploymentUrl),
     }).mutation(request);
@@ -237,11 +241,13 @@ export class DecentralizedConvexClient {
     return connection;
   }
 
-  async #resolveRoutes(routes: readonly string[]) {
+  async #resolveRoutes(routes: readonly string[], request: AnyPdsQueryRequest) {
     return Promise.all(
-      [...new Set(routes)].map(async (route) =>
-        pdsTarget(route, await this.resolvePds(route)),
-      ),
+      [...new Set(routes)].map(async (route) => {
+        const pds = await this.resolvePds(route);
+        assertPdsRequestCompatibility(pds, request);
+        return pdsTarget(route, pds);
+      }),
     );
   }
 

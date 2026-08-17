@@ -123,16 +123,16 @@ importers:
         specifier: 0.12.5
         version: 0.12.5(@standard-schema/spec@1.1.0)(better-auth@1.6.25(@tanstack/react-start@1.159.14(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(convex@1.38.0(react@19.2.5))(react@19.2.5)(typescript@5.9.3)
       '@decentralized-convex/client':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-client
       '@decentralized-convex/messages':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-messages
       '@decentralized-convex/react':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-react
       '@decentralized-convex/tanstack-query':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-tanstack-query
       '@tanstack/react-query':
         specifier: 'catalog:'
@@ -201,11 +201,14 @@ importers:
 
   packages/decentralized-convex-accounts:
     dependencies:
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       '@decentralized-convex/plugin':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-plugin
       '@decentralized-convex/server':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-server
       convex:
         specifier: 'catalog:'
@@ -234,6 +237,10 @@ importers:
         version: 5.9.3
 
   packages/decentralized-convex-address:
+    dependencies:
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
     devDependencies:
       '@acme/eslint-config':
         specifier: workspace:*
@@ -260,10 +267,13 @@ importers:
   packages/decentralized-convex-client:
     dependencies:
       '@decentralized-convex/address':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-address
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       '@decentralized-convex/plugin':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-plugin
       convex:
         specifier: 'catalog:'
@@ -291,13 +301,40 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
+  packages/decentralized-convex-core:
+    devDependencies:
+      '@acme/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint
+      '@acme/prettier-config':
+        specifier: workspace:*
+        version: link:../../tooling/prettier
+      '@acme/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.4(jiti@2.6.1)
+      prettier:
+        specifier: 'catalog:'
+        version: 3.8.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   packages/decentralized-convex-messages:
     dependencies:
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       '@decentralized-convex/plugin':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-plugin
       '@decentralized-convex/server':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-server
       convex:
         specifier: 'catalog:'
@@ -327,6 +364,9 @@ importers:
 
   packages/decentralized-convex-plugin:
     dependencies:
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       convex:
         specifier: 'catalog:'
         version: 1.38.0(react@19.2.5)
@@ -356,7 +396,7 @@ importers:
   packages/decentralized-convex-react:
     dependencies:
       '@decentralized-convex/client':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-client
       convex:
         specifier: 'catalog:'
@@ -392,8 +432,11 @@ importers:
 
   packages/decentralized-convex-server:
     dependencies:
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       '@decentralized-convex/plugin':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-plugin
       convex:
         specifier: 'catalog:'
@@ -424,10 +467,13 @@ importers:
   packages/decentralized-convex-tanstack-query:
     dependencies:
       '@decentralized-convex/client':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-client
+      '@decentralized-convex/core':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-core
       '@decentralized-convex/react':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../decentralized-convex-react
       convex:
         specifier: 'catalog:'
@@ -470,19 +516,19 @@ importers:
         specifier: 0.12.5
         version: 0.12.5(@standard-schema/spec@1.1.0)(better-auth@1.6.25(@tanstack/react-start@1.159.14(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.21.0)(yaml@2.8.3)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(convex@1.38.0(react@19.2.5))(react@19.2.5)(typescript@5.9.3)
       '@decentralized-convex/accounts':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-accounts
       '@decentralized-convex/address':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-address
       '@decentralized-convex/client':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-client
       '@decentralized-convex/messages':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-messages
       '@decentralized-convex/server':
-        specifier: workspace:*
+        specifier: workspace:0.1.0
         version: link:../../packages/decentralized-convex-server
       better-auth:
         specifier: ~1.6.15

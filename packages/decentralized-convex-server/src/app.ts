@@ -3,8 +3,14 @@ import type {
   ProtocolGraphConstraint,
 } from "@decentralized-convex/plugin";
 import type { ComponentDefinition } from "convex/server";
+import {
+  DECENTRALIZED_CONVEX_LAST_CHANGED,
+  DECENTRALIZED_CONVEX_VERSION,
+} from "@decentralized-convex/core";
 import { defineProtocolSet } from "@decentralized-convex/plugin";
 import { defineApp } from "convex/server";
+
+import type { FederationDescriptor } from "./descriptor.ts";
 
 type AppDefinition = ReturnType<typeof defineApp>;
 
@@ -143,10 +149,35 @@ export function definePdsApp<
 export function protocolCapabilities<
   const Protocols extends readonly AnyPluginProtocol[],
 >(...protocols: ProtocolGraphConstraint<Protocols>) {
-  return defineProtocolSet(...protocols).map(({ name, version }) => ({
+  return defineProtocolSet(...protocols).map(({ lastChanged, name }) => ({
     id: name,
-    versions: [version],
+    lastChanged,
   }));
+}
+
+/** Release state used by discovery today and PDS upgrades in the future. */
+export function pdsReleaseFromApp<
+  App extends PdsAppDefinition<readonly AnyPdsPluginComponent[]>,
+>(app: App) {
+  const protocols = protocolsFromPdsApp(app);
+  return Object.freeze({
+    capabilities: protocols.map(({ lastChanged, name }) => ({
+      id: name,
+      lastChanged,
+    })),
+    lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.protocol,
+    version: DECENTRALIZED_CONVEX_VERSION,
+  });
+}
+
+/** Builds a PDS descriptor without repeating release or plugin metadata. */
+export function pdsDescriptorFromApp<
+  App extends PdsAppDefinition<readonly AnyPdsPluginComponent[]>,
+>(
+  app: App,
+  host: Omit<FederationDescriptor, "capabilities" | "lastChanged" | "version">,
+): FederationDescriptor {
+  return { ...host, ...pdsReleaseFromApp(app) };
 }
 
 function isComponentInstall(

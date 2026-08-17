@@ -4,6 +4,7 @@ Framework-independent discovery, connection, and federation client.
 
 ```ts
 const pds = definePdsApi(accountsProtocol, messagesProtocol);
+const home = assertPdsCompatibility(await discoverPds(address), pds);
 const client = new DecentralizedConvexClient({ pds: { home } });
 
 await client.pdsMutation(pds.messages.send(input));
@@ -22,3 +23,8 @@ the configured home. The lower-level `federatedPdsQuery` and
 The default function references are `pds:dispatchQuery` and
 `pds:dispatchMutation`. Advanced consumers may construct `PdsClient` with
 different references or a custom connection.
+
+`assertPdsCompatibility` runs before sign-in. It checks the core wire contract
+and every plugin required by the generated API using `lastChanged` metadata.
+Overall ecosystem versions may differ when those exact contracts are
+unchanged.

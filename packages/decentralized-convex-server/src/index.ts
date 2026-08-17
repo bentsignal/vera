@@ -1,6 +1,8 @@
 export {
   definePdsApp,
   definePdsPluginComponent,
+  pdsDescriptorFromApp,
+  pdsReleaseFromApp,
   protocolsFromPdsApp,
   protocolCapabilities,
 } from "./app.ts";

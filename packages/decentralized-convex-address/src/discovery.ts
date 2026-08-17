@@ -1,4 +1,5 @@
-export const PDS_DISCOVERY_VERSION = "pds1";
+/** Stable DNS record format marker, not an ecosystem version. */
+export const PDS_DISCOVERY_RECORD_FORMAT = "pds1";
 export const PDS_DNS_LABEL = "_pds";
 
 export interface PdsManifest {
@@ -9,11 +10,12 @@ export interface PdsManifest {
   };
   capabilities?: readonly {
     id: string;
-    versions: readonly string[];
+    lastChanged: string;
   }[];
   deploymentUrl: string;
   httpUrl: string;
-  protocolVersion: "0.1";
+  lastChanged: string;
+  version: string;
 }
 
 export interface DiscoveredPds {
@@ -77,7 +79,7 @@ export function parsePdsTxtRecord(record: string) {
           : [field.slice(0, separator), field.slice(separator + 1)];
       }),
   );
-  if (fields.v !== PDS_DISCOVERY_VERSION || fields.url === undefined) {
+  if (fields.v !== PDS_DISCOVERY_RECORD_FORMAT || fields.url === undefined) {
     return null;
   }
   return requireHttpsUrl(fields.url, "PDS manifest URL");
@@ -104,7 +106,7 @@ function selectManifestUrl(records: readonly string[]) {
     .filter((url): url is string => url !== null);
   if (matches.length === 0) {
     throw new Error(
-      `No ${PDS_DISCOVERY_VERSION} record found at the _pds DNS name`,
+      `No ${PDS_DISCOVERY_RECORD_FORMAT} record found at the _pds DNS name`,
     );
   }
   if (matches.length > 1) {
@@ -140,10 +142,6 @@ async function resolveTxtWithDoh(name: string, fetcher: typeof fetch) {
 function parsePdsManifest(value: unknown): PdsManifest {
   if (!isRecord(value)) throw new Error("The PDS manifest is not an object");
   const accountDomainValue = accountDomain(requireString(value.accountDomain));
-  const protocolVersion = requireString(value.protocolVersion);
-  if (protocolVersion !== "0.1") {
-    throw new Error(`Unsupported PDS protocol version: ${protocolVersion}`);
-  }
   const auth = value.auth;
   return {
     accountDomain: accountDomainValue,
@@ -156,7 +154,8 @@ function parsePdsManifest(value: unknown): PdsManifest {
       "Convex deployment URL",
     ),
     httpUrl: requireHttpsUrl(requireString(value.httpUrl), "PDS HTTP URL"),
-    protocolVersion,
+    lastChanged: requireVersion(value.lastChanged, "PDS last-changed version"),
+    version: requireVersion(value.version, "PDS ecosystem version"),
   };
 }
 
@@ -171,14 +170,25 @@ function parseAuth(value: unknown) {
 function parseCapabilities(value: unknown) {
   if (!Array.isArray(value)) throw new Error("Invalid PDS capabilities");
   return value.map((capability) => {
-    if (!isRecord(capability) || !Array.isArray(capability.versions)) {
+    if (!isRecord(capability)) {
       throw new Error("Invalid PDS capability");
     }
     return {
       id: requireString(capability.id),
-      versions: capability.versions.map(requireString),
+      lastChanged: requireVersion(
+        capability.lastChanged,
+        "capability last-changed version",
+      ),
     };
   });
+}
+
+function requireVersion(value: unknown, label: string) {
+  const version = requireString(value);
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return version;
 }
 
 function requireHttpsUrl(input: string, label: string) {

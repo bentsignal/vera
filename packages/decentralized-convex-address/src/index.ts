@@ -5,7 +5,7 @@ export {
   decodeDnsTxtData,
   discoverPds,
   parsePdsTxtRecord,
-  PDS_DISCOVERY_VERSION,
+  PDS_DISCOVERY_RECORD_FORMAT,
   PDS_DNS_LABEL,
 } from "./discovery.ts";
 export type {

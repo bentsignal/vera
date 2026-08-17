@@ -36,6 +36,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             subject: string;
             tokenIdentifier: string;
           };
+          lastChanged: "0.1.0";
           operation:
             | {
                 args: { conversationId: string; participants: Array<string> };
@@ -49,7 +50,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 };
                 type: "send";
               };
-          version: "1";
+          version: string;
         },
         | {
             routes?: Array<string>;
@@ -82,8 +83,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             subject: string;
             tokenIdentifier: string;
           };
+          lastChanged: "0.1.0";
           operation: { args: { conversationId: string }; type: "list" };
-          version: "1";
+          version: string;
         },
         {
           routes?: Array<string>;

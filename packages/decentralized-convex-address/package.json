@@ -1,6 +1,6 @@
 {
   "name": "@decentralized-convex/address",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -14,6 +14,9 @@
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@decentralized-convex/core": "workspace:0.1.0"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",

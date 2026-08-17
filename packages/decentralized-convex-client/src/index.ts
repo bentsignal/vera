@@ -1,10 +1,15 @@
 export { DecentralizedConvexClient } from "./client.ts";
 export {
+  assertPdsCompatibility,
+  assertPdsRequestCompatibility,
+  IncompatiblePdsError,
+} from "./compatibility.ts";
+export {
   accountDomain,
   decodeDnsTxtData,
   discoverPds,
   parsePdsTxtRecord,
-  PDS_DISCOVERY_VERSION,
+  PDS_DISCOVERY_RECORD_FORMAT,
   PDS_DNS_LABEL,
 } from "@decentralized-convex/address";
 export type {
@@ -13,7 +18,12 @@ export type {
   PdsManifest,
 } from "@decentralized-convex/address";
 export { createConvexPdsConnection } from "./connection.ts";
-export { definePdsApi, pdsFunctions, PdsClient } from "./pds.ts";
+export {
+  definePdsApi,
+  pdsApiRequirements,
+  pdsFunctions,
+  PdsClient,
+} from "./pds.ts";
 export { FederatedQueryObserver } from "./observer.ts";
 export { FederatedPdsQueryObserver } from "./pds-observer.ts";
 export { defaultCombine } from "./snapshot.ts";

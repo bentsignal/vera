@@ -1,6 +1,6 @@
 {
   "name": "@decentralized-convex/plugin",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -16,6 +16,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@decentralized-convex/core": "workspace:0.1.0",
     "convex": "catalog:"
   },
   "devDependencies": {

@@ -16,3 +16,20 @@ If all of these succeed, run:
 4. `pnpm run format:fix`
 
 Then summarize changes for the user.
+
+## Decentralized Convex Release Invariant
+
+All official `@decentralized-convex/*` packages and the wire protocol use one
+exact ecosystem version. The source of truth is
+`packages/decentralized-convex-core/src/index.ts`.
+
+- Never version one decentralized Convex package independently.
+- On every release, bump every `@decentralized-convex/*` `package.json` and
+  every internal `workspace:<version>` dependency together.
+- Update `DECENTRALIZED_CONVEX_LAST_CHANGED` only for packages or wire
+  contracts that actually changed in that release.
+- Do not write a plugin protocol version manually; `definePluginProtocol`
+  injects the ecosystem version.
+- Run `pnpm run decentralized-convex:check`; it is also enforced by lint.
+- Component data upgrades belong behind the PDS management surface. Do not ask
+  application developers to run plugin-specific migration commands directly.

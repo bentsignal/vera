@@ -1,5 +1,5 @@
 {
-  "name": "@decentralized-convex/client",
+  "name": "@decentralized-convex/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,12 +14,6 @@
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "typecheck": "tsgo --noEmit"
-  },
-  "dependencies": {
-    "@decentralized-convex/address": "workspace:0.1.0",
-    "@decentralized-convex/core": "workspace:0.1.0",
-    "@decentralized-convex/plugin": "workspace:0.1.0",
-    "convex": "catalog:"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",

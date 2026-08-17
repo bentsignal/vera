@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { v } from "convex/values";
 
 import {
-  defineOperation,
-  definePluginProtocol,
   defineProtocolSet,
   inspectProtocolGraph,
   ProtocolGraphError,
@@ -15,17 +12,11 @@ function protocol<const Name extends string, const Version extends string>(
   version: Version,
   requires: Readonly<Record<string, string>> = {},
 ) {
-  return definePluginProtocol({
+  return {
     name,
-    mutations: {
-      write: defineOperation({ args: v.object({}), returns: v.null() }),
-    },
-    queries: {
-      read: defineOperation({ args: v.object({}), returns: v.null() }),
-    },
     requires,
     version,
-  });
+  } as const;
 }
 
 void test("accepts a valid protocol set with explicit dependencies", () => {

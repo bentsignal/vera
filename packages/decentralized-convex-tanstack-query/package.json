@@ -1,6 +1,6 @@
 {
   "name": "@decentralized-convex/tanstack-query",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -12,11 +12,13 @@
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@decentralized-convex/client": "workspace:*",
-    "@decentralized-convex/react": "workspace:*",
+    "@decentralized-convex/client": "workspace:0.1.0",
+    "@decentralized-convex/core": "workspace:0.1.0",
+    "@decentralized-convex/react": "workspace:0.1.0",
     "convex": "catalog:"
   },
   "peerDependencies": {

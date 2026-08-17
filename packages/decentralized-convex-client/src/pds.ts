@@ -8,13 +8,15 @@ import type {
   SerializedPdsRequest,
 } from "./api.ts";
 
-export { definePdsApi } from "./api.ts";
+export { definePdsApi, pdsApiRequirements } from "./api.ts";
 export type {
   AnyPdsMutationRequest,
   AnyPdsQueryRequest,
   DefaultCombinedPdsResult,
   FederatedPdsQueryOptions,
   PdsApi,
+  PdsApiRequirement,
+  PdsApiRequirements,
   PdsPluginApi,
   PdsRequest,
   PdsRequestResult,

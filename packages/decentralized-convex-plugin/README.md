@@ -4,9 +4,9 @@ Defines the contract shared by plugin authors, PDS hosts, and clients.
 
 ```ts
 export const messagesProtocol = definePluginProtocol({
+  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.messages,
   name: "messages",
-  version: "1",
-  requires: { accounts: "1" },
+  requires: { accounts: DECENTRALIZED_CONVEX_VERSION },
   queries: {
     list: defineOperation({
       args: v.object({ conversationId: v.string() }),
@@ -26,7 +26,12 @@ export const messagesProtocol = definePluginProtocol({
 });
 ```
 
-`requires` maps plugin names to exact protocol versions. A complete protocol
+`definePluginProtocol` injects the one decentralized Convex ecosystem version;
+plugins cannot select independent versions. `lastChanged` comes from the
+central release manifest and changes only when this plugin's wire contract
+actually changes.
+
+`requires` maps plugin names to the ecosystem version. A complete protocol
 set rejects missing dependencies, incompatible versions, duplicate names, and
 cycles both statically and at runtime:
 
@@ -38,6 +43,6 @@ The same operation definitions generate discriminated request/response
 validators and preserve operation-specific argument and result types through
 the intentionally generic PDS dispatcher.
 
-Version ranges, optional dependencies, and migration policy are deliberately
-not hidden behind premature abstractions. Version `1` currently means exact
-compatibility.
+Every official package is released in lockstep. See
+[`docs/versioning.md`](../../docs/versioning.md) for compatibility and upgrade
+rules.

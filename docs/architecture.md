@@ -6,16 +6,17 @@ A plugin protocol is the source of truth for four things:
 
 ```ts
 export const messagesProtocol = definePluginProtocol({
+  lastChanged: DECENTRALIZED_CONVEX_LAST_CHANGED.messages,
   name: "messages",
-  version: "1",
-  requires: { accounts: "1" },
+  requires: { accounts: DECENTRALIZED_CONVEX_VERSION },
   queries: { list: defineOperation(/* validators */) },
   mutations: { send: defineOperation(/* validators */) },
 });
 ```
 
 - `name` is the Convex Component install name and wire plugin discriminator.
-- `version` is checked by the client, root router, Component, and manifest.
+- the ecosystem `version` is injected from one release source of truth;
+- `lastChanged` records when this plugin's wire contract actually changed;
 - `requires` is validated against the complete deployment at type-check and
   Convex config evaluation time.
 - operation validators produce client argument/result types and enforce the
@@ -32,7 +33,7 @@ required by Convex and never manually pairs a Component with its protocol.
 
 The host calls `definePdsApp({ plugins, components })`. It:
 
-1. checks duplicate names, missing plugins, and incompatible exact versions
+1. checks duplicate names, missing plugins, and incompatible ecosystem versions
    through the plugin tuple's TypeScript type;
 2. installs each plugin as a normal Convex Component;
 3. installs unrelated Components such as Better Auth without treating them as
@@ -65,7 +66,7 @@ useQuery(pdsQuery(...))
   -> pds:dispatchQuery on each discovered deployment
   -> root authentication and plugin selection
   -> messages.dispatcher.dispatchQuery
-  -> exact operation/version/argument validation
+  -> exact operation/last-changed/argument validation
   -> list handler and Component database
   -> per-source results merged into the application's TanStack cache
 ```
@@ -123,6 +124,6 @@ Still prototype-only:
   implemented;
 - the UI holds one active account rather than concurrent accounts;
 - auth lacks scopes, revocation, replay limits, and resource-specific policy;
-- plugin version ranges, migrations, upgrades, and large plugin graphs need a
-  production design;
+- Component migration execution, persisted upgrade state, and large plugin
+  graphs still need a production design;
 - packages are private workspace packages and self-hosting is not productized.

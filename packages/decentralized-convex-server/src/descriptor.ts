@@ -4,7 +4,7 @@ export const FEDERATION_DESCRIPTOR_PATH = "/.well-known/decentralized-convex";
 
 export interface FederationCapability {
   id: string;
-  versions: readonly string[];
+  lastChanged: string;
 }
 
 export interface FederationAuthDescriptor {
@@ -18,7 +18,8 @@ export interface FederationDescriptor {
   capabilities?: readonly FederationCapability[];
   deploymentUrl: string;
   httpUrl: string;
-  protocolVersion: "0.1";
+  lastChanged: string;
+  version: string;
 }
 
 export interface RegisterFederationRoutesOptions {

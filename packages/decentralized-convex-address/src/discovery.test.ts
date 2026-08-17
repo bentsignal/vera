@@ -47,10 +47,11 @@ void test("discovers and validates a PDS manifest", async () => {
             issuer: "https://a.example",
             jwksUrl: "https://a.example/jwks",
           },
-          capabilities: [{ id: "messages", versions: ["1"] }],
+          capabilities: [{ id: "messages", lastChanged: "0.1.0" }],
           deploymentUrl: "https://a.example.convex.cloud",
           httpUrl: "https://a.example.convex.site",
-          protocolVersion: "0.1",
+          lastChanged: "0.1.0",
+          version: "0.1.0",
         }),
       );
     },
@@ -76,7 +77,8 @@ void test("rejects a manifest for a different account domain", async () => {
             accountDomain: "b.vera.chat",
             deploymentUrl: "https://a.example.convex.cloud",
             httpUrl: "https://a.example.convex.site",
-            protocolVersion: "0.1",
+            lastChanged: "0.1.0",
+            version: "0.1.0",
           }),
         ),
       resolveTxt: () =>
@@ -114,7 +116,8 @@ void test("uses browser-compatible DNS-over-HTTPS by default", async () => {
               accountDomain: "a.vera.chat",
               deploymentUrl: "https://a.example.convex.cloud",
               httpUrl: "https://a.example.convex.site",
-              protocolVersion: "0.1",
+              lastChanged: "0.1.0",
+              version: "0.1.0",
             }),
       );
     },
