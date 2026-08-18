@@ -1,5 +1,9 @@
 export { decentralizedConvexPackage } from "../metadata.ts";
-export { DecentralizedConvexClient } from "./client.ts";
+export {
+  DecentralizedConvexClient,
+  DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER,
+} from "./client.ts";
+export type { PdsQueryExecutionOptions } from "./client.ts";
 export {
   assertPdsCompatibility,
   assertPdsRequestCompatibility,

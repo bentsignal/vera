@@ -21,6 +21,7 @@ export class RoutedPdsQueryObserver<
   readonly #home;
   readonly #listeners = new Set<() => void>();
   readonly #request;
+  readonly #revealPartialResultsAfter;
   readonly #resolveRoutes;
   readonly #sources = new Map<
     string,
@@ -28,13 +29,18 @@ export class RoutedPdsQueryObserver<
   >();
   readonly #unsubscribes = new Map<string, () => void>();
   #closed = false;
+  #completedInitialLoad = false;
+  #partialResultsTimer?: ReturnType<typeof setTimeout>;
+  #routesResolved = false;
   #routingGeneration = 0;
   #snapshot: FederatedQuerySnapshot<Combined, PdsRequestResult<Request>>;
+  readonly #startedAt = Date.now();
 
   constructor(options: {
     getConnection: (url: string) => PdsConnection;
     home: FederationTarget;
     request: Request;
+    revealPartialResultsAfter: number;
     resolveRoutes: (
       routes: readonly string[],
     ) => Promise<readonly FederationTarget[]>;
@@ -45,6 +51,7 @@ export class RoutedPdsQueryObserver<
       url: options.home.url,
     };
     this.#request = options.request;
+    this.#revealPartialResultsAfter = options.revealPartialResultsAfter;
     this.#resolveRoutes = options.resolveRoutes;
     this.#sources.set(this.#home.url, {
       status: "pending",
@@ -65,6 +72,9 @@ export class RoutedPdsQueryObserver<
     if (this.#closed) return;
     this.#closed = true;
     this.#routingGeneration += 1;
+    if (this.#partialResultsTimer !== undefined) {
+      clearTimeout(this.#partialResultsTimer);
+    }
     for (const unsubscribe of this.#unsubscribes.values()) unsubscribe();
     this.#unsubscribes.clear();
     this.#listeners.clear();
@@ -97,6 +107,7 @@ export class RoutedPdsQueryObserver<
       ...resolved,
     ]);
     this.#removeStaleTargets(targets);
+    this.#routesResolved = true;
     this.#addTargets(targets);
     this.#publish();
   }
@@ -117,11 +128,14 @@ export class RoutedPdsQueryObserver<
       readonly url: string;
     }[],
   ) {
-    for (const target of targets) {
-      if (target.url === this.#home.url || this.#sources.has(target.url)) {
-        continue;
-      }
+    const added = targets.filter(
+      (target) =>
+        target.url !== this.#home.url && !this.#sources.has(target.url),
+    );
+    for (const target of added) {
       this.#sources.set(target.url, { status: "pending", target });
+    }
+    for (const target of added) {
       const client = new PdsClient({
         connection: this.#getConnection(target.url),
       });
@@ -145,12 +159,59 @@ export class RoutedPdsQueryObserver<
     if (this.#closed) return;
     const source = this.#sources.get(url);
     if (source === undefined) return;
-    this.#sources.set(url, { ...update, target: source.target });
+    this.#sources.set(
+      url,
+      update.status === "error" &&
+        (source.status === "live" || source.status === "stale")
+        ? {
+            data: source.data,
+            error: update.error,
+            status: "stale",
+            target: source.target,
+          }
+        : { ...update, target: source.target },
+    );
     this.#publish();
   }
 
   #publish() {
-    this.#snapshot = createFederatedSnapshot([...this.#sources.values()]);
+    let snapshot = createFederatedSnapshot<PdsRequestResult<Request>, Combined>(
+      [...this.#sources.values()],
+    );
+
+    if (!this.#routesResolved && snapshot.status !== "error") {
+      snapshot = { ...snapshot, status: "pending" };
+    }
+
+    if (snapshot.status === "success") {
+      this.#completedInitialLoad = true;
+      this.#clearPartialResultsTimer();
+    } else if (this.#completedInitialLoad) {
+      snapshot = { ...snapshot, status: "success" };
+    } else if (snapshot.status === "partial") {
+      const remaining =
+        this.#revealPartialResultsAfter - (Date.now() - this.#startedAt);
+      if (remaining > 0) {
+        this.#schedulePartialResults(remaining);
+        return;
+      }
+    }
+
+    this.#snapshot = snapshot;
     for (const listener of this.#listeners) listener();
+  }
+
+  #schedulePartialResults(delay: number) {
+    if (this.#partialResultsTimer !== undefined) return;
+    this.#partialResultsTimer = setTimeout(() => {
+      this.#partialResultsTimer = undefined;
+      this.#publish();
+    }, delay);
+  }
+
+  #clearPartialResultsTimer() {
+    if (this.#partialResultsTimer === undefined) return;
+    clearTimeout(this.#partialResultsTimer);
+    this.#partialResultsTimer = undefined;
   }
 }

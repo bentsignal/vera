@@ -88,17 +88,20 @@ function ConversationHeader({
 }) {
   const { sources, status } = messages.data.federation;
   const live = sources.filter((source) => source.status === "live").length;
-  const complete = live === sources.length;
+  const description =
+    messages.data.status === "loading"
+      ? "Connecting to participant home servers"
+      : messages.data.status === "partial"
+        ? `Incomplete history — ${live} of ${sources.length} homes connected`
+        : messages.data.status === "error"
+          ? "Unable to load conversation history"
+          : "Messages from every participant's home server";
 
   return (
     <header className="channel-header">
       <div>
         <h1>Prototype conversation</h1>
-        <p>
-          {complete
-            ? "Messages from every participant's home server"
-            : `Incomplete history — ${live} of ${sources.length} homes connected`}
-        </p>
+        <p>{description}</p>
       </div>
       <div className="channel-actions">
         <span className="connection-summary" data-status={status}>
@@ -167,7 +170,7 @@ function MessageList({
 
   return (
     <div className="message-list" aria-live="polite">
-      {live < total ? (
+      {messages.data.status === "partial" ? (
         <aside className="federation-warning" role="status">
           <strong>Showing partial history</strong>
           <p>

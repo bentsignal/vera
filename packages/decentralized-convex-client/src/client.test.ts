@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
+import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 import {
   defineOperation,
@@ -9,6 +10,7 @@ import {
 import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
 
+import type { PdsRequest } from "./pds.ts";
 import type {
   FederationConnection,
   FederationMutationReference,
@@ -92,6 +94,101 @@ void test("federates typed PDS requests without a generated backend API", async 
   await client.close();
 });
 
+void test("reveals initial partial PDS data after the grace period and retains stale data", async () => {
+  const connections = new Map<string, ControlledConnection>();
+  const client = new DecentralizedConvexClient({
+    connectionFactory: (url) => {
+      const connection = new ControlledConnection();
+      connections.set(url, connection);
+      return connection;
+    },
+    pds: {
+      discover: (domain) => Promise.resolve(discoveredPds(domain)),
+      home: discoveredPds("a.test"),
+    },
+  });
+  const observer = client.watchPdsQuery(listNotesRequest, {
+    revealPartialResultsAfter: 20,
+  });
+  const unsubscribe = observer.subscribe(() => undefined);
+
+  connections.get("https://a.test")?.emit([{ body: "a" }], ["b.test"]);
+  await nextTask();
+  assert.equal(observer.getSnapshot().status, "pending");
+
+  await wait(25);
+  assert.equal(observer.getSnapshot().status, "partial");
+  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }]);
+
+  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  assert.equal(observer.getSnapshot().status, "success");
+  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }, { body: "b" }]);
+
+  connections.get("https://b.test")?.fail(new Error("temporarily offline"));
+  assert.equal(observer.getSnapshot().status, "success");
+  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }, { body: "b" }]);
+  assert.equal(
+    observer
+      .getSnapshot()
+      .sources.find((source) => source.target.url === "https://b.test")?.status,
+    "stale",
+  );
+
+  connections
+    .get("https://a.test")
+    ?.emit([{ body: "a2" }], ["b.test", "c.test"]);
+  await nextTask();
+  assert.equal(observer.getSnapshot().status, "success");
+  assert.deepEqual(observer.getSnapshot().data, [
+    { body: "a2" },
+    { body: "b" },
+  ]);
+  assert.equal(
+    observer
+      .getSnapshot()
+      .sources.find((source) => source.target.url === "https://c.test")?.status,
+    "pending",
+  );
+
+  unsubscribe();
+  observer.close();
+  await client.close();
+});
+
+void test("returns complete PDS data immediately during the partial grace period", async () => {
+  const connections = new Map<string, ControlledConnection>();
+  const client = new DecentralizedConvexClient({
+    connectionFactory: (url) => {
+      const connection = new ControlledConnection();
+      connections.set(url, connection);
+      return connection;
+    },
+    pds: {
+      discover: (domain) => Promise.resolve(discoveredPds(domain)),
+      home: discoveredPds("a.test"),
+    },
+  });
+  const observer = client.watchPdsQuery(listNotesRequest, {
+    revealPartialResultsAfter: 60_000,
+  });
+
+  connections.get("https://a.test")?.emit([{ body: "a" }], ["b.test"]);
+  await nextTask();
+  assert.equal(observer.getSnapshot().status, "pending");
+  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  assert.equal(observer.getSnapshot().status, "success");
+
+  observer.close();
+  await client.close();
+});
+
+const listNotesRequest = {
+  lastChanged: corePackage.lastChanged,
+  operation: { args: {}, type: "list" },
+  plugin: "notes",
+  version: DECENTRALIZED_CONVEX_VERSION,
+} satisfies PdsRequest<readonly { body: string }[], "query">;
+
 class MemoryConnection implements FederationConnection {
   readonly #url;
 
@@ -129,6 +226,85 @@ class MemoryConnection implements FederationConnection {
     void this.query(query, args).then(onResult);
     return () => undefined;
   }
+}
+
+class ControlledConnection implements FederationConnection {
+  #fail?: (error: Error) => void;
+  #publish?: (
+    value: readonly { body: string }[],
+    routes: readonly string[],
+  ) => void;
+
+  close() {
+    return Promise.resolve();
+  }
+
+  mutation<Mutation extends FederationMutationReference>(): Promise<
+    FunctionReturnType<Mutation>
+  > {
+    return Promise.reject(new Error("Not implemented"));
+  }
+
+  query<Query extends FederationQueryReference>(): Promise<
+    FunctionReturnType<Query>
+  > {
+    return Promise.reject(new Error("Not implemented"));
+  }
+
+  subscribe<Query extends FederationQueryReference>(
+    _query: Query,
+    _args: FunctionArgs<Query>,
+    onResult: (result: FunctionReturnType<Query>) => void,
+    onError: (error: Error) => void,
+  ) {
+    this.#publish = (value, routes) => {
+      const result = { routes, value };
+      // The controlled connection only receives the PDS root query in this test.
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      onResult(result as FunctionReturnType<Query>);
+    };
+    this.#fail = onError;
+    return () => {
+      this.#publish = undefined;
+      this.#fail = undefined;
+    };
+  }
+
+  emit(value: readonly { body: string }[], routes: readonly string[] = []) {
+    this.#publish?.(value, routes);
+  }
+
+  fail(error: Error) {
+    this.#fail?.(error);
+  }
+}
+
+function discoveredPds(domain: string) {
+  return {
+    domain,
+    manifest: {
+      accountDomain: domain,
+      capabilities: [
+        {
+          id: "notes",
+          lastChanged: corePackage.lastChanged,
+        },
+      ],
+      deploymentUrl: `https://${domain}`,
+      httpUrl: `https://${domain}`,
+      lastChanged: corePackage.lastChanged,
+      version: DECENTRALIZED_CONVEX_VERSION,
+    },
+    manifestUrl: `https://${domain}/.well-known/pds.json`,
+  };
+}
+
+function nextTask() {
+  return wait(0);
+}
+
+function wait(delay: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, delay));
 }
 
 function isPdsRequest(args: unknown) {

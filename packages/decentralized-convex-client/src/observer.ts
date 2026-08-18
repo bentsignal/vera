@@ -78,7 +78,18 @@ export class FederatedQueryObserver<
     if (this.#closed) return;
     const source = this.#sources.get(url);
     if (source === undefined) return;
-    this.#sources.set(url, { ...update, target: source.target });
+    this.#sources.set(
+      url,
+      update.status === "error" &&
+        (source.status === "live" || source.status === "stale")
+        ? {
+            data: source.data,
+            error: update.error,
+            status: "stale",
+            target: source.target,
+          }
+        : { ...update, target: source.target },
+    );
     this.#snapshot = createFederatedSnapshot(
       [...this.#sources.values()],
       this.#options.combine,

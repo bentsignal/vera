@@ -9,6 +9,7 @@ export type { FederatedTanStackQueryOptions } from "./options.ts";
 export { pdsMutation, pdsQuery, PdsQueryClient } from "./pds.ts";
 export type {
   PdsMutationConfig,
+  PdsQueryBuilderOptions,
   PdsQueryConfig,
   PdsQueryKey,
   PdsQueryOptions,

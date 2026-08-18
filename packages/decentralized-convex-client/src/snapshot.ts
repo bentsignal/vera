@@ -12,7 +12,7 @@ export function createFederatedSnapshot<Result, Combined>(
   ) => Combined,
 ): FederatedQuerySnapshot<Combined, Result> {
   const successful = sources.flatMap((source) =>
-    source.status === "live"
+    source.status === "live" || source.status === "stale"
       ? [{ data: source.data, target: source.target }]
       : [],
   );
@@ -48,10 +48,12 @@ function getStatus<Result>(
   sources: readonly FederationSourceSnapshot<Result>[],
 ) {
   if (sources.length === 0) return "success";
-  const live = sources.filter((source) => source.status === "live").length;
+  const available = sources.filter(
+    (source) => source.status === "live" || source.status === "stale",
+  ).length;
   const errors = sources.filter((source) => source.status === "error").length;
-  if (live === sources.length) return "success";
+  if (available === sources.length) return "success";
   if (errors === sources.length) return "error";
-  if (live > 0) return "partial";
+  if (available > 0) return "partial";
   return "pending";
 }

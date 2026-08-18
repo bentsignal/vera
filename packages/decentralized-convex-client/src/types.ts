@@ -30,13 +30,19 @@ export interface FederationTargetGroup {
   url: string;
 }
 
-export type FederationSourceStatus = "pending" | "live" | "error";
+export type FederationSourceStatus = "pending" | "live" | "stale" | "error";
 export type FederatedQueryStatus = "pending" | "success" | "partial" | "error";
 
 export type FederationSourceSnapshot<Result> =
   | {
       data: Result;
       status: "live";
+      target: FederationTargetGroup;
+    }
+  | {
+      data: Result;
+      error: Error;
+      status: "stale";
       target: FederationTargetGroup;
     }
   | {

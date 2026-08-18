@@ -115,6 +115,12 @@ object. Partial and successful states carry the operation value as `result`;
 loading is never represented by an ambiguous `undefined` value. Every state
 also carries federation status and per-source diagnostics.
 
+Initial partial data remains loading for `500ms` by default and can be tuned
+with `options.revealPartialResultsAfter`. Complete data bypasses the delay. Once
+every initial PDS has responded, the query remains successful: temporary
+disconnects retain last-known source data, and newly discovered PDSs load in
+the background instead of resetting the visible result.
+
 Applications may override:
 
 - ordinary Component install names and HTTP prefixes;
@@ -135,8 +141,6 @@ Still prototype-only:
 
 - the web app uses one explicit two-domain conversation fixture, but its
   routing is stored on each account's home and discovered through product data;
-- the initial loading grace period and partial-result reveal policy are not yet
-  implemented;
 - the UI holds one active account rather than concurrent accounts;
 - auth lacks scopes, revocation, replay limits, and resource-specific policy;
 - Component migration execution, persisted upgrade state, and large plugin

@@ -64,8 +64,10 @@ void test("produces native TanStack query and mutation options", async () => {
 
   const query = pdsQuery({
     args: { owner: "alice" },
+    options: { revealPartialResultsAfter: 0 },
     query: listNotes,
   });
+  assert.equal("revealPartialResultsAfter" in query, false);
   const initialObserver = new QueryObserver(new QueryClient(), query);
   assert.deepEqual(initialObserver.getCurrentResult().data, {
     federation: { sources: [], status: "pending" },

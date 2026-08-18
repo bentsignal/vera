@@ -91,3 +91,8 @@ messages.data.federation.sources;
 
 const sendMessage = useMutation(pdsMutation({ mutation: pds.messages.send }));
 ```
+
+PDS reads hide partial results for `500ms` by default while participant homes
+deliver their first snapshots. Set `options.revealPartialResultsAfter` in
+`pdsQuery` to override the delay. Complete data returns immediately, and a
+temporary disconnect retains the affected PDS's last known data.

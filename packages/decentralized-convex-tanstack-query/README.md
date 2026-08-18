@@ -39,6 +39,7 @@ const messages = useQuery(
     query: pds.messages.list,
     args: { conversationId },
     options: {
+      revealPartialResultsAfter: 1_000,
       retry: 3,
       select: (data) =>
         mapPdsQueryData(data, (messages) =>
@@ -55,6 +56,13 @@ Query `data` is always an explicit state object: `loading`, `partial`,
 and successful states, so a successfully loaded `undefined` can never be
 confused with loading. The same data envelope includes federation status and
 per-source diagnostics, so applications do not need a second hook.
+
+Partial results are hidden for `500ms` by default so normally fast PDS
+responses appear together. `options.revealPartialResultsAfter` changes that
+delay; `0` reveals partial data immediately. A complete result is never delayed.
+After the initial result becomes complete, temporary disconnects retain each
+source's last known data. Newly discovered PDSs synchronize in the background
+without returning successful data to a loading or partial state.
 
 Connect the decentralized transport once when creating an account session:
 

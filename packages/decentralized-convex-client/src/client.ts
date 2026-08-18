@@ -26,6 +26,12 @@ import { RoutedPdsQueryObserver } from "./routed-pds-observer.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
 import { groupFederationTargets, normalizeFederationUrl } from "./targets.ts";
 
+export const DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER = 500;
+
+export interface PdsQueryExecutionOptions {
+  readonly revealPartialResultsAfter?: number;
+}
+
 export class DecentralizedConvexClient {
   readonly #connectionFactory;
   readonly #connections = new Map<string, FederationConnection>();
@@ -62,13 +68,17 @@ export class DecentralizedConvexClient {
     );
   }
 
-  watchPdsQuery<Request extends AnyPdsQueryRequest>(request: Request) {
+  watchPdsQuery<Request extends AnyPdsQueryRequest>(
+    request: Request,
+    options: PdsQueryExecutionOptions = {},
+  ) {
     const home = this.#requireHome();
     assertPdsRequestCompatibility(home, request);
     return new RoutedPdsQueryObserver({
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
       request,
+      revealPartialResultsAfter: partialResultsDelay(options),
       resolveRoutes: (routes) => this.#resolveRoutes(routes, request),
     });
   }
@@ -135,7 +145,12 @@ export class DecentralizedConvexClient {
     );
   }
 
-  async pdsQuery<Request extends AnyPdsQueryRequest>(request: Request) {
+  async pdsQuery<Request extends AnyPdsQueryRequest>(
+    request: Request,
+    options: PdsQueryExecutionOptions = {},
+  ) {
+    const startedAt = Date.now();
+    const revealPartialResultsAfter = partialResultsDelay(options);
     const home = this.#requireHome();
     assertPdsRequestCompatibility(home, request);
     const homeTarget = pdsTarget(home.domain, home);
@@ -167,10 +182,15 @@ export class DecentralizedConvexClient {
         }
       }),
     );
-    return createFederatedSnapshot<
+    const snapshot = createFederatedSnapshot<
       PdsRequestResult<Request>,
       DefaultCombinedPdsResult<Request>
     >(settled);
+    if (snapshot.status === "partial") {
+      const remaining = revealPartialResultsAfter - (Date.now() - startedAt);
+      if (remaining > 0) await wait(remaining);
+    }
+    return snapshot;
   }
 
   mutation<Mutation extends FederationMutationReference>(
@@ -272,4 +292,19 @@ function pdsTarget(id: string, pds: DiscoveredPds): FederationTarget {
 
 function toError(error: unknown) {
   return error instanceof Error ? error : new Error("Federation query failed");
+}
+
+function partialResultsDelay(options: PdsQueryExecutionOptions) {
+  const delay =
+    options.revealPartialResultsAfter ?? DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER;
+  if (!Number.isFinite(delay) || delay < 0) {
+    throw new RangeError(
+      "revealPartialResultsAfter must be a finite, non-negative number",
+    );
+  }
+  return delay;
+}
+
+function wait(delay: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, delay));
 }

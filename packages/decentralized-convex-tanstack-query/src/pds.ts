@@ -4,6 +4,7 @@ import type {
   DecentralizedConvexClient,
   DefaultCombinedPdsResult,
   PdsQueryData,
+  PdsQueryExecutionOptions,
   PdsRequest,
   PdsRequestResult,
 } from "@decentralized-convex/client";
@@ -98,11 +99,12 @@ export class PdsQueryClient {
 
   async query<Request extends AnyPdsQueryRequest>(
     request: Request,
+    options: PdsQueryExecutionOptions,
   ): Promise<
     PdsQueryData<DefaultCombinedPdsResult<Request>, PdsRequestResult<Request>>
   > {
     try {
-      const snapshot = await this.#client.pdsQuery(request);
+      const snapshot = await this.#client.pdsQuery(request, options);
       return pdsQueryDataFromSnapshot(snapshot);
     } catch (error) {
       return {
@@ -120,14 +122,14 @@ export class PdsQueryClient {
   }
 
   #startQuery(queryClient: QueryClient, query: Query) {
-    const request = pdsRequestFromMeta(query.meta);
-    if (request === undefined || this.#activeQueries.has(query.queryHash)) {
+    const config = pdsQueryConfigFromMeta(query.meta);
+    if (config === undefined || this.#activeQueries.has(query.queryHash)) {
       return;
     }
 
     const active: ActiveQuery = { cancelled: false };
     this.#activeQueries.set(query.queryHash, active);
-    const observer = this.#client.watchPdsQuery(request);
+    const observer = this.#client.watchPdsQuery(config.request, config.options);
     function publish() {
       const snapshot = observer.getSnapshot();
       queryClient.setQueryData(
@@ -174,16 +176,22 @@ export type PdsQueryOptions<
   PdsQueryKey<Request>
 >;
 
+export type PdsQueryBuilderOptions<
+  Request extends AnyPdsQueryRequest,
+  Data = QueryData<Request>,
+> = Omit<
+  PdsQueryOptions<Request, Data>,
+  "initialData" | "meta" | "queryFn" | "queryKey"
+> &
+  PdsQueryExecutionOptions;
+
 export interface PdsQueryConfig<
   Args,
   Request extends AnyPdsQueryRequest,
   Data = QueryData<Request>,
 > {
   readonly args: Args;
-  readonly options?: Omit<
-    PdsQueryOptions<Request, Data>,
-    "initialData" | "meta" | "queryFn" | "queryKey"
-  >;
+  readonly options?: PdsQueryBuilderOptions<Request, Data>;
   readonly query: (args: Args) => Request;
 }
 
@@ -202,6 +210,11 @@ function pdsQueryOptions<
   request: Request,
   options?: PdsQueryConfig<unknown, Request, Data>["options"],
 ): PdsQueryOptions<Request, Data> {
+  const { revealPartialResultsAfter, ...tanStackOptions } = options ?? {};
+  const executionOptions =
+    revealPartialResultsAfter === undefined
+      ? {}
+      : { revealPartialResultsAfter };
   const queryKey: PdsQueryKey<typeof request> = [
     "decentralized-convex",
     "pds",
@@ -214,12 +227,15 @@ function pdsQueryOptions<
   >();
   return {
     initialData,
-    meta: { [PDS_QUERY_META_KEY]: request },
-    queryFn: ({ client }) => connectedPdsClient(client).query(request),
+    meta: {
+      [PDS_QUERY_META_KEY]: { options: executionOptions, request },
+    },
+    queryFn: ({ client }) =>
+      connectedPdsClient(client).query(request, executionOptions),
     queryKey,
     staleTime: (query) =>
       query.state.data?.status === "loading" ? 0 : Infinity,
-    ...options,
+    ...tanStackOptions,
   };
 }
 
@@ -267,20 +283,36 @@ function connectedPdsClient(queryClient: QueryClient) {
   return client;
 }
 
-function pdsRequestFromMeta(meta: QueryMeta | undefined) {
-  const request = meta?.[PDS_QUERY_META_KEY];
+function pdsQueryConfigFromMeta(meta: QueryMeta | undefined) {
+  const config = meta?.[PDS_QUERY_META_KEY];
   if (
-    typeof request !== "object" ||
-    request === null ||
-    !("plugin" in request) ||
-    !("version" in request) ||
-    !("operation" in request)
+    !isRecord(config) ||
+    !("request" in config) ||
+    !isPdsQueryRequest(config.request) ||
+    !("options" in config) ||
+    !isRecord(config.options)
   ) {
     return undefined;
   }
   // Only pdsQuery writes this private metadata entry.
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  return request as AnyPdsQueryRequest;
+  return config as {
+    options: PdsQueryExecutionOptions;
+    request: AnyPdsQueryRequest;
+  };
+}
+
+function isPdsQueryRequest(value: unknown): value is AnyPdsQueryRequest {
+  return (
+    isRecord(value) &&
+    "plugin" in value &&
+    "version" in value &&
+    "operation" in value
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function toError(error: unknown) {
