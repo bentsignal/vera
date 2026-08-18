@@ -13,12 +13,14 @@ import {
   QueryClient,
   QueryObserver,
   useQuery,
+  useSuspenseQuery,
 } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
-import { pdsMutation, pdsQuery, PdsQueryClient } from "./pds.ts";
+import { PdsQueryClient } from "./pds-query-client.ts";
+import { pdsMutation, pdsQuery } from "./pds.ts";
 
 interface Note {
   body: string;
@@ -116,6 +118,57 @@ void test("produces native TanStack query and mutation options", async () => {
   await transport.close();
 });
 
+void test("strict queries resolve only with complete initial data", async () => {
+  const connections = new Map<string, MemoryConnection>();
+  const transport = new DecentralizedConvexClient({
+    connectionFactory: (url) => {
+      const connection = new MemoryConnection(url);
+      connections.set(url, connection);
+      return connection;
+    },
+    pds: {
+      discover: (domain) => Promise.resolve(discoveredPds(domain)),
+      home: discoveredPds("a.test"),
+    },
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const adapter = new PdsQueryClient(transport);
+  const disconnect = adapter.connect(queryClient);
+  const query = pdsQuery({
+    args: { owner: "alice" },
+    options: { requireCompleteResults: true },
+    query: listNotes,
+  });
+
+  assert.equal("initialData" in query, false);
+  const result = await queryClient.ensureQueryData(query);
+  assert.equal(result.status, "success");
+  assert.deepEqual(result.result, [
+    { body: "https://a.test", id: "alice" },
+    { body: "https://b.test", id: "alice" },
+  ]);
+
+  const observer = new QueryObserver(queryClient, query);
+  const unsubscribe = observer.subscribe(() => undefined);
+  assert.equal(observer.getCurrentResult().data?.status, "success");
+  await nextTask();
+  connections.get("https://a.test")?.emit("Hydrated live update");
+  await nextTask();
+  const updated = observer.getCurrentResult().data;
+  assert.ok(updated);
+  assert.equal(updated.status, "success");
+  assert.deepEqual(updated.result, [
+    { body: "Hydrated live update", id: "alice" },
+    { body: "https://b.test", id: "alice" },
+  ]);
+
+  unsubscribe();
+  disconnect();
+  await transport.close();
+});
+
 function usePdsQueryTypeTest() {
   const query = useQuery(
     pdsQuery({
@@ -134,6 +187,21 @@ function usePdsQueryTypeTest() {
 }
 
 void usePdsQueryTypeTest;
+
+function useCompletePdsQueryTypeTest() {
+  const query = useSuspenseQuery(
+    pdsQuery({
+      args: { owner: "alice" },
+      options: { requireCompleteResults: true },
+      query: listNotes,
+    }),
+  );
+  const status: "success" = query.data.status;
+  const notes: Note[] = query.data.result;
+  return { notes, status };
+}
+
+void useCompletePdsQueryTypeTest;
 
 class MemoryConnection implements FederationConnection {
   readonly #publishers = new Set<(body: string) => void>();

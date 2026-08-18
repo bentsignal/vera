@@ -9,6 +9,7 @@ import type {
   FederationSourceSnapshot,
   FederationTarget,
 } from "./types.ts";
+import { PdsInitialResponseTimeoutError } from "./errors.ts";
 import { PdsClient } from "./pds.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
 import { groupFederationTargets } from "./targets.ts";
@@ -19,6 +20,11 @@ export class RoutedPdsQueryObserver<
 > {
   readonly #getConnection;
   readonly #home;
+  readonly #initialResponseTimeout;
+  readonly #initialResponseTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
   readonly #listeners = new Set<() => void>();
   readonly #request;
   readonly #revealPartialResultsAfter;
@@ -39,6 +45,7 @@ export class RoutedPdsQueryObserver<
   constructor(options: {
     getConnection: (url: string) => PdsConnection;
     home: FederationTarget;
+    initialResponseTimeout: number;
     request: Request;
     revealPartialResultsAfter: number;
     resolveRoutes: (
@@ -50,6 +57,7 @@ export class RoutedPdsQueryObserver<
       ids: [options.home.id],
       url: options.home.url,
     };
+    this.#initialResponseTimeout = options.initialResponseTimeout;
     this.#request = options.request;
     this.#revealPartialResultsAfter = options.revealPartialResultsAfter;
     this.#resolveRoutes = options.resolveRoutes;
@@ -58,6 +66,7 @@ export class RoutedPdsQueryObserver<
       target: this.#home,
     });
     this.#snapshot = createFederatedSnapshot([...this.#sources.values()]);
+    this.#startInitialResponseTimer(this.#home.url);
     this.#watchHome();
   }
 
@@ -75,6 +84,10 @@ export class RoutedPdsQueryObserver<
     if (this.#partialResultsTimer !== undefined) {
       clearTimeout(this.#partialResultsTimer);
     }
+    for (const timer of this.#initialResponseTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.#initialResponseTimers.clear();
     for (const unsubscribe of this.#unsubscribes.values()) unsubscribe();
     this.#unsubscribes.clear();
     this.#listeners.clear();
@@ -118,6 +131,7 @@ export class RoutedPdsQueryObserver<
       if (url === this.#home.url || desiredUrls.has(url)) continue;
       this.#unsubscribes.get(url)?.();
       this.#unsubscribes.delete(url);
+      this.#clearInitialResponseTimer(url);
       this.#sources.delete(url);
     }
   }
@@ -134,6 +148,7 @@ export class RoutedPdsQueryObserver<
     );
     for (const target of added) {
       this.#sources.set(target.url, { status: "pending", target });
+      this.#startInitialResponseTimer(target.url);
     }
     for (const target of added) {
       const client = new PdsClient({
@@ -159,6 +174,7 @@ export class RoutedPdsQueryObserver<
     if (this.#closed) return;
     const source = this.#sources.get(url);
     if (source === undefined) return;
+    this.#clearInitialResponseTimer(url);
     this.#sources.set(
       url,
       update.status === "error" &&
@@ -213,5 +229,26 @@ export class RoutedPdsQueryObserver<
     if (this.#partialResultsTimer === undefined) return;
     clearTimeout(this.#partialResultsTimer);
     this.#partialResultsTimer = undefined;
+  }
+
+  #startInitialResponseTimer(url: string) {
+    this.#initialResponseTimers.set(
+      url,
+      setTimeout(
+        () =>
+          this.#update(url, {
+            error: new PdsInitialResponseTimeoutError(url),
+            status: "error",
+          }),
+        this.#initialResponseTimeout,
+      ),
+    );
+  }
+
+  #clearInitialResponseTimer(url: string) {
+    const timer = this.#initialResponseTimers.get(url);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    this.#initialResponseTimers.delete(url);
   }
 }

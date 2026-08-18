@@ -64,6 +64,38 @@ After the initial result becomes complete, temporary disconnects retain each
 source's last known data. Newly discovered PDSs synchronize in the background
 without returning successful data to a loading or partial state.
 
+For SSR routes that must not render until every initial PDS has responded, use
+the same strict options object in the route loader and component:
+
+```ts
+function messagesQuery(conversationId: string) {
+  return pdsQuery({
+    args: { conversationId },
+    options: { requireCompleteResults: true },
+    query: pds.messages.list,
+  });
+}
+
+export const Route = createFileRoute("/messages/$conversationId")({
+  loader: ({ context, params }) =>
+    context.queryClient.ensureQueryData(messagesQuery(params.conversationId)),
+  component: Messages,
+});
+
+function Messages() {
+  const { conversationId } = Route.useParams();
+  const messages = useSuspenseQuery(messagesQuery(conversationId));
+  messages.data.status; // "success"
+  messages.data.result; // Message[]
+}
+```
+
+Strict queries reject into the route error boundary if an initial PDS fails or
+does not respond within `2_000ms`. `options.initialResponseTimeout` changes
+that timeout. Once complete data is rendered, live subscriptions retain the
+last known source data through temporary disconnects and synchronize newly
+discovered PDSs in the background.
+
 Connect the decentralized transport once when creating an account session:
 
 ```ts

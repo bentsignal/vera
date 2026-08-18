@@ -54,8 +54,15 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-const messages = useQuery(pdsQuery(pds.messages.list, { conversationId }));
-const sendMessage = useMutation(pdsMutation(pds.messages.send));
+const messages = useQuery(
+  pdsQuery({
+    args: { conversationId },
+    query: pds.messages.list,
+  }),
+);
+const sendMessage = useMutation(
+  pdsMutation({ mutation: pds.messages.send }),
+);
 ```
 
 The backend's `pds` export derives its plugin names, versions, operations, and

@@ -30,6 +30,11 @@ export type PdsQueryData<Result, SourceResult = Result> =
       readonly status: "error";
     };
 
+export type SuccessfulPdsQueryData<Result, SourceResult = Result> = Extract<
+  PdsQueryData<Result, SourceResult>,
+  { readonly status: "success" }
+>;
+
 export function pdsQueryDataFromSnapshot<Result, SourceResult>(
   snapshot: FederatedQuerySnapshot<Result, SourceResult>,
 ): PdsQueryData<Result, SourceResult> {

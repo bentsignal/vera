@@ -9,6 +9,7 @@ import type {
   FederatedPdsQueryOptions,
   PdsRequestResult,
 } from "./pds.ts";
+import type { PdsQueryExecutionOptions } from "./query-execution.ts";
 import type {
   FederatedQueryOptions,
   FederationClientOptions,
@@ -22,15 +23,14 @@ import { createConvexFederationConnection } from "./connection.ts";
 import { FederatedQueryObserver } from "./observer.ts";
 import { FederatedPdsQueryObserver } from "./pds-observer.ts";
 import { PdsClient } from "./pds.ts";
+import {
+  initialResponseTimeout,
+  partialResultsDelay,
+  withInitialResponseTimeout,
+} from "./query-execution.ts";
 import { RoutedPdsQueryObserver } from "./routed-pds-observer.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
 import { groupFederationTargets, normalizeFederationUrl } from "./targets.ts";
-
-export const DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER = 500;
-
-export interface PdsQueryExecutionOptions {
-  readonly revealPartialResultsAfter?: number;
-}
 
 export class DecentralizedConvexClient {
   readonly #connectionFactory;
@@ -77,6 +77,7 @@ export class DecentralizedConvexClient {
     return new RoutedPdsQueryObserver({
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
+      initialResponseTimeout: initialResponseTimeout(options),
       request,
       revealPartialResultsAfter: partialResultsDelay(options),
       resolveRoutes: (routes) => this.#resolveRoutes(routes, request),
@@ -150,15 +151,20 @@ export class DecentralizedConvexClient {
     options: PdsQueryExecutionOptions = {},
   ) {
     const startedAt = Date.now();
+    const responseTimeout = initialResponseTimeout(options);
     const revealPartialResultsAfter = partialResultsDelay(options);
     const home = this.#requireHome();
     assertPdsRequestCompatibility(home, request);
     const homeTarget = pdsTarget(home.domain, home);
     const homeGroup = groupFederationTargets([homeTarget])[0];
     if (homeGroup === undefined) throw new Error("PDS home is invalid");
-    const homeResult = await new PdsClient({
-      connection: this.#getConnection(homeTarget.url),
-    }).queryWithRouting(request);
+    const homeResult = await withInitialResponseTimeout(
+      new PdsClient({
+        connection: this.#getConnection(homeTarget.url),
+      }).queryWithRouting(request),
+      responseTimeout,
+      homeTarget.url,
+    );
     const targets = groupFederationTargets([
       homeTarget,
       ...(await this.#resolveRoutes(homeResult.routes, request)),
@@ -169,9 +175,13 @@ export class DecentralizedConvexClient {
           return { data: homeResult.data, status: "live" as const, target };
         }
         try {
-          const data = await new PdsClient({
-            connection: this.#getConnection(target.url),
-          }).query(request);
+          const data = await withInitialResponseTimeout(
+            new PdsClient({
+              connection: this.#getConnection(target.url),
+            }).query(request),
+            responseTimeout,
+            target.url,
+          );
           return { data, status: "live" as const, target };
         } catch (error) {
           return {
@@ -292,17 +302,6 @@ function pdsTarget(id: string, pds: DiscoveredPds): FederationTarget {
 
 function toError(error: unknown) {
   return error instanceof Error ? error : new Error("Federation query failed");
-}
-
-function partialResultsDelay(options: PdsQueryExecutionOptions) {
-  const delay =
-    options.revealPartialResultsAfter ?? DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER;
-  if (!Number.isFinite(delay) || delay < 0) {
-    throw new RangeError(
-      "revealPartialResultsAfter must be a finite, non-negative number",
-    );
-  }
-  return delay;
 }
 
 function wait(delay: number) {

@@ -1,9 +1,11 @@
 export { decentralizedConvexPackage } from "../metadata.ts";
+export { DecentralizedConvexClient } from "./client.ts";
+export { PdsInitialResponseTimeoutError } from "./errors.ts";
 export {
-  DecentralizedConvexClient,
+  DEFAULT_INITIAL_RESPONSE_TIMEOUT,
   DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER,
-} from "./client.ts";
-export type { PdsQueryExecutionOptions } from "./client.ts";
+} from "./query-execution.ts";
+export type { PdsQueryExecutionOptions } from "./query-execution.ts";
 export {
   assertPdsCompatibility,
   assertPdsRequestCompatibility,
@@ -32,7 +34,11 @@ export {
 export { FederatedQueryObserver } from "./observer.ts";
 export { FederatedPdsQueryObserver } from "./pds-observer.ts";
 export { mapPdsQueryData, pdsQueryDataFromSnapshot } from "./query-data.ts";
-export type { PdsQueryData, PdsQueryFederation } from "./query-data.ts";
+export type {
+  PdsQueryData,
+  PdsQueryFederation,
+  SuccessfulPdsQueryData,
+} from "./query-data.ts";
 export { defaultCombine } from "./snapshot.ts";
 export { groupFederationTargets, normalizeFederationUrl } from "./targets.ts";
 export type {
