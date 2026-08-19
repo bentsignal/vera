@@ -6,24 +6,15 @@ import { signJWT } from "better-auth/plugins/jwt";
 import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 import { z } from "zod";
 
-import { actorFromEmail } from "./lib";
+import type { BetterAuthPdsRuntimeConfig } from "./adapter.ts";
 
-const assertionBody = z.object({
-  audience: z.string().min(1),
-});
+const assertionBody = z.object({ audience: z.string().min(1) });
+const exchangeBody = z.object({ assertion: z.string().min(1) });
 
-const exchangeBody = z.object({
-  assertion: z.string().min(1),
-});
-
-interface PdsFederationAuthOptions {
-  accountDomain: string;
-  issuer: string;
-}
-
-export function pdsFederationAuth(
-  options: PdsFederationAuthOptions,
+export function createFederationPlugin(
+  options: BetterAuthPdsRuntimeConfig,
 ): BetterAuthPlugin {
+  const accountDomain = normalizeDomain(options.accountDomain);
   const jwtOptions = {
     jwt: {
       audience: "convex",
@@ -40,7 +31,17 @@ export function pdsFederationAuth(
         { body: assertionBody, method: "POST", use: [sessionMiddleware] },
         async (ctx) => {
           const audience = normalizeDomain(ctx.body.audience);
-          const accountId = actorFromEmail(ctx.context.session.user.email);
+          const user = ctx.context.session.user;
+          const accountId = options.getAccountId({
+            email: user.email,
+            id: user.id,
+            name: user.name,
+          });
+          if (accountDomainFromId(accountId) !== accountDomain) {
+            throw new Error(
+              `Authenticated account ${accountId} does not belong to ${accountDomain}`,
+            );
+          }
           const issuedAt = nowInSeconds();
           const assertion = await signJWT(ctx, {
             options: {
@@ -54,12 +55,12 @@ export function pdsFederationAuth(
             payload: {
               accountId,
               aud: audience,
-              home: options.accountDomain,
+              home: accountDomain,
               iat: issuedAt,
               jti: crypto.randomUUID(),
-              name: ctx.context.session.user.name,
+              name: user.name,
               purpose: "pds-federation",
-              sub: ctx.context.session.user.id,
+              sub: user.id,
             },
           });
           return { assertion };
@@ -73,7 +74,7 @@ export function pdsFederationAuth(
           try {
             verifiedAssertion = await verifyAssertion(
               ctx.body.assertion,
-              options.accountDomain,
+              accountDomain,
             );
           } catch {
             throw ctx.error("UNAUTHORIZED", {
@@ -81,7 +82,6 @@ export function pdsFederationAuth(
             });
           }
           const { accountId, auth, homeDomain, payload } = verifiedAssertion;
-
           const issuedAt = nowInSeconds();
           const expiresAt = issuedAt + 15 * 60;
           const token = await signJWT(ctx, {
@@ -107,7 +107,7 @@ export function pdsFederationAuth(
         },
       ),
     },
-    id: "pds-federation-auth",
+    id: "decentralized-convex-federation-auth",
   } satisfies BetterAuthPlugin;
 }
 
@@ -128,7 +128,6 @@ async function verifyAssertion(
   if (unverified.purpose !== "pds-federation") {
     throw new Error("Invalid federation assertion purpose");
   }
-
   const discovery = await discoverPds(homeDomain);
   const auth = discovery.manifest.auth;
   if (auth === undefined) {
@@ -170,7 +169,7 @@ function normalizeDomain(value: string) {
 
 function requireClaim(value: unknown, name: string) {
   if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`Federation assertion is missing ${name}`);
+    throw new Error(`PDS authentication assertion is missing ${name}`);
   }
   return value;
 }

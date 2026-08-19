@@ -5,10 +5,15 @@ single declaration in `convex/convex.config.ts`:
 
 ```ts
 export default definePdsApp({
-  components: [betterAuth],
+  auth: pdsAuth,
   plugins: [accounts, messages],
 });
 ```
+
+`pdsAuth` is the shared Better Auth adapter declaration. It installs the
+Better Auth Component, supplies the federation plugin to Vera's otherwise
+normal `betterAuth({...})` configuration, and contributes public auth metadata
+to PDS discovery without repeating it in the HTTP router.
 
 Messages explicitly requires Accounts. The app definition fails type-checking
 if that dependency is absent or incompatible. No custom development or deploy
@@ -43,10 +48,10 @@ pnpm --filter @vera/backend deploy:a
 pnpm --filter @vera/backend deploy:b
 ```
 
-Each deployment needs its own `FEDERATION_DOMAIN`. Better Auth is the current
-Vera authentication choice; the decentralized Convex packages remain auth
-provider agnostic. The same backend is currently deployed to the independent A
-and B development deployments.
+Each deployment needs its own `FEDERATION_DOMAIN`. Better Auth is Vera's
+current authentication choice through `@decentralized-convex/auth-better-auth`;
+other hosts can supply adapters for their own auth system. The same backend is
+currently deployed to the independent A and B development deployments.
 
 ## Public discovery
 

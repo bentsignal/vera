@@ -16,10 +16,6 @@ registerFederationRoutes(http, httpAction, {
   descriptor: () =>
     pdsDescriptorFromApp(app, {
       accountDomain: requireEnvironment("FEDERATION_DOMAIN"),
-      auth: {
-        issuer: requireEnvironment("CONVEX_SITE_URL"),
-        jwksUrl: `${requireEnvironment("CONVEX_SITE_URL")}/api/auth/convex/jwks`,
-      },
       deploymentUrl: requireEnvironment("CONVEX_CLOUD_URL"),
       httpUrl: requireEnvironment("CONVEX_SITE_URL"),
     }),

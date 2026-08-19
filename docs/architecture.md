@@ -39,13 +39,14 @@ Each plugin exports a normal Convex Component whose TypeScript type carries its
 protocol. The host imports that single value through the `convex.config` path
 required by Convex and never manually pairs a Component with its protocol.
 
-The host calls `definePdsApp({ plugins, components })`. It:
+The host calls `definePdsApp({ auth, plugins, components })`. It:
 
 1. checks duplicate names, missing plugins, and incompatible ecosystem versions
    through the plugin tuple's TypeScript type;
 2. installs each plugin as a normal Convex Component;
-3. installs unrelated Components such as Better Auth without treating them as
-   PDS protocols.
+3. installs an optional auth adapter's Component and derives its public
+   descriptor metadata from that same adapter;
+4. installs unrelated Components without treating them as PDS protocols.
 
 The protocol marker is deliberately type-only. Convex replaces imported
 Component definitions while evaluating `convex.config.ts`, so runtime metadata
@@ -88,16 +89,24 @@ identity value across one Component boundary.
 `@decentralized-convex/plugin` knows about contracts, not React, authentication,
 Vera, or deployment routing.
 
-`@decentralized-convex/server` knows how to install and dispatch protocols, but
-not Vera's messaging policy or Better Auth.
+`@decentralized-convex/server` knows how to install and dispatch protocols and
+the generic shape of a PDS auth adapter, but not Vera's messaging policy or any
+specific auth vendor.
+
+`@decentralized-convex/auth-better-auth` bridges a normally configured Better
+Auth instance to the public PDS federation-auth endpoints. Better Auth remains
+a peer dependency, and its database, providers, sessions, callbacks, and UI
+remain entirely under the host's control. The config-time adapter is separated
+from its server-only runtime bridge so importing the generated PDS API does not
+bundle Better Auth into clients.
 
 `@decentralized-convex/client` knows deployments, connections, authentication
 token callbacks, subscriptions, and typed protocol requests. React and
 TanStack Query integrations remain optional packages.
 
 Accounts and Messages own their schemas and operation implementations. Vera's
-backend supplies authentication and federation credential exchange. Vera's web
-app supplies product-specific conversation selection and presentation.
+backend supplies its normal Better Auth configuration to the adapter. Vera's
+web app supplies product-specific conversation selection and presentation.
 
 ## Defaults and extension points
 
@@ -142,6 +151,8 @@ Still prototype-only:
 - the web app uses one explicit two-domain conversation fixture, but its
   routing is stored on each account's home and discovered through product data;
 - the UI holds one active account rather than concurrent accounts;
+- the Better Auth adapter covers the existing home-to-remote assertion
+  exchange, while universal client-to-home sign-in is the next auth slice;
 - auth lacks scopes, revocation, replay limits, and resource-specific policy;
 - Component migration execution, persisted upgrade state, and large plugin
   graphs still need a production design;

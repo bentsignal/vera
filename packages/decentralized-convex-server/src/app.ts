@@ -16,6 +16,7 @@ declare const pdsPluginProtocol: unique symbol;
 declare const pdsAppPlugins: unique symbol;
 
 const localComponentProtocols = new WeakMap<object, AnyPluginProtocol>();
+const localAppAuth = new WeakMap<object, PdsAuthAdapter>();
 const localAppProtocols = new WeakMap<object, readonly AnyPluginProtocol[]>();
 
 /**
@@ -66,10 +67,20 @@ export interface ComponentInstall {
   };
 }
 
+/**
+ * Connects a host's auth implementation to the public PDS auth protocol.
+ * Vendor-specific adapters own their runtime integration details.
+ */
+export interface PdsAuthAdapter {
+  readonly component?: ComponentDefinition | ComponentInstall;
+  descriptor(): NonNullable<FederationDescriptor["auth"]>;
+}
+
 export interface PdsAppOptions<
   Plugins extends readonly AnyPdsPluginComponent[],
 > {
   readonly app?: { readonly httpPrefix?: string };
+  readonly auth?: PdsAuthAdapter;
   readonly components?: readonly (ComponentDefinition | ComponentInstall)[];
   readonly plugins: Plugins & PdsPluginGraphDiagnostics<NoInfer<Plugins>>;
 }
@@ -118,18 +129,14 @@ export function definePdsApp<
   const Plugins extends readonly AnyPdsPluginComponent[],
 >({
   app: appOptions,
+  auth,
   components = [],
   plugins,
 }: PdsAppOptions<Plugins>): PdsAppDefinition<Plugins> {
   const app = defineApp(appOptions);
+  if (auth?.component !== undefined) installComponent(app, auth.component);
   for (const install of components) {
-    if (isComponentInstall(install)) {
-      if (isImportedComponent(install.component)) {
-        app.use(install.component, install.options);
-      }
-    } else if (isImportedComponent(install)) {
-      app.use(install);
-    }
+    installComponent(app, install);
   }
 
   const protocols: AnyPluginProtocol[] = [];
@@ -138,6 +145,7 @@ export function definePdsApp<
     if (protocol !== undefined) protocols.push(protocol);
     if (isImportedComponent(plugin)) app.use(plugin);
   }
+  if (auth !== undefined) localAppAuth.set(app, auth);
   localAppProtocols.set(app, Object.freeze(protocols));
   // Installed plugin types are retained for downstream generated/client typing only.
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -173,9 +181,30 @@ export function pdsDescriptorFromApp<
   App extends PdsAppDefinition<readonly AnyPdsPluginComponent[]>,
 >(
   app: App,
-  host: Omit<FederationDescriptor, "capabilities" | "lastChanged" | "version">,
+  host: Omit<
+    FederationDescriptor,
+    "auth" | "capabilities" | "lastChanged" | "version"
+  >,
 ): FederationDescriptor {
-  return { ...host, ...pdsReleaseFromApp(app) };
+  const auth = localAppAuth.get(app)?.descriptor();
+  return {
+    ...host,
+    ...(auth === undefined ? {} : { auth }),
+    ...pdsReleaseFromApp(app),
+  };
+}
+
+function installComponent(
+  app: AppDefinition,
+  install: ComponentDefinition | ComponentInstall,
+) {
+  if (isComponentInstall(install)) {
+    if (isImportedComponent(install.component)) {
+      app.use(install.component, install.options);
+    }
+  } else if (isImportedComponent(install)) {
+    app.use(install);
+  }
 }
 
 function isComponentInstall(

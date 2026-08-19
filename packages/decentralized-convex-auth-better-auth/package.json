@@ -1,37 +1,39 @@
 {
-  "name": "@vera/backend",
+  "name": "@decentralized-convex/auth-better-auth",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
-    "./api": "./convex/_generated/api.js",
-    "./pds": "./pds.ts"
+    ".": "./src/index.ts",
+    "./metadata": "./metadata.ts",
+    "./runtime": "./src/runtime.ts"
   },
   "scripts": {
+    "build": "tsgo --noEmit",
     "clean": "git clean -xdf .cache .turbo node_modules",
-    "deploy:a": "convex dev --once --env-file .env.a.local",
-    "deploy:b": "convex dev --once --env-file .env.b.local",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
-    "typecheck": "tsgo --noEmit -p tsconfig.json"
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@convex-dev/better-auth": "0.12.5",
-    "@decentralized-convex/accounts": "workspace:0.1.0",
     "@decentralized-convex/address": "workspace:0.1.0",
-    "@decentralized-convex/auth-better-auth": "workspace:0.1.0",
-    "@decentralized-convex/client": "workspace:0.1.0",
-    "@decentralized-convex/messages": "workspace:0.1.0",
+    "@decentralized-convex/core": "workspace:0.1.0",
     "@decentralized-convex/server": "workspace:0.1.0",
-    "better-auth": "~1.6.15",
-    "convex": "catalog:"
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "better-auth": ">=1.6.15 <2"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",
     "@acme/prettier-config": "workspace:*",
     "@acme/tsconfig": "workspace:*",
     "@types/node": "catalog:",
+    "better-auth": "~1.6.15",
+    "convex": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

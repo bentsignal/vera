@@ -1,13 +1,14 @@
 import type { GenericCtx } from "@convex-dev/better-auth";
 import { createClient } from "@convex-dev/better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
+import { betterAuthPdsPlugin } from "@decentralized-convex/auth-better-auth/runtime";
 import { betterAuth } from "better-auth/minimal";
 
 import type { DataModel } from "./_generated/dataModel";
+import { pdsAuth } from "../pds-auth";
 import { components } from "./_generated/api";
 import { query } from "./_generated/server";
 import authConfig from "./auth.config";
-import { pdsFederationAuth } from "./federationAuth";
 import { actorFromEmail, requireEnvironment } from "./lib";
 
 export const authComponent = createClient<DataModel>(components.betterAuth);
@@ -34,10 +35,7 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
           }),
         },
       }),
-      pdsFederationAuth({
-        accountDomain: requireEnvironment("FEDERATION_DOMAIN"),
-        issuer: requireEnvironment("CONVEX_SITE_URL"),
-      }),
+      betterAuthPdsPlugin(pdsAuth),
     ],
     trustedOrigins: [siteUrl],
   });

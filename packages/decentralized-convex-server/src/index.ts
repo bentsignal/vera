@@ -10,6 +10,7 @@ export {
 export type {
   AnyPdsPluginComponent,
   ComponentInstall,
+  PdsAuthAdapter,
   PdsAppDefinition,
   PdsAppOptions,
   PdsPluginComponent,

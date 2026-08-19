@@ -13,8 +13,8 @@ Read these files in order to follow one request end to end:
 
 1. `packages/decentralized-convex-messages/protocol.ts` defines the typed
    Messages API and its dependency on Accounts.
-2. `services/backend/convex/convex.config.ts` installs Better Auth, Accounts,
-   and Messages in one validated PDS app.
+2. `services/backend/convex/convex.config.ts` installs the PDS auth adapter,
+   Accounts, and Messages in one validated PDS app.
 3. `services/backend/convex/pds.ts` exposes the canonical public dispatcher.
 4. `packages/decentralized-convex-messages/dispatcher.ts` implements the
    Messages operations inside its Component.
@@ -31,13 +31,13 @@ A PDS installs ordinary third-party Components and decentralized-convex
 plugins declaratively:
 
 ```ts
-import betterAuth from "@convex-dev/better-auth/convex.config";
 import accounts from "@decentralized-convex/accounts/convex.config";
 import messages from "@decentralized-convex/messages/convex.config";
 import { definePdsApp } from "@decentralized-convex/server";
+import { pdsAuth } from "../pds-auth";
 
 export default definePdsApp({
-  components: [betterAuth],
+  auth: pdsAuth,
   plugins: [accounts, messages],
 });
 ```
@@ -84,6 +84,8 @@ authentication remain available when an application needs control.
   last-changed release metadata
 - `packages/decentralized-convex-server` — PDS installation, root dispatch,
   Component dispatch, and discovery descriptors
+- `packages/decentralized-convex-auth-better-auth` — Better Auth adapter for
+  the public PDS auth protocol
 - `packages/decentralized-convex-client` — discovery, connections, typed calls,
   federation, and subscriptions
 - `packages/decentralized-convex-react` — client provider

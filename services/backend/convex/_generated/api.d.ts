@@ -8,21 +8,19 @@
  * @module
  */
 
-import type * as auth from "../auth.js";
-import type * as federationAuth from "../federationAuth.js";
-import type * as http from "../http.js";
-import type * as lib from "../lib.js";
-import type * as pds from "../pds.js";
-
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
+import type * as auth from "../auth.js";
+import type * as http from "../http.js";
+import type * as lib from "../lib.js";
+import type * as pds from "../pds.js";
+
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
-  federationAuth: typeof federationAuth;
   http: typeof http;
   lib: typeof lib;
   pds: typeof pds;

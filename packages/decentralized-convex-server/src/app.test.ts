@@ -12,6 +12,7 @@ import { v } from "convex/values";
 import {
   definePdsApp,
   definePdsPluginComponent,
+  pdsDescriptorFromApp,
   pdsReleaseFromApp,
   protocolsFromPdsApp,
 } from "./app.ts";
@@ -65,4 +66,28 @@ void test("derives client protocols from the same local app declaration", () => 
     lastChanged: corePackage.lastChanged,
     version: DECENTRALIZED_CONVEX_VERSION,
   });
+});
+
+void test("derives public auth metadata from the app auth adapter", () => {
+  const app = definePdsApp({
+    auth: {
+      descriptor: () => ({
+        issuer: "https://auth.example",
+        jwksUrl: "https://auth.example/jwks",
+      }),
+    },
+    plugins: [],
+  });
+
+  assert.deepEqual(
+    pdsDescriptorFromApp(app, {
+      accountDomain: "example.com",
+      deploymentUrl: "https://example.convex.cloud",
+      httpUrl: "https://example.com",
+    }).auth,
+    {
+      issuer: "https://auth.example",
+      jwksUrl: "https://auth.example/jwks",
+    },
+  );
 });
