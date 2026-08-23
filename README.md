@@ -1,30 +1,105 @@
-<a name="readme-top"></a>
+# Vera
 
-<br />
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/c74389d4-faad-4af9-b4e0-d31115ea167f" alt="Animated GIF of advertisement for Vera, showing off its search capability." width="500px">
-  <br />
-  <br />
-  <br />
-  <br />
-  <a href="https://www.vera.chat" target="_blank">
-    vera.chat
-  </a>
-</div>
-<br />
-<br />
-<br />
-<div align="center">
+Vera is the reference application and current incubator for decentralized
+Convex: a small toolkit for building applications whose data and realtime
+subscriptions span independently hosted Convex deployments.
 
-A great starting point for building agentic applications for the web.
+The current branch proves one private, reactive conversation across two PDSs.
+It is intentionally a vertical slice, not a production messaging product yet.
 
-For more information, head over to the [docs](https://docs.vera.chat)
+## Start here
 
-<br />
-<br />
+Read these files in order to follow one request end to end:
 
-[x.com/bentsignal](https://x.com/bentsignal)
+1. `packages/decentralized-convex-messages/protocol.ts` defines the typed
+   Messages API and its dependency on Accounts.
+2. `services/backend/convex/convex.config.ts` installs the PDS auth adapter,
+   Accounts, and Messages in one validated PDS app.
+3. `services/backend/convex/pds.ts` exposes the canonical public dispatcher.
+4. `packages/decentralized-convex-messages/dispatcher.ts` implements the
+   Messages operations inside its Component.
+5. `apps/web/src/features/conversation/useConversation.ts` shows the complete
+   client API used for reactive reads and writes.
 
-<br />
+The longer explanation is in [docs/architecture.md](docs/architecture.md).
+The lockstep `0.1.0` release and upgrade rules are in
+[docs/versioning.md](docs/versioning.md).
 
-</div>
+## The default setup
+
+A PDS installs ordinary third-party Components and decentralized-convex
+plugins declaratively:
+
+```ts
+import accounts from "@decentralized-convex/accounts/convex.config";
+import messages from "@decentralized-convex/messages/convex.config";
+import { definePdsApp } from "@decentralized-convex/server";
+import { pdsAuth } from "../pds-auth";
+
+export default definePdsApp({
+  auth: pdsAuth,
+  plugins: [accounts, messages],
+});
+```
+
+Messages declares an exact dependency on Accounts at the shared ecosystem
+version. Removing Accounts or
+installing an incompatible version fails type-checking. The normal
+`convex dev`, `convex deploy`, and `convex codegen` commands remain unchanged.
+
+The common client path uses the application's own TanStack hooks:
+
+```ts
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
+import { pds } from "@vera/backend/pds";
+
+const messages = useQuery(
+  pdsQuery({
+    args: { conversationId },
+    query: pds.messages.list,
+  }),
+);
+const sendMessage = useMutation(
+  pdsMutation({ mutation: pds.messages.send }),
+);
+```
+
+The backend's `pds` export derives its plugin names, versions, operations, and
+types from the same `definePdsApp` declaration. The web app never repeats the
+installed plugin list, and the discovery manifest derives its capabilities
+from the same protocol tuple.
+
+The query starts at the signed-in account's home PDS, reads routing identities
+stored with the conversation, discovers their current deployments, and merges
+live results. Mutations automatically target home. Ordinary TanStack options,
+connection factories, explicit lower-level federation, and destination-aware
+authentication remain available when an application needs control.
+
+## Workspace
+
+- `packages/decentralized-convex-plugin` — operation protocols and dependency
+  graph validation
+- `packages/decentralized-convex-core` — the single ecosystem version and
+  last-changed release metadata
+- `packages/decentralized-convex-server` — PDS installation, root dispatch,
+  Component dispatch, and discovery descriptors
+- `packages/decentralized-convex-auth-better-auth` — Better Auth adapter for
+  the public PDS auth protocol
+- `packages/decentralized-convex-client` — discovery, connections, typed calls,
+  federation, and subscriptions
+- `packages/decentralized-convex-react` — client provider
+- `packages/decentralized-convex-tanstack-query` — native TanStack option builders
+- `packages/decentralized-convex-accounts` and `-messages` — first-party plugins
+- `services/backend` — Vera's thin Better Auth PDS host
+- `apps/web` — the Vera reference client
+- `legacy` — the archived centralized Vera application
+
+## Development
+
+```sh
+pnpm install
+pnpm --filter @vera/web dev
+```
+
+The web app runs at `https://www.vera.localhost`.

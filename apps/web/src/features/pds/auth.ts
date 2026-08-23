@@ -1,0 +1,161 @@
+import type { FederationAuthTokenFetcher } from "@decentralized-convex/client";
+import {
+  convexClient,
+  crossDomainClient,
+} from "@convex-dev/better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
+
+import type { HomePds } from "./model.ts";
+
+export function createHomeAuthClient(home: HomePds) {
+  return createAuthClient({
+    baseURL: home.manifest.httpUrl,
+    plugins: [
+      convexClient(),
+      crossDomainClient({ storagePrefix: `vera-${home.domain}` }),
+    ],
+  });
+}
+
+export type HomeAuthClient = ReturnType<typeof createHomeAuthClient>;
+
+interface FederationAuthOptions {
+  authClient: HomeAuthClient;
+  home: HomePds;
+}
+
+interface CachedToken {
+  expiresAt: number;
+  token: string;
+}
+
+/**
+ * Uses the local Better Auth session for the account's home and exchanges a
+ * short-lived home assertion for credentials scoped to every remote PDS.
+ */
+export function createFederationAuthTokenFetcher({
+  authClient,
+  home,
+}: FederationAuthOptions): FederationAuthTokenFetcher {
+  const cache = new Map<string, CachedToken>();
+
+  return async ({ forceRefreshToken, pds, url }) => {
+    if (url === home.manifest.deploymentUrl) return getHomeToken(authClient);
+    if (pds === undefined) return null;
+    return getRemoteToken({
+      authClient,
+      cache,
+      forceRefreshToken,
+      home,
+      target: pds,
+      url,
+    });
+  };
+}
+
+async function getHomeToken(authClient: HomeAuthClient) {
+  const token = await authClient.convex.token({
+    fetchOptions: { throw: false },
+  });
+  return token.data?.token ?? null;
+}
+
+async function getRemoteToken({
+  authClient,
+  cache,
+  forceRefreshToken,
+  home,
+  target,
+  url,
+}: {
+  authClient: HomeAuthClient;
+  cache: Map<string, CachedToken>;
+  forceRefreshToken: boolean;
+  home: HomePds;
+  target: HomePds;
+  url: string;
+}) {
+  const cached = cache.get(url);
+  if (
+    !forceRefreshToken &&
+    cached !== undefined &&
+    cached.expiresAt > Date.now() / 1_000 + 30
+  ) {
+    return cached.token;
+  }
+
+  const session = await authClient.getSession();
+  const sessionToken = session.data?.session.token;
+  if (sessionToken === undefined) return null;
+
+  const assertionResponse = await postJson(
+    `${home.manifest.httpUrl}/api/auth/federation/assertion`,
+    { audience: target.domain },
+    { authorization: `Bearer ${sessionToken}` },
+  );
+  if (!assertionResponse.ok) {
+    throw new Error(
+      `Home PDS could not create an identity proof (${assertionResponse.status})`,
+    );
+  }
+
+  const assertionPayload = await readJson(assertionResponse);
+  const assertion = requireString(
+    readProperty(assertionPayload, "assertion"),
+    "assertion",
+  );
+  const exchangeResponse = await postJson(
+    `${target.manifest.httpUrl}/api/auth/federation/exchange`,
+    { assertion },
+  );
+  if (!exchangeResponse.ok) {
+    throw new Error(
+      `Remote PDS rejected the identity proof (${exchangeResponse.status})`,
+    );
+  }
+
+  const exchange = await readJson(exchangeResponse);
+  const result = {
+    expiresAt: requireNumber(readProperty(exchange, "expiresAt"), "expiresAt"),
+    token: requireString(readProperty(exchange, "token"), "token"),
+  };
+  cache.set(url, result);
+  return result.token;
+}
+
+function postJson(
+  url: string,
+  body: object,
+  headers: Readonly<Record<string, string>> = {},
+) {
+  return fetch(url, {
+    body: JSON.stringify(body),
+    headers: { ...headers, "content-type": "application/json" },
+    method: "POST",
+  });
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  return response.json();
+}
+
+function readProperty(value: unknown, field: string): unknown {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("PDS authentication returned an invalid response");
+  }
+  return Reflect.get(value, field);
+}
+
+function requireString(value: unknown, field: string) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`PDS authentication response is missing ${field}`);
+  }
+  return value;
+}
+
+function requireNumber(value: unknown, field: string) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`PDS authentication response is missing ${field}`);
+  }
+  return value;
+}
