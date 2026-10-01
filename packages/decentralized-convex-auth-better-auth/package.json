@@ -1,0 +1,42 @@
+{
+  "name": "@decentralized-convex/auth-better-auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./metadata": "./metadata.ts",
+    "./runtime": "./src/runtime.ts"
+  },
+  "scripts": {
+    "build": "tsgo --noEmit",
+    "clean": "git clean -xdf .cache .turbo node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "format:fix": "prettier --write . --ignore-path ../../.gitignore",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@decentralized-convex/address": "workspace:0.1.0",
+    "@decentralized-convex/core": "workspace:0.1.0",
+    "@decentralized-convex/server": "workspace:0.1.0",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "better-auth": ">=1.6.15 <2"
+  },
+  "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "better-auth": "~1.6.15",
+    "convex": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@acme/prettier-config"
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "@acme/tsconfig/base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["metadata.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

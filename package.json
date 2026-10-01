@@ -1,6 +1,7 @@
 {
   "name": "vera",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=24 <25",
     "pnpm": "10.32.1"
@@ -13,7 +14,8 @@
     "dev": "portless proxy start && turbo run dev --parallel --continue",
     "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
-    "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
+    "decentralized-convex:check": "node --experimental-strip-types scripts/check-decentralized-convex-release.ts",
+    "lint": "pnpm run decentralized-convex:check && turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
     "lint:ws": "pnpm dlx sherif@latest",
     "postinstall": "pnpm lint:ws",
@@ -21,7 +23,7 @@
     "check": "pnpm run lint && pnpm run typecheck",
     "ui-add": "turbo run ui-add",
     "create-package": "turbo gen init",
-    "loc": "cloc --exclude-dir=_generated --not-match-f=routeTree.gen.ts apps/*/src packages/*/src"
+    "loc": "cloc --exclude-dir=_generated --not-match-f=routeTree.gen.ts apps/*/src packages/*/src services/*/convex shared/*/src"
   },
   "devDependencies": {
     "@acme/prettier-config": "workspace:*",

@@ -1,23 +1,56 @@
 {
-  "name": "@acme/web",
+  "name": "@vera/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
   "scripts": {
     "build": "vite build",
+    "clean": "git clean -xdf .cache .turbo .output node_modules",
     "dev": "portless",
     "dev:app": "vite",
-    "preview": "vite preview",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore",
-    "clean": "git clean -xdf node_modules .cache .turbo dist"
+    "generate-routes": "tsr generate",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "preview": "vite preview",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@convex-dev/better-auth": "0.12.5",
+    "@decentralized-convex/client": "workspace:0.1.0",
+    "@decentralized-convex/messages": "workspace:0.1.0",
+    "@decentralized-convex/react": "workspace:0.1.0",
+    "@decentralized-convex/tanstack-query": "workspace:0.1.0",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-router-ssr-query": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "@vera/backend": "workspace:*",
+    "better-auth": "~1.6.15",
+    "convex": "catalog:",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
   },
   "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "@tanstack/router-cli": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "@vitejs/plugin-react": "catalog:",
+    "eslint": "catalog:",
     "prettier": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:"
   },
   "portless": {
     "name": "www.vera",
     "script": "dev:app"
-  }
+  },
+  "prettier": "@acme/prettier-config"
 }
