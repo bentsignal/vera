@@ -1,11 +1,12 @@
 # Vera
 
-Vera is the reference application and current incubator for decentralized
-Convex: a small toolkit for building applications whose data and realtime
-subscriptions span independently hosted Convex deployments.
+Vera is a decentralized, self-hostable messaging app. It is also the reference
+application and incubator for decentralized Convex: a small toolkit for
+building applications whose data and realtime subscriptions span independently
+hosted Convex deployments.
 
-The current branch proves one private, reactive conversation across two PDSs.
-It is intentionally a vertical slice, not a production messaging product yet.
+The first release is a mobile app for iOS and Android. Its scope and
+infrastructure are in [docs/mobile-launch.md](docs/mobile-launch.md).
 
 ## Start here
 
@@ -18,8 +19,6 @@ Read these files in order to follow one request end to end:
 3. `services/backend/convex/pds.ts` exposes the canonical public dispatcher.
 4. `packages/decentralized-convex-messages/dispatcher.ts` implements the
    Messages operations inside its Component.
-5. `apps/web/src/features/conversation/useConversation.ts` shows the complete
-   client API used for reactive reads and writes.
 
 The longer explanation is in [docs/architecture.md](docs/architecture.md).
 The lockstep `0.1.0` release and upgrade rules are in
@@ -92,14 +91,16 @@ authentication remain available when an application needs control.
 - `packages/decentralized-convex-tanstack-query` — native TanStack option builders
 - `packages/decentralized-convex-accounts` and `-messages` — first-party plugins
 - `services/backend` — Vera's thin Better Auth PDS host
-- `apps/web` — the Vera reference client
-- `legacy` — the archived centralized Vera application
+- `apps/mobile` — the Vera iOS and Android app
+- `shared/ui` — shadcn components for the future web app
+- `shared/app-config` — shared app URLs and configuration
 
 ## Development
 
 ```sh
 pnpm install
-pnpm --filter @vera/web dev
+pnpm run check
 ```
 
-The web app runs at `https://www.vera.localhost`.
+The archived centralized Vera AI chat app lives in git history before the
+`legacy/` folder was removed.

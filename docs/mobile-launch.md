@@ -1,0 +1,86 @@
+# Mobile launch decisions
+
+Decided with Shawn on 2026-10-01. Goal: a working app on Shawn's phone within
+1–2 days, friends messaging on it within a week.
+
+## Product scope for the first release
+
+- Mobile first. The web app is removed for now and rebuilt later on `shared/ui`.
+- Accounts are addresses: `username@vera.chat`.
+- One-on-one DMs, an inbox, group chats.
+- Minimal spaces: a named collection of text channels. No roles, threads, or
+  other Discord extras.
+- Push notifications through Expo/EAS notifications.
+- Attachments: photos, videos, and files, viewable and playable in the app.
+- Link previews with Open Graph title, description, and image.
+
+## File storage
+
+Vera's server stores files on bunny.net (Storage + CDN). File storage sits
+behind a provider interface in decentralized Convex, so a self-hoster can plug
+in another provider. bunny.net is only Vera's implementation.
+
+## Sign-up and sign-in
+
+Better Auth with passkeys only: no passwords, no email codes, no social sign-in.
+Every account creates a passkey at sign-up, and passkeys are the only way to
+sign in. Later, web and other clients will sign in by scanning a code with the
+phone.
+
+Sign-up requires an invite code. Codes are stored in Convex, are multi-use, and
+stay valid until deactivated. Shawn asks the agent to create a code, sends it to
+friends, and later asks the agent to deactivate it. The repo skill
+`.claude/skills/invite-codes` describes the procedure.
+
+## Mobile stack
+
+- `apps/mobile`: latest Expo SDK and React Native.
+- Native UI through `@expo/ui`; the app should feel as native as possible.
+- Styling with Uniwind (Tailwind v4).
+- iOS and Android. App Store and Play Store submission comes later.
+- No Expo Go. EAS build profiles:
+  - `development`: development client with hot reload, installed directly to
+    Shawn's phone and the iOS simulator.
+  - `preview`: internal/TestFlight testing builds.
+  - `production`: store builds.
+- EAS account: `directedbyshawn`.
+
+## Infrastructure
+
+- Convex team BSX, project `vera`. The production deployment backs both
+  TestFlight and store builds, so data from testing carries into the App Store
+  release. Development builds use a dev deployment in the same project.
+- Leave the `old-vera` Convex project alone.
+- DNS for `vera.chat` lives in Vercel (team `bsx-sh`). PDS discovery uses
+  `_pds.<domain>` TXT records. Test records from the two-deployment demo
+  (`_pds.a`, `_pds.b`) are removed once the production record exists. Clerk
+  and Resend records belong to the old AI chat app and are removed.
+- Passkey relying party ID is `vera.chat`. This is permanent: changing it
+  invalidates every passkey. iOS and Android require
+  `https://vera.chat/.well-known/apple-app-site-association` and
+  `https://vera.chat/.well-known/assetlinks.json`. The production Convex
+  deployment serves both from HTTP routes, with `vera.chat` attached as a Convex
+  custom domain (BSX is on Convex Professional). If Convex cannot take the apex
+  domain, a Cloudflare Worker serves the two files and proxies everything else
+  to Convex.
+- Web hosting, when needed, goes on Cloudflare, not Vercel. Vercel only hosts
+  DNS. When the web app ships, `/.well-known/*` on `vera.chat` must still reach
+  the files above.
+- CLIs are signed in: `vercel` (bentsignal), `eas` (directedbyshawn), `convex`
+  (BSX), `wrangler` (Cloudflare). If a CLI lacks a feature, use the dashboard
+  through Chrome.
+
+## Decentralization
+
+Only Vera's own server runs for now, and self-hosting tooling is out of scope.
+The code must stay decentralized in shape so easy self-hosting can be added
+later: identities are addresses, data lives on the owner's home PDS, and clients
+discover servers through DNS.
+
+## Repository housekeeping
+
+- Keep `shared/ui` (future web shadcn UI) and `shared/app-config`.
+- `legacy/` (the old AI chat app) was removed; it remains in git history.
+- Review `.plans/` before removing anything from it.
+- Project knowledge lives in this repository. Do not use external memory or
+  task CLIs, or Claude Code auto memory.

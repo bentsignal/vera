@@ -1,23 +1,45 @@
 # AGENTS.md
 
-## Repository Summary
+## Repository summary
 
-This project was initally an AI chat app, and is now being rebuilt as a decentralized, easily self-hostable messaing & email platform.
+Vera is a decentralized, easily self-hostable messaging platform built on
+decentralized Convex. The first release is a mobile app (`apps/mobile`) backed
+by Vera's own PDS (`services/backend`). Product and infrastructure decisions
+are in [docs/mobile-launch.md](docs/mobile-launch.md); the framework design is
+in [docs/architecture.md](docs/architecture.md) and
+[docs/versioning.md](docs/versioning.md). Read those before asking design or
+infrastructure questions; treat recorded decisions as settled.
 
-## Required Validation After Changes
+## Project knowledge
 
-At the end of every run, run the following commands in order:
+Record decisions, plans, and durable context as Markdown in this repository
+(`docs/`, package READMEs, or `.plans/`). Do not use external memory or task
+CLIs (such as UAV) or Claude Code auto memory for this project.
+
+## Git workflow
+
+The agent owns git for this repository:
+
+- Never commit directly to `main`. Start each change on a short-lived branch
+  from an up-to-date `main`.
+- Keep each pull request to one coherent change, with a description covering
+  the summary and the validation that was run.
+- Commit, push, open the PR, review the diff yourself, wait for CI, then merge
+  with a merge commit and delete the branch.
+- Do not leave work uncommitted between sessions. If work must pause, push it to
+  its branch and note its state in the PR.
+
+## Required validation after changes
+
+At the end of every run, run these in order:
 
 1. `pnpm run lint`
 2. `pnpm run typecheck`
+3. `pnpm run test`
 
-If all of these succeed, run:
+If all succeed, run `pnpm run format:fix`, then summarize the changes.
 
-4. `pnpm run format:fix`
-
-Then summarize changes for the user.
-
-## Decentralized Convex Release Invariant
+## Decentralized Convex release invariant
 
 All official `@decentralized-convex/*` packages and the wire protocol use one
 exact ecosystem version. The source of truth is
