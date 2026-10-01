@@ -1,19 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { defineComponent } from "convex/server";
 
 import { betterAuthAdapter, betterAuthRuntimeConfig } from "./adapter.ts";
 import { betterAuthPdsPlugin } from "./runtime.ts";
 
 void test("keeps Better Auth configuration external and derives PDS integration", () => {
-  const component = defineComponent("betterAuth");
   const adapter = betterAuthAdapter({
     accountDomain: "accounts.example",
-    component,
     issuer: "https://accounts.example",
   });
 
-  assert.equal(adapter.component, component);
   assert.deepEqual(adapter.descriptor(), {
     issuer: "https://accounts.example",
     jwksUrl: "https://accounts.example/api/auth/convex/jwks",
@@ -42,7 +38,6 @@ void test("resolves host environment only when runtime metadata is requested", (
       resolutions += 1;
       return "accounts.example";
     },
-    component: defineComponent("betterAuth"),
     issuer: () => {
       resolutions += 1;
       return "https://accounts.example";
