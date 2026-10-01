@@ -7,23 +7,23 @@ export {
 } from "./query-execution.ts";
 export type { PdsQueryExecutionOptions } from "./query-execution.ts";
 export {
-  assertPdsCompatibility,
-  assertPdsRequestCompatibility,
+  assertPdsSupportsApi,
+  assertPdsSupportsRequest,
   IncompatiblePdsError,
 } from "./compatibility.ts";
+export { discoverPds } from "./discovery.ts";
+export type {
+  DiscoveredPdsSelection,
+  DiscoverPdsOptions,
+} from "./discovery.ts";
 export {
   accountDomain,
   decodeDnsTxtData,
-  discoverPds,
   parsePdsTxtRecord,
   PDS_DISCOVERY_RECORD_FORMAT,
   PDS_DNS_LABEL,
 } from "@decentralized-convex/address";
-export type {
-  DiscoverPdsOptions,
-  DiscoveredPds,
-  PdsManifest,
-} from "@decentralized-convex/address";
+export type { DiscoveredPds, PdsManifest } from "@decentralized-convex/address";
 export { createConvexPdsConnection } from "./connection.ts";
 export {
   definePdsApi,

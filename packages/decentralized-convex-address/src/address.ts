@@ -9,7 +9,7 @@ export function parseAddress(value: string): DecentralizedAddress {
   const username = normalized.slice(0, separator);
   const domain = normalized.slice(separator + 1);
 
-  if (separator < 1 || username.length === 0 || !isDomain(domain)) {
+  if (separator < 1 || !isUsername(username) || !isDomain(domain)) {
     throw new Error(`Invalid decentralized address: ${value}`);
   }
 
@@ -28,6 +28,10 @@ export function addressToTarget(value: string) {
     id: formatAddress(address),
     url: `https://${address.domain}`,
   };
+}
+
+function isUsername(value: string) {
+  return /^[a-z0-9][a-z0-9._-]{1,31}$/.test(value);
 }
 
 function isDomain(value: string) {

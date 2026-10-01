@@ -1,9 +1,6 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
-import {
-  assertPdsCompatibility,
-  discoverPds,
-} from "@decentralized-convex/client";
+import { discoverPds } from "@decentralized-convex/client";
 import { pds } from "@vera/backend/pds";
 
 import type { HomePds } from "../pds/model.ts";
@@ -20,18 +17,9 @@ export function AccountEntry({ onSelect }: AccountEntryProps) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(undefined);
-    const normalized = address.trim().toLowerCase();
-    const separator = normalized.lastIndexOf("@");
-    const username = normalized.slice(0, separator);
-    if (separator <= 0 || !/^[a-z0-9][a-z0-9._-]{1,31}$/.test(username)) {
-      setError("Enter a valid username@domain address.");
-      return;
-    }
-
     setLoading(true);
     try {
-      const home = assertPdsCompatibility(await discoverPds(normalized), pds);
-      onSelect({ home, username });
+      onSelect(await discoverPds({ address, api: pds }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "PDS discovery failed");
     } finally {

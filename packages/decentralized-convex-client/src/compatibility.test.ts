@@ -9,10 +9,7 @@ import {
 import { v } from "convex/values";
 
 import { definePdsApi } from "./api.ts";
-import {
-  assertPdsCompatibility,
-  IncompatiblePdsError,
-} from "./compatibility.ts";
+import { assertPdsSupportsApi, IncompatiblePdsError } from "./compatibility.ts";
 
 const notes = definePluginProtocol({
   lastChanged: corePackage.lastChanged,
@@ -29,19 +26,19 @@ const api = definePdsApi(notes);
 
 void test("accepts a newer ecosystem release when required contracts are unchanged", () => {
   const pds = discoveredPds({ ecosystemVersion: "9.0.0" });
-  assert.equal(assertPdsCompatibility(pds, api), pds);
+  assert.equal(assertPdsSupportsApi(pds, api), pds);
 });
 
 void test("rejects missing or changed contracts before sign-in", () => {
   assert.throws(
-    () => assertPdsCompatibility(discoveredPds({ capabilities: [] }), api),
+    () => assertPdsSupportsApi(discoveredPds({ capabilities: [] }), api),
     (error: unknown) =>
       error instanceof IncompatiblePdsError &&
       error.message.includes("required notes plugin"),
   );
   assert.throws(
     () =>
-      assertPdsCompatibility(
+      assertPdsSupportsApi(
         discoveredPds({ capabilityLastChanged: "0.2.0" }),
         api,
       ),
@@ -51,7 +48,7 @@ void test("rejects missing or changed contracts before sign-in", () => {
   );
   assert.throws(
     () =>
-      assertPdsCompatibility(
+      assertPdsSupportsApi(
         discoveredPds({ protocolLastChanged: "0.2.0" }),
         api,
       ),

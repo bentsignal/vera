@@ -11,8 +11,8 @@
     "clean": "git clean -xdf .cache .turbo node_modules",
     "deploy:a": "convex dev --once --env-file .env.a.local",
     "deploy:b": "convex dev --once --env-file .env.b.local",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
-    "format:fix": "prettier --write . --ignore-path ../../.gitignore",
+    "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
+    "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },

@@ -18,7 +18,7 @@ import type {
   FederationQueryReference,
   FederationTarget,
 } from "./types.ts";
-import { assertPdsRequestCompatibility } from "./compatibility.ts";
+import { assertPdsSupportsRequest } from "./compatibility.ts";
 import { createConvexFederationConnection } from "./connection.ts";
 import { FederatedQueryObserver } from "./observer.ts";
 import { FederatedPdsQueryObserver } from "./pds-observer.ts";
@@ -73,7 +73,7 @@ export class DecentralizedConvexClient {
     options: PdsQueryExecutionOptions = {},
   ) {
     const home = this.#requireHome();
-    assertPdsRequestCompatibility(home, request);
+    assertPdsSupportsRequest(home, request);
     return new RoutedPdsQueryObserver({
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
@@ -154,7 +154,7 @@ export class DecentralizedConvexClient {
     const responseTimeout = initialResponseTimeout(options);
     const revealPartialResultsAfter = partialResultsDelay(options);
     const home = this.#requireHome();
-    assertPdsRequestCompatibility(home, request);
+    assertPdsSupportsRequest(home, request);
     const homeTarget = pdsTarget(home.domain, home);
     const homeGroup = groupFederationTargets([homeTarget])[0];
     if (homeGroup === undefined) throw new Error("PDS home is invalid");
@@ -222,7 +222,7 @@ export class DecentralizedConvexClient {
 
   pdsMutation<Request extends AnyPdsMutationRequest>(request: Request) {
     const home = this.#requireHome();
-    assertPdsRequestCompatibility(home, request);
+    assertPdsSupportsRequest(home, request);
     return new PdsClient({
       connection: this.#getConnection(home.manifest.deploymentUrl),
     }).mutation(request);
@@ -275,7 +275,7 @@ export class DecentralizedConvexClient {
     return Promise.all(
       [...new Set(routes)].map(async (route) => {
         const pds = await this.resolvePds(route);
-        assertPdsRequestCompatibility(pds, request);
+        assertPdsSupportsRequest(pds, request);
         return pdsTarget(route, pds);
       }),
     );

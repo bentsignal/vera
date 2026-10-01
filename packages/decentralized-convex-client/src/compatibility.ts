@@ -12,7 +12,7 @@ export class IncompatiblePdsError extends Error {
  * Verifies the exact wire contracts used by an application. The overall
  * ecosystem versions may differ when none of those contracts changed.
  */
-export function assertPdsCompatibility(
+export function assertPdsSupportsApi(
   pds: DiscoveredPds,
   api: object,
 ): DiscoveredPds {
@@ -21,7 +21,7 @@ export function assertPdsCompatibility(
   return pds;
 }
 
-export function assertPdsRequestCompatibility(
+export function assertPdsSupportsRequest(
   pds: DiscoveredPds,
   request: SerializedPdsRequest,
 ): DiscoveredPds {

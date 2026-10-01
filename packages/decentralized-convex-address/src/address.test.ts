@@ -13,3 +13,8 @@ void test("parses an address into an optional federation target", () => {
     url: "https://chat.example",
   });
 });
+
+void test("rejects addresses with an invalid username", () => {
+  assert.throws(() => parseAddress("not valid@chat.example"));
+  assert.throws(() => parseAddress("@chat.example"));
+});

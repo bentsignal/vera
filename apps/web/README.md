@@ -29,10 +29,10 @@ account domain and keeps that verified descriptor as `home`; both auth and the
 decentralized client use the same value:
 
 ```ts
-const home = assertPdsCompatibility(
-  await discoverPds("alice@a.vera.chat"),
-  pds,
-);
+const { home, username } = await discoverPds({
+  address: "alice@a.vera.chat",
+  api: pds,
+});
 
 const authClient = createHomeAuthClient(home);
 const client = new DecentralizedConvexClient({
