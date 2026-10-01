@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "clean": "git clean -xdf node_modules .turbo",
     "clean:all": "turbo run clean && pnpm run clean",
-    "dev": "portless proxy start && turbo run dev --parallel --continue",
+    "dev": "turbo run dev --parallel --continue",
     "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "decentralized-convex:check": "node --experimental-strip-types scripts/check-decentralized-convex-release.ts",
@@ -20,10 +20,11 @@
     "lint:ws": "pnpm dlx sherif@latest",
     "postinstall": "pnpm lint:ws",
     "typecheck": "turbo run typecheck",
-    "check": "pnpm run lint && pnpm run typecheck",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
     "ui-add": "turbo run ui-add",
     "create-package": "turbo gen init",
-    "loc": "cloc --exclude-dir=_generated --not-match-f=routeTree.gen.ts apps/*/src packages/*/src services/*/convex shared/*/src"
+    "loc": "cloc --exclude-dir=_generated --not-match-f=routeTree.gen.ts apps/*/src packages/*/src services/*/convex shared/*/src",
+    "test": "turbo run test"
   },
   "devDependencies": {
     "@acme/prettier-config": "workspace:*",
@@ -31,7 +32,6 @@
     "@turbo/gen": "2.8.17",
     "@typescript/native-preview": "catalog:",
     "dotenv-cli": "10.0.0",
-    "portless": "^0.12.0",
     "prettier": "catalog:",
     "turbo": "2.8.17",
     "typescript": "catalog:"
