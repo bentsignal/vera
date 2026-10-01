@@ -1,6 +1,6 @@
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   DECENTRALIZED_CONVEX_RELEASES,
@@ -10,9 +10,11 @@ import {
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const packagesRoot = `${repoRoot}packages`;
 const problems: string[] = [];
-const packageDirectories = (await readdir(packagesRoot, {
-  withFileTypes: true,
-}))
+const packageDirectories = (
+  await readdir(packagesRoot, {
+    withFileTypes: true,
+  })
+)
   .filter(
     (entry) =>
       entry.isDirectory() && entry.name.startsWith("decentralized-convex-"),
@@ -60,6 +62,7 @@ for (const directory of packageDirectories) {
 }
 
 for (const root of ["apps", "packages", "services", "shared", "tooling"]) {
+  if (!existsSync(`${repoRoot}${root}`)) continue;
   for (const entry of await readdir(`${repoRoot}${root}`, {
     withFileTypes: true,
   })) {
@@ -71,9 +74,7 @@ for (const root of ["apps", "packages", "services", "shared", "tooling"]) {
   }
 }
 
-if (
-  DECENTRALIZED_CONVEX_RELEASES.at(-1) !== DECENTRALIZED_CONVEX_VERSION
-) {
+if (DECENTRALIZED_CONVEX_RELEASES.at(-1) !== DECENTRALIZED_CONVEX_VERSION) {
   problems.push("the current version is not the latest known release");
 }
 
