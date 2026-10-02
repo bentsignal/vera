@@ -23,62 +23,41 @@ const AVATAR = 52;
 const CAPSULE_OVERLAP = 6;
 const CAPSULE = 26;
 
-/** How far the fade behind the header reaches past the name capsule. */
-const FADE_PAST = 12;
-
 /**
- * Height of the header below the status bar, through the end of its fade.
- * Content resting below it is never dimmed.
+ * Height of the header below the status bar. Messages rest below it and
+ * scroll up behind it.
  */
 export const CONVERSATION_HEADER_HEIGHT =
-  AVATAR + CAPSULE - CAPSULE_OVERLAP + FADE_PAST;
+  AVATAR + CAPSULE - CAPSULE_OVERLAP + 8;
 
 const CHANNEL_GLYPH = { android: "tag", ios: "number" } as const;
 
-/** Solid this far below the status bar, then easing out. */
-const FADE_SOLID = 16;
-/** Alpha along the fade, from where it starts (0) to where it ends (1). */
-const FADE_STOPS = [
-  [0, 1],
-  [0.3, 0.9],
-  [0.55, 0.7],
-  [0.8, 0.35],
-  [1, 0],
-] as const;
-
-/** The page color with less alpha, so the fade never turns gray. */
-function withAlpha(color: string, alpha: number) {
-  if (/^#[0-9a-f]{6}$/i.test(color)) {
-    const hex = Math.round(alpha * 255)
-      .toString(16)
-      .padStart(2, "0");
-    return `${color}${hex}`;
-  }
-  return alpha === 0 ? "transparent" : color;
-}
+/** How far below the status bar the soft edge reaches. */
+const EDGE = 14;
 
 /**
- * Keeps the header legible over messages scrolling underneath, like iOS's
- * scroll edge effect: the page color behind the status bar, easing out
- * across the photo and name. Content at rest sits below it.
+ * A soft edge behind the status bar only, like the system's scroll edge
+ * effect: messages reach up behind the photo and name, and just the clock
+ * and battery stay clear of them.
  */
-function TopFade() {
+function TopEdge() {
   const insets = useSafeAreaInsets();
   const color = useCSSVariable("--color-background");
-  if (Platform.OS !== "ios" || typeof color !== "string") return null;
-  const solid = insets.top + FADE_SOLID;
-  const height = insets.top + CONVERSATION_HEADER_HEIGHT;
-  const start = (solid / height) * 100;
-  const stops = FADE_STOPS.map(
-    ([at, alpha]) =>
-      `${withAlpha(color, alpha)} ${Math.round(start + (100 - start) * at)}%`,
-  );
+  if (
+    Platform.OS !== "ios" ||
+    typeof color !== "string" ||
+    !/^#[0-9a-f]{6}$/i.test(color)
+  ) {
+    return null;
+  }
+  const height = insets.top + EDGE;
+  const solid = Math.round(((insets.top * 0.6) / height) * 100);
   return (
     <View
       pointerEvents="none"
       className="absolute top-0 right-0 left-0"
       style={{
-        experimental_backgroundImage: `linear-gradient(180deg, ${color} 0%, ${stops.join(", ")})`,
+        experimental_backgroundImage: `linear-gradient(180deg, ${color}e6 0%, ${color}b3 ${solid}%, ${color}00 100%)`,
         height,
       }}
     />
@@ -179,7 +158,7 @@ function NameCapsule({ title }: { title: string }) {
 /**
  * iMessage's conversation header: a floating glass back button, the photo
  * and name centered under the Dynamic Island, and an info button. Messages
- * scroll underneath and fade out behind it. Anything that loads later fades
+ * scroll up behind it, under the glass. Anything that loads later fades
  * in; what is known when the screen opens shows right away.
  */
 export function ConversationHeader({
@@ -199,7 +178,7 @@ export function ConversationHeader({
   const insets = useSafeAreaInsets();
   return (
     <>
-      <TopFade />
+      <TopEdge />
       <LayoutAnimationConfig skipEntering>
         <View
           // Drags between the buttons still scroll the messages beneath.

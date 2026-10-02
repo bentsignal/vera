@@ -4,7 +4,6 @@ import { GlassView } from "expo-glass-effect";
 import { withUniwind } from "uniwind";
 
 import type { ReactionSummary } from "~/features/messaging/reactions";
-import { SymbolIcon } from "~/components/symbol-icon";
 import { cn } from "~/lib/cn";
 
 const StyledGlassView = withUniwind(GlassView);
@@ -50,18 +49,17 @@ function Chip({
 
 /**
  * Slack's row, made quieter: small glass chips under the message, yours
- * tinted. Tap one to add or take back that reaction, or + for another.
+ * tinted. Tap one to add or take back that reaction; long press the message
+ * for more.
  */
 export function ChipRow({
   reactions,
   align,
   onToggle,
-  onAdd,
 }: {
   reactions: readonly ReactionSummary[];
   align: "end" | "start";
   onToggle: (emoji: string) => void;
-  onAdd: () => void;
 }) {
   return (
     <View
@@ -77,22 +75,6 @@ export function ChipRow({
           onPress={() => onToggle(reaction.emoji)}
         />
       ))}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Add reaction"
-        onPress={onAdd}
-      >
-        <StyledGlassView
-          isInteractive
-          className="h-[26px] items-center justify-center rounded-full px-2"
-        >
-          <SymbolIcon
-            name={{ android: "add_reaction", ios: "face.smiling" }}
-            size={14}
-            tintColorClassName="accent-muted"
-          />
-        </StyledGlassView>
-      </Pressable>
     </View>
   );
 }

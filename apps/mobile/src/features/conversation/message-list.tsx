@@ -1,7 +1,7 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated, {
   FadeInDown,
   LinearTransition,
@@ -172,6 +172,8 @@ interface MessageListProps {
   /** Height of the composer floating over the bottom of the list. */
   composerHeight: number;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  /** Opens the sheet of who reacted to a message. */
+  onViewReactions: (messageId: string) => void;
 }
 
 /**
@@ -194,12 +196,15 @@ export function MessageList({
   topInset,
   composerHeight,
   onToggleReaction,
+  onViewReactions,
 }: MessageListProps) {
   const listRef = useRef<LegendListRef>(null);
   // Hidden until the first layout settles at its starting position, then
   // faded in, so nothing flashes or jumps into place.
+  // A page-colored cover fades away rather than the list fading in: glass
+  // (reaction chips) created under a fully transparent parent never draws.
   const loaded = useSharedValue(0);
-  const fadeIn = useAnimatedStyle(() => ({ opacity: loaded.value }));
+  const cover = useAnimatedStyle(() => ({ opacity: 1 - loaded.value }));
   const isNearEnd = useSharedValue(true);
   const showJump = useDerivedValue(() => hasNewer || !isNearEnd.value);
   const rows = buildMessageRows(messages, { layout, self });
@@ -209,9 +214,12 @@ export function MessageList({
     anchorId === undefined ? -1 : rows.findIndex((row) => row.key === anchorId);
 
   return (
-    <MessageActionsProvider onToggleReaction={onToggleReaction}>
+    <MessageActionsProvider
+      onToggleReaction={onToggleReaction}
+      onViewReactions={onViewReactions}
+    >
       <RevealTimes>
-        <Animated.View style={[{ flex: 1 }, fadeIn]}>
+        <View style={{ flex: 1 }}>
           <KeyboardAwareLegendList
             ref={listRef}
             data={rows}
@@ -261,8 +269,13 @@ export function MessageList({
             }}
             style={{ flex: 1 }}
           />
-        </Animated.View>
+        </View>
       </RevealTimes>
+      <Animated.View
+        pointerEvents="none"
+        className="bg-background absolute inset-0"
+        style={cover}
+      />
       <JumpToLatest
         visible={showJump}
         bottom={composerHeight + 12}

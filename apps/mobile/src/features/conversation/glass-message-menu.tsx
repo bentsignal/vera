@@ -17,7 +17,7 @@ import { requireOptionalNativeModule } from "expo";
 import { BlurView } from "expo-blur";
 import { useUniwind } from "uniwind";
 
-import type { PreviewShape } from "./native-message-menu";
+import type { MenuAction } from "./glass-menu-parts";
 import type { Message } from "./types";
 import { cn } from "~/lib/cn";
 import { canCopy, copyText, selectionTick } from "~/lib/native-extras";
@@ -25,12 +25,15 @@ import {
   ActionMenu,
   BAR_HEIGHT,
   BAR_WIDTH,
-  MENU_HEIGHT,
   MENU_WIDTH,
+  menuHeight,
   ReactionBar,
 } from "./glass-menu-parts";
 
 export type TargetAlign = "end" | "start";
+
+/** Bubbles lift as they are; plain (stacked) text lifts on a card. */
+export type PreviewShape = "bubble" | "card";
 
 interface Rect {
   readonly height: number;
@@ -200,6 +203,44 @@ function Lifted({
   );
 }
 
+/** Copy for text, and View Reactions once anyone has reacted. */
+function menuActions(
+  message: MenuTarget["message"],
+  body: string | undefined,
+  {
+    close,
+    onViewReactions,
+  }: {
+    close: (then?: () => void) => void;
+    onViewReactions: () => void;
+  },
+) {
+  const copy =
+    canCopy && body !== undefined && body !== ""
+      ? [
+          {
+            icon: { android: "content_copy", ios: "doc.on.doc" },
+            label: "Copy",
+            onPress: () => {
+              copyText(body);
+              close();
+            },
+          } satisfies MenuAction,
+        ]
+      : [];
+  const viewReactions =
+    message.reactions.length > 0
+      ? [
+          {
+            icon: { android: "groups", ios: "person.2" },
+            label: "View Reactions",
+            onPress: () => close(onViewReactions),
+          } satisfies MenuAction,
+        ]
+      : [];
+  return [...copy, ...viewReactions];
+}
+
 /**
  * The iMessage-style long-press overlay: the conversation blurs, the message
  * lifts, a Liquid Glass reaction bar springs out above it and the actions
@@ -208,17 +249,23 @@ function Lifted({
 export function GlassMessageMenu({
   target,
   onReact,
+  onViewReactions,
   onClosed,
 }: {
   target: MenuTarget;
   onReact: (emoji: string) => void;
+  /** Opens the sheet of who reacted with what. */
+  onViewReactions: () => void;
   onClosed: () => void;
 }) {
   const screen = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { body } = target.message;
-  const copyable = canCopy && body !== undefined && body !== "";
-  const layout = layoutFor(target, screen, insets, copyable ? MENU_HEIGHT : 0);
+  const actions = menuActions(target.message, body, {
+    close: (then) => close(then),
+    onViewReactions,
+  });
+  const layout = layoutFor(target, screen, insets, menuHeight(actions.length));
   const progress = useSharedValue(0);
   useAnimatedReaction(
     () => true,
@@ -227,21 +274,31 @@ export function GlassMessageMenu({
     },
   );
 
-  function close() {
+  /** Plays the overlay back into place, then runs `then` (if any). */
+  function close(then?: () => void) {
+    function closed() {
+      onClosed();
+      then?.();
+    }
     progress.set(
       withTiming(
         0,
         { duration: 240, easing: Easing.out(Easing.cubic) },
         (finished) => {
-          if (finished === true) scheduleOnRN(onClosed);
+          if (finished === true) scheduleOnRN(closed);
         },
       ),
     );
   }
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={close}>
-      <Backdrop progress={progress} onPress={close} />
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      onRequestClose={() => close()}
+    >
+      <Backdrop progress={progress} onPress={() => close()} />
       <Lifted target={target} shift={layout.shift} progress={progress} />
       <ReactionBar
         target={target}
@@ -253,15 +310,12 @@ export function GlassMessageMenu({
           close();
         }}
       />
-      {copyable && (
+      {actions.length > 0 && (
         <ActionMenu
           progress={progress}
           align={target.align}
           position={{ left: layout.menuLeft, top: layout.menuTop }}
-          onCopy={() => {
-            copyText(body);
-            close();
-          }}
+          actions={actions}
         />
       )}
     </Modal>

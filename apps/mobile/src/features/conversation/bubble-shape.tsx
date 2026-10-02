@@ -1,42 +1,47 @@
 import Svg, { Path } from "react-native-svg";
 
-/** How far the tail reaches past the side of the bubble. */
-export const TAIL_WIDTH = 4;
+/** How far the tail hangs below the bubble. */
+export const TAIL_DROP = 6;
 /** Bubble corner radius, a touch rounder than a capsule's for one line. */
 export const BUBBLE_RADIUS = 20;
 
 /**
- * The iMessage bubble outline with its tail at the bottom right: one
- * continuous path, so the tail flows out from under the corner instead of
- * sitting on top of it. `width` and `height` are the bubble's own box; the
- * tail extends `TAIL_WIDTH` past the right edge.
+ * A rounded bubble with a tail hanging from its bottom edge, just inside the
+ * bottom-right corner: the corner keeps its full curve, and the tail grows
+ * out of the bottom like a small hook pointing toward the corner. One
+ * continuous path, so there is no seam where the tail meets the bubble.
+ * `width` and `height` are the bubble's own box; the tail drops `TAIL_DROP`
+ * below it.
  */
 function tailedBubblePath(width: number, height: number) {
   const r = Math.min(BUBBLE_RADIUS, height / 2);
-  const k = r * 0.4;
-  const w = width + TAIL_WIDTH;
+  const k = r * 0.45;
+  const w = width;
   const h = height;
+  const d = TAIL_DROP;
+  // Where the bottom-right corner's curve meets the bottom edge.
+  const corner = w - r;
   return [
-    `M ${w - r} ${h}`,
+    `M ${r} 0`,
+    `L ${w - r} 0`,
+    `C ${w - k} 0 ${w} ${k} ${w} ${r}`,
+    `L ${w} ${h - r}`,
+    `C ${w} ${h - k} ${w - k} ${h} ${corner} ${h}`,
+    // Down into the tip, which sits under the end of the corner's curve...
+    `C ${corner - 1} ${h + d * 0.4} ${corner + 1} ${h + d * 0.85} ${corner + 4} ${h + d}`,
+    // ...then a soft scoop back up into the bottom edge, toward the center.
+    `C ${corner - 4} ${h + d} ${corner - 10} ${h + d * 0.5} ${corner - 14} ${h}`,
     `L ${r} ${h}`,
     `C ${k} ${h} 0 ${h - k} 0 ${h - r}`,
     `L 0 ${r}`,
     `C 0 ${k} ${k} 0 ${r} 0`,
-    `L ${width - r} 0`,
-    `C ${width - k} 0 ${width} ${k} ${width} ${r}`,
-    `L ${width} ${h - 11}`,
-    // Down into the tail's tip, just past the bottom corner...
-    `C ${width} ${h - 1} ${w} ${h} ${w} ${h}`,
-    // ...then back under the bubble, curving up and into its bottom edge.
-    `C ${w - 4} ${h + 0.5} ${w - 8} ${h - 1} ${w - 11} ${h - 4}`,
-    `C ${w - 15} ${h + 0.5} ${w - r} ${h} ${w - r} ${h}`,
     "Z",
   ].join(" ");
 }
 
 /**
  * Paints a bubble with its tail behind the bubble's content. Incoming
- * bubbles are mirrored so the tail points left.
+ * bubbles are mirrored so the tail sits at the bottom left.
  */
 export function TailedBubble({
   width,
@@ -52,10 +57,10 @@ export function TailedBubble({
   return (
     <Svg
       pointerEvents="none"
-      width={width + TAIL_WIDTH}
-      height={height}
+      width={width}
+      height={height + TAIL_DROP}
       style={{
-        left: isOwn ? 0 : -TAIL_WIDTH,
+        left: 0,
         position: "absolute",
         top: 0,
         transform: isOwn ? undefined : [{ scaleX: -1 }],

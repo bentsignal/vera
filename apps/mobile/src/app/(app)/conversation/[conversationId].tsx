@@ -168,6 +168,12 @@ function Conversation({
             topInset={CONVERSATION_HEADER_HEIGHT}
             composerHeight={composerHeight}
             onToggleReaction={messages.toggleReaction}
+            onViewReactions={(messageId) =>
+              router.push({
+                params: { account: address, conversationId, messageId },
+                pathname: "/reactions",
+              })
+            }
           />
         )}
       </KeyboardGestureArea>
