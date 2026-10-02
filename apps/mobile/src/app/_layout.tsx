@@ -9,9 +9,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
 import { useCSSVariable } from "uniwind";
 
+import { applyStoredPreferences } from "~/features/preferences/store";
 import { SessionProvider } from "~/features/session/session-provider";
 
 void SplashScreen.preventAutoHideAsync();
+applyStoredPreferences();
 
 function useNavigationTheme() {
   const scheme = useColorScheme();

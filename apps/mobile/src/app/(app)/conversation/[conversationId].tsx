@@ -23,6 +23,7 @@ import {
   useMessages,
 } from "~/features/messaging/conversations";
 import { useActiveConversation } from "~/features/notifications/push";
+import { usePreference } from "~/features/preferences/store";
 
 const ATTACHMENT_SOURCES = [
   { label: "Photos & Videos", source: "library" },
@@ -41,8 +42,9 @@ function Conversation({
 }) {
   const insets = useSafeAreaInsets();
   const { address } = useAccount();
-  const { conversation, displayName, isLoading, title } =
+  const { conversation, isLoading, profileOf, title } =
     useConversation(conversationId);
+  const layout = usePreference("messageLayout");
   const messages = useMessages(conversationId, anchorId);
   const uploadAttachments = useAttachmentUploader();
   const devTools = useDevTools();
@@ -90,9 +92,9 @@ function Conversation({
             key={messages.viewKey}
             messages={messages.messages}
             self={address}
-            authorName={
-              conversation?.kind === "direct" ? undefined : displayName
-            }
+            layout={layout}
+            profileOf={profileOf}
+            showAuthors={conversation?.kind !== "direct"}
             anchorId={messages.anchor}
             hasNewer={messages.hasNewer}
             onStartReached={messages.loadOlder}

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { GlassView } from "expo-glass-effect";
@@ -27,7 +26,7 @@ function SendButton({
   // Always mounted, so it never pops in below the field or resizes.
   const style = useAnimatedStyle(() => ({
     opacity: withTiming(visible ? 1 : 0, { duration: 120 }),
-    transform: [{ scale: withSpring(visible ? 1 : 0.6, { damping: 18 }) }],
+    transform: [{ scale: withTiming(visible ? 1 : 0.7, { duration: 140 }) }],
   }));
   return (
     <Animated.View
@@ -101,6 +100,9 @@ export function Composer({
           onChangeText={setDraft}
           placeholder="Message"
           accessibilityLabel="Message"
+          // A message field never needs AutoFill suggestions.
+          autoComplete="off"
+          textContentType="none"
           className="text-body text-foreground max-h-32 pl-4"
           // The send button floats over this padding, so text never jumps.
           style={{ paddingBottom: 9, paddingRight: SEND + 12, paddingTop: 9 }}

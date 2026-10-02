@@ -1,38 +1,88 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
+import type { ReactNode } from "react";
 import { useRef } from "react";
 import { Pressable } from "react-native";
 import Animated, {
   useAnimatedProps,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withDelay,
   withTiming,
 } from "react-native-reanimated";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 
 import type { MessageRow } from "./build-rows";
 import type { Message } from "./types";
+import type { MessageLayout } from "~/features/preferences/store";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { buildMessageRows } from "./build-rows";
 import { DaySeparator } from "./day-separator";
 import { MessageBubble } from "./message-bubble";
+import { MessageStacked } from "./message-stacked";
 
-function Row({
-  row,
-  self,
-  authorName,
-}: {
+type ProfileOf = (address: string) => {
+  avatarUrl: string | null;
+  displayName: string;
+};
+
+/** Fades a tint behind the message a conversation opened on. */
+function Highlight({ children }: { children: ReactNode }) {
+  const tint = useSharedValue(1);
+  useAnimatedReaction(
+    () => true,
+    (_, previous) => {
+      if (previous === null)
+        tint.value = withDelay(800, withTiming(0, { duration: 1600 }));
+    },
+  );
+  const style = useAnimatedStyle(() => ({
+    backgroundColor: `rgba(124, 124, 255, ${0.18 * tint.value})`,
+  }));
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+interface RowProps {
   row: MessageRow;
   self: string;
-  authorName?: (address: string) => string;
-}) {
+  layout: MessageLayout;
+  profileOf: ProfileOf;
+  showAuthors: boolean;
+}
+
+function Row({ highlighted, ...props }: RowProps & { highlighted: boolean }) {
+  return highlighted ? (
+    <Highlight>
+      <RowContent {...props} />
+    </Highlight>
+  ) : (
+    <RowContent {...props} />
+  );
+}
+
+function RowContent({ row, self, layout, profileOf, showAuthors }: RowProps) {
   if (row.type === "day") return <DaySeparator date={row.date} />;
-  const isOwn = row.message.authorId === self;
+  const { message } = row;
+  if (layout === "stacked") {
+    return (
+      <MessageStacked
+        message={message}
+        author={profileOf(message.authorId)}
+        startsGroup={row.startsGroup}
+      />
+    );
+  }
+  const isOwn = message.authorId === self;
   return (
     <MessageBubble
-      message={row.message}
+      message={message}
       isOwn={isOwn}
-      authorName={isOwn ? undefined : authorName?.(row.message.authorId)}
+      authorName={
+        showAuthors && !isOwn
+          ? profileOf(message.authorId).displayName
+          : undefined
+      }
       startsGroup={row.startsGroup}
       endsGroup={row.endsGroup}
     />
@@ -86,7 +136,9 @@ function JumpToLatest({
 export function MessageList({
   messages,
   self,
-  authorName,
+  layout,
+  profileOf,
+  showAuthors,
   anchorId,
   hasNewer,
   onStartReached,
@@ -97,8 +149,10 @@ export function MessageList({
   messages: readonly Message[];
   /** The signed-in account's address. */
   self: string;
-  /** Labels incoming messages; pass it for groups and channels. */
-  authorName?: (address: string) => string;
+  layout: MessageLayout;
+  profileOf: ProfileOf;
+  /** Name incoming bubbles; for groups and channels. */
+  showAuthors: boolean;
   anchorId?: string;
   /** Newer messages exist beyond the loaded window. */
   hasNewer: boolean;
@@ -122,7 +176,14 @@ export function MessageList({
         keyExtractor={(row) => row.key}
         getItemType={(row) => row.type}
         renderItem={({ item }) => (
-          <Row row={item} self={self} authorName={authorName} />
+          <Row
+            row={item}
+            self={self}
+            layout={layout}
+            profileOf={profileOf}
+            showAuthors={showAuthors}
+            highlighted={item.key === anchorId}
+          />
         )}
         estimatedItemSize={56}
         recycleItems
