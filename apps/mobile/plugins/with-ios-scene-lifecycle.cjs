@@ -1,13 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
-import type { ExpoConfig } from "expo/config";
-import {
+const fs = require("node:fs");
+const path = require("node:path");
+const {
   IOSConfig,
   withAppDelegate,
   withDangerousMod,
   withInfoPlist,
   withXcodeProject,
-} from "@expo/config-plugins";
+} = require("@expo/config-plugins");
 
 /**
  * Apps built with the iOS 27 SDK must adopt the UIScene life cycle or they
@@ -29,7 +28,7 @@ class SceneDelegate: ExpoAppSceneDelegate {
 const WINDOW_SETUP =
   /\n#if os\(iOS\) \|\| os\(tvOS\)\n\s+window = UIWindow\(frame: UIScreen\.main\.bounds\)\n\s+factory\.startReactNative\([\s\S]*?\)\n#endif\n/;
 
-function adoptSceneDelegate(contents: string) {
+function adoptSceneDelegate(contents) {
   if (contents.includes("ExpoReactNativeFactoryProvider")) return contents;
   if (!WINDOW_SETUP.test(contents)) {
     throw new Error(
@@ -47,7 +46,7 @@ function adoptSceneDelegate(contents: string) {
     );
 }
 
-function withSceneManifest(config: ExpoConfig) {
+function withSceneManifest(config) {
   return withInfoPlist(config, (mod) => {
     mod.modResults.UIApplicationSceneManifest = {
       UIApplicationSupportsMultipleScenes: false,
@@ -64,7 +63,7 @@ function withSceneManifest(config: ExpoConfig) {
   });
 }
 
-function withSceneDelegateFile(config: ExpoConfig) {
+function withSceneDelegateFile(config) {
   return withDangerousMod(config, [
     "ios",
     (mod) => {
@@ -79,7 +78,7 @@ function withSceneDelegateFile(config: ExpoConfig) {
   ]);
 }
 
-function withSceneDelegateSource(config: ExpoConfig) {
+function withSceneDelegateSource(config) {
   return withXcodeProject(config, (mod) => {
     const projectName = IOSConfig.XcodeUtils.getProjectName(
       mod.modRequest.projectRoot,
@@ -96,15 +95,17 @@ function withSceneDelegateSource(config: ExpoConfig) {
   });
 }
 
-function withAppDelegateProvider(config: ExpoConfig) {
+function withAppDelegateProvider(config) {
   return withAppDelegate(config, (mod) => {
     mod.modResults.contents = adoptSceneDelegate(mod.modResults.contents);
     return mod;
   });
 }
 
-export function withIosSceneLifecycle(config: ExpoConfig) {
+function withIosSceneLifecycle(config) {
   return withAppDelegateProvider(
     withSceneDelegateSource(withSceneDelegateFile(withSceneManifest(config))),
   );
 }
+
+module.exports = withIosSceneLifecycle;
