@@ -4,7 +4,7 @@ import { APIError, createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 
-import { requireEnvironment } from "./lib";
+import { optionalEnvironment, requireEnvironment } from "./lib";
 
 /**
  * Development only: signs in as any username without a passkey, because iOS
@@ -47,5 +47,5 @@ export function devSignIn(): BetterAuthPlugin {
 }
 
 export function devToolsEnabled() {
-  return process.env.DEV_TOOLS === "true";
+  return optionalEnvironment("DEV_TOOLS") === "true";
 }
