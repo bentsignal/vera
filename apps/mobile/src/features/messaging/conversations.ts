@@ -72,7 +72,6 @@ function summarize(
     id: conversation.conversationId,
     key: `${account} ${conversation.conversationId}`,
     kind: conversation.kind,
-    avatarSeed: other ?? conversation.conversationId,
     avatarUrl: other === undefined ? null : profileOf(other).avatarUrl,
     lastActivityAt: new Date(
       conversation.lastMessage?.sentAt ?? conversation.updatedAt,

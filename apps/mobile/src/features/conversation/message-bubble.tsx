@@ -104,22 +104,15 @@ function Content({
 /** The sender's photo beside the last bubble of a run in group chats. */
 function AvatarColumn({
   author,
-  seed,
   visible,
 }: {
   author: { avatarUrl: string | null; displayName: string };
-  seed: string;
   visible: boolean;
 }) {
   return (
     <View style={{ width: AVATAR_COLUMN }}>
       {visible && (
-        <Avatar
-          name={author.displayName}
-          seed={seed}
-          size="sm"
-          uri={author.avatarUrl}
-        />
+        <Avatar name={author.displayName} size="sm" uri={author.avatarUrl} />
       )}
     </View>
   );
@@ -187,13 +180,7 @@ export function MessageBubble({
             isOwn ? "justify-end" : "justify-start",
           )}
         >
-          {showAuthor && (
-            <AvatarColumn
-              author={author}
-              seed={message.authorId}
-              visible={endsGroup}
-            />
-          )}
+          {showAuthor && <AvatarColumn author={author} visible={endsGroup} />}
           <BubbleColumn
             message={message}
             isOwn={isOwn}

@@ -1,7 +1,8 @@
-import { ActivityIndicator, Platform, Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import Add from "@expo/material-symbols/add.xml";
 
+import { HeaderFade } from "~/components/header-fade";
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { useVisibleAccounts } from "~/features/messaging/account";
@@ -39,13 +40,12 @@ export default function SpacesScreen() {
       <ScreenList
         data={spaces}
         keyExtractor={(space) => space.key}
-        ListEmptyComponent={
-          isLoading ? <ActivityIndicator className="pt-24" /> : <EmptySpaces />
-        }
+        ListEmptyComponent={isLoading ? null : <EmptySpaces />}
         renderItem={({ item }) => (
           <SpaceRow space={item} showAccount={showAccount} />
         )}
       />
+      <HeaderFade />
     </>
   );
 }

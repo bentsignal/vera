@@ -1,5 +1,6 @@
 import { FieldGroup } from "@expo/ui";
 
+import { HeaderFade } from "~/components/header-fade";
 import { NativeHost } from "~/components/native-host";
 import { TabTitle } from "~/components/tab-title";
 import { AccountsSection } from "~/features/settings/accounts-section";
@@ -17,6 +18,7 @@ export default function SettingsScreen() {
           <ThemesSection />
         </FieldGroup>
       </NativeHost>
+      <HeaderFade background="--color-background-grouped" />
     </>
   );
 }

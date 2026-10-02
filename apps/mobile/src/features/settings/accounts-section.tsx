@@ -21,12 +21,7 @@ function AccountRow() {
   return (
     <ListItem
       leading={
-        <Avatar
-          name={displayName}
-          seed={address}
-          size="md"
-          uri={profile?.avatarUrl ?? null}
-        />
+        <Avatar name={displayName} size="md" uri={profile?.avatarUrl ?? null} />
       }
       trailing={
         <SymbolIcon

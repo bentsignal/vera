@@ -18,9 +18,7 @@ export function ProfileSection({
   return (
     <FieldGroup.Section>
       <ListItem
-        leading={
-          <Avatar name={displayName} seed={address} size="lg" uri={avatarUrl} />
-        }
+        leading={<Avatar name={displayName} size="lg" uri={avatarUrl} />}
         supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
         onPress={onChangePhoto}
       >
