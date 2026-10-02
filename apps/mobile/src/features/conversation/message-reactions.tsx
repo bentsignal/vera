@@ -4,10 +4,10 @@ import { useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
 
-import type { ReactionSummary } from "~/features/messaging/reactions";
-import type { ReactionsExperiment } from "~/features/preferences/store";
 import type { PreviewShape } from "./native-message-menu";
 import type { Message } from "./types";
+import type { ReactionSummary } from "~/features/messaging/reactions";
+import type { ReactionsExperiment } from "~/features/preferences/store";
 import { usePreference } from "~/features/preferences/store";
 import { cn } from "~/lib/cn";
 import { selectionTick } from "~/lib/native-extras";
@@ -19,7 +19,6 @@ const SHOWN = 3;
 /** Room above a message for its corner badge, and below for its pill. */
 const BADGE_ROOM = 14;
 const PILL_ROOM = 12;
-
 
 /** Most-used first, so the badge shows what people reacted with most. */
 function ranked(reactions: readonly ReactionSummary[]) {
@@ -137,7 +136,9 @@ function CornerBadge({
           </View>
         )}
         {others.length > 0 && (
-          <View className={cn(mine.length > 0 && (fanLeft ? "-mr-3" : "-ml-3"))}>
+          <View
+            className={cn(mine.length > 0 && (fanLeft ? "-mr-3" : "-ml-3"))}
+          >
             <Tapback
               emojis={others.map((reaction) => reaction.emoji)}
               count={othersCount}

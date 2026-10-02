@@ -47,8 +47,8 @@ export function ExperimentsSection() {
       </Row>
       <FieldGroup.SectionFooter>
         <Text>
-          Try each design in a conversation. This section goes away once one
-          is picked.
+          Try each design in a conversation. This section goes away once one is
+          picked.
         </Text>
       </FieldGroup.SectionFooter>
     </FieldGroup.Section>

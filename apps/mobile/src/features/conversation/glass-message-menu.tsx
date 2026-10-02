@@ -94,7 +94,10 @@ function layoutFor(
   const rect = frameOf(target);
   const minTop = insets.top + EDGE + BAR_HEIGHT + GAP;
   const maxBottom =
-    screen.height - insets.bottom - EDGE - (menuHeight > 0 ? menuHeight + GAP : 0);
+    screen.height -
+    insets.bottom -
+    EDGE -
+    (menuHeight > 0 ? menuHeight + GAP : 0);
   // Keep the message between the bar and the menu; the top wins when tall.
   const top = Math.max(minTop, Math.min(rect.y, maxBottom - rect.height));
   function side(width: number) {
@@ -186,7 +189,10 @@ function Lifted({
           top: rect.y,
           width: rect.width,
         },
-        card && { paddingHorizontal: CARD_INSET.x, paddingVertical: CARD_INSET.y },
+        card && {
+          paddingHorizontal: CARD_INSET.x,
+          paddingVertical: CARD_INSET.y,
+        },
         style,
       ]}
     >
@@ -213,12 +219,7 @@ export function GlassMessageMenu({
   const insets = useSafeAreaInsets();
   const { body } = target.message;
   const copyable = canCopy && body !== undefined && body !== "";
-  const layout = layoutFor(
-    target,
-    screen,
-    insets,
-    copyable ? MENU_HEIGHT : 0,
-  );
+  const layout = layoutFor(target, screen, insets, copyable ? MENU_HEIGHT : 0);
   const progress = useSharedValue(0);
   useAnimatedReaction(
     () => true,
