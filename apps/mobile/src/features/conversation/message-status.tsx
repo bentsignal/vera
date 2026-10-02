@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import Animated, {
+  FadeIn,
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
@@ -20,7 +21,7 @@ export function SendingFade({
   children: ReactNode;
 }) {
   const style = useAnimatedStyle(() => ({
-    opacity: withTiming(status === "sending" ? 0.55 : 1, { duration: 220 }),
+    opacity: withTiming(status === "sending" ? 0.75 : 1, { duration: 220 }),
   }));
   return <Animated.View style={style}>{children}</Animated.View>;
 }
@@ -47,8 +48,11 @@ export function MessageMeta({
   }
   if (!delivered) return null;
   return (
-    <Text className="text-caption text-muted px-1 pt-0.5 font-medium">
+    <Animated.Text
+      entering={FadeIn.duration(240)}
+      className="text-caption text-muted px-1 pt-0.5 font-medium"
+    >
       Delivered
-    </Text>
+    </Animated.Text>
   );
 }

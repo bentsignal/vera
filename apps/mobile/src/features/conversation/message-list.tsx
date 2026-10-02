@@ -1,8 +1,10 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
 import type { ReactNode } from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Pressable } from "react-native";
 import Animated, {
+  FadeInDown,
+  LinearTransition,
   useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -53,14 +55,34 @@ interface RowProps {
   showAuthors: boolean;
 }
 
-function Row({ highlighted, ...props }: RowProps & { highlighted: boolean }) {
-  return highlighted ? (
+/** New rows rise a little and fade in, like a sent message in iMessage. */
+const ARRIVE = FadeInDown.duration(280).withInitialValues({
+  opacity: 0,
+  transform: [{ translateY: 14 }],
+});
+
+function Row({
+  highlighted,
+  arriving,
+  ...props
+}: RowProps & { highlighted: boolean; arriving: boolean }) {
+  const content = highlighted ? (
     <Highlight>
       <RowContent {...props} />
     </Highlight>
   ) : (
     <RowContent {...props} />
   );
+  return (
+    <Animated.View entering={arriving ? ARRIVE : undefined}>
+      {content}
+    </Animated.View>
+  );
+}
+
+function arrivedAfter(row: MessageRow, openedAt: number) {
+  const date = row.type === "message" ? row.message.sentAt : row.date;
+  return date.getTime() > openedAt;
 }
 
 function RowContent({ row, self, layout, profileOf, showAuthors }: RowProps) {
@@ -176,6 +198,8 @@ export function MessageList({
   const isNearEnd = useSharedValue(true);
   const showJump = useDerivedValue(() => hasNewer || !isNearEnd.value);
   const rows = buildMessageRows(messages, { layout, self });
+  // Only messages that arrive while open animate in, not loaded pages.
+  const [openedAt] = useState(Date.now);
   const anchorIndex =
     anchorId === undefined ? -1 : rows.findIndex((row) => row.key === anchorId);
 
@@ -196,12 +220,16 @@ export function MessageList({
                 profileOf={profileOf}
                 showAuthors={showAuthors}
                 highlighted={item.key === anchorId}
+                arriving={arrivedAfter(item, openedAt)}
               />
             )}
             estimatedItemSize={56}
-            recycleItems
+            // Rows mount fresh, so arriving messages can animate in.
+            recycleItems={false}
+            // Rows already on screen glide to their new places.
+            itemLayoutAnimation={LinearTransition.duration(240)}
             alignItemsAtEnd
-            maintainScrollAtEnd={!hasNewer}
+            maintainScrollAtEnd={hasNewer ? false : { animated: true }}
             maintainVisibleContentPosition
             {...(anchorIndex === -1
               ? { initialScrollAtEnd: true }

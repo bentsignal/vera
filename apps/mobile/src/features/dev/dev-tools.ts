@@ -35,6 +35,11 @@ export function useDevTools() {
           );
       }
     },
+    /** A long DM and a message ~200 back in it, to open there. */
+    longThreadMiddle: async () => {
+      const convex = await session.convex();
+      return convex.action(api.dev.longThreadMiddle, {});
+    },
     seed: async () => {
       const convex = await session.convex();
       return convex.action(api.dev.seed, {});
