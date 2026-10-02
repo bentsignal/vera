@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
 import {
-  KeyboardAvoidingView,
-  useKeyboardState,
+  KeyboardGestureArea,
+  KeyboardStickyView,
 } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useHeaderHeight } from "expo-router/react-navigation";
-import { withUniwind } from "uniwind";
 
 import type { AttachmentSource } from "~/features/messaging/attachments";
 import { showActionSheet } from "~/components/action-sheet";
@@ -25,32 +24,29 @@ import {
 } from "~/features/messaging/conversations";
 import { useActiveConversation } from "~/features/notifications/push";
 
-const StyledKeyboardAvoidingView = withUniwind(KeyboardAvoidingView);
-
 const ATTACHMENT_SOURCES = [
   { label: "Photos & Videos", source: "library" },
   { label: "Camera", source: "camera" },
   { label: "Files", source: "files" },
 ] as const;
 
-function CenteredMessage({ text }: { text: string }) {
-  return (
-    <View className="bg-background flex-1 items-center justify-center">
-      <Text className="text-body text-muted">{text}</Text>
-    </View>
-  );
-}
-
-function Conversation({ conversationId }: { conversationId: string }) {
+function Conversation({
+  conversationId,
+  anchorId,
+  initialTitle,
+}: {
+  conversationId: string;
+  anchorId?: string;
+  initialTitle?: string;
+}) {
+  const insets = useSafeAreaInsets();
   const { address } = useAccount();
   const { conversation, displayName, isLoading, title } =
     useConversation(conversationId);
-  const messages = useMessages(conversationId);
+  const messages = useMessages(conversationId, anchorId);
   const uploadAttachments = useAttachmentUploader();
   const devTools = useDevTools();
   const [uploading, setUploading] = useState(false);
-  const keyboardVisible = useKeyboardState((state) => state.isVisible);
-  const headerHeight = useHeaderHeight();
   useMarkRead(conversationId, messages.newestSentAt);
   useActiveConversation(conversationId);
 
@@ -70,50 +66,82 @@ function Conversation({ conversationId }: { conversationId: string }) {
     }
   }
 
-  if (isLoading) return <CenteredMessage text="" />;
-  if (conversation === undefined) {
-    return <CenteredMessage text="This conversation doesn't exist." />;
+  // The title from the opening screen shows until the conversation loads.
+  const heading = title === "" ? (initialTitle ?? "") : title;
+  if (!isLoading && conversation === undefined) {
+    return (
+      <View className="bg-background flex-1 items-center justify-center">
+        <Stack.Title>{heading}</Stack.Title>
+        <Text className="text-body text-muted">
+          This conversation doesn't exist.
+        </Text>
+      </View>
+    );
   }
 
   return (
-    <StyledKeyboardAvoidingView
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}
-      className="bg-background flex-1"
-    >
-      <Stack.Title>{title}</Stack.Title>
-      <MessageList
-        messages={messages.messages}
-        self={address}
-        authorName={conversation.kind === "direct" ? undefined : displayName}
-        onEndReached={messages.loadOlder}
-      />
-      {uploading && (
-        <View className="flex-row items-center justify-center gap-2 py-1">
-          <ActivityIndicator size="small" />
-          <Text className="text-footnote text-muted">Uploading…</Text>
+    <View className="bg-background flex-1">
+      <Stack.Title>{heading}</Stack.Title>
+      <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
+        {messages.isLoading ? (
+          <ActivityIndicator className="flex-1" />
+        ) : (
+          <MessageList
+            key={messages.viewKey}
+            messages={messages.messages}
+            self={address}
+            authorName={
+              conversation?.kind === "direct" ? undefined : displayName
+            }
+            anchorId={messages.anchor}
+            hasNewer={messages.hasNewer}
+            onStartReached={messages.loadOlder}
+            onEndReached={messages.loadNewer}
+            onJumpToLatest={messages.jumpToLatest}
+            bottomInset={insets.bottom}
+          />
+        )}
+      </KeyboardGestureArea>
+      <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
+        {uploading && (
+          <View className="flex-row items-center justify-center gap-2 py-1">
+            <ActivityIndicator size="small" />
+            <Text className="text-footnote text-muted">Uploading…</Text>
+          </View>
+        )}
+        <View style={{ paddingBottom: insets.bottom }}>
+          <Composer
+            onSend={(body) => {
+              messages.sendMessage(body);
+              devTools.replyToMe(conversationId);
+            }}
+            onAttach={() =>
+              showActionSheet(
+                ATTACHMENT_SOURCES.map(({ label, source }) => ({
+                  label,
+                  onPress: () => void attach(source),
+                })),
+              )
+            }
+          />
         </View>
-      )}
-      <Composer
-        onSend={(body) => {
-          messages.sendMessage(body);
-          devTools.replyToMe(conversationId);
-        }}
-        onAttach={() =>
-          showActionSheet(
-            ATTACHMENT_SOURCES.map(({ label, source }) => ({
-              label,
-              onPress: () => void attach(source),
-            })),
-          )
-        }
-        keyboardVisible={keyboardVisible}
-      />
-    </StyledKeyboardAvoidingView>
+      </KeyboardStickyView>
+    </View>
   );
 }
 
 export default function ConversationScreen() {
-  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
-  return <Conversation key={conversationId} conversationId={conversationId} />;
+  const { conversationId, messageId, title } = useLocalSearchParams<{
+    conversationId: string;
+    messageId?: string;
+    title?: string;
+  }>();
+  return (
+    <Conversation
+      key={`${conversationId}:${messageId ?? ""}`}
+      conversationId={conversationId}
+      anchorId={messageId}
+      initialTitle={title}
+    />
+  );
 }

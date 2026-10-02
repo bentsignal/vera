@@ -15,6 +15,7 @@ import type * as index from "../index.js";
 import type * as metadata from "../metadata.js";
 import type * as model from "../model.js";
 import type * as notifications from "../notifications.js";
+import type * as paging from "../paging.js";
 import type * as previews from "../previews.js";
 import type * as protocol from "../protocol.js";
 import type * as pushTokens from "../pushTokens.js";
@@ -35,6 +36,7 @@ const fullApi: ApiFromModules<{
   metadata: typeof metadata;
   model: typeof model;
   notifications: typeof notifications;
+  paging: typeof paging;
   previews: typeof previews;
   protocol: typeof protocol;
   pushTokens: typeof pushTokens;

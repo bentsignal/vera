@@ -24,6 +24,7 @@
     "@decentralized-convex/tanstack-query": "workspace:0.1.0",
     "@expo/material-symbols": "^0.1.1",
     "@expo/ui": "~57.0.21",
+    "@legendapp/list": "^3.6.0",
     "@tanstack/react-query": "catalog:",
     "@vera/backend": "workspace:*",
     "better-auth": "~1.6.33",

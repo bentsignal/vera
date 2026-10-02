@@ -63,7 +63,10 @@ export function useCompose() {
     }
     router.dismiss();
     router.push({
-      params: { conversationId: created.conversationId },
+      params: {
+        conversationId: created.conversationId,
+        title: isGroup ? groupName.trim() : displayName(only ?? ""),
+      },
       pathname: "/conversation/[conversationId]",
     });
   }

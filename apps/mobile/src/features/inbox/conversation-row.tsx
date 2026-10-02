@@ -21,7 +21,7 @@ export function ConversationRow({
     <Link
       href={{
         pathname: "/conversation/[conversationId]",
-        params: { conversationId: id },
+        params: { conversationId: id, title },
       }}
       asChild
     >

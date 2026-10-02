@@ -9,6 +9,8 @@ export function TabStack() {
         headerBackButtonDisplayMode: "minimal",
         headerLargeTitleEnabled: true,
         headerTransparent: Platform.OS === "ios",
+        // Screens set their own titles; never show the route name.
+        title: "",
       }}
     />
   );

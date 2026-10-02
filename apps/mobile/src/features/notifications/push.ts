@@ -33,6 +33,15 @@ function conversationIdOf(data: unknown) {
     : undefined;
 }
 
+function messageIdOf(data: unknown) {
+  return typeof data === "object" &&
+    data !== null &&
+    "messageId" in data &&
+    typeof data.messageId === "string"
+    ? data.messageId
+    : undefined;
+}
+
 Notifications.setNotificationHandler({
   handleNotification: (notification) => {
     const conversationId = conversationIdOf(notification.request.content.data);
@@ -85,12 +94,16 @@ export function useNotificationRouting() {
   const response = Notifications.useLastNotificationResponse();
   // eslint-disable-next-line no-restricted-syntax -- Responds to a notification tap delivered by the OS.
   useEffect(() => {
-    const conversationId = conversationIdOf(
-      response?.notification.request.content.data,
-    );
+    const data = response?.notification.request.content.data;
+    const conversationId = conversationIdOf(data);
     if (conversationId === undefined) return;
+    const messageId = messageIdOf(data);
     router.push({
-      params: { conversationId },
+      // Opening at the message keeps an old notification useful.
+      params:
+        messageId === undefined
+          ? { conversationId }
+          : { conversationId, messageId },
       pathname: "/conversation/[conversationId]",
     });
     void Notifications.clearLastNotificationResponseAsync();

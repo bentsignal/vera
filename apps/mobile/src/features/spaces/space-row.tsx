@@ -8,7 +8,7 @@ export function SpaceRow({ space }: { space: Space }) {
   return (
     <Link
       href={{
-        params: { spaceId: space.spaceId },
+        params: { name: space.name, spaceId: space.spaceId },
         pathname: "/spaces/[spaceId]",
       }}
       asChild
