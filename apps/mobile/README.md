@@ -48,6 +48,72 @@ Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 
 Local runs default to `dev.vera.chat`; read the domain through `~/env`.
 
+## Message notifications
+
+Message pushes (built by `@decentralized-convex/messages`, see its README)
+have the sender as the title, the group or `Space #channel` as the subtitle,
+and the message as the body. On iOS, the `NotificationService` Notification
+Service Extension turns them into communication notifications, like
+iMessage: the sender's photo (or an initials monogram on the app's gray
+gradient) is the large icon with a small Vera badge, and iOS groups them by
+conversation. Its source is `plugins/notification-service/`; the
+`plugins/with-notification-service.cjs` config plugin adds the target during
+prebuild, gives the app the Communication Notifications entitlement
+(`com.apple.developer.usernotifications.communication`), lists
+`INSendMessageIntent` in `NSUserActivityTypes`, and app.config.ts registers
+`chat.vera.app.NotificationService` with EAS
+(`extra.eas.build.experimental.ios.appExtensions`). If the extension fails or
+runs out of time, iOS shows the plain push.
+
+The extension is **off by default**, because it needs signing credentials
+that EAS cannot create without an Apple account session. Prebuild includes it
+only with `VERA_NOTIFICATION_EXTENSION=1`; without it, the native project is
+unchanged.
+
+### One-time setup (Shawn)
+
+1. From `apps/mobile`, run an interactive credentials setup with the flag on,
+   signed in to the Apple Developer account (team `39K6A9FP99`):
+
+   ```sh
+   VERA_NOTIFICATION_EXTENSION=1 eas credentials -p ios
+   ```
+
+   Choose the `development` profile, then "Build credentials: set up all the
+   required credentials", and log in to Apple when asked. EAS registers the
+   `chat.vera.app.NotificationService` App ID and creates its ad hoc
+   provisioning profile. Repeat for `preview` (App Store profile; production
+   reuses it).
+
+2. In the Apple Developer portal (Certificates, Identifiers & Profiles →
+   Identifiers → `chat.vera.app`), check that **Communication Notifications**
+   is enabled. EAS normally turns it on from the entitlement during the
+   first interactive build; if it was off, enable it and run step 1 again so
+   the app's profiles include it.
+
+3. Turn the flag on for EAS builds: add `"VERA_NOTIFICATION_EXTENSION": "1"`
+   to the `env` of every build profile in `eas.json`. Run the first build
+   interactively (`eas build -p ios --profile development`, without
+   `--non-interactive`) so EAS can fix any credential it still needs. After
+   that, builds work non-interactively.
+
+Once it ships in every build, delete the flag and the `enabled` option so the
+plugin is always on.
+
+### Local simulator build with the extension
+
+```sh
+VERA_NOTIFICATION_EXTENSION=1 npx expo prebuild --platform ios --clean
+```
+
+Then build with the `xcodebuild` command under "Run it"; its local signing
+applies to both targets and keeps the communication entitlement.
+`xcrun simctl push` skips service extensions, so it shows only the plain
+notification. A real APNs push does run the extension on an Apple silicon
+simulator: register the simulator's device token with Expo
+(`getExpoPushTokenAsync`, or `POST https://exp.host/--/api/v2/push/getExpoPushToken`
+with `development: true`) and send to that token through the Expo push API.
+
 ## Layout
 
 - `src/app`: routes. `(auth)` holds welcome, create account, and sign in;

@@ -458,6 +458,9 @@ importers:
 
   packages/decentralized-convex-messages:
     dependencies:
+      '@decentralized-convex/accounts':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-accounts
       '@decentralized-convex/core':
         specifier: workspace:0.1.0
         version: link:../decentralized-convex-core
