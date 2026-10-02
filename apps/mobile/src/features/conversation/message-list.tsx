@@ -169,6 +169,7 @@ export function MessageList({
   onEndReached,
   onJumpToLatest,
   bottomInset,
+  topInset,
   composerHeight,
   onToggleReaction,
 }: {
@@ -186,6 +187,8 @@ export function MessageList({
   onEndReached: () => void;
   onJumpToLatest: () => void;
   bottomInset: number;
+  /** Height of the header floating over the top, below the status bar. */
+  topInset: number;
   /** Height of the composer floating over the bottom of the list. */
   composerHeight: number;
   onToggleReaction: (messageId: string, emoji: string) => void;
@@ -245,11 +248,12 @@ export function MessageList({
             keyboardShouldPersistTaps="handled"
             keyboardOffset={bottomInset}
             contentInsetAdjustmentBehavior="automatic"
-            // Messages scroll under the floating composer.
+            // Messages scroll under the floating header and composer.
             contentContainerStyle={{
               paddingBottom: composerHeight + 8,
-              paddingTop: 8,
+              paddingTop: topInset + 8,
             }}
+            scrollIndicatorInsets={{ top: topInset }}
             onLoad={() => {
               loaded.set(withTiming(1, { duration: 220 }));
             }}

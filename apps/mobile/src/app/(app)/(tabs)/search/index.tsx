@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { pds } from "@vera/backend/pds";
 
 import type { SearchResult } from "~/features/search/use-search";
 import { ScreenList } from "~/components/screen-list";
 import { SymbolIcon } from "~/components/symbol-icon";
-import { useAccounts } from "~/features/messaging/account";
 import {
   blurNativeSearch,
   focusNativeSearch,
@@ -54,7 +52,6 @@ export default function SearchScreen() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const results = useSearchResults(query);
-  const accounts = useAccounts();
 
   // Selecting the tab opens the search field over the keyboard. The frame
   // waits for the native search bar to attach on the first visit.
@@ -66,32 +63,22 @@ export default function SearchScreen() {
     };
   });
 
-  async function open(result: SearchResult) {
+  function open(result: SearchResult) {
     const { target } = result;
     if ("spaceId" in target) {
       router.push({ params: target, pathname: "/spaces/[spaceId]" });
-      return;
+    } else if ("conversationId" in target) {
+      router.push({
+        params: target,
+        pathname: "/conversation/[conversationId]",
+      });
+    } else {
+      // People open their profile, which can start a conversation.
+      router.push({
+        params: { account: target.account, address: target.accountId },
+        pathname: "/profile/[address]",
+      });
     }
-    const session = accounts.find(
-      (account) => account.address === target.account,
-    );
-    if (session === undefined) return;
-    const conversation =
-      "conversationId" in target
-        ? target
-        : {
-            account: target.account,
-            conversationId: (
-              await session.pds.mutate(
-                pds.messages.openDirect({ accountId: target.accountId }),
-              )
-            ).conversationId,
-            title: result.title,
-          };
-    router.push({
-      params: conversation,
-      pathname: "/conversation/[conversationId]",
-    });
   }
 
   return (
@@ -117,7 +104,7 @@ export default function SearchScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <ResultRow result={item} onPress={() => void open(item)} />
+          <ResultRow result={item} onPress={() => open(item)} />
         )}
       />
     </>

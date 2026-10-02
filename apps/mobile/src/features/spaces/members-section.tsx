@@ -5,15 +5,17 @@ import { FieldGroup, ListItem, Text } from "@expo/ui";
 import { Avatar } from "~/components/avatar";
 import { SectionHeaderWithAdd } from "~/components/section-header";
 import { useAccount } from "~/features/messaging/account";
-import { useDisplayNames } from "~/features/messaging/profiles";
+import { useProfiles } from "~/features/messaging/profiles";
+import { useOpenProfile } from "~/features/profile/use-open-profile";
 import { secondaryTextStyle } from "~/lib/colors";
 
 export function MembersSection({ space }: { space: Space }) {
   const router = useRouter();
   const { address: account } = useAccount();
-  const displayName = useDisplayNames(
+  const profileOf = useProfiles(
     space.members.map((member) => member.accountId),
   );
+  const openProfile = useOpenProfile();
   return (
     <FieldGroup.Section>
       <FieldGroup.SectionHeader>
@@ -30,7 +32,13 @@ export function MembersSection({ space }: { space: Space }) {
       {space.members.map((member) => (
         <ListItem
           key={member.accountId}
-          leading={<Avatar name={displayName(member.accountId)} size="sm" />}
+          leading={
+            <Avatar
+              name={profileOf(member.accountId).displayName}
+              size="sm"
+              uri={profileOf(member.accountId).avatarUrl}
+            />
+          }
           supportingText={
             <Text textStyle={secondaryTextStyle}>
               {member.role === "owner"
@@ -38,8 +46,9 @@ export function MembersSection({ space }: { space: Space }) {
                 : member.accountId}
             </Text>
           }
+          onPress={() => openProfile(member.accountId)}
         >
-          {displayName(member.accountId)}
+          {profileOf(member.accountId).displayName}
         </ListItem>
       ))}
     </FieldGroup.Section>
