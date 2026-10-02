@@ -24,20 +24,20 @@ merge. iMessage is the reference for feel throughout.
 
 ## Lists and headers
 
-- [ ] Chats list feels like iMessage: spacing, alignment, larger rows,
+- [x] Chats list feels like iMessage: spacing, alignment, larger rows,
       gradient initials avatars.
-- [ ] Inline tab titles (Chats, Spaces, Settings) stay readable while
+- [x] Inline tab titles (Chats, Spaces, Settings) stay readable while
       scrolling: a soft background-colored fade behind the header that only
       shows once content scrolls under it.
-- [ ] Search uses the real iOS 27 search tab behavior. Rodge Mail
+- [x] Search uses the real iOS 27 search tab behavior. Rodge Mail
       (`../rodge-mail`, see `WORM_IOS_27_SEARCH_HANDOFF.md`) works around the
       React Native issue.
 
 ## Icons and themes
 
-- [ ] App icon modeled on the iMessage icon (white speech bubble on a
+- [x] App icon modeled on the iMessage icon (white speech bubble on a
       gradient), in every theme color, with light and dark versions. Green,
       close to iMessage's green, is the default.
-- [ ] A Themes section in Settings: a horizontal carousel of app icons
+- [x] A Themes section in Settings: a horizontal carousel of app icons
       (showing the light or dark version to match the current appearance)
       and color circles for the accent themes.

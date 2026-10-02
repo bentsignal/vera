@@ -3,7 +3,7 @@ import { Link } from "expo-router";
 
 import type { ConversationSummary } from "./types";
 import { Avatar } from "~/components/avatar";
-import { UnreadBadge } from "~/components/unread-badge";
+import { SymbolIcon } from "~/components/symbol-icon";
 import { usernameOf } from "~/features/messaging/profiles";
 import { formatInboxTimestamp } from "~/lib/format";
 
@@ -30,14 +30,19 @@ export function ConversationRow({
       asChild
     >
       <Link.Trigger>
-        <Pressable className="active:bg-fill flex-row items-center gap-3 pl-4">
-          <Avatar
-            name={title}
-            seed={conversation.avatarSeed}
-            uri={conversation.avatarUrl}
-          />
-          <View className="border-b-hairline border-separator flex-1 gap-0.5 py-3 pr-4">
-            <View className="flex-row items-baseline gap-2">
+        <Pressable className="active:bg-fill flex-row items-center">
+          {/* iMessage's unread dot sits in a gutter left of the photo. */}
+          <View className="w-6 items-center">
+            {unreadCount > 0 && (
+              <View
+                accessibilityLabel={`${unreadCount} unread`}
+                className="bg-accent size-[10px] rounded-full"
+              />
+            )}
+          </View>
+          <Avatar name={title} size="list" uri={conversation.avatarUrl} />
+          <View className="border-b-hairline border-separator ml-3 min-h-[78px] flex-1 justify-center py-2.5 pr-4">
+            <View className="flex-row items-center gap-1.5">
               <Text
                 numberOfLines={1}
                 className="text-headline text-foreground flex-1 font-semibold"
@@ -52,16 +57,19 @@ export function ConversationRow({
               <Text className="text-subhead text-muted">
                 {formatInboxTimestamp(lastActivityAt)}
               </Text>
+              <SymbolIcon
+                name={{ android: "chevron_right", ios: "chevron.right" }}
+                size={12}
+                weight="semibold"
+                tintColorClassName="accent-subtle"
+              />
             </View>
-            <View className="flex-row items-center gap-2">
-              <Text
-                numberOfLines={2}
-                className="text-subhead text-muted flex-1"
-              >
-                {lastMessage}
-              </Text>
-              <UnreadBadge count={unreadCount} />
-            </View>
+            <Text
+              numberOfLines={2}
+              className="text-subhead text-muted pt-0.5 leading-[20px]"
+            >
+              {lastMessage}
+            </Text>
           </View>
         </Pressable>
       </Link.Trigger>

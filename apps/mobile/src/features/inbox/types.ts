@@ -21,6 +21,4 @@ export interface ConversationSummary {
   unreadCount: number;
   /** The other person's photo in a direct conversation. */
   avatarUrl: string | null;
-  /** Stable avatar color seed. */
-  avatarSeed: string;
 }

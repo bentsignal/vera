@@ -27,12 +27,7 @@ export function MessageStacked({
     >
       <View style={{ width: AVATAR_COLUMN }}>
         {startsGroup && (
-          <Avatar
-            name={author.displayName}
-            seed={message.authorId}
-            size="row"
-            uri={author.avatarUrl}
-          />
+          <Avatar name={author.displayName} size="row" uri={author.avatarUrl} />
         )}
       </View>
       <View className="flex-1 gap-1">

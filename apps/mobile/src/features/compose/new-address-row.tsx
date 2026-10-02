@@ -26,9 +26,7 @@ export function NewAddressRow({
   return (
     <FieldGroup.Section>
       <ListItem
-        leading={
-          <Avatar name={displayName(address)} seed={address} size="sm" />
-        }
+        leading={<Avatar name={displayName(address)} size="sm" />}
         supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
         onPress={() => onAdd(address)}
       >
