@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { pds } from "@vera/backend/pds";
 
 import type { SearchResult } from "~/features/search/use-search";
 import { ScreenList } from "~/components/screen-list";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { useAccounts } from "~/features/messaging/account";
+import {
+  blurNativeSearch,
+  focusNativeSearch,
+  nativeSearchBarRef,
+} from "~/features/search/native-search";
 import { useSearchResults } from "~/features/search/use-search";
 
 const ICONS = {
@@ -51,6 +56,16 @@ export default function SearchScreen() {
   const results = useSearchResults(query);
   const accounts = useAccounts();
 
+  // Selecting the tab opens the search field over the keyboard. The frame
+  // waits for the native search bar to attach on the first visit.
+  useFocusEffect(() => {
+    const frame = requestAnimationFrame(focusNativeSearch);
+    return () => {
+      cancelAnimationFrame(frame);
+      blurNativeSearch();
+    };
+  });
+
   async function open(result: SearchResult) {
     const { target } = result;
     if ("spaceId" in target) {
@@ -83,8 +98,12 @@ export default function SearchScreen() {
     <>
       <Stack.Title>Search</Stack.Title>
       <Stack.SearchBar
+        ref={nativeSearchBarRef}
         placeholder="People, chats, spaces"
         autoCapitalize="none"
+        hideWhenScrolling={false}
+        obscureBackground={false}
+        placement="automatic"
         onChangeText={(event) => setQuery(event.nativeEvent.text)}
       />
       <ScreenList

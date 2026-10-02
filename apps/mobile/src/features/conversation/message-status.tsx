@@ -7,7 +7,6 @@ import Animated, {
 
 import type { Message } from "./types";
 import { SymbolIcon } from "~/components/symbol-icon";
-import { formatTime } from "~/lib/format";
 
 /**
  * Fades a message in from translucent while it is sending, so a confirmed
@@ -26,15 +25,13 @@ export function SendingFade({
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 
-/** The time under a run of messages, or why a message did not send. */
+/** "Delivered" under your newest message, or why a message did not send. */
 export function MessageMeta({
   message,
-  showTime,
-  align,
+  delivered,
 }: {
   message: Message;
-  showTime: boolean;
-  align: "end" | "start";
+  delivered: boolean;
 }) {
   if (message.status === "failed") {
     return (
@@ -48,12 +45,10 @@ export function MessageMeta({
       </View>
     );
   }
-  if (!showTime || message.status === "sending") return null;
+  if (!delivered) return null;
   return (
-    <Text
-      className={`text-caption text-muted px-1 ${align === "end" ? "text-right" : ""}`}
-    >
-      {formatTime(message.sentAt)}
+    <Text className="text-caption text-muted px-1 pt-0.5 font-medium">
+      Delivered
     </Text>
   );
 }
