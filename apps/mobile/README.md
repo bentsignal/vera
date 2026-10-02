@@ -182,6 +182,6 @@ with `development: true`) and send to that token through the Expo push API.
   react-native-screens or Expo Router ships a working search tab on iOS 27,
   then run `pnpm install` and rebuild.
 - `assets/icons`: the app icon, a top-down aloe vera made as a Liquid Glass
-  Icon Composer document, and the flat Android, fallback, and splash images
-  rendered from it. Color themes don't change the icon. See
+  Icon Composer document, and the flat Android and fallback images rendered
+  from it. The splash screen has no logo, only the app's background color. Color themes don't change the icon. See
   `assets/icons/README.md`.

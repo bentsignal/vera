@@ -17,6 +17,8 @@ import {
 } from "~/features/session/session-provider";
 
 void SplashScreen.preventAutoHideAsync();
+// The splash is a plain background, so the app fades in over it.
+SplashScreen.setOptions({ duration: 250, fade: true });
 applyStoredPreferences();
 
 function useNavigationTheme() {

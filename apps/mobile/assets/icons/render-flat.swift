@@ -1,20 +1,17 @@
 // Renders the flat icon assets from vera.icon (its SVG leaves and the fills
-// in icon.json), and cuts the splash image out of build-icons.py's glass
-// renders:
+// in icon.json), without Liquid Glass:
 //   vera-android-foreground.png   Android adaptive foreground (light leaves)
 //   vera-android-monochrome.png   Android themed icon (white leaves)
 //   vera-android-background.png   Android adaptive background
 //   ../images/icon.png            square, opaque fallback icon
-//   ../images/splash-icon.png     the dark icon's green glass leaves, for both splashes
-// In the flat assets a thin transparent gap separates overlapping leaves,
-// standing in for the glass edges.
-// Usage: swift render-flat.swift "$PWD" SPLASH_DIR (build-icons.py runs it).
+// A thin transparent gap separates overlapping leaves, standing in for the
+// glass edges.
+// Usage: swift render-flat.swift "$PWD" (build-icons.py runs it).
 import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 
 let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
-let splashSources = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
 let bundle = root.appendingPathComponent("vera.icon")
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 let document = try! JSONSerialization.jsonObject(
@@ -135,58 +132,3 @@ drawBackground(icon, 1024)
 icon.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: CGColor(colorSpace: space, components: [0, 0.2, 0.05, 0.25])!)
 icon.draw(leaves(size: 1024, width: iconWidth, appearance: .light), in: full)
 write(icon, "../images/icon.png")
-
-// Splash: the glass leaves alone, rendered on black and on white,
-// which ictool draws as near-black kb and near-white kw (sampled from a
-// corner). A pixel of color c and coverage a shows as B = c*a + kb*(1 - a)
-// and W = c*a + kw*(1 - a), so a = 1 - (W - B) / (kw - kb) and the
-// premultiplied color is B - kb*(1 - a). The crop keeps the leaves and their
-// shadows and drops the icon's rim; a radial fade past the leaf tips clears
-// the faint glass haze that would otherwise end in a visible square.
-/// RGBA bytes, rows `size * 4` bytes apart.
-func pixels(_ name: String, _ size: Int) -> [UInt8] {
-  let url = splashSources.appendingPathComponent(name)
-  let image = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(url as CFURL, nil)!, 0, nil)!
-  let ctx = context(size)
-  ctx.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
-  let data = ctx.data!.assumingMemoryBound(to: UInt8.self)
-  return (0..<size).flatMap { y in UnsafeBufferPointer(start: data + y * ctx.bytesPerRow, count: size * 4) }
-}
-let side = Int(max(box.width, box.height)) + 96
-let origin = (1024 - side) / 2
-// The farthest leaf tip from the center, and where the fade ends.
-var tip = 0.0
-for path in layers.flatMap(\.paths) {
-  let b = path.boundingBoxOfPath
-  for (x, y) in [(b.minX, b.minY), (b.maxX, b.minY), (b.minX, b.maxY), (b.maxX, b.maxY)] {
-    tip = max(tip, Double(hypot(x - 512, y - 512)))
-  }
-}
-let inner = tip * 0.92
-let outer = Double(side) / 2 - 2
-do {
-  let black = pixels("splash-black.png", 1024), white = pixels("splash-white.png", 1024)
-  let corner = (origin * 1024 + origin) * 4
-  let kb = (0..<3).map { Double(black[corner + $0]) }, kw = (0..<3).map { Double(white[corner + $0]) }
-  let splash = context(side)
-  let out = splash.data!.assumingMemoryBound(to: UInt8.self)
-  for y in 0..<side {
-    for x in 0..<side {
-      let i = ((origin + y) * 1024 + origin + x) * 4, o = y * splash.bytesPerRow + x * 4
-      let cover = (0..<3).map { 1 - (Double(white[i + $0]) - Double(black[i + $0])) / (kw[$0] - kb[$0]) }
-      let radius = hypot(Double(x - side / 2), Double(y - side / 2))
-      let fade: Double = max(0, min(1, (outer - radius) / (outer - inner)))
-      let smooth: Double = fade * fade * (3 - 2 * fade)
-      let raw: Double = max(0, min(1, cover.reduce(0, +) / 3))
-      var alpha: Double = raw * smooth
-      if alpha < 0.01 { alpha = 0 }
-      for c in 0..<3 {
-        // The color as covered before the fade, scaled down with it.
-        let color = raw > 0 ? (Double(black[i + c]) - kb[c] * (1 - raw)) / raw : 0
-        out[o + c] = UInt8(max(0, min(alpha * 255, (color * alpha).rounded())))
-      }
-      out[o + 3] = UInt8((alpha * 255).rounded())
-    }
-  }
-  write(splash, "../images/splash-icon.png")
-}
