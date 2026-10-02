@@ -1,0 +1,98 @@
+import { Pressable, Text, View } from "react-native";
+import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
+import { GlassView } from "expo-glass-effect";
+import { withUniwind } from "uniwind";
+
+import type { ReactionSummary } from "~/features/messaging/reactions";
+import { SymbolIcon } from "~/components/symbol-icon";
+import { cn } from "~/lib/cn";
+
+const StyledGlassView = withUniwind(GlassView);
+
+/** Reactions pop in when they arrive and shrink away when taken back. */
+export const POP_IN = ZoomIn.springify().damping(13).stiffness(260);
+export const POP_OUT = ZoomOut.duration(140);
+
+function Chip({
+  reaction,
+  onPress,
+}: {
+  reaction: ReactionSummary;
+  onPress: () => void;
+}) {
+  return (
+    <Animated.View entering={POP_IN} exiting={POP_OUT}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${reaction.emoji} ${reaction.count}`}
+        accessibilityState={{ selected: reaction.mine }}
+        onPress={onPress}
+      >
+        <StyledGlassView
+          isInteractive
+          tintColorClassName={reaction.mine ? "accent-accent/25" : undefined}
+          className="h-[26px] flex-row items-center gap-1 rounded-full px-2"
+        >
+          <Text style={{ fontSize: 13 }}>{reaction.emoji}</Text>
+          <Text
+            className={cn(
+              "text-footnote font-semibold",
+              reaction.mine ? "text-accent" : "text-muted",
+            )}
+          >
+            {reaction.count}
+          </Text>
+        </StyledGlassView>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/**
+ * Slack's row, made quieter: small glass chips under the message, yours
+ * tinted. Tap one to add or take back that reaction, or + for another.
+ */
+export function ChipRow({
+  reactions,
+  align,
+  onToggle,
+  onAdd,
+}: {
+  reactions: readonly ReactionSummary[];
+  align: "end" | "start";
+  onToggle: (emoji: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <View
+      className={cn(
+        "flex-row flex-wrap gap-1 pt-1",
+        align === "end" ? "justify-end" : "justify-start",
+      )}
+    >
+      {reactions.map((reaction) => (
+        <Chip
+          key={reaction.emoji}
+          reaction={reaction}
+          onPress={() => onToggle(reaction.emoji)}
+        />
+      ))}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add reaction"
+        onPress={onAdd}
+      >
+        <StyledGlassView
+          isInteractive
+          className="h-[26px] items-center justify-center rounded-full px-2"
+        >
+          <SymbolIcon
+            name={{ android: "add_reaction", ios: "face.smiling" }}
+            size={14}
+            tintColorClassName="accent-muted"
+          />
+        </StyledGlassView>
+      </Pressable>
+    </View>
+  );
+}

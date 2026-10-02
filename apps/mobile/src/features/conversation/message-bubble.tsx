@@ -8,7 +8,7 @@ import { cn } from "~/lib/cn";
 import { AttachmentView } from "./attachment-view";
 import { BUBBLE_RADIUS, TailedBubble } from "./bubble-shape";
 import { LinkPreviewCard } from "./link-preview-card";
-import { LongPressMessage, ReactionChips } from "./message-actions";
+import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
 import { RevealedTime, SlideWithReveal } from "./reveal";
 
@@ -133,10 +133,13 @@ function BubbleColumn({
       {name !== undefined && (
         <Text className="text-caption text-muted px-3">{name}</Text>
       )}
-      <LongPressMessage message={message}>
+      <InteractiveMessage
+        message={message}
+        align={isOwn ? "end" : "start"}
+        shape="bubble"
+      >
         <Content message={message} isOwn={isOwn} endsGroup={endsGroup} />
-      </LongPressMessage>
-      <ReactionChips message={message} align={isOwn ? "end" : "start"} />
+      </InteractiveMessage>
       <MessageMeta message={message} delivered={delivered} />
     </View>
   );

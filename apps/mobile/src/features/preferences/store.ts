@@ -9,17 +9,25 @@ const STORAGE_KEY = "vera.preferences";
 
 export type Appearance = "dark" | "light" | "system";
 export type MessageLayout = "bubbles" | "stacked";
+/** Temporary: how a long press on a message opens its actions. */
+export type PressExperiment = "glass" | "menu";
+/** Temporary: how reactions show on a message. */
+export type ReactionsExperiment = "badge" | "chips" | "pill";
 
 export interface Preferences {
   readonly appearance: Appearance;
   readonly messageLayout: MessageLayout;
   readonly theme: ThemeId;
+  readonly pressExperiment: PressExperiment;
+  readonly reactionsExperiment: ReactionsExperiment;
 }
 
 const DEFAULTS = {
   appearance: "system",
   messageLayout: "bubbles",
   theme: "blue",
+  pressExperiment: "menu",
+  reactionsExperiment: "badge",
 } satisfies Preferences;
 
 function pick<Value extends string>(
@@ -48,6 +56,16 @@ function fromStored(stored: unknown) {
       DEFAULTS.messageLayout,
     ),
     theme: themeOr(Reflect.get(stored, "theme"), DEFAULTS.theme),
+    pressExperiment: pick(
+      Reflect.get(stored, "pressExperiment"),
+      ["menu", "glass"],
+      DEFAULTS.pressExperiment,
+    ),
+    reactionsExperiment: pick(
+      Reflect.get(stored, "reactionsExperiment"),
+      ["badge", "pill", "chips"],
+      DEFAULTS.reactionsExperiment,
+    ),
   } satisfies Preferences;
 }
 
