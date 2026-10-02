@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { SearchResult } from "~/features/search/use-search";
+import { ScreenList } from "~/components/screen-list";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { useSearchResults } from "~/features/search/use-search";
 
@@ -81,12 +82,9 @@ export default function SearchScreen() {
         autoCapitalize="none"
         onChangeText={(event) => setQuery(event.nativeEvent.text)}
       />
-      <FlatList
+      <ScreenList
         data={results}
         keyExtractor={(result) => result.id}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardDismissMode="on-drag"
-        className="bg-background"
         ListEmptyComponent={
           query.trim().length > 0 ? (
             <Text className="text-body text-muted pt-16 text-center">

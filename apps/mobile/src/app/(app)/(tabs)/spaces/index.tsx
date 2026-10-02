@@ -1,13 +1,8 @@
-import {
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import Add from "@expo/material-symbols/add.xml";
 
+import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { useSpaces } from "~/features/messaging/spaces";
 import { SpaceRow } from "~/features/spaces/space-row";
@@ -38,11 +33,9 @@ export default function SpacesScreen() {
           onPress={() => router.push("/new-space")}
         />
       </Stack.Toolbar>
-      <FlatList
+      <ScreenList
         data={spaces}
         keyExtractor={(space) => space.spaceId}
-        contentInsetAdjustmentBehavior="automatic"
-        className="bg-background"
         ListEmptyComponent={
           isLoading ? <ActivityIndicator className="pt-24" /> : <EmptySpaces />
         }
