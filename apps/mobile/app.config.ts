@@ -1,16 +1,5 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-/** Themes with an alternate app icon; blue is the primary icon. */
-const ALTERNATE_ICON_THEMES = [
-  "green",
-  "indigo",
-  "teal",
-  "orange",
-  "pink",
-  "purple",
-  "graphite",
-];
-
 const NOTIFICATION_SERVICE_BUNDLE_ID = "chat.vera.app.NotificationService";
 
 /**
@@ -33,7 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   platforms: ["ios", "android"],
   ios: {
     // Liquid Glass icon from Icon Composer; see assets/icons/README.md.
-    icon: "./assets/icons/vera-blue.icon",
+    icon: "./assets/icons/vera.icon",
     bundleIdentifier: "chat.vera.app",
     supportsTablet: true,
     // Passkeys use the permanent relying party ID `vera.chat`.
@@ -45,21 +34,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     adaptiveIcon: {
       backgroundImage: "./assets/icons/vera-android-background.png",
       foregroundImage: "./assets/icons/vera-android-foreground.png",
-      monochromeImage: "./assets/icons/vera-android-foreground.png",
+      monochromeImage: "./assets/icons/vera-android-monochrome.png",
     },
     predictiveBackGestureEnabled: true,
   },
   plugins: [
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
-    [
-      "./plugins/with-alternate-icons.cjs",
-      {
-        icons: ALTERNATE_ICON_THEMES.map(
-          (theme) => `./assets/icons/vera-${theme}.icon`,
-        ),
-      },
-    ],
     "expo-router",
     [
       "expo-image-picker",
@@ -75,10 +56,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 96,
+        // Green leaves on white; the pale (light icon) leaves on black.
+        image: "./assets/images/splash-icon-light.png",
+        imageWidth: 120,
         backgroundColor: "#FFFFFF",
-        dark: { backgroundColor: "#000000" },
+        dark: {
+          image: "./assets/images/splash-icon-dark.png",
+          backgroundColor: "#000000",
+        },
       },
     ],
     [
