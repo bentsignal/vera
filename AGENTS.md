@@ -16,6 +16,15 @@ Record decisions, plans, and durable context as Markdown in this repository
 (`docs/`, package READMEs, or `.plans/`). Do not use external memory or task
 CLIs (such as UAV) or Claude Code auto memory for this project.
 
+## Computer use
+
+For anything that needs a browser, dashboard, or GUI (for example the Convex,
+Vercel, or bunny.net dashboards), use the Codex CLI with the GPT 6.1 Sol model,
+headless where possible, instead of driving the screen yourself:
+`codex exec -m gpt-6.1-sol "<task>"`. Prefer each
+service's CLI or API first. Never open repeated browser tabs or login pages in
+the background; tell Shawn before anything opens on his machine.
+
 ## Git workflow
 
 The agent owns git for this repository:
