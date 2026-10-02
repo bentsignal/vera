@@ -42,6 +42,7 @@ export const targets = internalQuery({
     return {
       body: previewText(message),
       conversationId: conversation.conversationId,
+      messageId: message.messageId,
       kind: conversation.kind,
       title: await title(ctx, conversation, message),
       tokens,
@@ -70,6 +71,7 @@ export const send = internalAction({
             data: {
               conversationId: target.conversationId,
               kind: target.kind,
+              messageId: target.messageId,
             },
             sound: "default",
             threadId: target.conversationId,

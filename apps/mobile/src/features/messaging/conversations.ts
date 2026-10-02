@@ -6,13 +6,14 @@ import type {
 import { useEffect, useRef, useState } from "react";
 import * as Crypto from "expo-crypto";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useAccount } from "./account";
+import { useMessageWindow } from "./message-window";
 import { useDisplayNames, useProfiles } from "./profiles";
 import { pdsResult } from "./results";
 
@@ -146,61 +147,39 @@ function usePendingMessages(conversationId: string) {
 }
 
 /**
- * Live messages, newest first, with older pages loaded on demand and sends
- * shown immediately until the server confirms them.
+ * Messages oldest first, opened at the latest message or around `anchor`,
+ * with this device's unconfirmed sends at the end.
  */
-export function useMessages(conversationId: string) {
+export function useMessages(conversationId: string, anchor?: string) {
   const { address } = useAccount();
-  const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
+  const view = useMessageWindow(conversationId, anchor);
   const { pending, sendMessage } = usePendingMessages(conversationId);
-  const pages = useQueries({
-    queries: cursors.map((before) =>
-      pdsQuery({
-        args:
-          before === undefined
-            ? { conversationId }
-            : { before, conversationId },
-        options: { select: pdsResult },
-        query: pds.messages.list,
-      }),
-    ),
-  });
-
-  const confirmed = new Map(
-    pages
-      .flatMap((page) => page.data ?? [])
-      .flatMap((source) => source.messages)
-      .map((message) => [message.messageId, message] as const),
-  );
-  const hasMore = pages.at(-1)?.data?.some((source) => source.hasMore) ?? false;
-  const sorted = [...confirmed.values()].sort((a, b) => b.sentAt - a.sentAt);
-  const unconfirmed = pending
-    .filter((message) => !confirmed.has(message.messageId))
-    .map((message) => ({
-      ...toMessage({
-        ...message,
-        authorId: address,
-        authorName: "",
-        conversationId,
-        linkPreview: null,
-      }),
-      status: message.failed ? ("failed" as const) : ("sending" as const),
-    }));
-
-  function loadOlder() {
-    const oldest = sorted.at(-1);
-    if (!hasMore || oldest === undefined || cursors.includes(oldest.sentAt)) {
-      return;
-    }
-    setCursors((current) => [...current, oldest.sentAt]);
-  }
+  const confirmed = new Set(view.messages.map((message) => message.messageId));
+  const atLatest = !view.hasNewer;
+  const unconfirmed = atLatest
+    ? pending
+        .filter((message) => !confirmed.has(message.messageId))
+        .map((message) => ({
+          ...toMessage({
+            ...message,
+            authorId: address,
+            authorName: "",
+            conversationId,
+            linkPreview: null,
+          }),
+          status: message.failed ? ("failed" as const) : ("sending" as const),
+        }))
+    : [];
 
   return {
-    isLoading: pages[0]?.data === undefined,
-    loadOlder,
-    messages: [...unconfirmed, ...sorted.map(toMessage)],
-    newestSentAt: sorted[0]?.sentAt,
-    sendMessage,
+    ...view,
+    messages: [...view.messages.map(toMessage), ...unconfirmed],
+    /** Only set when the newest loaded message is the newest there is. */
+    newestSentAt: atLatest ? view.messages.at(-1)?.sentAt : undefined,
+    sendMessage: (body: string, attachments: Attachment[] = []) => {
+      if (!atLatest) view.jumpToLatest();
+      sendMessage(body, attachments);
+    },
   };
 }
 

@@ -15,7 +15,12 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="conversation/[conversationId]" />
+      <Stack.Screen
+        name="conversation/[conversationId]"
+        // Messages scroll under a transparent header, which iOS fades with
+        // its scroll edge effect. The title comes from the opening screen.
+        options={{ headerTransparent: true, title: "" }}
+      />
       <Stack.Screen
         name="media"
         options={{

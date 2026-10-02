@@ -1,6 +1,7 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import type { MessagePage } from "./paging.ts";
 import type { Attachment, messagesProtocol } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
 import {
@@ -18,7 +19,7 @@ import {
   toMessage,
   upsertMember,
 } from "./model.ts";
-import { MESSAGE_PAGE_SIZE } from "./protocol.ts";
+import { around, newerThan, olderThan } from "./paging.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
 type Queries = (typeof messagesProtocol)["queries"];
@@ -226,7 +227,7 @@ export async function conversation(
   return access === null ? null : toConversation(ctx, access, self);
 }
 
-/** One page of messages, newest first, for inverted message lists. */
+/** One page of messages, oldest first, by whichever cursor was given. */
 export async function list(
   ctx: QueryCtx,
   self: string,
@@ -237,21 +238,29 @@ export async function list(
     args.conversationId,
     self,
   );
-  const { before, conversationId } = args;
-  const page = await ctx.db
-    .query("messages")
-    .withIndex("by_conversation_sent", (index) =>
-      before === undefined
-        ? index.eq("conversationId", conversationId)
-        : index.eq("conversationId", conversationId).lt("sentAt", before),
-    )
-    .order("desc")
-    .take(MESSAGE_PAGE_SIZE + 1);
+  const { after, around: anchor, before, conversationId } = args;
+  let page: MessagePage;
+  if (anchor !== undefined) {
+    const centered = await around(ctx, conversationId, anchor);
+    if (centered === null) fail("MESSAGE_NOT_FOUND");
+    page = centered;
+  } else if (after === undefined) {
+    const older = await olderThan(ctx, conversationId, before);
+    page = {
+      hasNewer: before !== undefined,
+      hasOlder: older.hasMore,
+      messages: older.messages,
+    };
+  } else {
+    const newer = await newerThan(ctx, conversationId, after);
+    page = {
+      hasNewer: newer.hasMore,
+      hasOlder: true,
+      messages: newer.messages,
+    };
+  }
   return {
-    page: {
-      hasMore: page.length > MESSAGE_PAGE_SIZE,
-      messages: page.slice(0, MESSAGE_PAGE_SIZE).map(toMessage),
-    },
+    page: { ...page, messages: page.messages.map(toMessage) },
     routes: await memberAddresses(ctx, found),
   };
 }

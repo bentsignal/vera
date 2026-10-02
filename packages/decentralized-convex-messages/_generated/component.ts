@@ -180,7 +180,12 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             | { args: {}; type: "inbox" }
             | { args: { conversationId: string }; type: "conversation" }
             | {
-                args: { before?: number; conversationId: string };
+                args: {
+                  after?: number;
+                  around?: string;
+                  before?: number;
+                  conversationId: string;
+                };
                 type: "list";
               }
             | { args: {}; type: "spaces" }
@@ -271,7 +276,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             routes?: Array<string>;
             type: "list";
             value: {
-              hasMore: boolean;
+              hasNewer: boolean;
+              hasOlder: boolean;
               messages: Array<{
                 attachments: Array<{
                   durationMs?: number;

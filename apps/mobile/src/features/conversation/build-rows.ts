@@ -25,29 +25,22 @@ function continues(previous: Message | undefined, next: Message | undefined) {
   );
 }
 
-/**
- * Interleaves day separators with messages and returns the rows newest
- * first, ready for an inverted list.
- */
-export function buildMessageRows(messages: Message[]) {
-  const sorted = [...messages].sort(
-    (a, b) => a.sentAt.getTime() - b.sentAt.getTime(),
-  );
-  const rows = sorted.flatMap((message, index): MessageRow[] => {
-    const previous = sorted[index - 1];
-    const next = sorted[index + 1];
+/** Interleaves day separators with messages, oldest first. */
+export function buildMessageRows(messages: readonly Message[]) {
+  return messages.flatMap((message, index): MessageRow[] => {
+    const previous = messages[index - 1];
+    const next = messages[index + 1];
     const row = {
-      type: "message",
+      endsGroup: !continues(message, next),
       key: message.id,
       message,
       startsGroup: !continues(previous, message),
-      endsGroup: !continues(message, next),
+      type: "message",
     } as const;
     if (previous && isSameDay(previous.sentAt, message.sentAt)) return [row];
     return [
-      { type: "day", key: `day-${message.id}`, date: message.sentAt },
+      { date: message.sentAt, key: `day-${message.id}`, type: "day" },
       row,
     ];
   });
-  return rows.reverse();
 }

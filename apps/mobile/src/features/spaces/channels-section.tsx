@@ -22,7 +22,10 @@ export function ChannelsSection({ space }: { space: Space }) {
           trailing={<UnreadBadge count={channel.unreadCount} />}
           onPress={() =>
             router.push({
-              params: { conversationId: channel.conversationId },
+              params: {
+                conversationId: channel.conversationId,
+                title: `#${channel.name}`,
+              },
               pathname: "/conversation/[conversationId]",
             })
           }

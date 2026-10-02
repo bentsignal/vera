@@ -12,11 +12,14 @@ import { destructive } from "~/lib/ui-modifiers";
 export default function SpaceScreen() {
   const router = useRouter();
   const { address } = useAccount();
-  const { spaceId } = useLocalSearchParams<{ spaceId: string }>();
+  const { name, spaceId } = useLocalSearchParams<{
+    name?: string;
+    spaceId: string;
+  }>();
   const { isLoading, space } = useSpace(spaceId);
   const { removeMember } = useSpaceActions();
 
-  if (isLoading) return null;
+  if (isLoading) return <Stack.Title>{name ?? ""}</Stack.Title>;
   if (space === undefined) return <Stack.Title>Space Not Found</Stack.Title>;
 
   function leave(name: string) {

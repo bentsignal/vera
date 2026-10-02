@@ -89,8 +89,10 @@ export const space = v.object({
 
 export type Space = Infer<typeof space>;
 
+/** Oldest first. `hasOlder`/`hasNewer` say whether more exist beyond it. */
 export const messagePage = v.object({
-  hasMore: v.boolean(),
+  hasNewer: v.boolean(),
+  hasOlder: v.boolean(),
   messages: v.array(message),
 });
 
@@ -186,7 +188,11 @@ export const messagesProtocol = definePluginProtocol({
       returns: v.union(v.null(), conversation),
     }),
     list: defineOperation({
+      // At most one cursor: older than `before`, newer than `after`, centered
+      // on the `around` message ID, or the latest page when none is given.
       args: v.object({
+        after: v.optional(v.number()),
+        around: v.optional(v.string()),
         before: v.optional(v.number()),
         conversationId: v.string(),
       }),
