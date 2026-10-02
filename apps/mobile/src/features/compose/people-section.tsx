@@ -21,7 +21,9 @@ export function PeopleSection({
       {addresses.map((address) => (
         <ListItem
           key={address}
-          leading={<Avatar name={displayName(address)} size="sm" />}
+          leading={
+            <Avatar name={displayName(address)} seed={address} size="sm" />
+          }
           supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
           onPress={() => onPress(address)}
         >

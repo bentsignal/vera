@@ -16,7 +16,13 @@ export function MembersSection({ space }: { space: Space }) {
       {space.members.map((member) => (
         <ListItem
           key={member.accountId}
-          leading={<Avatar name={displayName(member.accountId)} size="sm" />}
+          leading={
+            <Avatar
+              name={displayName(member.accountId)}
+              seed={member.accountId}
+              size="sm"
+            />
+          }
           supportingText={
             <Text textStyle={secondaryTextStyle}>
               {member.role === "owner"

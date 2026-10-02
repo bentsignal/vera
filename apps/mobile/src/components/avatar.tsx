@@ -1,7 +1,10 @@
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
+import { withUniwind } from "uniwind";
 
 import { cn } from "~/lib/cn";
+
+const StyledImage = withUniwind(Image);
 
 const BACKGROUNDS = [
   "bg-indigo-500",
@@ -36,10 +39,13 @@ function backgroundFor(seed: string) {
 
 export function Avatar({
   name,
+  seed = name,
   size = "md",
   uri,
 }: {
   name: string;
+  /** Picks the background color; pass the address so it stays stable. */
+  seed?: string;
   size?: keyof typeof SIZES;
   /** Profile photo; initials show while it loads or when absent. */
   uri?: string | null;
@@ -47,7 +53,7 @@ export function Avatar({
   const { box, text } = SIZES[size];
   if (uri) {
     return (
-      <Image
+      <StyledImage
         accessibilityLabel={name}
         source={{ uri }}
         contentFit="cover"
@@ -61,7 +67,7 @@ export function Avatar({
       className={cn(
         "items-center justify-center rounded-full",
         box,
-        backgroundFor(name),
+        backgroundFor(seed),
       )}
     >
       <Text className={cn("font-semibold text-white", text)}>

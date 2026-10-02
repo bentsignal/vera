@@ -13,7 +13,7 @@ import { pds } from "@vera/backend/pds";
 import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useAccount } from "./account";
-import { useDisplayNames } from "./profiles";
+import { useDisplayNames, useProfiles } from "./profiles";
 import { pdsResult } from "./results";
 
 export function toMessage(message: PdsMessage) {
@@ -57,25 +57,35 @@ export function useInbox() {
       query: pds.messages.inbox,
     }),
   );
-  const displayName = useDisplayNames(
+  const profileOf = useProfiles(
     conversations?.flatMap((conversation) => conversation.members) ?? [],
   );
-  const summaries = conversations?.map(
-    (conversation) =>
-      ({
-        id: conversation.conversationId,
-        kind: conversation.kind,
-        lastActivityAt: new Date(conversation.updatedAt),
-        lastMessage: preview(
-          conversation.lastMessage,
-          address,
-          displayName(conversation.lastMessage?.authorId ?? ""),
-        ),
-        memberIds: conversation.members,
-        title: conversationTitle(conversation, address, displayName),
-        unreadCount: conversation.unreadCount,
-      }) satisfies ConversationSummary,
-  );
+  function displayName(account: string) {
+    return profileOf(account).displayName;
+  }
+  const summaries = conversations?.map((conversation) => {
+    const other =
+      conversation.kind === "direct"
+        ? conversation.members.find((member) => member !== address)
+        : undefined;
+    return {
+      id: conversation.conversationId,
+      kind: conversation.kind,
+      avatarSeed: other ?? conversation.conversationId,
+      avatarUrl: other === undefined ? null : profileOf(other).avatarUrl,
+      lastActivityAt: new Date(
+        conversation.lastMessage?.sentAt ?? conversation.updatedAt,
+      ),
+      lastMessage: preview(
+        conversation.lastMessage,
+        address,
+        displayName(conversation.lastMessage?.authorId ?? ""),
+      ),
+      memberIds: conversation.members,
+      title: conversationTitle(conversation, address, displayName),
+      unreadCount: conversation.unreadCount,
+    } satisfies ConversationSummary;
+  });
   return { conversations: summaries, isLoading: summaries === undefined };
 }
 
