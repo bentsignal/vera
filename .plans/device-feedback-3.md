@@ -15,17 +15,17 @@ Shawn tested the round 2 build on his phone. Check items off as PRs merge.
 
 ## Conversations
 
-- [ ] A temporary dev tool that opens a long thread in the middle, to test
+- [x] A temporary dev tool that opens a long thread in the middle, to test
       paging both ways from an old notification.
-- [ ] Bubble tails sit under the bottom corner like iMessage and flow into
+- [x] Bubble tails sit under the bottom corner like iMessage and flow into
       the bubble; corners slightly less pointy.
 - [ ] iMessage-style header: no big bar. Floating back button, the other
       person's photo and name in a glass capsule centered under the Dynamic
       Island, and an info button on the right.
 - [ ] Info for a conversation, and a basic profile page for a person
       (reachable from search too).
-- [ ] Sending is smooth: the new message animates in, nothing jumps.
-- [ ] Drag-to-reveal times stops at the time's width and settles back with
+- [x] Sending is smooth: the new message animates in, nothing jumps.
+- [x] Drag-to-reveal times stops at the time's width and settles back with
       only a little spring.
 - [ ] Reactions feel native: glassy picker, better animation, nicer counts.
       Several options switchable in Settings for Shawn to compare.

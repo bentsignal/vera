@@ -15,7 +15,13 @@ import {
   requireCaller,
   requireDevTools,
 } from "./devBots";
-import { seedDirects, seedGroup, seedProfiles, seedSpace } from "./devSeed";
+import {
+  longThreadAnchor,
+  seedDirects,
+  seedGroup,
+  seedProfiles,
+  seedSpace,
+} from "./devSeed";
 
 // Development only. Bots are ordinary accounts on the dev deployment that
 // post through the Messages plugin as themselves, so screens show other
@@ -37,6 +43,21 @@ export const seed = action({
     await seedDirects(ctx, me, bots, authors);
     await seedGroup(ctx, me, authors);
     return { spaceId: await seedSpace(ctx, me, bots, authors) };
+  },
+});
+
+/**
+ * For testing old notifications: a long DM and a message about 200 back,
+ * which the app opens at so paging both ways can be tried.
+ */
+export const longThreadMiddle = action({
+  args: {},
+  handler: async (ctx) => {
+    const caller = await requireCaller(ctx);
+    return longThreadAnchor(ctx, caller, {
+      address: caller.accountId,
+      name: caller.name,
+    });
   },
 });
 
