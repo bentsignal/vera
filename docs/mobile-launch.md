@@ -64,12 +64,11 @@ friends, and later asks the agent to deactivate it. The repo skill
   invalidates every passkey. iOS and Android require
   `https://vera.chat/.well-known/apple-app-site-association` and
   `https://vera.chat/.well-known/assetlinks.json`. The production Convex
-  deployment serves both from HTTP routes, with `vera.chat` attached as a Convex
-  custom domain (BSX is on Convex Professional). If Convex cannot take the apex
-  domain, a Cloudflare Worker serves the two files and proxies everything else
-  to Convex.
-- Web hosting, when needed, goes on Cloudflare, not Vercel. Vercel only hosts
-  DNS. When the web app ships, `/.well-known/*` on `vera.chat` must still reach
+  deployment serves both from HTTP routes. Convex custom domains verify with a
+  CNAME, which a bare domain cannot have, so a file-less Vercel project
+  (`infra/vera-chat-domain`) owns `vera.chat`, forwards `/.well-known/*` to
+  Convex, and redirects `/` to `www.vera.chat`.
+- Web hosting, when needed, can go on Vercel or Cloudflare. When the web app ships, `/.well-known/*` on `vera.chat` must still reach
   the files above.
 - CLIs are signed in: `vercel` (bentsignal), `eas` (directedbyshawn), `convex`
   (BSX), `wrangler` (Cloudflare). If a CLI lacks a feature, use the dashboard
@@ -77,15 +76,15 @@ friends, and later asks the agent to deactivate it. The repo skill
 
 ## Current setup (2026-10-01)
 
-| Thing                        | Value                                                                                 |
-| ---------------------------- | ------------------------------------------------------------------------------------- |
-| Convex production            | `disciplined-hyena-211`, account domain `vera.chat`                                   |
-| Convex development           | `perceptive-magpie-29`, account domain `dev.vera.chat`                                |
-| Custom domain                | `vera.chat` → production HTTP actions (`ALIAS convex.domains`, `_convex_domains` TXT) |
-| Discovery records            | `_pds.vera.chat`, `_pds.dev.vera.chat` (Vercel DNS)                                   |
-| Apple team                   | `39K6A9FP99` (bundle `chat.vera.app`)                                                 |
-| EAS project                  | `@directedbyshawn/vera`, `5680db13-57a8-4b74-ae41-1f52abbda0b1`                       |
-| Android dev keystore SHA-256 | `E6:A1:C5:45:…:44:5F` (in `PASSKEY_ANDROID_CERT_SHA256`)                              |
+| Thing                        | Value                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| Convex production            | `disciplined-hyena-211`, account domain `vera.chat`                                           |
+| Convex development           | `perceptive-magpie-29`, account domain `dev.vera.chat`                                        |
+| Bare domain                  | `vera.chat` → Vercel project `vera-chat-domain`, which proxies `/.well-known/*` to production |
+| Discovery records            | `_pds.vera.chat`, `_pds.dev.vera.chat` (Vercel DNS)                                           |
+| Apple team                   | `39K6A9FP99` (bundle `chat.vera.app`)                                                         |
+| EAS project                  | `@directedbyshawn/vera`, `5680db13-57a8-4b74-ae41-1f52abbda0b1`                               |
+| Android dev keystore SHA-256 | `E6:A1:C5:45:…:44:5F` (in `PASSKEY_ANDROID_CERT_SHA256`)                                      |
 
 Store builds signed by Google Play App Signing need that key's fingerprint
 added to `PASSKEY_ANDROID_CERT_SHA256` and `PASSKEY_ORIGINS` too.
