@@ -4,6 +4,7 @@ import {
   controlSize,
   foregroundStyle,
   frame,
+  scrollDismissesKeyboard,
 } from "@expo/ui/swift-ui/modifiers";
 
 export const fillWidth = [frame({ maxWidth: Infinity })];
@@ -26,3 +27,7 @@ export const circleProminentButton = [
 /** Borderless buttons take the accent tint, like iOS text buttons. */
 export const linkButton = [buttonStyle("borderless")];
 export const destructive = [buttonStyle("borderless"), foregroundStyle("red")];
+/** Dragging a form down pulls the keyboard away with it. */
+export const dismissKeyboardOnScroll = [
+  scrollDismissesKeyboard("interactively"),
+];

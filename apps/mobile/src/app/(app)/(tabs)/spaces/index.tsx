@@ -8,6 +8,7 @@ import {
 import { Stack, useRouter } from "expo-router";
 import Add from "@expo/material-symbols/add.xml";
 
+import { TabTitle } from "~/components/tab-title";
 import { useSpaces } from "~/features/messaging/spaces";
 import { SpaceRow } from "~/features/spaces/space-row";
 
@@ -29,7 +30,7 @@ export default function SpacesScreen() {
   const { isLoading, spaces } = useSpaces();
   return (
     <>
-      <Stack.Title>Spaces</Stack.Title>
+      <TabTitle title="Spaces" />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon={Platform.OS === "ios" ? "plus" : Add}

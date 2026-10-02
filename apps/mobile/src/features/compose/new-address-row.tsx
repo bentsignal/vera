@@ -4,7 +4,7 @@ import { Avatar } from "~/components/avatar";
 import { useAccountExists } from "~/features/messaging/directory";
 import { secondaryTextStyle } from "~/lib/colors";
 
-/** The address being typed, once it is complete enough to look up. */
+/** The account for the typed address, or "No users found". */
 export function NewAddressRow({
   address,
   displayName,
@@ -15,18 +15,24 @@ export function NewAddressRow({
   onAdd: (address: string) => void;
 }) {
   const exists = useAccountExists(address);
+  if (exists === undefined) return null;
+  if (!exists) {
+    return (
+      <FieldGroup.Section>
+        <Text textStyle={secondaryTextStyle}>No users found</Text>
+      </FieldGroup.Section>
+    );
+  }
   return (
     <FieldGroup.Section>
       <ListItem
-        leading={<Avatar name={address} seed={address} size="sm" />}
-        supportingText={
-          <Text textStyle={secondaryTextStyle}>
-            {exists === false ? "No Vera account" : address}
-          </Text>
+        leading={
+          <Avatar name={displayName(address)} seed={address} size="sm" />
         }
-        onPress={exists === true ? () => onAdd(address) : undefined}
+        supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
+        onPress={() => onAdd(address)}
       >
-        {exists === true ? displayName(address) : address}
+        {displayName(address)}
       </ListItem>
     </FieldGroup.Section>
   );

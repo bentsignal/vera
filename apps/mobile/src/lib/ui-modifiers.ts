@@ -11,3 +11,4 @@ export const circleButton = [] satisfies ModifierConfig[];
 export const circleProminentButton = [] satisfies ModifierConfig[];
 export const linkButton = [] satisfies ModifierConfig[];
 export const destructive = [] satisfies ModifierConfig[];
+export const dismissKeyboardOnScroll = [] satisfies ModifierConfig[];

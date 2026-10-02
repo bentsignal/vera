@@ -87,6 +87,11 @@ export function useInbox() {
       unreadCount: conversation.unreadCount,
     } satisfies ConversationSummary;
   });
+  // Order by the last message, matching the times shown on each row.
+  summaries?.sort(
+    (left, right) =>
+      right.lastActivityAt.getTime() - left.lastActivityAt.getTime(),
+  );
   return { conversations: summaries, isLoading: summaries === undefined };
 }
 
