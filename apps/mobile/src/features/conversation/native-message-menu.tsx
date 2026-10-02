@@ -6,6 +6,7 @@ import { requireNativeView, requireOptionalNativeModule } from "expo";
 import type { Message } from "./types";
 import { QUICK_REACTIONS } from "~/features/messaging/reactions";
 import { canCopy, copyText } from "~/lib/native-extras";
+import { BUBBLE_RADIUS } from "./bubble-shape";
 
 interface MenuAction {
   readonly id: string;
@@ -67,7 +68,7 @@ export function NativeMessageMenu({
         .filter((reaction) => reaction.mine)
         .map((reaction) => reaction.emoji)}
       actions={actions}
-      previewCornerRadius={shape === "bubble" ? 18 : 14}
+      previewCornerRadius={shape === "bubble" ? BUBBLE_RADIUS : 14}
       previewInset={shape === "bubble" ? 0 : 8}
       previewBackground={shape === "card"}
       enabled={message.status === undefined}

@@ -180,3 +180,77 @@ export async function seedSpace(
   }
   return spaceId;
 }
+
+/** Message IDs and timestamps from a `messages.list` page, oldest first. */
+function pageMessages(page: unknown) {
+  const messages: unknown =
+    typeof page === "object" && page !== null
+      ? Reflect.get(page, "messages")
+      : undefined;
+  if (!Array.isArray(messages)) return [];
+  return messages.flatMap((message: unknown) => {
+    if (typeof message !== "object" || message === null) return [];
+    const messageId: unknown = Reflect.get(message, "messageId");
+    const sentAt: unknown = Reflect.get(message, "sentAt");
+    return typeof messageId === "string" && typeof sentAt === "number"
+      ? [{ messageId, sentAt }]
+      : [];
+  });
+}
+
+/** The message `back` messages before the newest, paging older as needed. */
+async function messageBack(
+  ctx: ActionCtx,
+  caller: Identity,
+  conversationId: string,
+  back: number,
+) {
+  const seen: { messageId: string; sentAt: number }[] = [];
+  let before: number | undefined;
+  while (seen.length <= back) {
+    const page = pageMessages(
+      await queryAs(ctx, caller, {
+        args:
+          before === undefined
+            ? { conversationId }
+            : { before, conversationId },
+        type: "list",
+      }),
+    );
+    if (page.length === 0) return null;
+    seen.unshift(...page);
+    before = page[0]?.sentAt;
+  }
+  return seen.at(-1 - back)?.messageId ?? null;
+}
+
+/**
+ * The long DM with the first bot, and a message about 200 back from its
+ * newest: where an old notification would open. Tops the thread up first if
+ * it is too short.
+ */
+export async function longThreadAnchor(
+  ctx: ActionCtx,
+  caller: Identity,
+  me: Author,
+) {
+  const bot = botIdentity(BOTS[0]);
+  const conversationId = stringField(
+    await asAccount(ctx, bot, {
+      args: { accountId: me.address },
+      type: "openDirect",
+    }),
+    "conversationId",
+  );
+  const found = await messageBack(ctx, caller, conversationId, 200);
+  if (found !== null) return { conversationId, messageId: found };
+  await importHistory(
+    ctx,
+    conversationId,
+    history([me, { address: bot.accountId, name: BOTS[0].name }], 400, 20),
+  );
+  return {
+    conversationId,
+    messageId: await messageBack(ctx, caller, conversationId, 200),
+  };
+}

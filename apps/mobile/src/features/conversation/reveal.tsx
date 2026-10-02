@@ -35,16 +35,12 @@ export function RevealTimes({ children }: { children: ReactNode }) {
     .activeOffsetX(-12)
     .failOffsetY([-12, 12])
     .onUpdate((event) => {
-      const drag = Math.max(0, -event.translationX);
-      // Past the full width, resist like a rubber band.
-      reveal.set(
-        drag <= REVEAL_WIDTH
-          ? drag
-          : REVEAL_WIDTH + (drag - REVEAL_WIDTH) * 0.15,
-      );
+      // Stops once the times are fully in view, like iMessage.
+      reveal.set(Math.min(REVEAL_WIDTH, Math.max(0, -event.translationX)));
     })
     .onFinalize(() => {
-      reveal.set(withSpring(0, { damping: 22, stiffness: 260 }));
+      // Settles back with one small overshoot, not a long wobble.
+      reveal.set(withSpring(0, { damping: 30, stiffness: 320 }));
     });
   return (
     <RevealContext value={reveal}>

@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Text, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 
 import type { Message } from "./types";
 import { Avatar } from "~/components/avatar";
 import { cn } from "~/lib/cn";
 import { AttachmentView } from "./attachment-view";
-import { useIsLifted } from "./lifted";
+import { BUBBLE_RADIUS, TailedBubble } from "./bubble-shape";
 import { LinkPreviewCard } from "./link-preview-card";
 import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
@@ -15,33 +17,6 @@ const AVATAR_COLUMN = 28;
 /** The sender's name above a run, plus the gap under it. */
 const NAME_HEIGHT = 18;
 
-/**
- * The iMessage tail: a bubble-colored corner, then a page-colored curve
- * that carves it into a hook. Drawn on the last bubble of a run.
- */
-function Tail({ isOwn }: { isOwn: boolean }) {
-  return (
-    <>
-      <View
-        className={cn(
-          "absolute bottom-0 h-5 w-5",
-          isOwn
-            ? "bg-bubble-outgoing -right-[7px] rounded-bl-[16px]"
-            : "bg-bubble-incoming -left-[7px] rounded-br-[16px]",
-        )}
-      />
-      <View
-        className={cn(
-          "bg-background absolute bottom-0 h-5 w-[10px]",
-          isOwn
-            ? "-right-[10px] rounded-bl-[10px]"
-            : "-left-[10px] rounded-br-[10px]",
-        )}
-      />
-    </>
-  );
-}
-
 function Body({
   text,
   isOwn,
@@ -51,17 +26,32 @@ function Body({
   isOwn: boolean;
   tail: boolean;
 }) {
-  // The tail's cutout is page-colored, so it would show over the overlay.
-  const lifted = useIsLifted();
+  const [size, setSize] = useState<{ height: number; width: number }>();
+  const outgoing = useCSSVariable("--color-bubble-outgoing");
+  const incoming = useCSSVariable("--color-bubble-incoming");
+  const color = isOwn ? outgoing : incoming;
+  // With a tail the whole bubble is drawn as one shape, once it is sized.
+  const shaped = tail && size !== undefined && typeof color === "string";
   return (
     <View
+      onLayout={(event) => {
+        const { height, width } = event.nativeEvent.layout;
+        if (tail) setSize({ height, width });
+      }}
       className={cn(
-        "rounded-[18px] px-3 py-[7px]",
-        isOwn ? "bg-bubble-outgoing" : "bg-bubble-incoming",
+        "px-3 py-[7px]",
+        !shaped && (isOwn ? "bg-bubble-outgoing" : "bg-bubble-incoming"),
       )}
-      style={{ borderCurve: "continuous" }}
+      style={{ borderCurve: "continuous", borderRadius: BUBBLE_RADIUS }}
     >
-      {tail && !lifted && <Tail isOwn={isOwn} />}
+      {shaped && (
+        <TailedBubble
+          width={size.width}
+          height={size.height}
+          color={color}
+          isOwn={isOwn}
+        />
+      )}
       <Text
         className={cn(
           "text-body leading-[22px]",

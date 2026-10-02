@@ -29,7 +29,6 @@ import {
   MENU_WIDTH,
   ReactionBar,
 } from "./glass-menu-parts";
-import { LiftedContext } from "./lifted";
 
 export type TargetAlign = "end" | "start";
 
@@ -196,7 +195,7 @@ function Lifted({
         style,
       ]}
     >
-      <LiftedContext value>{target.preview}</LiftedContext>
+      {target.preview}
     </Animated.View>
   );
 }
