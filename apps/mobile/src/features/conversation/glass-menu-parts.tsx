@@ -1,3 +1,4 @@
+import type { SymbolViewProps } from "expo-symbols";
 import type { SharedValue } from "react-native-reanimated";
 import { Pressable, Text, View } from "react-native";
 import Animated, {
@@ -19,8 +20,10 @@ const BAR_PADDING = 5;
 export const BAR_HEIGHT = EMOJI + BAR_PADDING * 2;
 export const BAR_WIDTH = QUICK_REACTIONS.length * EMOJI + BAR_PADDING * 2;
 const ROW_HEIGHT = 46;
-/** The action menu's size: one row (Copy) inside its padding. */
-export const MENU_HEIGHT = ROW_HEIGHT + 12;
+/** The action menu's height for `rows` actions, inside its padding. */
+export function menuHeight(rows: number) {
+  return rows === 0 ? 0 : rows * ROW_HEIGHT + 12;
+}
 export const MENU_WIDTH = 230;
 
 /** Pops out of the message's corner, then settles. */
@@ -121,16 +124,23 @@ export function ReactionBar({
   );
 }
 
+/** One row in the action menu under a lifted message. */
+export interface MenuAction {
+  readonly label: string;
+  readonly icon: SymbolViewProps["name"];
+  readonly onPress: () => void;
+}
+
 export function ActionMenu({
   progress,
   align,
   position,
-  onCopy,
+  actions,
 }: {
   progress: SharedValue<number>;
   align: TargetAlign;
   position: { left: number; top: number };
-  onCopy: () => void;
+  actions: readonly MenuAction[];
 }) {
   const style = usePopStyle(progress, "bottom", align);
   return (
@@ -139,19 +149,22 @@ export function ActionMenu({
       style={[{ ...position, width: MENU_WIDTH }, style]}
     >
       <StyledGlassView className="overflow-hidden rounded-[24px] py-1.5">
-        <Pressable
-          accessibilityRole="button"
-          onPress={onCopy}
-          className="active:bg-fill mx-1.5 flex-row items-center justify-between rounded-[18px] px-3.5"
-          style={{ height: ROW_HEIGHT }}
-        >
-          <Text className="text-body text-foreground">Copy</Text>
-          <SymbolIcon
-            name={{ android: "content_copy", ios: "doc.on.doc" }}
-            size={17}
-            tintColorClassName="accent-foreground"
-          />
-        </Pressable>
+        {actions.map((action) => (
+          <Pressable
+            key={action.label}
+            accessibilityRole="button"
+            onPress={action.onPress}
+            className="active:bg-fill mx-1.5 flex-row items-center justify-between rounded-[18px] px-3.5"
+            style={{ height: ROW_HEIGHT }}
+          >
+            <Text className="text-body text-foreground">{action.label}</Text>
+            <SymbolIcon
+              name={action.icon}
+              size={17}
+              tintColorClassName="accent-foreground"
+            />
+          </Pressable>
+        ))}
       </StyledGlassView>
     </Animated.View>
   );

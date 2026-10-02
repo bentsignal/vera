@@ -51,6 +51,15 @@ function AppStack() {
         options={{ headerTransparent: Platform.OS === "ios", title: "" }}
       />
       <Stack.Screen
+        name="reactions"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 1],
+          sheetGrabberVisible: true,
+          title: "Reactions",
+        }}
+      />
+      <Stack.Screen
         name="media"
         options={{
           animation: "fade",

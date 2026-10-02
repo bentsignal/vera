@@ -9,13 +9,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import type { MenuTarget, TargetAlign } from "./glass-message-menu";
-import type { PreviewShape } from "./native-message-menu";
+import type {
+  MenuTarget,
+  PreviewShape,
+  TargetAlign,
+} from "./glass-message-menu";
 import type { Message } from "./types";
-import { usePreference } from "~/features/preferences/store";
-import { impact, selectionTick } from "~/lib/native-extras";
+import { impact } from "~/lib/native-extras";
 import { GlassMessageMenu } from "./glass-message-menu";
-import { hasNativeMessageMenu, NativeMessageMenu } from "./native-message-menu";
 
 interface MessageActions {
   readonly open: (target: MenuTarget) => void;
@@ -33,14 +34,16 @@ export function useMessageActions() {
 }
 
 /**
- * Long-press actions for the messages below: the glass reaction overlay
- * (the native menu presents itself) and reaction toggles for the badges.
+ * Long-press actions for the messages below: the glass reaction overlay,
+ * reaction toggles for the chips, and the sheet of who reacted.
  */
 export function MessageActionsProvider({
   onToggleReaction,
+  onViewReactions,
   children,
 }: {
   onToggleReaction: (messageId: string, emoji: string) => void;
+  onViewReactions: (messageId: string) => void;
   children: ReactNode;
 }) {
   const [target, setTarget] = useState<MenuTarget | null>(null);
@@ -53,6 +56,7 @@ export function MessageActionsProvider({
         <GlassMessageMenu
           target={target}
           onReact={(emoji) => onToggleReaction(target.message.id, emoji)}
+          onViewReactions={() => onViewReactions(target.message.id)}
           onClosed={() => setTarget(null)}
         />
       )}
@@ -115,10 +119,7 @@ function GlassLongPress({
   );
 }
 
-/**
- * A message that opens its actions on a long press, as the Experiments
- * setting picks: the system context menu or the glass overlay.
- */
+/** A message that opens the glass reaction overlay on a long press. */
 export function LongPressMessage({
   message,
   align,
@@ -131,22 +132,6 @@ export function LongPressMessage({
   shape: PreviewShape;
   children: ReactNode;
 }) {
-  const press = usePreference("pressExperiment");
-  const { toggleReaction } = useMessageActions();
-  if (press === "menu" && hasNativeMessageMenu) {
-    return (
-      <NativeMessageMenu
-        message={message}
-        shape={shape}
-        onReact={(emoji) => {
-          selectionTick();
-          toggleReaction(message.id, emoji);
-        }}
-      >
-        {children}
-      </NativeMessageMenu>
-    );
-  }
   return (
     <GlassLongPress message={message} align={align} shape={shape}>
       {children}

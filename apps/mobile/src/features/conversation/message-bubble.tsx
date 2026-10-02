@@ -6,7 +6,7 @@ import type { Message } from "./types";
 import { Avatar } from "~/components/avatar";
 import { cn } from "~/lib/cn";
 import { AttachmentView } from "./attachment-view";
-import { BUBBLE_RADIUS, TailedBubble } from "./bubble-shape";
+import { BUBBLE_RADIUS, TAIL_DROP, TailedBubble } from "./bubble-shape";
 import { LinkPreviewCard } from "./link-preview-card";
 import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
@@ -42,7 +42,12 @@ function Body({
         "px-3 py-[7px]",
         !shaped && (isOwn ? "bg-bubble-outgoing" : "bg-bubble-incoming"),
       )}
-      style={{ borderCurve: "continuous", borderRadius: BUBBLE_RADIUS }}
+      style={{
+        borderCurve: "continuous",
+        borderRadius: BUBBLE_RADIUS,
+        // Room for the tail hanging below, so nothing under it overlaps.
+        marginBottom: tail ? TAIL_DROP : 0,
+      }}
     >
       {shaped && (
         <TailedBubble

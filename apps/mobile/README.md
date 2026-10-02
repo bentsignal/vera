@@ -31,6 +31,11 @@ xcodebuild -workspace ios/Vera.xcworkspace -scheme Vera -configuration Debug \
 xcrun simctl install booted ios/build/Build/Products/Debug-iphonesimulator/Vera.app
 ```
 
+On dev builds, sign a simulator in without typing (passkeys can't work
+there) by opening `vera:///dev-sign-in?username=simtest` with
+`xcrun simctl openurl <udid> <url>`; other screens open by deep link the same
+way, such as `vera:///settings`.
+
 Passkeys do not work on these builds: iOS only allows them for apps signed by
 the team listed in `vera.chat`'s Apple app site association. Test sign-in on a
 device with an EAS development build.

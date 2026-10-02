@@ -1,43 +1,14 @@
-import { Text } from "react-native";
 import { Stack } from "expo-router";
-import { useCSSVariable } from "uniwind";
 
 /**
- * A tab's title in the same row as its toolbar buttons, instead of a large
- * title sitting below them. A soft glow in the page color keeps it legible
- * as content scrolls underneath.
+ * A tab's native large title: it starts big at the top left, scrolls with
+ * the content, and hands off to the small centered title in the glass bar
+ * once it scrolls past (the tab stack enables large titles).
  */
-export function TabTitle({
-  title,
-  background = "--color-background",
-}: {
-  title: string;
-  /** The CSS color variable of the page behind the title. */
-  background?: "--color-background" | "--color-background-grouped";
-}) {
-  const glow = useCSSVariable(background);
+export function TabTitle({ title }: { title: string }) {
   return (
-    <>
-      <Stack.Screen
-        // The visible title lives in the toolbar; `title` still names the
-        // screen for back buttons and accessibility.
-        options={{ headerLargeTitleEnabled: false, headerTitle: "", title }}
-      />
-      <Stack.Toolbar placement="left">
-        <Stack.Toolbar.View hidesSharedBackground>
-          <Text
-            accessibilityRole="header"
-            className="text-foreground text-[30px] font-bold"
-            style={{
-              textShadowColor: typeof glow === "string" ? glow : undefined,
-              textShadowOffset: { height: 0, width: 0 },
-              textShadowRadius: 10,
-            }}
-          >
-            {title}
-          </Text>
-        </Stack.Toolbar.View>
-      </Stack.Toolbar>
-    </>
+    <Stack.Screen
+      options={{ headerLargeTitleEnabled: true, headerTitle: title, title }}
+    />
   );
 }
