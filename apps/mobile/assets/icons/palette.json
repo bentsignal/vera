@@ -1,66 +1,66 @@
 {
   "indigo": {
-    "base": "#4f46e5",
-    "light_top": "#766feb",
-    "light_bottom": "#3932a5",
-    "dark_top": "#121121",
-    "dark_bottom": "#0b0b14",
-    "dark_glyph": "#4f46e5"
+    "light_top": "#8c87ff",
+    "light_bottom": "#4a40e6",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#8c87ff",
+    "dark_bubble_bottom": "#4a40e6"
   },
   "blue": {
-    "base": "#007aff",
-    "light_top": "#3897ff",
-    "light_bottom": "#0058b8",
-    "dark_top": "#0a1623",
-    "dark_bottom": "#060e16",
-    "dark_glyph": "#007aff"
+    "light_top": "#5cc0ff",
+    "light_bottom": "#0a74f5",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#5cc0ff",
+    "dark_bubble_bottom": "#0a74f5"
   },
   "teal": {
-    "base": "#0d9488",
-    "light_top": "#42aca2",
-    "light_bottom": "#096b62",
-    "dark_top": "#0b1817",
-    "dark_bottom": "#070f0f",
-    "dark_glyph": "#0d9488"
+    "light_top": "#5ae6d6",
+    "light_bottom": "#0fa596",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#5ae6d6",
+    "dark_bubble_bottom": "#0fa596"
   },
   "green": {
-    "base": "#16a34a",
-    "light_top": "#49b772",
-    "light_bottom": "#107535",
-    "dark_top": "#0c1a11",
-    "dark_bottom": "#08100b",
-    "dark_glyph": "#16a34a"
+    "light_top": "#53f06d",
+    "light_bottom": "#1fd13c",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#53f06d",
+    "dark_bubble_bottom": "#1fd13c"
   },
   "orange": {
-    "base": "#ea580c",
-    "light_top": "#ef7d41",
-    "light_bottom": "#a83f09",
-    "dark_top": "#21120b",
-    "dark_bottom": "#140c07",
-    "dark_glyph": "#ea580c"
+    "light_top": "#ffb340",
+    "light_bottom": "#fa6e0a",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#ffb340",
+    "dark_bubble_bottom": "#fa6e0a"
   },
   "pink": {
-    "base": "#db2777",
-    "light_top": "#e35795",
-    "light_bottom": "#9e1c56",
-    "dark_top": "#200e16",
-    "dark_bottom": "#14090e",
-    "dark_glyph": "#db2777"
+    "light_top": "#ff7fb4",
+    "light_bottom": "#e62e7a",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#ff7fb4",
+    "dark_bubble_bottom": "#e62e7a"
   },
   "purple": {
-    "base": "#7c3aed",
-    "light_top": "#9965f1",
-    "light_bottom": "#592aab",
-    "dark_top": "#160f21",
-    "dark_bottom": "#0e0a15",
-    "dark_glyph": "#7c3aed"
+    "light_top": "#bb88ff",
+    "light_bottom": "#7a3ced",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#bb88ff",
+    "dark_bubble_bottom": "#7a3ced"
   },
   "graphite": {
-    "base": "#3a3a3c",
-    "light_top": "#656567",
-    "light_bottom": "#2a2a2b",
-    "dark_top": "#0f0f10",
-    "dark_bottom": "#0a0a0a",
-    "dark_glyph": "#b6b6bd"
+    "light_top": "#9a9aa0",
+    "light_bottom": "#4a4a4e",
+    "dark_top": "#313131",
+    "dark_bottom": "#141414",
+    "dark_bubble_top": "#e2e2e7",
+    "dark_bubble_bottom": "#a4a4aa"
   }
 }

@@ -82,5 +82,6 @@ Local runs default to `dev.vera.chat`; read the domain through `~/env`.
   react-native-screens or Expo Router ships a working search tab on iOS 27,
   then run `pnpm install` and rebuild.
 - `assets/icons` and `plugins/with-alternate-icons.cjs`: one Liquid Glass
-  Icon Composer icon per color theme. Indigo is the primary icon; the rest
-  are iOS alternate icons chosen in Settings. See `assets/icons/README.md`.
+  Icon Composer icon per color theme, styled after the Messages icon. Green
+  is the primary icon and the default theme; the rest are iOS alternate
+  icons chosen in Settings → Themes. See `assets/icons/README.md`.

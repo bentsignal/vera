@@ -1,9 +1,13 @@
 import {
+  accessibilityAddTraits,
+  accessibilityElement,
+  accessibilityLabel,
   buttonBorderShape,
   buttonStyle,
   controlSize,
   foregroundStyle,
   frame,
+  listRowInsets,
   scrollDismissesKeyboard,
 } from "@expo/ui/swift-ui/modifiers";
 
@@ -31,3 +35,17 @@ export const destructive = [buttonStyle("borderless"), foregroundStyle("red")];
 export const dismissKeyboardOnScroll = [
   scrollDismissesKeyboard("interactively"),
 ];
+/** A form row whose content (such as a carousel) reaches the card edges. */
+export const edgeToEdgeRow = [
+  listRowInsets({ bottom: 10, leading: 0, top: 12, trailing: 0 }),
+];
+/** One choice in a row of custom-drawn options, read as a labeled button. */
+export function choiceButton(label: string, selected: boolean) {
+  return [
+    accessibilityElement("ignore"),
+    accessibilityLabel(label),
+    accessibilityAddTraits(
+      selected ? ["isButton", "isSelected"] : ["isButton"],
+    ),
+  ];
+}

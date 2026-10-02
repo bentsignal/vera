@@ -1,10 +1,10 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-/** Themes with an alternate app icon; indigo is the primary icon. */
+/** Themes with an alternate app icon; green is the primary icon. */
 const ALTERNATE_ICON_THEMES = [
+  "indigo",
   "blue",
   "teal",
-  "green",
   "orange",
   "pink",
   "purple",
@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   platforms: ["ios", "android"],
   ios: {
     // Liquid Glass icon from Icon Composer; see assets/icons/README.md.
-    icon: "./assets/icons/vera-indigo.icon",
+    icon: "./assets/icons/vera-green.icon",
     bundleIdentifier: "chat.vera.app",
     supportsTablet: true,
     // Passkeys use the permanent relying party ID `vera.chat`.
@@ -34,9 +34,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "chat.vera.app",
     adaptiveIcon: {
-      backgroundColor: "#4F46E5",
-      foregroundImage: "./assets/icons/vera-indigo-android-foreground.png",
-      monochromeImage: "./assets/icons/vera-android-monochrome.png",
+      backgroundImage: "./assets/icons/vera-green-android-background.png",
+      foregroundImage: "./assets/icons/vera-android-foreground.png",
+      monochromeImage: "./assets/icons/vera-android-foreground.png",
     },
     predictiveBackGestureEnabled: true,
   },
@@ -60,7 +60,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         photosPermission: "Vera uses your photos to send them in messages.",
       },
     ],
-    ["expo-notifications", { color: "#3B3BD6" }],
+    ["expo-notifications", { color: "#34C759" }],
     "expo-secure-store",
     "expo-video",
     [
