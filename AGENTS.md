@@ -38,6 +38,15 @@ The agent owns git for this repository:
 - Do not leave work uncommitted between sessions. If work must pause, push it to
   its branch and note its state in the PR.
 
+## Phone builds
+
+When Shawn asks for a "development build" (or a build for his iPhone), make
+the standalone `internal` EAS build: Release JavaScript bundled into the app,
+against the dev PDS, no dev server needed. Never build the dev client (the
+`development` profile) unless he asks for a "dev client" by name. See
+[apps/mobile/README.md](apps/mobile/README.md#eas) for the build and upload
+commands.
+
 ## Required validation after changes
 
 At the end of every run, run these in order:
