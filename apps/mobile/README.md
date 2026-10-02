@@ -41,9 +41,9 @@ Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 
 | Profile                 | Use                                  | `EXPO_PUBLIC_VERA_DOMAIN` |
 | ----------------------- | ------------------------------------ | ------------------------- |
-| `development`           | Dev client on Shawn's phone          | `dev.vera.chat`           |
+| `development`           | Dev client, only when asked for one  | `dev.vera.chat`           |
 | `development-simulator` | Dev client for the iOS simulator     | `dev.vera.chat`           |
-| `internal`              | Standalone test build for Shawn      | `dev.vera.chat`           |
+| `internal`              | Shawn's "development build"          | `dev.vera.chat`           |
 | `preview`               | TestFlight and Play internal testing | `vera.chat`               |
 | `production`            | Store builds                         | `vera.chat`               |
 
