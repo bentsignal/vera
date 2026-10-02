@@ -1,0 +1,196 @@
+import type { OperationArgs } from "@decentralized-convex/plugin";
+
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import type { messagesProtocol } from "./protocol.ts";
+import {
+  fail,
+  getConversation,
+  getSpace,
+  getSpaceMember,
+  newId,
+  normalizeAddress,
+  normalizeMembers,
+  normalizeName,
+  requireSpaceRole,
+  toSpace,
+} from "./model.ts";
+
+type Mutations = (typeof messagesProtocol)["mutations"];
+type Args<Operation extends keyof Mutations> = OperationArgs<
+  Mutations[Operation]
+>;
+
+function normalizeChannelName(value: string) {
+  return normalizeName(
+    value.replace(/^#/, "").toLowerCase().replace(/\s+/g, "-"),
+  );
+}
+
+async function requireChannelOwner(
+  ctx: QueryCtx,
+  conversationId: string,
+  self: string,
+) {
+  const channel = await getConversation(ctx, conversationId);
+  if (channel?.kind !== "channel" || channel.spaceId === undefined) {
+    fail("CHANNEL_NOT_FOUND");
+  }
+  await requireSpaceRole(ctx, channel.spaceId, self, "owner");
+  return channel;
+}
+
+/** Creates a space owned by the caller, with a #general channel. */
+export async function createSpace(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"createSpace">,
+) {
+  const spaceId = newId("space", self);
+  await ctx.db.insert("spaces", {
+    createdBy: self,
+    name: normalizeName(args.name),
+    spaceId,
+  });
+  await ctx.db.insert("spaceMembers", {
+    accountId: self,
+    role: "owner",
+    spaceId,
+  });
+  await ctx.db.insert("conversations", {
+    conversationId: newId("channel", self),
+    createdBy: self,
+    kind: "channel",
+    name: "general",
+    position: 0,
+    spaceId,
+    updatedAt: Date.now(),
+  });
+  return { spaceId };
+}
+
+export async function renameSpace(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"renameSpace">,
+) {
+  const { space } = await requireSpaceRole(ctx, args.spaceId, self, "owner");
+  await ctx.db.patch(space._id, { name: normalizeName(args.name) });
+  return null;
+}
+
+/** Any member may invite people into a space. */
+export async function addSpaceMembers(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"addSpaceMembers">,
+) {
+  await requireSpaceRole(ctx, args.spaceId, self, "member");
+  for (const accountId of normalizeMembers(args.members, self)) {
+    if ((await getSpaceMember(ctx, args.spaceId, accountId)) === null) {
+      await ctx.db.insert("spaceMembers", {
+        accountId,
+        role: "member",
+        spaceId: args.spaceId,
+      });
+    }
+  }
+  return null;
+}
+
+/** Anyone may leave; only owners remove others. Owners cannot leave. */
+export async function removeSpaceMember(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"removeSpaceMember">,
+) {
+  const target = normalizeAddress(args.accountId);
+  const { member } = await requireSpaceRole(
+    ctx,
+    args.spaceId,
+    self,
+    target === self ? "member" : "owner",
+  );
+  const removed =
+    target === self ? member : await getSpaceMember(ctx, args.spaceId, target);
+  if (removed === null) return null;
+  if (removed.role === "owner") fail("SPACE_OWNER_CANNOT_LEAVE");
+  await ctx.db.delete(removed._id);
+  return null;
+}
+
+export async function createChannel(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"createChannel">,
+) {
+  await requireSpaceRole(ctx, args.spaceId, self, "owner");
+  const channels = await ctx.db
+    .query("conversations")
+    .withIndex("by_space", (index) => index.eq("spaceId", args.spaceId))
+    .collect();
+  const conversationId = newId("channel", self);
+  await ctx.db.insert("conversations", {
+    conversationId,
+    createdBy: self,
+    kind: "channel",
+    name: normalizeChannelName(args.name),
+    position:
+      Math.max(-1, ...channels.map(({ position }) => position ?? 0)) + 1,
+    spaceId: args.spaceId,
+    updatedAt: Date.now(),
+  });
+  return { conversationId };
+}
+
+export async function renameChannel(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"renameChannel">,
+) {
+  const channel = await requireChannelOwner(ctx, args.conversationId, self);
+  await ctx.db.patch(channel._id, { name: normalizeChannelName(args.name) });
+  return null;
+}
+
+export async function deleteChannel(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"deleteChannel">,
+) {
+  const channel = await requireChannelOwner(ctx, args.conversationId, self);
+  const { conversationId } = channel;
+  const messages = await ctx.db
+    .query("messages")
+    .withIndex("by_conversation_sent", (index) =>
+      index.eq("conversationId", conversationId),
+    )
+    .collect();
+  const members = await ctx.db
+    .query("members")
+    .withIndex("by_conversation_account", (index) =>
+      index.eq("conversationId", conversationId),
+    )
+    .collect();
+  for (const row of [...messages, ...members]) await ctx.db.delete(row._id);
+  await ctx.db.delete(channel._id);
+  return null;
+}
+
+export async function spaces(ctx: QueryCtx, self: string) {
+  const memberships = await ctx.db
+    .query("spaceMembers")
+    .withIndex("by_account", (index) => index.eq("accountId", self))
+    .collect();
+  const result = [];
+  for (const membership of memberships) {
+    const found = await getSpace(ctx, membership.spaceId);
+    const value = found === null ? null : await toSpace(ctx, found, self);
+    if (value !== null) result.push(value);
+  }
+  return result.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export async function space(ctx: QueryCtx, self: string, spaceId: string) {
+  const found = await getSpace(ctx, spaceId);
+  return found === null ? null : toSpace(ctx, found, self);
+}

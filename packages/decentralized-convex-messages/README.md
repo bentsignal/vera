@@ -7,10 +7,15 @@ Messages without a compatible Accounts plugin. Messages receives canonical
 identity from the root PDS router and keeps its hot read/write path inside one
 Component boundary.
 
-Each account stores its own conversation routing record in the Component.
-`messages.list` returns ordinary `Message[]` to application code while carrying
-those routing identities as transport metadata. The core client reads that
-metadata from home and discovers the current participant PDS deployments.
+It covers direct conversations, groups, and spaces with text channels, plus
+attachments (as public URLs), Open Graph link previews, read state, muting,
+and Expo push notifications. Every read and write checks membership; channel
+membership comes from the space. Design notes live in
+[`.plans/messaging-v1.md`](../../.plans/messaging-v1.md).
+
+`messages.list` returns one page of messages, newest first, while carrying the
+conversation's member addresses as transport metadata. The core client reads
+that metadata from home and discovers the current participant PDS deployments.
 
 ```ts
 import messages from "@decentralized-convex/messages/convex.config";

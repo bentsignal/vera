@@ -8,10 +8,16 @@
  * @module
  */
 
+import type * as conversations from "../conversations.js";
 import type * as dispatcher from "../dispatcher.js";
 import type * as index from "../index.js";
 import type * as metadata from "../metadata.js";
+import type * as model from "../model.js";
+import type * as notifications from "../notifications.js";
+import type * as previews from "../previews.js";
 import type * as protocol from "../protocol.js";
+import type * as pushTokens from "../pushTokens.js";
+import type * as spaces from "../spaces.js";
 
 import type {
   ApiFromModules,
@@ -21,10 +27,16 @@ import type {
 import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
+  conversations: typeof conversations;
   dispatcher: typeof dispatcher;
   index: typeof index;
   metadata: typeof metadata;
+  model: typeof model;
+  notifications: typeof notifications;
+  previews: typeof previews;
   protocol: typeof protocol;
+  pushTokens: typeof pushTokens;
+  spaces: typeof spaces;
 }> = anyApi as any;
 
 /**
