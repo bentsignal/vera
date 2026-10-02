@@ -7,3 +7,4 @@ export const circleButton = [];
 export const circleProminentButton = [];
 export const linkButton = [];
 export const destructive = [];
+export const dismissKeyboardOnScroll = [];

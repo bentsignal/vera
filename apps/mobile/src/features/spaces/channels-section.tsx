@@ -1,14 +1,30 @@
 import type { Space } from "@decentralized-convex/messages";
 import { useRouter } from "expo-router";
-import { Button, FieldGroup, ListItem, Text } from "@expo/ui";
+import { FieldGroup, ListItem, Text } from "@expo/ui";
 
+import { SectionHeaderWithAdd } from "~/components/section-header";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { UnreadBadge } from "~/components/unread-badge";
 
 export function ChannelsSection({ space }: { space: Space }) {
   const router = useRouter();
   return (
-    <FieldGroup.Section title="Text Channels">
+    <FieldGroup.Section>
+      <FieldGroup.SectionHeader>
+        {space.role === "owner" ? (
+          <SectionHeaderWithAdd
+            title="Text Channels"
+            onAdd={() =>
+              router.push({
+                params: { spaceId: space.spaceId },
+                pathname: "/new-channel",
+              })
+            }
+          />
+        ) : (
+          <Text>Text Channels</Text>
+        )}
+      </FieldGroup.SectionHeader>
       {space.channels.map((channel) => (
         <ListItem
           key={channel.conversationId}
@@ -33,18 +49,6 @@ export function ChannelsSection({ space }: { space: Space }) {
           {channel.name}
         </ListItem>
       ))}
-      {space.role === "owner" && (
-        <Button
-          onPress={() =>
-            router.push({
-              params: { spaceId: space.spaceId },
-              pathname: "/new-channel",
-            })
-          }
-        >
-          <Text>New Channel</Text>
-        </Button>
-      )}
     </FieldGroup.Section>
   );
 }

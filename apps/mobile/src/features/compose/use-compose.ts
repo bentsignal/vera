@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
@@ -10,12 +10,17 @@ import { useInbox } from "~/features/messaging/conversations";
 import { toAddress } from "~/features/messaging/directory";
 import { useDisplayNames } from "~/features/messaging/profiles";
 
+const LOOKUP_DELAY_MS = 400;
+
 /** Recipients for a new DM (one person) or group (several). */
 export function useCompose() {
   const router = useRouter();
   const { address: self } = useAccount();
   const { conversations } = useInbox();
-  const [query, setQuery] = useState("");
+  const [query, setQueryNow] = useState("");
+  // Account lookups wait for typing to pause.
+  const [lookup, setLookup] = useState("");
+  const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [recipients, setRecipients] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
   // Remounting clears the native field after someone is added.
@@ -31,7 +36,13 @@ export function useCompose() {
     pdsMutation({ mutation: pds.messages.createGroup }),
   );
 
-  const typed = toAddress(query);
+  function setQuery(value: string) {
+    setQueryNow(value);
+    clearTimeout(lookupTimer.current);
+    lookupTimer.current = setTimeout(() => setLookup(value), LOOKUP_DELAY_MS);
+  }
+
+  const typed = toAddress(lookup);
   const needle = query.trim().toLowerCase();
   const isGroup = recipients.length > 1;
 

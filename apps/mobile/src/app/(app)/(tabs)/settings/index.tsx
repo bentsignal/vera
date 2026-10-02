@@ -1,14 +1,15 @@
-import { Stack } from "expo-router";
 import { FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { showActionSheet } from "~/components/action-sheet";
 import { NativeHost } from "~/components/native-host";
+import { TabTitle } from "~/components/tab-title";
 import { DeveloperSection } from "~/features/dev/developer-section";
 import { useAccount } from "~/features/messaging/account";
 import { AccountSection } from "~/features/settings/account-section";
 import { DisplaySection } from "~/features/settings/display-section";
 import { ProfileSection } from "~/features/settings/profile-section";
 import { useProfileEditor } from "~/features/settings/use-profile-editor";
+import { dismissKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 export default function SettingsScreen() {
   const { address } = useAccount();
@@ -32,9 +33,9 @@ export default function SettingsScreen() {
 
   return (
     <>
-      <Stack.Title>Settings</Stack.Title>
+      <TabTitle title="Settings" />
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
+        <FieldGroup modifiers={dismissKeyboardOnScroll}>
           <ProfileSection
             displayName={profile.displayName}
             address={address}
