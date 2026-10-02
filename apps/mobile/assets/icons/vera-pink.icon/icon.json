@@ -1,8 +1,8 @@
 {
   "fill": {
     "linear-gradient": [
-      "extended-srgb:0.88988,0.33929,0.58400,1.00000",
-      "extended-srgb:0.61835,0.11012,0.33600,1.00000"
+      "extended-srgb:1.00000,0.49804,0.70588,1.00000",
+      "extended-srgb:0.90196,0.18039,0.47843,1.00000"
     ]
   },
   "fill-specializations": [
@@ -10,31 +10,38 @@
       "appearance": "dark",
       "value": {
         "linear-gradient": [
-          "extended-srgb:0.12388,0.05329,0.08467,1.00000",
-          "extended-srgb:0.07653,0.03418,0.05300,1.00000"
+          "extended-srgb:0.19216,0.19216,0.19216,1.00000",
+          "extended-srgb:0.07843,0.07843,0.07843,1.00000"
         ]
       }
     },
     {
       "appearance": "tinted",
       "value": {
-        "solid": "extended-srgb:0.09020,0.09020,0.09804,1.00000"
+        "linear-gradient": [
+          "extended-srgb:0.19216,0.19216,0.19216,1.00000",
+          "extended-srgb:0.07843,0.07843,0.07843,1.00000"
+        ]
       }
     }
   ],
   "groups": [
     {
-      "name": "Vera bubble",
+      "name": "Bubble",
       "layers": [
         {
-          "image-name": "bubble-v.svg",
-          "name": "Bubble with V counterform",
+          "image-name": "bubble.svg",
+          "name": "Bubble",
           "glass": true,
+          "opacity": 0.95,
           "fill-specializations": [
             {
               "appearance": "dark",
               "value": {
-                "solid": "extended-srgb:0.85882,0.15294,0.46667,1.00000"
+                "linear-gradient": [
+                  "extended-srgb:1.00000,0.49804,0.70588,1.00000",
+                  "extended-srgb:0.90196,0.18039,0.47843,1.00000"
+                ]
               }
             },
             {
@@ -47,13 +54,29 @@
         }
       ],
       "shadow": {
-        "kind": "neutral",
-        "opacity": 0.22
+        "kind": "layer-color",
+        "opacity": 0.5
       },
+      "shadow-specializations": [
+        {
+          "appearance": "dark",
+          "value": {
+            "kind": "neutral",
+            "opacity": 0.5
+          }
+        },
+        {
+          "appearance": "tinted",
+          "value": {
+            "kind": "neutral",
+            "opacity": 0.5
+          }
+        }
+      ],
       "specular": true,
       "translucency": {
         "enabled": true,
-        "value": 0.12
+        "value": 0.3
       }
     }
   ],

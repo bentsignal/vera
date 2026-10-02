@@ -71,5 +71,6 @@ Local runs default to `dev.vera.chat`; read the domain through `~/env`.
   the iOS 27 SDK requires. Expo SDK 58 does this in its template; remove the
   plugin when upgrading.
 - `assets/icons` and `plugins/with-alternate-icons.cjs`: one Liquid Glass
-  Icon Composer icon per color theme. Indigo is the primary icon; the rest
-  are iOS alternate icons chosen in Settings. See `assets/icons/README.md`.
+  Icon Composer icon per color theme, styled after the Messages icon. Green
+  is the primary icon and the default theme; the rest are iOS alternate
+  icons chosen in Settings → Themes. See `assets/icons/README.md`.

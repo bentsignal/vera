@@ -4,6 +4,7 @@ import { NativeHost } from "~/components/native-host";
 import { TabTitle } from "~/components/tab-title";
 import { AccountsSection } from "~/features/settings/accounts-section";
 import { DisplaySection } from "~/features/settings/display-section";
+import { ThemesSection } from "~/features/settings/themes-section";
 
 export default function SettingsScreen() {
   return (
@@ -13,6 +14,7 @@ export default function SettingsScreen() {
         <FieldGroup>
           <AccountsSection />
           <DisplaySection />
+          <ThemesSection />
         </FieldGroup>
       </NativeHost>
     </>
