@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/.well-known/:path*",
+      "destination": "https://disciplined-hyena-211.convex.site/.well-known/:path*"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://www.vera.chat",
+      "permanent": false
+    }
+  ]
+}

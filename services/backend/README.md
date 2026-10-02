@@ -91,8 +91,9 @@ Environment variables on each deployment:
 Passkeys use the relying party `vera.chat`, and iOS and Android require that
 domain to list the app. The production deployment serves
 `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`
-from `convex/appAssociation.ts`, and `vera.chat` is attached to it as a Convex
-custom domain.
+from `convex/appAssociation.ts`. `vera.chat` reaches them through a small
+Vercel proxy (`infra/vera-chat-domain`), because Convex custom domains need a
+CNAME, which a bare domain cannot have.
 
 ## Public discovery
 
