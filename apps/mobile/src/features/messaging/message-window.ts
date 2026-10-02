@@ -14,15 +14,15 @@ type PageCursor =
 interface View {
   /** The message the window opened on, or undefined for the latest. */
   readonly anchor: string | undefined;
+  /**
+   * The page the window opened with. Loading more never changes it, so the
+   * list only remounts when the window reopens.
+   */
+  readonly opened: PageCursor;
   /** Oldest page first. */
   readonly pages: readonly PageCursor[];
 }
 
-/**
- * Pages for the latest messages. The first page is frozen at the moment the
- * conversation opened, and a live tail page collects everything after it,
- * so new messages never shift the older pages.
- */
 /**
  * When each conversation's latest window opened this app session. Reusing
  * it keeps query keys stable, so reopening a conversation shows cached
@@ -32,6 +32,11 @@ const openedAtByConversation = new Map<string, number>();
 /** Past this, so many messages may have arrived that a fresh window is better. */
 const REUSE_WINDOW_MS = 10 * 60 * 1000;
 
+/**
+ * Pages for the latest messages. The first page is frozen at the moment the
+ * conversation opened, and a live tail page collects everything after it,
+ * so new messages never shift the older pages.
+ */
 function latestWindow(windowKey: string, reopen = false) {
   const previous = openedAtByConversation.get(windowKey);
   const openedAt =
@@ -39,16 +44,20 @@ function latestWindow(windowKey: string, reopen = false) {
       ? previous
       : Date.now();
   openedAtByConversation.set(windowKey, openedAt);
+  const opened = { before: openedAt + 1 };
   return {
     anchor: undefined,
-    pages: [{ before: openedAt + 1 }, { after: openedAt }],
+    opened,
+    pages: [opened, { after: openedAt }],
   } satisfies View;
 }
 
 function anchoredWindow(messageId: string) {
+  const opened = { around: messageId };
   return {
     anchor: messageId,
-    pages: [{ around: messageId }],
+    opened,
+    pages: [opened],
   } satisfies View;
 }
 
@@ -149,7 +158,7 @@ export function useMessageWindow(
   return {
     anchor: view.anchor,
     /** Changes whenever the window reopens, so lists can remount. */
-    viewKey: JSON.stringify(view.pages[0]),
+    viewKey: JSON.stringify(view.opened),
     hasNewer,
     hasOlder,
     isLoading:

@@ -91,9 +91,12 @@ function RowContent({ row, self, layout, profileOf, showAuthors }: RowProps) {
 
 function JumpToLatest({
   visible,
+  bottom,
   onPress,
 }: {
   visible: { value: boolean };
+  /** Distance from the bottom edge, above the floating composer. */
+  bottom: number;
   onPress: () => void;
 }) {
   const style = useAnimatedStyle(() => ({
@@ -108,8 +111,8 @@ function JumpToLatest({
   return (
     <Animated.View
       animatedProps={props}
-      className="absolute right-4 bottom-3"
-      style={style}
+      className="absolute right-4"
+      style={[{ bottom }, style]}
     >
       <Pressable
         accessibilityRole="button"
@@ -145,6 +148,7 @@ export function MessageList({
   onEndReached,
   onJumpToLatest,
   bottomInset,
+  composerHeight,
 }: {
   messages: readonly Message[];
   /** The signed-in account's address. */
@@ -160,8 +164,14 @@ export function MessageList({
   onEndReached: () => void;
   onJumpToLatest: () => void;
   bottomInset: number;
+  /** Height of the composer floating over the bottom of the list. */
+  composerHeight: number;
 }) {
   const listRef = useRef<LegendListRef>(null);
+  // Hidden until the first layout settles at its starting position, then
+  // faded in, so nothing flashes or jumps into place.
+  const loaded = useSharedValue(0);
+  const fadeIn = useAnimatedStyle(() => ({ opacity: loaded.value }));
   const isNearEnd = useSharedValue(true);
   const showJump = useDerivedValue(() => hasNewer || !isNearEnd.value);
   const rows = buildMessageRows(messages);
@@ -170,43 +180,55 @@ export function MessageList({
 
   return (
     <>
-      <KeyboardAwareLegendList
-        ref={listRef}
-        data={rows}
-        keyExtractor={(row) => row.key}
-        getItemType={(row) => row.type}
-        renderItem={({ item }) => (
-          <Row
-            row={item}
-            self={self}
-            layout={layout}
-            profileOf={profileOf}
-            showAuthors={showAuthors}
-            highlighted={item.key === anchorId}
-          />
-        )}
-        estimatedItemSize={56}
-        recycleItems
-        alignItemsAtEnd
-        maintainScrollAtEnd={!hasNewer}
-        maintainVisibleContentPosition
-        {...(anchorIndex === -1
-          ? { initialScrollAtEnd: true }
-          : { initialScrollIndex: { index: anchorIndex, viewPosition: 0.5 } })}
-        onStartReached={onStartReached}
-        onStartReachedThreshold={1}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={1}
-        sharedValues={{ isNearEnd }}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        keyboardOffset={bottomInset}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingVertical: 8 }}
-        style={{ flex: 1 }}
-      />
+      <Animated.View style={[{ flex: 1 }, fadeIn]}>
+        <KeyboardAwareLegendList
+          ref={listRef}
+          data={rows}
+          keyExtractor={(row) => row.key}
+          getItemType={(row) => row.type}
+          renderItem={({ item }) => (
+            <Row
+              row={item}
+              self={self}
+              layout={layout}
+              profileOf={profileOf}
+              showAuthors={showAuthors}
+              highlighted={item.key === anchorId}
+            />
+          )}
+          estimatedItemSize={56}
+          recycleItems
+          alignItemsAtEnd
+          maintainScrollAtEnd={!hasNewer}
+          maintainVisibleContentPosition
+          {...(anchorIndex === -1
+            ? { initialScrollAtEnd: true }
+            : {
+                initialScrollIndex: { index: anchorIndex, viewPosition: 0.5 },
+              })}
+          onStartReached={onStartReached}
+          onStartReachedThreshold={1}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={1}
+          sharedValues={{ isNearEnd }}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          keyboardOffset={bottomInset}
+          contentInsetAdjustmentBehavior="automatic"
+          // Messages scroll under the floating composer.
+          contentContainerStyle={{
+            paddingBottom: composerHeight + 8,
+            paddingTop: 8,
+          }}
+          onLoad={() => {
+            loaded.set(withTiming(1, { duration: 220 }));
+          }}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
       <JumpToLatest
         visible={showJump}
+        bottom={composerHeight + 12}
         onPress={() => {
           if (hasNewer) onJumpToLatest();
           else void listRef.current?.scrollToEnd({ animated: true });
