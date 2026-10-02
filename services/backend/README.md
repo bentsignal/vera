@@ -70,15 +70,21 @@ pnpm --filter @vera/backend deploy   # deploy to production
 
 Environment variables on each deployment:
 
-| Name                          | Example                    | Purpose                                       |
-| ----------------------------- | -------------------------- | --------------------------------------------- |
-| `FEDERATION_DOMAIN`           | `vera.chat`                | Domain in every account address               |
-| `PASSKEY_RP_ID`               | `vera.chat`                | WebAuthn relying party ID (permanent)         |
-| `PASSKEY_ORIGINS`             | `https://vera.chat`        | Comma-separated accepted WebAuthn origins     |
-| `BETTER_AUTH_SECRET`          | random                     | Better Auth signing secret                    |
-| `PASSKEY_APPLE_APP_IDS`       | `39K6A9FP99.chat.vera.app` | Apps listed in the Apple app site association |
-| `PASSKEY_ANDROID_PACKAGE`     | `chat.vera.app`            | Android app listed in `assetlinks.json`       |
-| `PASSKEY_ANDROID_CERT_SHA256` | `AB:CD:...`                | Comma-separated Android signing fingerprints  |
+| Name                          | Example                              | Purpose                                       |
+| ----------------------------- | ------------------------------------ | --------------------------------------------- |
+| `FEDERATION_DOMAIN`           | `vera.chat`                          | Domain in every account address               |
+| `PASSKEY_RP_ID`               | `vera.chat`                          | WebAuthn relying party ID (permanent)         |
+| `PASSKEY_ORIGINS`             | `https://vera.chat`                  | Comma-separated accepted WebAuthn origins     |
+| `BETTER_AUTH_SECRET`          | random                               | Better Auth signing secret                    |
+| `PASSKEY_APPLE_APP_IDS`       | `39K6A9FP99.chat.vera.app`           | Apps listed in the Apple app site association |
+| `PASSKEY_ANDROID_PACKAGE`     | `chat.vera.app`                      | Android app listed in `assetlinks.json`       |
+| `PASSKEY_ANDROID_CERT_SHA256` | `AB:CD:...`                          | Comma-separated Android signing fingerprints  |
+| `BUNNY_S3_ENDPOINT`           | `https://ny-s3.storage.bunnycdn.com` | bunny.net Storage S3 endpoint                 |
+| `BUNNY_S3_REGION`             | `ny`                                 | Region used to sign uploads                   |
+| `BUNNY_STORAGE_ZONE`          | `vera-media`                         | Storage zone (also the S3 access key)         |
+| `BUNNY_S3_SECRET`             | secret                               | Storage zone password                         |
+| `BUNNY_CDN_URL`               | `https://media.vera.chat`            | Public base URL for media                     |
+| `BUNNY_PATH_PREFIX`           | `prod`                               | Folder for this deployment's uploads          |
 
 ## Passkey domain
 
