@@ -110,6 +110,24 @@ export function stringField(
   return result;
 }
 
+/** The newest message in a `messages.list` page sent by `author`. */
+export function latestMessageBy(page: unknown, author: string) {
+  const messages: unknown =
+    typeof page === "object" && page !== null
+      ? Reflect.get(page, "messages")
+      : undefined;
+  if (!Array.isArray(messages)) return null;
+  const ids = messages.flatMap((message: unknown) =>
+    typeof message === "object" &&
+    message !== null &&
+    Reflect.get(message, "authorId") === author &&
+    typeof Reflect.get(message, "messageId") === "string"
+      ? [String(Reflect.get(message, "messageId"))]
+      : [],
+  );
+  return ids.at(-1) ?? null;
+}
+
 export function listField(value: unknown, field: "channels" | "members") {
   const result: unknown =
     typeof value === "object" && value !== null

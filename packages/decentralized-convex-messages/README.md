@@ -8,8 +8,8 @@ identity from the root PDS router and keeps its hot read/write path inside one
 Component boundary.
 
 It covers direct conversations, groups, and spaces with text channels, plus
-attachments (as public URLs), Open Graph link previews, read state, muting,
-and Expo push notifications. Every read and write checks membership; channel
+attachments (as public URLs), Open Graph link previews, emoji reactions,
+read state, muting, and Expo push notifications. Every read and write checks membership; channel
 membership comes from the space. Design notes live in
 [`.plans/messaging-v1.md`](../../.plans/messaging-v1.md).
 
@@ -20,6 +20,10 @@ that metadata from home and discovers the current participant PDS deployments.
 ```ts
 import messages from "@decentralized-convex/messages/convex.config";
 ```
+
+Reactions follow the same author-home rule as messages: `messages.react`
+stores your reaction on your home PDS, and `messages.reactions` (given the
+message IDs on screen) gathers reactions from every member's PDS.
 
 The default export is a normal Convex Component whose TypeScript type also
 carries the Messages protocol and its `accounts@1` requirement.

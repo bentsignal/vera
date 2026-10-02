@@ -72,6 +72,15 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 type: "send";
               }
             | {
+                args: {
+                  conversationId: string;
+                  emoji: string;
+                  messageId: string;
+                  on: boolean;
+                };
+                type: "react";
+              }
+            | {
                 args: { conversationId: string; readAt: number };
                 type: "markRead";
               }
@@ -142,6 +151,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               sentAt: number;
             };
           }
+        | { routes?: Array<string>; type: "react"; value: null }
         | { routes?: Array<string>; type: "markRead"; value: null }
         | { routes?: Array<string>; type: "setMuted"; value: null }
         | {
@@ -187,6 +197,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   conversationId: string;
                 };
                 type: "list";
+              }
+            | {
+                args: { conversationId: string; messageIds: Array<string> };
+                type: "reactions";
               }
             | { args: {}; type: "spaces" }
             | { args: { spaceId: string }; type: "space" };
@@ -305,6 +319,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 sentAt: number;
               }>;
             };
+          }
+        | {
+            routes?: Array<string>;
+            type: "reactions";
+            value: Array<{
+              accountId: string;
+              emoji: string;
+              messageId: string;
+              reactedAt: number;
+            }>;
           }
         | {
             routes?: Array<string>;

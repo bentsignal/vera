@@ -19,6 +19,7 @@ import type * as paging from "../paging.js";
 import type * as previews from "../previews.js";
 import type * as protocol from "../protocol.js";
 import type * as pushTokens from "../pushTokens.js";
+import type * as reactions from "../reactions.js";
 import type * as spaces from "../spaces.js";
 
 import type {
@@ -40,6 +41,7 @@ const fullApi: ApiFromModules<{
   previews: typeof previews;
   protocol: typeof protocol;
   pushTokens: typeof pushTokens;
+  reactions: typeof reactions;
   spaces: typeof spaces;
 }> = anyApi as any;
 

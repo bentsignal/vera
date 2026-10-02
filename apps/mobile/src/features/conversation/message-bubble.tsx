@@ -5,6 +5,7 @@ import { Avatar } from "~/components/avatar";
 import { cn } from "~/lib/cn";
 import { AttachmentView } from "./attachment-view";
 import { LinkPreviewCard } from "./link-preview-card";
+import { LongPressMessage, ReactionChips } from "./message-actions";
 import { MessageMeta, SendingFade } from "./message-status";
 import { RevealedTime, SlideWithReveal } from "./reveal";
 
@@ -124,6 +125,37 @@ function AvatarColumn({
   );
 }
 
+/** A message's bubbles, with its sender's name, reactions, and status. */
+function BubbleColumn({
+  message,
+  isOwn,
+  name,
+  endsGroup,
+  delivered,
+}: {
+  message: Message;
+  isOwn: boolean;
+  /** The sender's name, above the first bubble of a run in group chats. */
+  name?: string;
+  endsGroup: boolean;
+  delivered: boolean;
+}) {
+  return (
+    <View
+      className={cn("max-w-[75%] gap-0.5", isOwn ? "items-end" : "items-start")}
+    >
+      {name !== undefined && (
+        <Text className="text-caption text-muted px-3">{name}</Text>
+      )}
+      <LongPressMessage message={message}>
+        <Content message={message} isOwn={isOwn} endsGroup={endsGroup} />
+      </LongPressMessage>
+      <ReactionChips message={message} align={isOwn ? "end" : "start"} />
+      <MessageMeta message={message} delivered={delivered} />
+    </View>
+  );
+}
+
 /**
  * iMessage-style: your messages on the right, everyone else's on the left,
  * runs tucked together with a tail on the last one. Times stay hidden until
@@ -162,20 +194,13 @@ export function MessageBubble({
               visible={endsGroup}
             />
           )}
-          <View
-            className={cn(
-              "max-w-[75%] gap-0.5",
-              isOwn ? "items-end" : "items-start",
-            )}
-          >
-            {startsGroup && showAuthor && (
-              <Text className="text-caption text-muted px-3">
-                {author.displayName}
-              </Text>
-            )}
-            <Content message={message} isOwn={isOwn} endsGroup={endsGroup} />
-            <MessageMeta message={message} delivered={delivered} />
-          </View>
+          <BubbleColumn
+            message={message}
+            isOwn={isOwn}
+            name={startsGroup && showAuthor ? author.displayName : undefined}
+            endsGroup={endsGroup}
+            delivered={delivered}
+          />
         </View>
       </SlideWithReveal>
       <RevealedTime

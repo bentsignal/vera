@@ -10,20 +10,26 @@ import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
+import type { ReactionSummary } from "./reactions";
 import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useAccount, useVisibleAccounts } from "./account";
 import { useMessageWindow } from "./message-window";
 import { useProfiles } from "./profiles";
+import { useReactions } from "./reactions";
 import { pdsResult } from "./results";
 
-export function toMessage(message: PdsMessage) {
+export function toMessage(
+  message: PdsMessage,
+  reactions: readonly ReactionSummary[] = [],
+) {
   return {
     attachments: message.attachments,
     authorId: message.authorId,
     body: message.body.length > 0 ? message.body : undefined,
     id: message.messageId,
     linkPreview: message.linkPreview ?? undefined,
+    reactions,
     sentAt: new Date(message.sentAt),
   } satisfies Message;
 }
@@ -192,6 +198,11 @@ function usePendingMessages(conversationId: string) {
 export function useMessages(conversationId: string, anchor?: string) {
   const { address } = useAccount();
   const view = useMessageWindow(address, conversationId, anchor);
+  const { reactionsOf, toggle } = useReactions(
+    address,
+    conversationId,
+    view.pageMessageIds,
+  );
   const { pending, sendMessage } = usePendingMessages(conversationId);
   const confirmed = new Set(view.messages.map((message) => message.messageId));
   const atLatest = !view.hasNewer;
@@ -212,7 +223,14 @@ export function useMessages(conversationId: string, anchor?: string) {
 
   return {
     ...view,
-    messages: [...view.messages.map(toMessage), ...unconfirmed],
+    messages: [
+      ...view.messages.map((message) =>
+        toMessage(message, reactionsOf(message.messageId)),
+      ),
+      ...unconfirmed,
+    ],
+    /** Adds or removes your reaction, showing it right away. */
+    toggleReaction: toggle,
     /** Only set when the newest loaded message is the newest there is. */
     newestSentAt: atLatest ? view.messages.at(-1)?.sentAt : undefined,
     sendMessage: (body: string, attachments: Attachment[] = []) => {

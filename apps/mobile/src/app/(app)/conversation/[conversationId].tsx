@@ -1,3 +1,4 @@
+import type { Attachment } from "@decentralized-convex/messages";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
 import {
@@ -31,6 +32,73 @@ const ATTACHMENT_SOURCES = [
   { label: "Files", source: "files" },
 ] as const;
 
+/**
+ * The composer floating over the bottom of the conversation, with
+ * attachment uploads. Reports its height so messages can scroll under it.
+ */
+function FloatingComposer({
+  conversationId,
+  onHeight,
+  onSend,
+}: {
+  conversationId: string;
+  onHeight: (height: number) => void;
+  onSend: (body: string, attachments?: Attachment[]) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const uploadAttachments = useAttachmentUploader();
+  const devTools = useDevTools();
+  const [uploading, setUploading] = useState(false);
+
+  async function attach(source: AttachmentSource) {
+    setUploading(true);
+    const attachments = await uploadAttachments(source).catch(
+      (error: unknown) =>
+        error instanceof AttachmentError
+          ? error.message
+          : "Couldn't upload that. Try again.",
+    );
+    setUploading(false);
+    if (typeof attachments === "string") {
+      Alert.alert("Upload Failed", attachments);
+    } else if (attachments.length > 0) {
+      onSend("", attachments);
+    }
+  }
+
+  return (
+    <KeyboardStickyView
+      offset={{ closed: 0, opened: insets.bottom }}
+      // Floats over the messages, which scroll all the way to the bottom.
+      style={{ bottom: 0, left: 0, position: "absolute", right: 0 }}
+      onLayout={(event) => onHeight(event.nativeEvent.layout.height)}
+    >
+      {uploading && (
+        <View className="flex-row items-center justify-center gap-2 py-1">
+          <ActivityIndicator size="small" />
+          <Text className="text-footnote text-muted">Uploading…</Text>
+        </View>
+      )}
+      <View style={{ paddingBottom: insets.bottom }}>
+        <Composer
+          onSend={(body) => {
+            onSend(body);
+            devTools.replyToMe(conversationId);
+          }}
+          onAttach={() =>
+            showActionSheet(
+              ATTACHMENT_SOURCES.map(({ label, source }) => ({
+                label,
+                onPress: () => void attach(source),
+              })),
+            )
+          }
+        />
+      </View>
+    </KeyboardStickyView>
+  );
+}
+
 function Conversation({
   conversationId,
   anchorId,
@@ -46,28 +114,9 @@ function Conversation({
     useConversation(conversationId);
   const layout = usePreference("messageLayout");
   const messages = useMessages(conversationId, anchorId);
-  const uploadAttachments = useAttachmentUploader();
-  const devTools = useDevTools();
-  const [uploading, setUploading] = useState(false);
   const [composerHeight, setComposerHeight] = useState(56);
   useMarkRead(conversationId, messages.newestSentAt);
   useActiveConversation(conversationId);
-
-  async function attach(source: AttachmentSource) {
-    setUploading(true);
-    const attachments = await uploadAttachments(source).catch(
-      (error: unknown) =>
-        error instanceof AttachmentError
-          ? error.message
-          : "Couldn't upload that. Try again.",
-    );
-    setUploading(false);
-    if (typeof attachments === "string") {
-      Alert.alert("Upload Failed", attachments);
-    } else if (attachments.length > 0) {
-      messages.sendMessage("", attachments);
-    }
-  }
 
   // The title from the opening screen shows until the conversation loads.
   const heading = title === "" ? (initialTitle ?? "") : title;
@@ -101,38 +150,15 @@ function Conversation({
             onJumpToLatest={messages.jumpToLatest}
             bottomInset={insets.bottom}
             composerHeight={composerHeight}
+            onToggleReaction={messages.toggleReaction}
           />
         )}
       </KeyboardGestureArea>
-      <KeyboardStickyView
-        offset={{ closed: 0, opened: insets.bottom }}
-        // Floats over the messages, which scroll all the way to the bottom.
-        style={{ bottom: 0, left: 0, position: "absolute", right: 0 }}
-        onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
-      >
-        {uploading && (
-          <View className="flex-row items-center justify-center gap-2 py-1">
-            <ActivityIndicator size="small" />
-            <Text className="text-footnote text-muted">Uploading…</Text>
-          </View>
-        )}
-        <View style={{ paddingBottom: insets.bottom }}>
-          <Composer
-            onSend={(body) => {
-              messages.sendMessage(body);
-              devTools.replyToMe(conversationId);
-            }}
-            onAttach={() =>
-              showActionSheet(
-                ATTACHMENT_SOURCES.map(({ label, source }) => ({
-                  label,
-                  onPress: () => void attach(source),
-                })),
-              )
-            }
-          />
-        </View>
-      </KeyboardStickyView>
+      <FloatingComposer
+        conversationId={conversationId}
+        onHeight={setComposerHeight}
+        onSend={messages.sendMessage}
+      />
     </View>
   );
 }

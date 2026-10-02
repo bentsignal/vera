@@ -4,9 +4,11 @@ export {
   channel,
   conversation,
   linkPreview,
+  MAX_REACTION_MESSAGES,
   MESSAGE_PAGE_SIZE,
   message,
   messagesProtocol,
+  reaction,
   space,
 } from "./protocol.ts";
 export type {
@@ -15,5 +17,6 @@ export type {
   Conversation,
   LinkPreview,
   Message,
+  Reaction,
   Space,
 } from "./protocol.ts";

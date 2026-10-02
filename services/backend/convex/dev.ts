@@ -7,6 +7,7 @@ import {
   botAddress,
   botIdentity,
   BOTS,
+  latestMessageBy,
   listField,
   pick,
   queryAs,
@@ -57,6 +58,15 @@ export const replyToMe = action({
     const count = Math.min(responders.length, isDirect ? 1 : 2);
     for (let index = 0; index < count; index += 1) {
       const bot = pick(responders, seed + index);
+      // About half the time, a bot also reacts to what you sent.
+      if ((seed + index) % 2 === 0) {
+        await ctx.scheduler.runAfter(900 + index * 900, internal.dev.react, {
+          callerId: me.accountId,
+          conversationId,
+          emoji: pick(BOT_REACTIONS, seed + index * 7),
+          username: bot.username,
+        });
+      }
       await ctx.scheduler.runAfter(
         1500 + index * 2000 + (seed % 1500),
         internal.dev.say,
@@ -67,6 +77,33 @@ export const replyToMe = action({
         },
       );
     }
+  },
+});
+
+const BOT_REACTIONS = ["❤️", "👍", "😂", "🔥", "😮"];
+
+/** A bot reacts to the caller's newest message, read when it runs. */
+export const react = internalAction({
+  args: {
+    callerId: v.string(),
+    conversationId: v.string(),
+    emoji: v.string(),
+    username: v.string(),
+  },
+  handler: async (ctx, { callerId, conversationId, emoji, username }) => {
+    requireDevTools();
+    const bot = BOTS.find((candidate) => candidate.username === username);
+    if (bot === undefined) return;
+    const page = await queryAs(ctx, botIdentity(bot), {
+      args: { conversationId },
+      type: "list",
+    });
+    const messageId = latestMessageBy(page, callerId);
+    if (messageId === null) return;
+    await asAccount(ctx, botIdentity(bot), {
+      args: { conversationId, emoji, messageId, on: true },
+      type: "react",
+    });
   },
 });
 
