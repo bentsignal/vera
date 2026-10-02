@@ -153,6 +153,18 @@ with `development: true`) and send to that token through the Expo push API.
   `accounts` plugins (inbox, messages with optimistic sends, spaces,
   profiles) and attachment uploads. `AccountScope` sets the account a screen
   acts as; Chats, Spaces, and Search combine every visible account.
+- `src/features/profile` and `src/app/(app)/profile/[address].tsx`: a
+  person's profile (photo, display name, address, and a Message button that
+  opens the direct conversation as the `account` param). Search's people
+  results, space members, and conversation members open it. It shows only
+  what `accounts.getProfile` returns today; richer profile details will come
+  from the Accounts plugin later.
+- `src/features/conversation/conversation-header.tsx`: the conversation
+  screen draws its own iMessage-style header (floating glass back and info
+  buttons, the photo and a glass name capsule centered under the Dynamic
+  Island) instead of a native bar, with messages scrolling underneath.
+  Tapping it opens `conversation-info/[conversationId]` (members, Hide
+  Alerts, leaving a group).
 - `src/features/notifications`: Expo push registration and notification
   routing.
 - `plugins/with-ios-scene-lifecycle.cjs`: adopts the UIScene life cycle that

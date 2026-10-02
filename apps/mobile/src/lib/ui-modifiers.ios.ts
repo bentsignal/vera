@@ -7,6 +7,7 @@ import {
   controlSize,
   foregroundStyle,
   frame,
+  listRowBackground,
   listRowInsets,
   scrollDismissesKeyboard,
 } from "@expo/ui/swift-ui/modifiers";
@@ -38,6 +39,11 @@ export const dismissKeyboardOnScroll = [
 /** A form row whose content (such as a carousel) reaches the card edges. */
 export const edgeToEdgeRow = [
   listRowInsets({ bottom: 10, leading: 0, top: 12, trailing: 0 }),
+];
+/** A full-width form row drawn straight on the page, without a card. */
+export const plainRow = [
+  frame({ maxWidth: Infinity }),
+  listRowBackground("clear"),
 ];
 /** One choice in a row of custom-drawn options, read as a labeled button. */
 export function choiceButton(label: string, selected: boolean) {

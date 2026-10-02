@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { Stack } from "expo-router";
 
 import { AccountScope, useAccounts } from "~/features/messaging/account";
@@ -37,9 +38,17 @@ function AppStack() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="conversation/[conversationId]"
-        // Messages scroll under a transparent header, which iOS fades with
-        // its scroll edge effect. The title comes from the opening screen.
-        options={{ headerTransparent: true, title: "" }}
+        // The screen draws its own iMessage-style header, with messages
+        // scrolling under it. Swiping back still works without the bar.
+        options={{ headerShown: false, title: "" }}
+      />
+      <Stack.Screen
+        name="conversation-info/[conversationId]"
+        options={{ headerTransparent: Platform.OS === "ios", title: "" }}
+      />
+      <Stack.Screen
+        name="profile/[address]"
+        options={{ headerTransparent: Platform.OS === "ios", title: "" }}
       />
       <Stack.Screen
         name="media"
