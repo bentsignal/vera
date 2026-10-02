@@ -35,7 +35,7 @@ index 481a9e6d5367ff6cad083b001d8b1dd780918b47..3af0d06a89ab958a95870b77f1f6a607
  
 +- (nullable UIViewController *)rns_currentSelectedViewController
 +{
-+#if !TARGET_OS_TV && !TARGET_OS_VISION
++#if !TARGET_OS_TV && !TARGET_OS_VISION && defined(__IPHONE_27_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_27_0
 +  if (@available(iOS 27.0, *)) {
 +    if (_usesModernSearchTabs) {
 +      return self.selectedTab.viewController;
@@ -47,7 +47,7 @@ index 481a9e6d5367ff6cad083b001d8b1dd780918b47..3af0d06a89ab958a95870b77f1f6a607
 +
 +- (void)rns_selectViewController:(UIViewController *)viewController
 +{
-+#if !TARGET_OS_TV && !TARGET_OS_VISION
++#if !TARGET_OS_TV && !TARGET_OS_VISION && defined(__IPHONE_27_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_27_0
 +  if (@available(iOS 27.0, *)) {
 +    if (_usesModernSearchTabs) {
 +      for (UITab *tab in self.tabs) {
@@ -139,7 +139,7 @@ index 481a9e6d5367ff6cad083b001d8b1dd780918b47..3af0d06a89ab958a95870b77f1f6a607
    _isHandlingExplicitSelectionUpdate = NO;
  }
  
-+#if !TARGET_OS_TV && !TARGET_OS_VISION
++#if !TARGET_OS_TV && !TARGET_OS_VISION && defined(__IPHONE_27_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_27_0
 +- (BOOL)tabBarController:(UITabBarController *)tabBarController shouldSelectTab:(UITab *)tab API_AVAILABLE(ios(18.0))
 +{
 +  return [self tabBarController:tabBarController shouldSelectViewController:tab.viewController];
@@ -160,7 +160,7 @@ index 481a9e6d5367ff6cad083b001d8b1dd780918b47..3af0d06a89ab958a95870b77f1f6a607
      return;
    }
  
-+#if !TARGET_OS_TV && !TARGET_OS_VISION
++#if !TARGET_OS_TV && !TARGET_OS_VISION && defined(__IPHONE_27_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_27_0
 +  if (@available(iOS 27.0, *)) {
 +    NSMutableArray<UITab *> *tabs = [NSMutableArray arrayWithCapacity:_tabScreenControllers.count];
 +    UISearchTab *searchTab = nil;

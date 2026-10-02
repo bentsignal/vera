@@ -6,27 +6,51 @@ settings:
 
 catalogs:
   default:
+    '@eslint/js':
+      specifier: ^9.38.0
+      version: 9.39.4
+    '@tailwindcss/postcss':
+      specifier: ^4.1.16
+      version: 4.2.2
     '@tanstack/react-query':
       specifier: ^5.101.4
       version: 5.101.4
     '@types/node':
       specifier: ^24
       version: 24.12.2
+    '@typescript/native-preview':
+      specifier: 7.0.0-dev.20260512.1
+      version: 7.0.0-dev.20260512.1
+    class-variance-authority:
+      specifier: ^0.7.1
+      version: 0.7.1
     convex:
       specifier: 1.46.0
       version: 1.46.0
     eslint:
       specifier: ^9.38.0
       version: 9.39.4
+    jose:
+      specifier: ^6.2.7
+      version: 6.2.7
+    lucide-react:
+      specifier: ^0.562.0
+      version: 0.562.0
     prettier:
       specifier: ^3.6.2
       version: 3.8.2
+    tailwind-merge:
+      specifier: ^3.3.1
+      version: 3.5.0
     tailwindcss:
       specifier: ^4.1.16
       version: 4.3.3
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
+    zod:
+      specifier: ^3.25.76
+      version: 3.25.76
   react19:
     '@types/react':
       specifier: ~19.2.0
@@ -41,7 +65,7 @@ overrides:
 
 patchedDependencies:
   react-native-screens@4.26.2:
-    hash: 4b86007f4bbac99b55b610e1bd077bc3c266a5728c46573d6f7b18a31b8a7540
+    hash: 26c4ea8fbff11e924c3aa0cf0f56b13985141abfade9ecb6f88c936b9712db96
     path: patches/react-native-screens@4.26.2.patch
 
 importers:
@@ -170,7 +194,7 @@ importers:
         version: 57.0.21(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       expo-router:
         specifier: ~57.0.24
-        version: 57.0.24(6dc4ddc9f61cc2796d0e34bda8182127)
+        version: 57.0.24(262618a2a478eb8d065b383923e59bb1)
       expo-secure-store:
         specifier: ~57.0.4
         version: 57.0.4(expo@57.0.26)
@@ -221,7 +245,7 @@ importers:
         version: 5.7.0(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       react-native-screens:
         specifier: ~4.26.0
-        version: 4.26.2(patch_hash=4b86007f4bbac99b55b610e1bd077bc3c266a5728c46573d6f7b18a31b8a7540)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+        version: 4.26.2(patch_hash=26c4ea8fbff11e924c3aa0cf0f56b13985141abfade9ecb6f88c936b9712db96)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       react-native-svg:
         specifier: 15.15.4
         version: 15.15.4(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
@@ -8507,7 +8531,7 @@ snapshots:
       ws: 8.21.0
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 57.0.24(6dc4ddc9f61cc2796d0e34bda8182127)
+      expo-router: 57.0.24(262618a2a478eb8d065b383923e59bb1)
       react-native: 0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
     transitivePeerDependencies:
       - '@expo/dom-webview'
@@ -8786,7 +8810,7 @@ snapshots:
       react: 19.2.3
     optionalDependencies:
       '@expo/metro-runtime': 57.0.16(@expo/log-box@57.0.4)(expo@57.0.26)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
-      expo-router: 57.0.24(6dc4ddc9f61cc2796d0e34bda8182127)
+      expo-router: 57.0.24(262618a2a478eb8d065b383923e59bb1)
       react-dom: 19.2.3(react@19.2.3)
     transitivePeerDependencies:
       - supports-color
@@ -11958,7 +11982,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-router@57.0.24(6dc4ddc9f61cc2796d0e34bda8182127):
+  expo-router@57.0.24(262618a2a478eb8d065b383923e59bb1):
     dependencies:
       '@expo/log-box': 57.0.4(@expo/dom-webview@57.0.1)(expo@57.0.26)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       '@expo/metro-runtime': 57.0.16(@expo/log-box@57.0.4)(expo@57.0.26)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
@@ -11987,7 +12011,7 @@ snapshots:
       react-native: 0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
       react-native-drawer-layout: 4.2.11(react-native-gesture-handler@2.32.0(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-reanimated@4.5.1(react-native-worklets@0.10.1(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       react-native-safe-area-context: 5.7.0(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
-      react-native-screens: 4.26.2(patch_hash=4b86007f4bbac99b55b610e1bd077bc3c266a5728c46573d6f7b18a31b8a7540)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+      react-native-screens: 4.26.2(patch_hash=26c4ea8fbff11e924c3aa0cf0f56b13985141abfade9ecb6f88c936b9712db96)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       server-only: 0.0.1
       sf-symbols-typescript: 2.2.0
       shallowequal: 1.1.0
@@ -13963,7 +13987,7 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
 
-  react-native-screens@4.26.2(patch_hash=4b86007f4bbac99b55b610e1bd077bc3c266a5728c46573d6f7b18a31b8a7540)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
+  react-native-screens@4.26.2(patch_hash=26c4ea8fbff11e924c3aa0cf0f56b13985141abfade9ecb6f88c936b9712db96)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/metro-config@0.86.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-freeze: 1.0.4(react@19.2.3)
