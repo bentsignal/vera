@@ -1,13 +1,17 @@
 import type { Attachment } from "@decentralized-convex/messages";
-import type { Id } from "@vera/backend/dataModel";
 import * as DocumentPicker from "expo-document-picker";
-import { FileSystemUploadType, uploadAsync } from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { api } from "@vera/backend/api";
 import { useConvex } from "convex/react";
 
+import { sendUpload } from "./upload-transports";
+
 const MAX_ATTACHMENTS = 10;
+const MAX_VIDEO_SECONDS = 120;
+
+/** An upload problem worth showing the person as-is. */
+export class AttachmentError extends Error {}
 
 interface LocalFile {
   readonly durationMs?: number;
@@ -44,6 +48,7 @@ async function pick(source: AttachmentSource) {
       ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     quality: 0.8,
     selectionLimit: MAX_ATTACHMENTS,
+    videoMaxDuration: MAX_VIDEO_SECONDS,
   } satisfies ImagePicker.ImagePickerOptions;
   if (source === "camera") {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -71,49 +76,38 @@ async function pick(source: AttachmentSource) {
   });
 }
 
-function storageIdOf(body: unknown) {
-  return typeof body === "object" &&
-    body !== null &&
-    "storageId" in body &&
-    typeof body.storageId === "string"
-    ? body.storageId
-    : undefined;
-}
-
 /** Picks files from a source and uploads them, ready to attach. */
 export function useAttachmentUploader() {
   const convex = useConvex();
 
-  async function upload(uri: string, mimeType: string) {
-    const target = await convex.mutation(api.files.createUpload, {});
-    const response = await uploadAsync(target.url, uri, {
-      headers: { "Content-Type": mimeType },
-      httpMethod: target.method,
-      uploadType: FileSystemUploadType.BINARY_CONTENT,
+  async function upload(file: LocalFile) {
+    const target = await convex.action(api.files.createUpload, {
+      kind: file.kind,
+      mimeType: file.mimeType,
+      name: file.name,
+      size: file.size,
     });
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Upload failed (${response.status})`);
-    }
-    const storageId = storageIdOf(JSON.parse(response.body));
-    if (storageId === undefined) throw new Error("Upload failed");
-    const { url } = await convex.mutation(api.files.completeUpload, {
-      // The server's v.id("_storage") validator checks the format.
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      storageId: storageId as Id<"_storage">,
+    return sendUpload(convex, target, file);
+  }
+
+  async function posterFor(file: LocalFile) {
+    const frame = await VideoThumbnails.getThumbnailAsync(file.uri, {
+      quality: 0.7,
+      time: 0,
     });
-    return url;
+    return upload({
+      kind: "image",
+      mimeType: "image/jpeg",
+      name: "poster.jpg",
+      size: 0,
+      uri: frame.uri,
+    });
   }
 
   async function uploadFile(file: LocalFile) {
-    const url = await upload(file.uri, file.mimeType);
-    let thumbnailUrl: string | undefined;
-    if (file.kind === "video") {
-      const thumbnail = await VideoThumbnails.getThumbnailAsync(file.uri, {
-        quality: 0.7,
-        time: 0,
-      });
-      thumbnailUrl = await upload(thumbnail.uri, "image/jpeg");
-    }
+    const url = await upload(file);
+    const thumbnailUrl =
+      file.kind === "video" ? await posterFor(file) : undefined;
     return {
       durationMs: file.durationMs,
       height: file.height,
@@ -130,6 +124,15 @@ export function useAttachmentUploader() {
   /** Returns uploaded attachments, or an empty list when cancelled. */
   return async (source: AttachmentSource) => {
     const files = (await pick(source)).slice(0, MAX_ATTACHMENTS);
+    if (
+      files.some(
+        (file) =>
+          "durationMs" in file &&
+          (file.durationMs ?? 0) > MAX_VIDEO_SECONDS * 1000 + 500,
+      )
+    ) {
+      throw new AttachmentError("Videos can be up to 2 minutes long.");
+    }
     return Promise.all(files.map(uploadFile));
   };
 }

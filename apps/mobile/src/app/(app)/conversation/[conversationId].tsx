@@ -13,7 +13,10 @@ import { ActionSheet } from "~/components/action-sheet";
 import { Composer } from "~/features/conversation/composer";
 import { MessageList } from "~/features/conversation/message-list";
 import { useAccount } from "~/features/messaging/account";
-import { useAttachmentUploader } from "~/features/messaging/attachments";
+import {
+  AttachmentError,
+  useAttachmentUploader,
+} from "~/features/messaging/attachments";
 import {
   useConversation,
   useMarkRead,
@@ -53,10 +56,15 @@ function Conversation({ conversationId }: { conversationId: string }) {
   async function attach(source: AttachmentSource) {
     setAttaching(false);
     setUploading(true);
-    const attachments = await uploadAttachments(source).catch(() => null);
+    const attachments = await uploadAttachments(source).catch(
+      (error: unknown) =>
+        error instanceof AttachmentError
+          ? error.message
+          : "Couldn't upload that. Try again.",
+    );
     setUploading(false);
-    if (attachments === null) {
-      Alert.alert("Upload Failed", "Couldn't upload that. Try again.");
+    if (typeof attachments === "string") {
+      Alert.alert("Upload Failed", attachments);
     } else if (attachments.length > 0) {
       messages.sendMessage("", attachments);
     }

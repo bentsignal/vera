@@ -16,9 +16,14 @@ Decided with Shawn on 2026-10-01. Goal: a working app on Shawn's phone within
 
 ## File storage
 
-Vera's server stores files on bunny.net (Storage + CDN). File storage sits
-behind a provider interface in decentralized Convex, so a self-hoster can plug
-in another provider. bunny.net is only Vera's implementation.
+Vera's server stores media in the bunny.net Storage zone `vera-media` (New
+York) and serves it from the CDN pull zone at `media.vera.chat`. The app
+uploads straight to Storage's S3-compatible endpoint through a URL the PDS
+presigns for one object path (`dev/` or `prod/` prefix per deployment). Videos
+are capped at 2 minutes and served as plain files from the CDN; Bunny Stream
+is not used. File storage sits behind a provider interface in the backend, so
+a self-hoster can plug in another provider; without bunny.net variables the
+backend falls back to Convex file storage.
 
 ## Sign-up and sign-in
 
