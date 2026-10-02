@@ -19,10 +19,10 @@ const native =
     ? requireOptionalNativeModule<AlternateIconsModule>("ExpoAlternateAppIcons")
     : null;
 
-/** Green is the primary icon; each other theme has `vera-<theme>`. */
+/** Blue is the primary icon; each other theme has `vera-<theme>`. */
 function themeOfIcon(name: string | null) {
   const theme = name?.replace(/^vera-/, "");
-  return isThemeId(theme) ? theme : "green";
+  return isThemeId(theme) ? theme : "blue";
 }
 
 /**
@@ -39,7 +39,7 @@ export function useAppIcon() {
     setIcon: async (theme: ThemeId) => {
       if (native === null) return;
       await native.setAlternateAppIcon(
-        theme === "green" ? null : `vera-${theme}`,
+        theme === "blue" ? null : `vera-${theme}`,
       );
       setIcon(theme);
     },
