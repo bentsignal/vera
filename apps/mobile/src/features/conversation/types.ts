@@ -1,30 +1,6 @@
-export type Attachment =
-  | {
-      kind: "image";
-      id: string;
-      width: number;
-      height: number;
-    }
-  | {
-      kind: "video";
-      id: string;
-      width: number;
-      height: number;
-      durationSeconds: number;
-    }
-  | {
-      kind: "file";
-      id: string;
-      name: string;
-      sizeBytes: number;
-    };
+import type { Attachment, LinkPreview } from "@decentralized-convex/messages";
 
-export interface LinkPreview {
-  url: string;
-  siteName: string;
-  title: string;
-  description: string;
-}
+export type { Attachment, LinkPreview };
 
 export interface Message {
   id: string;
@@ -33,4 +9,6 @@ export interface Message {
   body?: string;
   attachments: Attachment[];
   linkPreview?: LinkPreview;
+  /** Set until the server confirms a message this device sent. */
+  status?: "failed" | "sending";
 }

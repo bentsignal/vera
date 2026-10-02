@@ -9,13 +9,14 @@ import { formatInboxTimestamp } from "~/lib/format";
 export function ConversationRow({
   conversation,
   onMarkRead,
-  onDelete,
+  onLeave,
 }: {
   conversation: ConversationSummary;
   onMarkRead: (id: string) => void;
-  onDelete: (id: string) => void;
+  onLeave: (id: string) => void;
 }) {
-  const { id, title, lastMessage, lastActivityAt, unreadCount } = conversation;
+  const { id, kind, title, lastMessage, lastActivityAt, unreadCount } =
+    conversation;
   return (
     <Link
       href={{
@@ -59,12 +60,14 @@ export function ConversationRow({
           disabled={unreadCount === 0}
           onPress={() => onMarkRead(id)}
         />
-        <Link.MenuAction
-          title="Delete"
-          icon="trash"
-          destructive
-          onPress={() => onDelete(id)}
-        />
+        {kind === "group" && (
+          <Link.MenuAction
+            title="Leave Group"
+            icon="rectangle.portrait.and.arrow.right"
+            destructive
+            onPress={() => onLeave(id)}
+          />
+        )}
       </Link.Menu>
     </Link>
   );

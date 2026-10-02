@@ -48,8 +48,15 @@ Local runs default to `dev.vera.chat`; read the domain through `~/env`.
 - `src/features`: screen building blocks grouped by feature.
 - `src/components`, `src/lib`: shared components and helpers.
   `lib/ui-modifiers` holds per-platform `@expo/ui` modifier presets.
-- `src/mock`: placeholder data and the fake session. Delete it as real data
-  from the PDS replaces each piece.
+- `src/features/session`: discovers the home PDS from the build's account
+  domain, creates the Better Auth (passkeys) and Convex clients, and connects
+  federated TanStack queries. Passkey sign-up and sign-in are in
+  `passkeys.ts`.
+- `src/features/messaging`: TanStack hooks over the PDS `messages` and
+  `accounts` plugins (inbox, messages with optimistic sends, spaces,
+  profiles) and attachment uploads.
+- `src/features/notifications`: Expo push registration and notification
+  routing.
 - `plugins/with-ios-scene-lifecycle.ts`: adopts the UIScene life cycle that
   the iOS 27 SDK requires. Expo SDK 58 does this in its template; remove the
   plugin when upgrading.

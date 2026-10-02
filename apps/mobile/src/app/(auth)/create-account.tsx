@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Alert, View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FieldGroup, Row, Text, TextInput } from "@expo/ui";
@@ -8,16 +8,30 @@ import { NativeHost } from "~/components/native-host";
 import { ProminentButton } from "~/components/prominent-button";
 import { env } from "~/env";
 import { isValidUsername, normalizeUsername } from "~/features/auth/username";
+import { createAccount } from "~/features/session/passkeys";
+import { useSession } from "~/features/session/session-provider";
 import { nativeColors } from "~/lib/colors";
-import { signIn } from "~/mock/session";
 
 export default function CreateAccountScreen() {
   const insets = useSafeAreaInsets();
+  const { authClient } = useSession();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
+  const [pending, setPending] = useState(false);
   const canSubmit =
+    !pending &&
     inviteCode.trim().length > 0 &&
     isValidUsername(normalizeUsername(username));
+
+  async function submit() {
+    setPending(true);
+    const error = await createAccount(authClient, {
+      inviteCode: inviteCode.trim(),
+      username: normalizeUsername(username),
+    });
+    setPending(false);
+    if (error !== null) Alert.alert("Couldn't Create Account", error);
+  }
 
   return (
     <View className="bg-background-grouped flex-1">
@@ -63,7 +77,7 @@ export default function CreateAccountScreen() {
           <ProminentButton
             label="Create Passkey"
             disabled={!canSubmit}
-            onPress={signIn}
+            onPress={() => void submit()}
           />
         </View>
       </KeyboardStickyView>

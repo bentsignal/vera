@@ -1,65 +1,80 @@
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 
 import type { Attachment } from "./types";
 import { SymbolIcon } from "~/components/symbol-icon";
-import { cn } from "~/lib/cn";
 import { formatBytes, formatDuration } from "~/lib/format";
 
 const MEDIA_WIDTH = 240;
+const MAX_MEDIA_HEIGHT = 300;
 
-function mediaHeight(width: number, height: number) {
-  return Math.min(300, (MEDIA_WIDTH * height) / width);
+function mediaHeight({ height, width }: Attachment) {
+  if (width === undefined || height === undefined || width === 0) {
+    return MEDIA_WIDTH;
+  }
+  return Math.min(MAX_MEDIA_HEIGHT, (MEDIA_WIDTH * height) / width);
 }
 
-function MediaPlaceholder({
-  attachment,
-}: {
-  attachment: Extract<Attachment, { kind: "image" | "video" }>;
-}) {
+function Media({ attachment }: { attachment: Attachment }) {
+  const router = useRouter();
   const isVideo = attachment.kind === "video";
+  const poster = isVideo ? attachment.thumbnailUrl : attachment.url;
   return (
-    <View
-      className={cn(
-        "items-center justify-center overflow-hidden rounded-2xl",
-        isVideo ? "bg-neutral-800" : "bg-fill",
-      )}
+    <Pressable
+      accessibilityRole="imagebutton"
+      accessibilityLabel={isVideo ? "Play video" : "View photo"}
+      onPress={() =>
+        router.push({
+          params: { kind: attachment.kind, url: attachment.url },
+          pathname: "/media",
+        })
+      }
+      className="bg-fill items-center justify-center overflow-hidden rounded-2xl active:opacity-90"
       style={{
-        width: MEDIA_WIDTH,
-        height: mediaHeight(attachment.width, attachment.height),
         borderCurve: "continuous",
+        height: mediaHeight(attachment),
+        width: MEDIA_WIDTH,
       }}
     >
-      <SymbolIcon
-        name={
-          isVideo
-            ? { ios: "play.circle.fill", android: "play_circle" }
-            : { ios: "photo", android: "image" }
-        }
-        size={isVideo ? 48 : 36}
-        tintColorClassName={isVideo ? "accent-white/80" : "accent-subtle"}
-      />
-      {isVideo && (
-        <Text className="text-caption absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-0.5 font-semibold text-white">
-          {formatDuration(attachment.durationSeconds)}
-        </Text>
+      {poster !== undefined && (
+        <Image
+          source={{ uri: poster }}
+          contentFit="cover"
+          transition={150}
+          style={{ height: "100%", position: "absolute", width: "100%" }}
+        />
       )}
-    </View>
+      {isVideo && (
+        <>
+          <SymbolIcon
+            name={{ android: "play_circle", ios: "play.circle.fill" }}
+            size={48}
+            tintColorClassName="accent-white/90"
+          />
+          {attachment.durationMs !== undefined && (
+            <Text className="text-caption absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-0.5 font-semibold text-white">
+              {formatDuration(Math.round(attachment.durationMs / 1000))}
+            </Text>
+          )}
+        </>
+      )}
+    </Pressable>
   );
 }
 
-function FileCard({
-  attachment,
-}: {
-  attachment: Extract<Attachment, { kind: "file" }>;
-}) {
+function FileCard({ attachment }: { attachment: Attachment }) {
   return (
-    <View
-      className="bg-bubble-incoming w-64 flex-row items-center gap-3 rounded-2xl p-3"
+    <Pressable
+      accessibilityRole="link"
+      onPress={() => void WebBrowser.openBrowserAsync(attachment.url)}
+      className="bg-bubble-incoming w-64 flex-row items-center gap-3 rounded-2xl p-3 active:opacity-80"
       style={{ borderCurve: "continuous" }}
     >
       <View className="bg-accent size-10 items-center justify-center rounded-lg">
         <SymbolIcon
-          name={{ ios: "doc.fill", android: "description" }}
+          name={{ android: "description", ios: "doc.fill" }}
           size={20}
           tintColorClassName="accent-on-accent"
         />
@@ -72,10 +87,10 @@ function FileCard({
           {attachment.name}
         </Text>
         <Text className="text-footnote text-muted">
-          {formatBytes(attachment.sizeBytes)}
+          {formatBytes(attachment.size)}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -83,6 +98,6 @@ export function AttachmentView({ attachment }: { attachment: Attachment }) {
   return attachment.kind === "file" ? (
     <FileCard attachment={attachment} />
   ) : (
-    <MediaPlaceholder attachment={attachment} />
+    <Media attachment={attachment} />
   );
 }
