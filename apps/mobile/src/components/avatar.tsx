@@ -43,6 +43,8 @@ export function Avatar({
         accessibilityLabel={name}
         source={{ uri }}
         contentFit="cover"
+        // Photos fade in as they load instead of popping in.
+        transition={180}
         className={cn("rounded-full", box)}
       />
     );

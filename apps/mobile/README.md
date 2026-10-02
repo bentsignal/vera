@@ -43,10 +43,31 @@ Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 | ----------------------- | ------------------------------------ | ------------------------- |
 | `development`           | Dev client on Shawn's phone          | `dev.vera.chat`           |
 | `development-simulator` | Dev client for the iOS simulator     | `dev.vera.chat`           |
+| `internal`              | Standalone test build for Shawn      | `dev.vera.chat`           |
 | `preview`               | TestFlight and Play internal testing | `vera.chat`               |
 | `production`            | Store builds                         | `vera.chat`               |
 
 Local runs default to `dev.vera.chat`; read the domain through `~/env`.
+
+Shawn tests changes on standalone `internal` builds: Release JavaScript
+bundled into the app (real performance, no dev server) against the dev PDS,
+so dev tools stay on. Build locally and install over the network or with the
+EAS link:
+
+```sh
+PATH="/opt/homebrew/bin:$PATH" eas build -p ios --profile internal --local \
+  --non-interactive --output /tmp/vera-internal.ipa
+eas upload -p ios --build-path /tmp/vera-internal.ipa   # shareable link
+```
+
+(Local builds need fastlane from Homebrew ahead of any rbenv shim.)
+
+## UI rules
+
+- Nothing pops in. Anything that loads (lists, conversations, screens,
+  photos) shows nothing until it is ready and then fades in.
+  `ScreenList`'s `ready` prop, the message list's `onLoad` fade, and
+  `expo-image` transitions do this; new screens follow the same pattern.
 
 ## Layout
 

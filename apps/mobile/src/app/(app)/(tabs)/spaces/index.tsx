@@ -2,7 +2,6 @@ import { Platform, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import Add from "@expo/material-symbols/add.xml";
 
-import { HeaderFade } from "~/components/header-fade";
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { useVisibleAccounts } from "~/features/messaging/account";
@@ -38,6 +37,7 @@ export default function SpacesScreen() {
         />
       </AccountToolbar>
       <ScreenList
+        ready={!isLoading}
         data={spaces}
         keyExtractor={(space) => space.key}
         ListEmptyComponent={isLoading ? null : <EmptySpaces />}
@@ -45,7 +45,6 @@ export default function SpacesScreen() {
           <SpaceRow space={item} showAccount={showAccount} />
         )}
       />
-      <HeaderFade />
     </>
   );
 }

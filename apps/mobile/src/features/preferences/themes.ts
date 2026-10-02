@@ -6,10 +6,16 @@ interface Palette {
 }
 
 /**
- * Accent color sets, green (the default) first. Each has tuned light and
+ * Accent color sets, blue (the default) first. Each has tuned light and
  * dark variants; bubbles stay dark enough for white text (about 3:1).
  */
 export const THEMES = [
+  {
+    dark: { accent: "#0a84ff", bubble: "#0a84ff" },
+    id: "blue",
+    light: { accent: "#007aff", bubble: "#007aff" },
+    name: "Blue",
+  },
   {
     dark: { accent: "#30d158", bubble: "#24a845" },
     id: "green",
@@ -21,12 +27,6 @@ export const THEMES = [
     id: "teal",
     light: { accent: "#0d9488", bubble: "#0d9488" },
     name: "Teal",
-  },
-  {
-    dark: { accent: "#0a84ff", bubble: "#0a84ff" },
-    id: "blue",
-    light: { accent: "#007aff", bubble: "#007aff" },
-    name: "Blue",
   },
   {
     dark: { accent: "#7c7cff", bubble: "#5b5bf7" },
