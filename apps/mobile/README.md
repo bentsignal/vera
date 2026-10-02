@@ -18,14 +18,22 @@ pnpm --filter @vera/mobile dev      # Metro only, for an installed dev build
 
 The passkey entitlement (`webcredentials:vera.chat`) makes `expo run:ios`
 require an Apple Development signing identity, even for the simulator. Without
-one, build unsigned for the simulator:
+one, build for the simulator with local ("Sign to Run Locally") signing. Fully
+unsigned builds lose their entitlements, and SecureStore then cannot reach the
+keychain:
 
 ```sh
 npx expo prebuild --platform ios
 xcodebuild -workspace ios/Vera.xcworkspace -scheme Vera -configuration Debug \
-  -sdk iphonesimulator -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+  -sdk iphonesimulator -derivedDataPath ios/build CODE_SIGN_IDENTITY=- \
+  CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=39K6A9FP99 \
+  PROVISIONING_PROFILE_SPECIFIER= build
 xcrun simctl install booted ios/build/Build/Products/Debug-iphonesimulator/Vera.app
 ```
+
+Passkeys do not work on these builds: iOS only allows them for apps signed by
+the team listed in `vera.chat`'s Apple app site association. Test sign-in on a
+device with an EAS development build.
 
 ## EAS
 
