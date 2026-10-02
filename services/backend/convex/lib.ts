@@ -6,6 +6,12 @@ export function requireEnvironment(name: string) {
   return value;
 }
 
+/** An environment variable, or null when unset or empty. */
+export function optionalEnvironment(name: string) {
+  const value = process.env[name];
+  return value === undefined || value.length === 0 ? null : value;
+}
+
 export function actorFromEmail(email: string) {
   const separator = email.indexOf("@");
   const localPart = email.slice(0, separator === -1 ? undefined : separator);

@@ -10,6 +10,7 @@
 
 import type * as conversations from "../conversations.js";
 import type * as dispatcher from "../dispatcher.js";
+import type * as history from "../history.js";
 import type * as index from "../index.js";
 import type * as metadata from "../metadata.js";
 import type * as model from "../model.js";
@@ -29,6 +30,7 @@ import { anyApi, componentsGeneric } from "convex/server";
 const fullApi: ApiFromModules<{
   conversations: typeof conversations;
   dispatcher: typeof dispatcher;
+  history: typeof history;
   index: typeof index;
   metadata: typeof metadata;
   model: typeof model;

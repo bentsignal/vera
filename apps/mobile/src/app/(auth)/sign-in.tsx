@@ -5,6 +5,8 @@ import { withUniwind } from "uniwind";
 
 import { ProminentButton } from "~/components/prominent-button";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { env } from "~/env";
+import { DevSignIn } from "~/features/dev/dev-sign-in";
 import { signIn } from "~/features/session/passkeys";
 import { useSession } from "~/features/session/session-provider";
 
@@ -40,6 +42,7 @@ export default function SignInScreen() {
           never asks for a password.
         </Text>
       </View>
+      {env.devTools && <DevSignIn />}
       <ProminentButton
         label="Sign In with Passkey"
         disabled={pending}
