@@ -157,6 +157,10 @@ export function useMessageWindow(
 
   return {
     anchor: view.anchor,
+    /** Each loaded page's message IDs, for per-page reaction queries. */
+    pageMessageIds: pages.map(
+      (page) => page.data?.messages.map((message) => message.messageId) ?? [],
+    ),
     /** Changes whenever the window reopens, so lists can remount. */
     viewKey: JSON.stringify(view.opened),
     hasNewer,

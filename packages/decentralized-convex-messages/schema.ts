@@ -42,6 +42,16 @@ export default defineSchema({
   })
     .index("by_message", ["messageId"])
     .index("by_conversation_sent", ["conversationId", "sentAt"]),
+  // Reactions by this PDS's accounts, to messages stored on any PDS.
+  reactions: defineTable({
+    accountId: v.string(),
+    conversationId: v.string(),
+    emoji: v.string(),
+    messageId: v.string(),
+    reactedAt: v.number(),
+  })
+    .index("by_message", ["messageId"])
+    .index("by_message_account", ["messageId", "accountId"]),
   spaces: defineTable({
     createdBy: v.string(),
     name: v.string(),

@@ -15,7 +15,7 @@ merge. iMessage is the reference for feel throughout.
 - [x] Bubbles feel like iMessage: spacing, roominess, grouping.
 - [x] No per-message times in bubbles. Like iMessage, dragging the list left
       slides every message over and reveals its time on the right.
-- [ ] Reactions: long press a message (with haptic feedback) to pick an
+- [x] Reactions: long press a message (with haptic feedback) to pick an
       emoji: heart, thumbs up, thumbs down, laughing first, then a few more.
       Counts show under the message (Slack/Discord style) and tapping one
       toggles your reaction. Works in bubbles and stacked layouts.

@@ -19,6 +19,7 @@ import type { MessageLayout } from "~/features/preferences/store";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { buildMessageRows } from "./build-rows";
 import { DaySeparator, TimeHeader } from "./day-separator";
+import { MessageActionsProvider } from "./message-actions";
 import { MessageBubble } from "./message-bubble";
 import { MessageStacked } from "./message-stacked";
 import { RevealTimes } from "./reveal";
@@ -147,6 +148,7 @@ export function MessageList({
   onJumpToLatest,
   bottomInset,
   composerHeight,
+  onToggleReaction,
 }: {
   messages: readonly Message[];
   /** The signed-in account's address. */
@@ -164,6 +166,7 @@ export function MessageList({
   bottomInset: number;
   /** Height of the composer floating over the bottom of the list. */
   composerHeight: number;
+  onToggleReaction: (messageId: string, emoji: string) => void;
 }) {
   const listRef = useRef<LegendListRef>(null);
   // Hidden until the first layout settles at its starting position, then
@@ -177,7 +180,7 @@ export function MessageList({
     anchorId === undefined ? -1 : rows.findIndex((row) => row.key === anchorId);
 
   return (
-    <>
+    <MessageActionsProvider onToggleReaction={onToggleReaction}>
       <RevealTimes>
         <Animated.View style={[{ flex: 1 }, fadeIn]}>
           <KeyboardAwareLegendList
@@ -234,6 +237,6 @@ export function MessageList({
           else void listRef.current?.scrollToEnd({ animated: true });
         }}
       />
-    </>
+    </MessageActionsProvider>
   );
 }

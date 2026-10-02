@@ -89,6 +89,19 @@ export const space = v.object({
 
 export type Space = Infer<typeof space>;
 
+/** One account's emoji reaction to a message. */
+export const reaction = v.object({
+  accountId: v.string(),
+  emoji: v.string(),
+  messageId: v.string(),
+  reactedAt: v.number(),
+});
+
+export type Reaction = Infer<typeof reaction>;
+
+/** At most this many messages per `reactions` query. */
+export const MAX_REACTION_MESSAGES = 100;
+
 /** Oldest first. `hasOlder`/`hasNewer` say whether more exist beyond it. */
 export const messagePage = v.object({
   hasNewer: v.boolean(),
@@ -132,6 +145,19 @@ export const messagesProtocol = definePluginProtocol({
         messageId: v.string(),
       }),
       returns: message,
+    }),
+    /**
+     * Adds (`on: true`) or removes your emoji reaction to a message. The
+     * reaction is stored on your home PDS, like the messages you send.
+     */
+    react: defineOperation({
+      args: v.object({
+        conversationId: v.string(),
+        emoji: v.string(),
+        messageId: v.string(),
+        on: v.boolean(),
+      }),
+      returns: v.null(),
     }),
     markRead: defineOperation({
       args: v.object({ conversationId: v.string(), readAt: v.number() }),
@@ -197,6 +223,17 @@ export const messagesProtocol = definePluginProtocol({
         conversationId: v.string(),
       }),
       returns: messagePage,
+    }),
+    /**
+     * Reactions to the given messages, gathered from every member's PDS
+     * (each stores its own accounts' reactions).
+     */
+    reactions: defineOperation({
+      args: v.object({
+        conversationId: v.string(),
+        messageIds: v.array(v.string()),
+      }),
+      returns: v.array(reaction),
     }),
     spaces: defineOperation({
       args: v.object({}),

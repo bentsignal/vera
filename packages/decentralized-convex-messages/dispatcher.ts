@@ -8,6 +8,7 @@ import * as conversations from "./conversations.ts";
 import { requireAccountId } from "./model.ts";
 import { messagesProtocol } from "./protocol.ts";
 import * as push from "./pushTokens.ts";
+import * as reactions from "./reactions.ts";
 import * as spaces from "./spaces.ts";
 
 export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
@@ -31,6 +32,8 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         conversations.markRead(ctx, requireAccountId(identity), args),
       openDirect: (ctx, { args, identity }) =>
         conversations.openDirect(ctx, requireAccountId(identity), args),
+      react: (ctx, { args, identity }) =>
+        reactions.react(ctx, requireAccountId(identity), args),
       registerPushToken: (ctx, { args, identity }) =>
         push.registerPushToken(ctx, requireAccountId(identity), args.token),
       removeSpaceMember: (ctx, { args, identity }) =>
@@ -63,6 +66,14 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
           args,
         );
         return routedQueryResult(page, routes);
+      },
+      reactions: async (ctx, { args, identity }) => {
+        const found = await reactions.reactions(
+          ctx,
+          requireAccountId(identity),
+          args,
+        );
+        return routedQueryResult(found.reactions, found.routes);
       },
       space: (ctx, { args, identity }) =>
         spaces.space(ctx, requireAccountId(identity), args.spaceId),

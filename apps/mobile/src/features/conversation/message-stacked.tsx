@@ -6,6 +6,7 @@ import { cn } from "~/lib/cn";
 import { formatTime } from "~/lib/format";
 import { AttachmentView } from "./attachment-view";
 import { LinkPreviewCard } from "./link-preview-card";
+import { LongPressMessage, ReactionChips } from "./message-actions";
 import { MessageMeta, SendingFade } from "./message-status";
 
 const AVATAR_COLUMN = 36;
@@ -47,21 +48,24 @@ export function MessageStacked({
             )}
           </View>
         )}
-        <SendingFade status={message.status}>
-          <View className="items-start gap-1">
-            {message.body && (
-              <Text selectable className="text-body text-foreground">
-                {message.body}
-              </Text>
-            )}
-            {message.attachments.map((attachment) => (
-              <AttachmentView key={attachment.url} attachment={attachment} />
-            ))}
-            {message.linkPreview && (
-              <LinkPreviewCard preview={message.linkPreview} />
-            )}
-          </View>
-        </SendingFade>
+        <LongPressMessage message={message}>
+          <SendingFade status={message.status}>
+            <View className="items-start gap-1">
+              {message.body && (
+                <Text className="text-body text-foreground">
+                  {message.body}
+                </Text>
+              )}
+              {message.attachments.map((attachment) => (
+                <AttachmentView key={attachment.url} attachment={attachment} />
+              ))}
+              {message.linkPreview && (
+                <LinkPreviewCard preview={message.linkPreview} />
+              )}
+            </View>
+          </SendingFade>
+        </LongPressMessage>
+        <ReactionChips message={message} align="start" />
         <MessageMeta message={message} delivered={false} />
       </View>
     </View>
