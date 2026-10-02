@@ -8,6 +8,7 @@ import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { env } from "~/env";
+import { useAccount } from "~/features/messaging/account";
 
 let activeConversationId: string | undefined;
 
@@ -24,27 +25,22 @@ export function useActiveConversation(conversationId: string) {
   }, [conversationId]);
 }
 
-function conversationIdOf(data: unknown) {
-  return typeof data === "object" &&
-    data !== null &&
-    "conversationId" in data &&
-    typeof data.conversationId === "string"
-    ? data.conversationId
-    : undefined;
+function asString(value: unknown) {
+  return typeof value === "string" ? value : undefined;
 }
 
-function messageIdOf(data: unknown) {
-  return typeof data === "object" &&
-    data !== null &&
-    "messageId" in data &&
-    typeof data.messageId === "string"
-    ? data.messageId
+function stringField(data: unknown, field: string) {
+  return typeof data === "object" && data !== null
+    ? asString(Reflect.get(data, field))
     : undefined;
 }
 
 Notifications.setNotificationHandler({
   handleNotification: (notification) => {
-    const conversationId = conversationIdOf(notification.request.content.data);
+    const conversationId = stringField(
+      notification.request.content.data,
+      "conversationId",
+    );
     const visible = conversationId !== activeConversationId;
     return Promise.resolve({
       shouldPlaySound: visible,
@@ -74,10 +70,11 @@ export async function getPushToken() {
   return data;
 }
 
-/** Registers this device for message notifications after sign-in. */
+/** Registers this device for the account's message notifications. */
 export function usePushRegistration() {
+  const { address } = useAccount();
   const register = useMutation(
-    pdsMutation({ mutation: pds.messages.registerPushToken }),
+    pdsMutation({ mutation: pds.messages.registerPushToken, session: address }),
   );
   const { mutate } = register;
   // eslint-disable-next-line no-restricted-syntax -- Registers this device with the OS push service and the server once per sign-in.
@@ -95,15 +92,18 @@ export function useNotificationRouting() {
   // eslint-disable-next-line no-restricted-syntax -- Responds to a notification tap delivered by the OS.
   useEffect(() => {
     const data = response?.notification.request.content.data;
-    const conversationId = conversationIdOf(data);
+    const conversationId = stringField(data, "conversationId");
     if (conversationId === undefined) return;
-    const messageId = messageIdOf(data);
+    const messageId = stringField(data, "messageId");
+    // Open as the account the message was sent to, at the message itself
+    // so an old notification stays useful.
+    const account = stringField(data, "accountId");
     router.push({
-      // Opening at the message keeps an old notification useful.
-      params:
-        messageId === undefined
-          ? { conversationId }
-          : { conversationId, messageId },
+      params: {
+        conversationId,
+        ...(account === undefined ? {} : { account }),
+        ...(messageId === undefined ? {} : { messageId }),
+      },
       pathname: "/conversation/[conversationId]",
     });
     void Notifications.clearLastNotificationResponseAsync();

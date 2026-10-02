@@ -1,14 +1,14 @@
 import { ActivityIndicator, Platform, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
-import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import EditSquare from "@expo/material-symbols/edit_square.xml";
 import { pds } from "@vera/backend/pds";
 
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { ConversationRow } from "~/features/inbox/conversation-row";
+import { useRunAs, useVisibleAccounts } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/conversations";
+import { AccountToolbar } from "~/features/session/account-toolbar";
 
 function EmptyInbox() {
   return (
@@ -26,37 +26,45 @@ function EmptyInbox() {
 export default function ChatsScreen() {
   const router = useRouter();
   const { conversations, isLoading } = useInbox();
-  const markRead = useMutation(
-    pdsMutation({ mutation: pds.messages.markRead }),
-  );
-  const leave = useMutation(
-    pdsMutation({ mutation: pds.messages.leaveConversation }),
-  );
+  const runAs = useRunAs();
+  const showAccount = useVisibleAccounts().length > 1;
   const visible = conversations ?? [];
 
   return (
     <>
       <TabTitle title="Chats" />
-      <Stack.Toolbar placement="right">
+      <AccountToolbar>
         <Stack.Toolbar.Button
           icon={Platform.OS === "ios" ? "square.and.pencil" : EditSquare}
           accessibilityLabel="New message"
           onPress={() => router.push("/new-message")}
         />
-      </Stack.Toolbar>
+      </AccountToolbar>
       <ScreenList
         data={visible}
-        keyExtractor={(conversation) => conversation.id}
+        keyExtractor={(conversation) => conversation.key}
         ListEmptyComponent={
           isLoading ? <ActivityIndicator className="pt-24" /> : <EmptyInbox />
         }
         renderItem={({ item }) => (
           <ConversationRow
             conversation={item}
-            onMarkRead={(conversationId) =>
-              markRead.mutate({ conversationId, readAt: Date.now() })
+            showAccount={showAccount}
+            onMarkRead={() =>
+              void runAs(
+                item.account,
+                pds.messages.markRead({
+                  conversationId: item.id,
+                  readAt: Date.now(),
+                }),
+              )
             }
-            onLeave={(conversationId) => leave.mutate({ conversationId })}
+            onLeave={() =>
+              void runAs(
+                item.account,
+                pds.messages.leaveConversation({ conversationId: item.id }),
+              )
+            }
           />
         )}
       />

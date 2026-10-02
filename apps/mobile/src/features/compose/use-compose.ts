@@ -16,7 +16,7 @@ const LOOKUP_DELAY_MS = 400;
 export function useCompose() {
   const router = useRouter();
   const { address: self } = useAccount();
-  const { conversations } = useInbox();
+  const { conversations } = useInbox({ account: self });
   const [query, setQueryNow] = useState("");
   // Account lookups wait for typing to pause.
   const [lookup, setLookup] = useState("");
@@ -30,10 +30,10 @@ export function useCompose() {
   ].filter((address) => address !== self);
   const displayName = useDisplayNames([...known, ...recipients]);
   const openDirect = useMutation(
-    pdsMutation({ mutation: pds.messages.openDirect }),
+    pdsMutation({ mutation: pds.messages.openDirect, session: self }),
   );
   const createGroup = useMutation(
-    pdsMutation({ mutation: pds.messages.createGroup }),
+    pdsMutation({ mutation: pds.messages.createGroup, session: self }),
   );
 
   function setQuery(value: string) {
@@ -75,6 +75,7 @@ export function useCompose() {
     router.dismiss();
     router.push({
       params: {
+        account: self,
         conversationId: created.conversationId,
         title: isGroup ? groupName.trim() : displayName(only ?? ""),
       },

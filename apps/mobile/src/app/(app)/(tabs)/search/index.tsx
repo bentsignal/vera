@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
-import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { SearchResult } from "~/features/search/use-search";
 import { ScreenList } from "~/components/screen-list";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { useAccounts } from "~/features/messaging/account";
 import { useSearchResults } from "~/features/search/use-search";
 
 const ICONS = {
@@ -50,9 +49,7 @@ export default function SearchScreen() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const results = useSearchResults(query);
-  const openDirect = useMutation(
-    pdsMutation({ mutation: pds.messages.openDirect }),
-  );
+  const accounts = useAccounts();
 
   async function open(result: SearchResult) {
     const { target } = result;
@@ -60,12 +57,20 @@ export default function SearchScreen() {
       router.push({ params: target, pathname: "/spaces/[spaceId]" });
       return;
     }
+    const session = accounts.find(
+      (account) => account.address === target.account,
+    );
+    if (session === undefined) return;
     const conversation =
       "conversationId" in target
         ? target
         : {
-            conversationId: (await openDirect.mutateAsync(target))
-              .conversationId,
+            account: target.account,
+            conversationId: (
+              await session.pds.mutate(
+                pds.messages.openDirect({ accountId: target.accountId }),
+              )
+            ).conversationId,
             title: result.title,
           };
     router.push({

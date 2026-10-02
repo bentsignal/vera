@@ -24,7 +24,7 @@ export const targets = internalQuery({
     const conversation = await getConversation(ctx, message.conversationId);
     if (conversation === null) return null;
 
-    const tokens: string[] = [];
+    const recipients: { accountId: string; token: string }[] = [];
     for (const accountId of await memberAddresses(ctx, conversation)) {
       if (accountId === message.authorId) continue;
       const member = await getMember(
@@ -37,15 +37,15 @@ export const targets = internalQuery({
         .query("pushTokens")
         .withIndex("by_account", (index) => index.eq("accountId", accountId))
         .collect();
-      tokens.push(...rows.map((row) => row.token));
+      recipients.push(...rows.map(({ token }) => ({ accountId, token })));
     }
     return {
       body: previewText(message),
       conversationId: conversation.conversationId,
       messageId: message.messageId,
       kind: conversation.kind,
+      recipients,
       title: await title(ctx, conversation, message),
-      tokens,
     };
   },
 });
@@ -56,19 +56,22 @@ export const send = internalAction({
     const target = await ctx.runQuery(internal.notifications.targets, {
       messageId,
     });
-    if (target === null || target.tokens.length === 0) return;
+    if (target === null || target.recipients.length === 0) return;
 
     for (
       let start = 0;
-      start < target.tokens.length;
+      start < target.recipients.length;
       start += EXPO_BATCH_SIZE
     ) {
-      const batch = target.tokens.slice(start, start + EXPO_BATCH_SIZE);
+      const batch = target.recipients.slice(start, start + EXPO_BATCH_SIZE);
       const response = await fetch(EXPO_PUSH_URL, {
         body: JSON.stringify(
-          batch.map((to) => ({
+          batch.map(({ accountId, token }) => ({
             body: target.body,
+            // A device signed into several accounts opens the message as
+            // the account it was sent to.
             data: {
+              accountId,
               conversationId: target.conversationId,
               kind: target.kind,
               messageId: target.messageId,
@@ -76,7 +79,7 @@ export const send = internalAction({
             sound: "default",
             threadId: target.conversationId,
             title: target.title,
-            to,
+            to: token,
           })),
         ),
         headers: {
@@ -90,9 +93,9 @@ export const send = internalAction({
         continue;
       }
       const errors = parseTicketErrors(await response.json());
-      const expired = batch.filter(
-        (_, index) => errors[index] === "DeviceNotRegistered",
-      );
+      const expired = batch
+        .filter((_, index) => errors[index] === "DeviceNotRegistered")
+        .map(({ token }) => token);
       if (expired.length > 0) {
         await ctx.runMutation(internal.notifications.removeTokens, {
           tokens: expired,
@@ -106,11 +109,11 @@ export const removeTokens = internalMutation({
   args: { tokens: v.array(v.string()) },
   handler: async (ctx, { tokens }) => {
     for (const token of tokens) {
-      const row = await ctx.db
+      const rows = await ctx.db
         .query("pushTokens")
         .withIndex("by_token", (index) => index.eq("token", token))
-        .unique();
-      if (row !== null) await ctx.db.delete(row._id);
+        .collect();
+      for (const row of rows) await ctx.db.delete(row._id);
     }
   },
 });

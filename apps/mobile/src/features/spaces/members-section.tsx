@@ -4,11 +4,13 @@ import { FieldGroup, ListItem, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
 import { SectionHeaderWithAdd } from "~/components/section-header";
+import { useAccount } from "~/features/messaging/account";
 import { useDisplayNames } from "~/features/messaging/profiles";
 import { secondaryTextStyle } from "~/lib/colors";
 
 export function MembersSection({ space }: { space: Space }) {
   const router = useRouter();
+  const { address: account } = useAccount();
   const displayName = useDisplayNames(
     space.members.map((member) => member.accountId),
   );
@@ -19,7 +21,7 @@ export function MembersSection({ space }: { space: Space }) {
           title={`Members (${space.members.length})`}
           onAdd={() =>
             router.push({
-              params: { spaceId: space.spaceId },
+              params: { account, spaceId: space.spaceId },
               pathname: "/add-people",
             })
           }

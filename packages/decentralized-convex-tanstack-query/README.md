@@ -104,6 +104,31 @@ const pdsQueryClient = new PdsQueryClient(client);
 const disconnect = pdsQueryClient.connect(queryClient);
 ```
 
+An application signed into several accounts at once can keep them in one
+`QueryClient` by naming each session. Queries and mutations then pass the
+session they run as, and each session's results are cached under its own key:
+
+```ts
+new PdsQueryClient(mayaClient, { session: "maya@vera.chat" }).connect(
+  queryClient,
+);
+new PdsQueryClient(workClient, { session: "maya@work.example" }).connect(
+  queryClient,
+);
+
+useQuery(
+  pdsQuery({ args: {}, query: pds.messages.inbox, session: "maya@vera.chat" }),
+);
+useMutation(
+  pdsMutation({ mutation: pds.messages.send, session: "maya@work.example" }),
+);
+
+// On sign-out, drop one account's cached queries.
+queryClient.removeQueries({
+  queryKey: pdsSessionQueryKey("maya@work.example"),
+});
+```
+
 `PdsQueryClient` updates TanStack's cache from live Convex subscriptions. The
 core client owns home-first routing, PDS discovery, connection reuse, and
 author-home mutations; the TanStack adapter only bridges those results into the

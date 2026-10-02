@@ -4,24 +4,28 @@ import { Link } from "expo-router";
 import type { ConversationSummary } from "./types";
 import { Avatar } from "~/components/avatar";
 import { UnreadBadge } from "~/components/unread-badge";
+import { usernameOf } from "~/features/messaging/profiles";
 import { formatInboxTimestamp } from "~/lib/format";
 
 export function ConversationRow({
   conversation,
+  showAccount,
   onMarkRead,
   onLeave,
 }: {
   conversation: ConversationSummary;
-  onMarkRead: (id: string) => void;
-  onLeave: (id: string) => void;
+  /** Names the account the conversation belongs to, when several show. */
+  showAccount: boolean;
+  onMarkRead: () => void;
+  onLeave: () => void;
 }) {
-  const { id, kind, title, lastMessage, lastActivityAt, unreadCount } =
+  const { account, id, kind, title, lastMessage, lastActivityAt, unreadCount } =
     conversation;
   return (
     <Link
       href={{
         pathname: "/conversation/[conversationId]",
-        params: { conversationId: id, title },
+        params: { account, conversationId: id, title },
       }}
       asChild
     >
@@ -40,6 +44,11 @@ export function ConversationRow({
               >
                 {title}
               </Text>
+              {showAccount && (
+                <Text numberOfLines={1} className="text-footnote text-accent">
+                  {usernameOf(account)}
+                </Text>
+              )}
               <Text className="text-subhead text-muted">
                 {formatInboxTimestamp(lastActivityAt)}
               </Text>
@@ -62,14 +71,14 @@ export function ConversationRow({
           title="Mark as Read"
           icon="envelope.open"
           disabled={unreadCount === 0}
-          onPress={() => onMarkRead(id)}
+          onPress={onMarkRead}
         />
         {kind === "group" && (
           <Link.MenuAction
             title="Leave Group"
             icon="rectangle.portrait.and.arrow.right"
             destructive
-            onPress={() => onLeave(id)}
+            onPress={onLeave}
           />
         )}
       </Link.Menu>

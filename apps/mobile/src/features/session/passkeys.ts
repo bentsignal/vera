@@ -5,6 +5,8 @@ import type {
 import { Passkey } from "react-native-passkey";
 
 import type { HomeAuthClient } from "./auth-client";
+import type { PendingSignIn } from "./pending-sign-in";
+import { finishPendingSignIn } from "./pending-sign-in";
 
 const SIGN_UP_ERRORS = new Map([
   ["INVALID_SIGN_UP_REQUEST", "Enter an invite code and a username."],
@@ -46,9 +48,10 @@ async function request<Result>(
  * Returns an error message, or null when cancelled or successful.
  */
 export async function createAccount(
-  authClient: HomeAuthClient,
+  pending: PendingSignIn,
   details: { inviteCode: string; username: string },
 ) {
+  const { authClient } = pending;
   try {
     const options = await request<PasskeyCreateRequest>(
       authClient,
@@ -59,15 +62,18 @@ export async function createAccount(
     await request(authClient, "/passkey/verify-registration", {
       body: { response },
     });
-    authClient.$store.notify("$sessionSignal");
-    return null;
+    return await finishPendingSignIn(pending);
   } catch (error) {
     return describe(error, "Couldn't create your account. Try again.");
   }
 }
 
-/** Signs in with any passkey saved for Vera. Returns an error message. */
-export async function signIn(authClient: HomeAuthClient) {
+/**
+ * Signs in with any passkey saved for Vera. Returns an error message, or
+ * null when cancelled or successful.
+ */
+export async function signIn(pending: PendingSignIn) {
+  const { authClient } = pending;
   try {
     const options = await request<PasskeyGetRequest>(
       authClient,
@@ -78,8 +84,7 @@ export async function signIn(authClient: HomeAuthClient) {
     await request(authClient, "/passkey/verify-authentication", {
       body: { response },
     });
-    authClient.$store.notify("$sessionSignal");
-    return null;
+    return await finishPendingSignIn(pending);
   } catch (error) {
     return describe(error, "Couldn't sign in. Try again.");
   }

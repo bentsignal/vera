@@ -3,8 +3,8 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { api } from "@vera/backend/api";
-import { useConvex } from "convex/react";
 
+import { useAccount } from "./account";
 import { sendUpload } from "./upload-transports";
 
 const MAX_ATTACHMENTS = 10;
@@ -81,9 +81,10 @@ async function pick(source: AttachmentSource, imagesOnly: boolean) {
 
 /** Picks files from a source and uploads them, ready to attach. */
 export function useAttachmentUploader() {
-  const convex = useConvex();
+  const { session } = useAccount();
 
   async function upload(file: LocalFile) {
+    const convex = await session.convex();
     const target = await convex.action(api.files.createUpload, {
       kind: file.kind,
       mimeType: file.mimeType,

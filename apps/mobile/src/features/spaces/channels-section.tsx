@@ -5,9 +5,11 @@ import { FieldGroup, ListItem, Text } from "@expo/ui";
 import { SectionHeaderWithAdd } from "~/components/section-header";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { UnreadBadge } from "~/components/unread-badge";
+import { useAccount } from "~/features/messaging/account";
 
 export function ChannelsSection({ space }: { space: Space }) {
   const router = useRouter();
+  const { address: account } = useAccount();
   return (
     <FieldGroup.Section>
       <FieldGroup.SectionHeader>
@@ -16,7 +18,7 @@ export function ChannelsSection({ space }: { space: Space }) {
             title="Text Channels"
             onAdd={() =>
               router.push({
-                params: { spaceId: space.spaceId },
+                params: { account, spaceId: space.spaceId },
                 pathname: "/new-channel",
               })
             }
@@ -39,6 +41,7 @@ export function ChannelsSection({ space }: { space: Space }) {
           onPress={() =>
             router.push({
               params: {
+                account,
                 conversationId: channel.conversationId,
                 title: `#${channel.name}`,
               },

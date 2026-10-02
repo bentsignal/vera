@@ -1,16 +1,19 @@
 import "~/global.css";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useConvexAuth } from "convex/react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useCSSVariable } from "uniwind";
 
 import { applyStoredPreferences } from "~/features/preferences/store";
-import { SessionProvider } from "~/features/session/session-provider";
+import { queryClient } from "~/features/session/account-session";
+import {
+  SessionProvider,
+  useSession,
+} from "~/features/session/session-provider";
 
 void SplashScreen.preventAutoHideAsync();
 applyStoredPreferences();
@@ -29,14 +32,18 @@ function useNavigationTheme() {
 }
 
 function Navigator() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  // eslint-disable-next-line no-restricted-syntax -- The native splash screen stays up until the session is known.
+  const isAuthenticated = useSession().accounts.length > 0;
+  // eslint-disable-next-line no-restricted-syntax -- The native splash screen stays up until the accounts' home servers are known.
   useEffect(() => {
-    if (!isLoading) void SplashScreen.hideAsync();
-  }, [isLoading]);
-  if (isLoading) return null;
+    void SplashScreen.hideAsync();
+  }, []);
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      // Signing out of the last account replaces the whole app tree, so no
+      // screen renders without an account first.
+      key={isAuthenticated ? "app" : "auth"}
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Protected guard={isAuthenticated}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
@@ -48,7 +55,6 @@ function Navigator() {
 }
 
 export default function RootLayout() {
-  const [queryClient] = useState(() => new QueryClient());
   return (
     <ThemeProvider value={useNavigationTheme()}>
       <KeyboardProvider>

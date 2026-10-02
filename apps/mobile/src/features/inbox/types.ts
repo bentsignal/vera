@@ -8,7 +8,11 @@ export interface Person {
 }
 
 export interface ConversationSummary {
+  /** The signed-in account this conversation belongs to. */
+  account: string;
   id: string;
+  /** Unique across accounts, which can share a conversation. */
+  key: string;
   kind: ConversationKind;
   title: string;
   memberIds: string[];

@@ -1,5 +1,5 @@
 import type { Id } from "@vera/backend/dataModel";
-import type { ConvexReactClient } from "convex/react";
+import type { ConvexHttpClient } from "convex/browser";
 import type { FunctionReturnType } from "convex/server";
 import { FileSystemUploadType, uploadAsync } from "expo-file-system/legacy";
 import { api } from "@vera/backend/api";
@@ -40,7 +40,7 @@ async function sendBinary(
 
 /** Convex file storage, used when no media provider is configured. */
 async function sendToConvex(
-  convex: ConvexReactClient,
+  convex: ConvexHttpClient,
   url: string,
   file: LocalUpload,
 ) {
@@ -58,7 +58,7 @@ async function sendToConvex(
 
 /** Sends a local file to wherever the server said, returning its URL. */
 export async function sendUpload(
-  convex: ConvexReactClient,
+  convex: ConvexHttpClient,
   target: UploadTarget,
   file: LocalUpload,
 ) {

@@ -3,18 +3,18 @@ import { Alert, TextInput, View } from "react-native";
 import { withUniwind } from "uniwind";
 
 import { ProminentButton } from "~/components/prominent-button";
-import { useSession } from "~/features/session/session-provider";
+import { usePendingSignIn } from "~/features/session/pending-sign-in";
 import { devSignIn } from "./dev-tools";
 
 const StyledTextInput = withUniwind(TextInput);
 
 /** Dev PDS only: sign in as any username, for simulators. */
 export function DevSignIn() {
-  const { authClient } = useSession();
+  const pending = usePendingSignIn();
   const [username, setUsername] = useState("");
 
   async function submit() {
-    const error = await devSignIn(authClient, username);
+    const error = await devSignIn(pending, username);
     if (error !== null) Alert.alert("Dev Sign In", error);
   }
 

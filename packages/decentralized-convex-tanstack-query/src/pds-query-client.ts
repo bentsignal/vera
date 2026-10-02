@@ -12,7 +12,20 @@ import type { Query, QueryClient, QueryMeta } from "@tanstack/react-query";
 import { pdsQueryDataFromSnapshot } from "@decentralized-convex/client";
 
 export const PDS_QUERY_META_KEY = "decentralizedConvexPdsQuery";
-const connectedClients = new WeakMap<QueryClient, PdsQueryClient>();
+/** Each QueryClient's connected PDS clients, by session (undefined: none). */
+const connectedClients = new WeakMap<
+  QueryClient,
+  Map<string | undefined, PdsQueryClient>
+>();
+
+export interface PdsQueryClientOptions {
+  /**
+   * Names an account session, so several signed-in accounts can share one
+   * QueryClient. Only queries and mutations created with the same `session`
+   * run through this client.
+   */
+  readonly session?: string;
+}
 
 export class IncompletePdsQueryError extends Error {
   readonly data: PdsQueryData<unknown, unknown>;
@@ -33,16 +46,26 @@ export class PdsQueryClient {
   readonly #activeQueries = new Map<string, ActiveQuery>();
   readonly #client;
   readonly #connections = new Map<QueryClient, () => void>();
+  readonly #session;
 
-  constructor(client: DecentralizedConvexClient) {
+  constructor(
+    client: DecentralizedConvexClient,
+    options: PdsQueryClientOptions = {},
+  ) {
     this.#client = client;
+    this.#session = options.session;
   }
 
   connect(queryClient: QueryClient) {
-    const connected = connectedClients.get(queryClient);
+    const sessions =
+      connectedClients.get(queryClient) ??
+      new Map<string | undefined, PdsQueryClient>();
+    const connected = sessions.get(this.#session);
     if (connected !== undefined && connected !== this) {
       throw new Error(
-        "This TanStack QueryClient is already connected to another PdsQueryClient",
+        this.#session === undefined
+          ? "This TanStack QueryClient is already connected to another PdsQueryClient"
+          : `This TanStack QueryClient is already connected to another PdsQueryClient for session ${this.#session}`,
       );
     }
     if (this.#connections.has(queryClient)) return () => undefined;
@@ -52,7 +75,8 @@ export class PdsQueryClient {
       );
     }
 
-    connectedClients.set(queryClient, this);
+    sessions.set(this.#session, this);
+    connectedClients.set(queryClient, sessions);
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (
         (event.type === "observerAdded" ||
@@ -86,8 +110,10 @@ export class PdsQueryClient {
     if (unsubscribe === undefined) return;
     unsubscribe();
     this.#connections.delete(queryClient);
-    if (connectedClients.get(queryClient) === this) {
-      connectedClients.delete(queryClient);
+    const sessions = connectedClients.get(queryClient);
+    if (sessions?.get(this.#session) === this) {
+      sessions.delete(this.#session);
+      if (sessions.size === 0) connectedClients.delete(queryClient);
     }
     if (this.#connections.size === 0) {
       for (const queryHash of this.#activeQueries.keys()) {
@@ -150,8 +176,13 @@ export class PdsQueryClient {
 
   #startQuery(queryClient: QueryClient, query: Query) {
     const config = pdsQueryConfigFromMeta(query.meta);
-    if (config === undefined || this.#activeQueries.has(query.queryHash))
+    if (
+      config === undefined ||
+      config.session !== this.#session ||
+      this.#activeQueries.has(query.queryHash)
+    ) {
       return;
+    }
 
     const active: ActiveQuery = {};
     this.#activeQueries.set(query.queryHash, active);
@@ -181,11 +212,13 @@ export class PdsQueryClient {
   }
 }
 
-export function connectedPdsClient(queryClient: QueryClient) {
-  const client = connectedClients.get(queryClient);
+export function connectedPdsClient(queryClient: QueryClient, session?: string) {
+  const client = connectedClients.get(queryClient)?.get(session);
   if (client === undefined) {
     throw new Error(
-      "Connect a PdsQueryClient to this TanStack QueryClient before using PDS options",
+      session === undefined
+        ? "Connect a PdsQueryClient to this TanStack QueryClient before using PDS options"
+        : `Connect a PdsQueryClient for session ${session} to this TanStack QueryClient before using its PDS options`,
     );
   }
   return client;
@@ -207,6 +240,7 @@ function pdsQueryConfigFromMeta(meta: QueryMeta | undefined) {
   return config as {
     options: PdsQueryExecutionOptions;
     request: AnyPdsQueryRequest;
+    session?: string;
   };
 }
 
