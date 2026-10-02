@@ -1,5 +1,5 @@
 import type { SymbolViewProps } from "expo-symbols";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -8,11 +8,10 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassView } from "expo-glass-effect";
 import { useRouter } from "expo-router";
-import { withUniwind } from "uniwind";
+import { useCSSVariable, withUniwind } from "uniwind";
 
 import type { ConversationKind } from "~/features/inbox/types";
 import { Avatar } from "~/components/avatar";
-import { HeaderFade } from "~/components/header-fade";
 import { SymbolIcon } from "~/components/symbol-icon";
 
 const StyledGlassView = withUniwind(GlassView);
@@ -35,6 +34,56 @@ export const CONVERSATION_HEADER_HEIGHT =
   AVATAR + CAPSULE - CAPSULE_OVERLAP + FADE_PAST;
 
 const CHANNEL_GLYPH = { android: "tag", ios: "number" } as const;
+
+/** Solid this far below the status bar, then easing out. */
+const FADE_SOLID = 16;
+/** Alpha along the fade, from where it starts (0) to where it ends (1). */
+const FADE_STOPS = [
+  [0, 1],
+  [0.3, 0.9],
+  [0.55, 0.7],
+  [0.8, 0.35],
+  [1, 0],
+] as const;
+
+/** The page color with less alpha, so the fade never turns gray. */
+function withAlpha(color: string, alpha: number) {
+  if (/^#[0-9a-f]{6}$/i.test(color)) {
+    const hex = Math.round(alpha * 255)
+      .toString(16)
+      .padStart(2, "0");
+    return `${color}${hex}`;
+  }
+  return alpha === 0 ? "transparent" : color;
+}
+
+/**
+ * Keeps the header legible over messages scrolling underneath, like iOS's
+ * scroll edge effect: the page color behind the status bar, easing out
+ * across the photo and name. Content at rest sits below it.
+ */
+function TopFade() {
+  const insets = useSafeAreaInsets();
+  const color = useCSSVariable("--color-background");
+  if (Platform.OS !== "ios" || typeof color !== "string") return null;
+  const solid = insets.top + FADE_SOLID;
+  const height = insets.top + CONVERSATION_HEADER_HEIGHT;
+  const start = (solid / height) * 100;
+  const stops = FADE_STOPS.map(
+    ([at, alpha]) =>
+      `${withAlpha(color, alpha)} ${Math.round(start + (100 - start) * at)}%`,
+  );
+  return (
+    <View
+      pointerEvents="none"
+      className="absolute top-0 right-0 left-0"
+      style={{
+        experimental_backgroundImage: `linear-gradient(180deg, ${color} 0%, ${stops.join(", ")})`,
+        height,
+      }}
+    />
+  );
+}
 
 function GlassCircleButton({
   icon,
@@ -150,8 +199,7 @@ export function ConversationHeader({
   const insets = useSafeAreaInsets();
   return (
     <>
-      {/* Solid behind the status bar, fading out across the header. */}
-      <HeaderFade barHeight={16} fade={CONVERSATION_HEADER_HEIGHT - 16} />
+      <TopFade />
       <LayoutAnimationConfig skipEntering>
         <View
           // Drags between the buttons still scroll the messages beneath.

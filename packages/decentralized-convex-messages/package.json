@@ -18,6 +18,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@decentralized-convex/accounts": "workspace:0.1.0",
     "@decentralized-convex/core": "workspace:0.1.0",
     "@decentralized-convex/plugin": "workspace:0.1.0",
     "@decentralized-convex/server": "workspace:0.1.0",

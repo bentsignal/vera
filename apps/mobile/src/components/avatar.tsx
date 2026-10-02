@@ -70,7 +70,7 @@ export function Avatar({
           source={{ uri }}
           contentFit="cover"
           // Fades over the initials instead of popping in.
-          transition={200}
+          transition={180}
           className={cn("absolute rounded-full", box)}
         />
       ) : null}
