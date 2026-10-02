@@ -45,6 +45,29 @@ export function formatInboxTimestamp(date: Date, now = new Date()) {
   return shortDateFormat.format(date);
 }
 
+const headerDateFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+});
+
+/**
+ * iMessage-style time headers between bursts of messages: "Today", a
+ * weekday within the week, then a short date, each with the time.
+ */
+export function formatTimeHeader(date: Date, now = new Date()) {
+  const days = daysBefore(date, now);
+  const day =
+    days === 0
+      ? "Today"
+      : days === 1
+        ? "Yesterday"
+        : days < 7
+          ? weekdayFormat.format(date)
+          : headerDateFormat.format(date);
+  return { day, time: formatTime(date) };
+}
+
 /** Day separators in a conversation. */
 export function formatDaySeparator(date: Date, now = new Date()) {
   const days = daysBefore(date, now);

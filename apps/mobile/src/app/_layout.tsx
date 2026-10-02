@@ -2,6 +2,7 @@ import "~/global.css";
 
 import { useEffect } from "react";
 import { useColorScheme } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -56,14 +57,16 @@ function Navigator() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider value={useNavigationTheme()}>
-      <KeyboardProvider>
-        <QueryClientProvider client={queryClient}>
-          <SessionProvider fallback={null}>
-            <Navigator />
-          </SessionProvider>
-        </QueryClientProvider>
-      </KeyboardProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={useNavigationTheme()}>
+        <KeyboardProvider>
+          <QueryClientProvider client={queryClient}>
+            <SessionProvider fallback={null}>
+              <Navigator />
+            </SessionProvider>
+          </QueryClientProvider>
+        </KeyboardProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

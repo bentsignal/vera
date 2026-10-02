@@ -62,7 +62,7 @@ export function MessageStacked({
             )}
           </View>
         </SendingFade>
-        <MessageMeta message={message} showTime={false} align="start" />
+        <MessageMeta message={message} delivered={false} />
       </View>
     </View>
   );
