@@ -152,6 +152,28 @@ function JumpToLatest({
   );
 }
 
+interface MessageListProps {
+  messages: readonly Message[];
+  /** The signed-in account's address. */
+  self: string;
+  layout: MessageLayout;
+  profileOf: ProfileOf;
+  /** Name incoming bubbles; for groups and channels. */
+  showAuthors: boolean;
+  anchorId?: string;
+  /** Newer messages exist beyond the loaded window. */
+  hasNewer: boolean;
+  onStartReached: () => void;
+  onEndReached: () => void;
+  onJumpToLatest: () => void;
+  bottomInset: number;
+  /** Height of the header floating over the top, below the status bar. */
+  topInset: number;
+  /** Height of the composer floating over the bottom of the list. */
+  composerHeight: number;
+  onToggleReaction: (messageId: string, emoji: string) => void;
+}
+
 /**
  * The conversation, oldest first and aligned to the bottom. Loads older
  * pages near the top and newer ones near the bottom without moving what is on
@@ -172,27 +194,7 @@ export function MessageList({
   topInset,
   composerHeight,
   onToggleReaction,
-}: {
-  messages: readonly Message[];
-  /** The signed-in account's address. */
-  self: string;
-  layout: MessageLayout;
-  profileOf: ProfileOf;
-  /** Name incoming bubbles; for groups and channels. */
-  showAuthors: boolean;
-  anchorId?: string;
-  /** Newer messages exist beyond the loaded window. */
-  hasNewer: boolean;
-  onStartReached: () => void;
-  onEndReached: () => void;
-  onJumpToLatest: () => void;
-  bottomInset: number;
-  /** Height of the header floating over the top, below the status bar. */
-  topInset: number;
-  /** Height of the composer floating over the bottom of the list. */
-  composerHeight: number;
-  onToggleReaction: (messageId: string, emoji: string) => void;
-}) {
+}: MessageListProps) {
   const listRef = useRef<LegendListRef>(null);
   // Hidden until the first layout settles at its starting position, then
   // faded in, so nothing flashes or jumps into place.
