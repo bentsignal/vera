@@ -14,7 +14,8 @@
       "distribution": "internal",
       "environment": "development",
       "env": {
-        "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat"
+        "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat",
+        "VERA_NOTIFICATION_EXTENSION": "1"
       }
     },
     "development-simulator": {
@@ -28,7 +29,8 @@
       "distribution": "internal",
       "environment": "development",
       "env": {
-        "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat"
+        "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat",
+        "VERA_NOTIFICATION_EXTENSION": "1"
       },
       "ios": {
         "buildConfiguration": "Release"
@@ -43,7 +45,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_VERA_DOMAIN": "vera.chat"
+        "EXPO_PUBLIC_VERA_DOMAIN": "vera.chat",
+        "VERA_NOTIFICATION_EXTENSION": "1"
       }
     },
     "production": {
@@ -52,12 +55,23 @@
       "environment": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_VERA_DOMAIN": "vera.chat"
+        "EXPO_PUBLIC_VERA_DOMAIN": "vera.chat",
+        "VERA_NOTIFICATION_EXTENSION": "1"
       }
     }
   },
   "submit": {
-    "preview": {},
-    "production": {}
+    "preview": {
+      "ios": {
+        "ascAppId": "6818656155",
+        "appleTeamId": "39K6A9FP99"
+      }
+    },
+    "production": {
+      "ios": {
+        "ascAppId": "6818656155",
+        "appleTeamId": "39K6A9FP99"
+      }
+    }
   }
 }
