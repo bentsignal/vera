@@ -44,9 +44,11 @@ The host calls `definePdsApp({ auth, plugins, components })`. It:
 1. checks duplicate names, missing plugins, and incompatible ecosystem versions
    through the plugin tuple's TypeScript type;
 2. installs each plugin as a normal Convex Component;
-3. installs an optional auth adapter's Component and derives its public
-   descriptor metadata from that same adapter;
-4. installs unrelated Components without treating them as PDS protocols.
+3. derives public auth descriptor metadata from the optional auth adapter;
+4. installs other Components, including the auth system's own, without
+   treating them as PDS protocols. Convex requires every Component import to
+   be written directly in `convex.config.ts`; importing one indirectly through
+   another module makes the push fail.
 
 The protocol marker is deliberately type-only. Convex replaces imported
 Component definitions while evaluating `convex.config.ts`, so runtime metadata

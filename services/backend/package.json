@@ -9,14 +9,16 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo node_modules",
-    "deploy:a": "convex dev --once --env-file .env.a.local",
-    "deploy:b": "convex dev --once --env-file .env.b.local",
+    "deploy": "convex deploy",
+    "dev": "convex dev",
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@better-auth/expo": "~1.6.33",
+    "@better-auth/passkey": "~1.6.33",
     "@convex-dev/better-auth": "0.12.5",
     "@decentralized-convex/accounts": "workspace:0.1.0",
     "@decentralized-convex/address": "workspace:0.1.0",
@@ -24,7 +26,7 @@
     "@decentralized-convex/client": "workspace:0.1.0",
     "@decentralized-convex/messages": "workspace:0.1.0",
     "@decentralized-convex/server": "workspace:0.1.0",
-    "better-auth": "~1.6.15",
+    "better-auth": "~1.6.33",
     "convex": "catalog:"
   },
   "devDependencies": {

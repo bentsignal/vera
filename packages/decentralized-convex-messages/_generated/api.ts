@@ -8,17 +8,17 @@
  * @module
  */
 
+import type * as dispatcher from "../dispatcher.js";
+import type * as index from "../index.js";
+import type * as metadata from "../metadata.js";
+import type * as protocol from "../protocol.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 import { anyApi, componentsGeneric } from "convex/server";
-
-import type * as dispatcher from "../dispatcher.js";
-import type * as index from "../index.js";
-import type * as metadata from "../metadata.js";
-import type * as protocol from "../protocol.js";
 
 const fullApi: ApiFromModules<{
   dispatcher: typeof dispatcher;
