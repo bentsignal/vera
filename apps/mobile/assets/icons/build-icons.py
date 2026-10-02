@@ -1,18 +1,12 @@
 """Writes the Vera app icon, an Icon Composer document, and its flat renders.
 
-    python3 build-icons.py              # vera.icon, splash renders, then render-flat.swift
+    python3 build-icons.py              # vera.icon, then render-flat.swift
     python3 build-icons.py --check DIR  # also every iOS appearance at 1024px in DIR
 
 The icon is a top-down aloe vera (Vera is named after the plant): two rings
 of six curved leaves, like a pinwheel. Light is pale glass leaves on a green
 gradient; dark is green leaves on near-black; tinted and clear use gray
 leaves, which iOS tints.
-
-The splash image is a glass render too, so it matches the icon: the dark
-icon's green leaves, shown on white in light mode and on black in dark
-mode. ictool can't render a transparent background, so it is rendered on
-black and on white and render-flat.swift recovers the transparency from the
-difference.
 """
 
 from pathlib import Path
@@ -21,7 +15,6 @@ import math
 import shutil
 import subprocess
 import sys
-import tempfile
 
 ROOT = Path(__file__).resolve().parent
 ICTOOL = "/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool"
@@ -31,7 +24,6 @@ TINT_HUE = .47
 
 BACKGROUND = ("#a6e57f", "#2f9e5a")
 DARK_BACKGROUND = ("#313131", "#141414")
-SRGB = "/System/Library/ColorSync/Profiles/sRGB Profile.icc"
 
 # (count, length, width, first leaf angle) per ring, outermost first. The
 # inner ring sits between the outer ring's leaves.
@@ -148,29 +140,15 @@ def document():
     }
 
 
-def splash_document(fills, background, shadow):
-    """The icon with one set of leaf fills on a flat background, for the
-    Default rendition (ictool replaces light backgrounds in Dark)."""
-    doc = document()
-    for group in doc["groups"]:
-        ring = int(group["name"].split()[-1]) - 1
-        for parity, layer in enumerate(group["layers"]):
-            layer["fill-specializations"] = [{"value": fill(fills[ring][parity])}]
-        group["shadow"] = {"kind": shadow, "opacity": .5}
-        del group["shadow-specializations"]
-    doc["fill"] = fill(background)
-    del doc["fill-specializations"]
-    return doc
-
-
-def write_bundle(bundle=ROOT / "vera.icon", doc=None):
+def write_bundle():
+    bundle = ROOT / "vera.icon"
     shutil.rmtree(bundle, ignore_errors=True)
     (bundle / "Assets").mkdir(parents=True)
     for ring, (count, length, width, start) in enumerate(RINGS):
         leaves = [leaf(start + 360 * i / count, length, width) for i in range(count)]
         for parity in (0, 1):
             (bundle / "Assets" / layer_names(ring, parity)[1]).write_text(svg(leaves[parity::2]))
-    (bundle / "icon.json").write_text(json.dumps(doc or document(), indent=2) + "\n")
+    (bundle / "icon.json").write_text(json.dumps(document(), indent=2) + "\n")
     return bundle
 
 
@@ -185,22 +163,9 @@ def render(bundle, rendition, output, size):
     subprocess.run(args, check=True, capture_output=True)
 
 
-def render_splash_sources(out):
-    """splash-<background>.png: the dark icon's leaves on black and on white."""
-    for background in ("#000000", "#ffffff"):
-        name = f"splash-{'black' if background == '#000000' else 'white'}"
-        bundle = write_bundle(out / f"{name}.icon", splash_document(DARK, background, "neutral"))
-        png = out / f"{name}.png"
-        render(bundle, "Default", png, 1024)
-        # ictool writes 16-bit Display P3; the matting expects 8-bit sRGB.
-        subprocess.run(["sips", "-m", SRGB, str(png), "--out", str(png)], check=True, capture_output=True)
-
-
 def main():
     bundle = write_bundle()
-    with tempfile.TemporaryDirectory() as splash:
-        render_splash_sources(Path(splash))
-        subprocess.run(["swift", str(ROOT / "render-flat.swift"), str(ROOT), splash], check=True)
+    subprocess.run(["swift", str(ROOT / "render-flat.swift"), str(ROOT)], check=True)
     if "--check" in sys.argv:
         check = Path(sys.argv[sys.argv.index("--check") + 1])
         check.mkdir(parents=True, exist_ok=True)

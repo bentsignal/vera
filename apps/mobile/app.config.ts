@@ -56,10 +56,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-splash-screen",
       {
-        // The dark icon's green glass leaves, on white or black, at about
-        // their size in the home screen icon (larger looks soft).
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 56,
+        // No logo: the app starts fast enough that one only flickers. The
+        // colors match the app background, which fades in over them.
         backgroundColor: "#FFFFFF",
         dark: { backgroundColor: "#000000" },
       },
