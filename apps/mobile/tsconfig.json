@@ -1,0 +1,18 @@
+{
+  "extends": ["@acme/tsconfig/base.json", "expo/tsconfig.base.json"],
+  "compilerOptions": {
+    "types": ["expo/types", "node"],
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "src",
+    "plugins",
+    "app.config.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": ["node_modules", "ios", "android"]
+}

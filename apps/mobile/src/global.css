@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import "uniwind";
+
+/*
+ * Semantic tokens follow the iOS system palette so custom views sit
+ * naturally next to native controls in both color schemes.
+ */
+@layer theme {
+  :root {
+    @variant light {
+      --color-background: #ffffff;
+      --color-background-grouped: #f2f2f7;
+      --color-background-elevated: #ffffff;
+      --color-foreground: #000000;
+      --color-muted: rgba(60, 60, 67, 0.6);
+      --color-subtle: rgba(60, 60, 67, 0.3);
+      --color-separator: rgba(60, 60, 67, 0.29);
+      --color-fill: rgba(118, 118, 128, 0.12);
+      --color-accent: #4f46e5;
+      --color-on-accent: #ffffff;
+      --color-bubble-incoming: #e9e9eb;
+      --color-bubble-outgoing: #4f46e5;
+      --color-destructive: #ff3b30;
+    }
+
+    @variant dark {
+      --color-background: #000000;
+      --color-background-grouped: #000000;
+      --color-background-elevated: #1c1c1e;
+      --color-foreground: #ffffff;
+      --color-muted: rgba(235, 235, 245, 0.6);
+      --color-subtle: rgba(235, 235, 245, 0.3);
+      --color-separator: rgba(84, 84, 88, 0.65);
+      --color-fill: rgba(118, 118, 128, 0.24);
+      --color-accent: #7c7cff;
+      --color-on-accent: #ffffff;
+      --color-bubble-incoming: #26252a;
+      --color-bubble-outgoing: #5b5bf7;
+      --color-destructive: #ff453a;
+    }
+  }
+}
+
+/* Apple Human Interface Guidelines text styles at the default size. */
+@theme {
+  --text-large-title: 34px;
+  --text-title: 28px;
+  --text-headline: 17px;
+  --text-body: 17px;
+  --text-callout: 16px;
+  --text-subhead: 15px;
+  --text-footnote: 13px;
+  --text-caption: 12px;
+}
+
+@utility border-hairline {
+  border-width: hairlineWidth();
+}
+
+@utility border-b-hairline {
+  border-bottom-width: hairlineWidth();
+}
