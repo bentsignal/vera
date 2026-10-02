@@ -337,4 +337,33 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Name
       >;
     };
+    history: {
+      importHistory: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          conversationId: string;
+          messages: Array<{
+            attachments: Array<{
+              durationMs?: number;
+              height?: number;
+              kind: "image" | "video" | "file";
+              mimeType: string;
+              name: string;
+              size: number;
+              thumbnailUrl?: string;
+              url: string;
+              width?: number;
+            }>;
+            authorId: string;
+            authorName: string;
+            body: string;
+            messageId: string;
+            sentAt: number;
+          }>;
+        },
+        any,
+        Name
+      >;
+    };
   };

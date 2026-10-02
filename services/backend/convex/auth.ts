@@ -16,6 +16,7 @@ import { components, internal } from "./_generated/api";
 import { query } from "./_generated/server";
 import authConfig from "./auth.config";
 import betterAuthSchema from "./betterAuth/schema";
+import { devSignIn, devToolsEnabled } from "./devSignIn";
 import { actorFromEmail, requireEnvironment } from "./lib";
 
 export const authComponent = createClient<DataModel, typeof betterAuthSchema>(
@@ -101,6 +102,7 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
         rpName: "Vera",
       }),
       betterAuthPdsPlugin(pdsAuth),
+      ...(devToolsEnabled() ? [devSignIn()] : []),
     ],
     trustedOrigins: ["vera://"],
   });

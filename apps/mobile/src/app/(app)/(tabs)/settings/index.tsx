@@ -4,6 +4,7 @@ import { FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { ActionSheet } from "~/components/action-sheet";
 import { NativeHost } from "~/components/native-host";
+import { DeveloperSection } from "~/features/dev/developer-section";
 import { useAccount } from "~/features/messaging/account";
 import { AccountSection } from "~/features/settings/account-section";
 import { AppearancePicker } from "~/features/settings/appearance-picker";
@@ -50,6 +51,7 @@ export default function SettingsScreen() {
           <FieldGroup.Section title="Display">
             <AppearancePicker />
           </FieldGroup.Section>
+          <DeveloperSection />
           <AccountSection />
         </FieldGroup>
       </NativeHost>

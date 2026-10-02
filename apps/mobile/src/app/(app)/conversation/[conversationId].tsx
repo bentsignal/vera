@@ -12,6 +12,7 @@ import type { AttachmentSource } from "~/features/messaging/attachments";
 import { ActionSheet } from "~/components/action-sheet";
 import { Composer } from "~/features/conversation/composer";
 import { MessageList } from "~/features/conversation/message-list";
+import { useDevTools } from "~/features/dev/dev-tools";
 import { useAccount } from "~/features/messaging/account";
 import {
   AttachmentError,
@@ -46,6 +47,7 @@ function Conversation({ conversationId }: { conversationId: string }) {
     useConversation(conversationId);
   const messages = useMessages(conversationId);
   const uploadAttachments = useAttachmentUploader();
+  const devTools = useDevTools();
   const [attaching, setAttaching] = useState(false);
   const [uploading, setUploading] = useState(false);
   const keyboardVisible = useKeyboardState((state) => state.isVisible);
@@ -95,7 +97,10 @@ function Conversation({ conversationId }: { conversationId: string }) {
         </View>
       )}
       <Composer
-        onSend={(body) => messages.sendMessage(body)}
+        onSend={(body) => {
+          messages.sendMessage(body);
+          devTools.replyToMe(conversationId);
+        }}
         onAttach={() => setAttaching(true)}
         keyboardVisible={keyboardVisible}
       />

@@ -8,25 +8,29 @@
  * @module
  */
 
-import type * as appAssociation from "../appAssociation.js";
-import type * as auth from "../auth.js";
-import type * as bunny from "../bunny.js";
-import type * as files from "../files.js";
-import type * as http from "../http.js";
-import type * as invites from "../invites.js";
-import type * as lib from "../lib.js";
-import type * as pds from "../pds.js";
-
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
+import type * as appAssociation from "../appAssociation.js";
+import type * as auth from "../auth.js";
+import type * as bunny from "../bunny.js";
+import type * as dev from "../dev.js";
+import type * as devSignIn from "../devSignIn.js";
+import type * as files from "../files.js";
+import type * as http from "../http.js";
+import type * as invites from "../invites.js";
+import type * as lib from "../lib.js";
+import type * as pds from "../pds.js";
+
 declare const fullApi: ApiFromModules<{
   appAssociation: typeof appAssociation;
   auth: typeof auth;
   bunny: typeof bunny;
+  dev: typeof dev;
+  devSignIn: typeof devSignIn;
   files: typeof files;
   http: typeof http;
   invites: typeof invites;
