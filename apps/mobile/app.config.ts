@@ -56,14 +56,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-splash-screen",
       {
-        // Green leaves on white; the pale (light icon) leaves on black.
-        image: "./assets/images/splash-icon-light.png",
-        imageWidth: 120,
+        // The dark icon's green glass leaves, on white or black.
+        image: "./assets/images/splash-icon.png",
+        imageWidth: 132,
         backgroundColor: "#FFFFFF",
-        dark: {
-          image: "./assets/images/splash-icon-dark.png",
-          backgroundColor: "#000000",
-        },
+        dark: { backgroundColor: "#000000" },
       },
     ],
     [
