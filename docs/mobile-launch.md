@@ -83,6 +83,7 @@ friends, and later asks the agent to deactivate it. The repo skill
 | Bare domain                  | `vera.chat` → Vercel project `vera-chat-domain`, which proxies `/.well-known/*` to production |
 | App Store Connect            | App "Vera Chat" (Apple ID `6818656155`, SKU `vera-ios`, bundle `chat.vera.app`); "Vera" was taken |
 | App Store Connect API key    | Team key "Vera EAS" (Admin), `~/.appstoreconnect/` on Shawn's Mac; EAS uses it for credentials and submits |
+| TestFlight                   | Internal group "Team" (Shawn); external group "Friends" with public link `https://testflight.apple.com/join/CqpKDW25`; App Review signs up with the "Apple App Review" invite code |
 | Discovery records            | `_pds.vera.chat`, `_pds.dev.vera.chat` (Vercel DNS)                                           |
 | Apple team                   | `39K6A9FP99` (bundle `chat.vera.app`)                                                         |
 | EAS project                  | `@directedbyshawn/vera`, `5680db13-57a8-4b74-ae41-1f52abbda0b1`                               |

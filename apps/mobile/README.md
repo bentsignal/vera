@@ -67,6 +67,30 @@ eas upload -p ios --build-path /tmp/vera-internal.ipa   # shareable link
 
 (Local builds need fastlane from Homebrew ahead of any rbenv shim.)
 
+### TestFlight
+
+App Store builds (`preview`, `production`) must come from a release Xcode;
+App Store Connect rejects builds from the default `Xcode-beta`. Build with
+Xcode 27 (`/Applications/Xcode-27.app`), which keeps the iOS 27 detached
+search tab (Xcode 26.5 builds compile the search tab patch out), then upload
+with Apple's uploader, which reads the API key from `~/.appstoreconnect`:
+
+```sh
+source ~/.appstoreconnect/vera.env
+DEVELOPER_DIR=/Applications/Xcode-27.app/Contents/Developer \
+  PATH="/opt/homebrew/bin:$PATH" eas build -p ios --profile preview --local \
+  --non-interactive --output /tmp/vera-preview.ipa
+xcrun altool --upload-app -f /tmp/vera-preview.ipa -t ios \
+  --apiKey "$EXPO_ASC_KEY_ID" --apiIssuer "$EXPO_ASC_ISSUER_ID"
+```
+
+(`eas submit --non-interactive` refuses an API key from the environment.)
+TestFlight groups: **Team** (internal, Shawn; every build, no review) and
+**Friends** (external, public link `https://testflight.apple.com/join/CqpKDW25`;
+each build goes through Beta App Review). Reviewers sign up with the
+production invite code labeled "Apple App Review", which the review notes
+in Test Information give them.
+
 ## UI rules
 
 - Nothing pops in. Anything that loads (lists, conversations, screens,
