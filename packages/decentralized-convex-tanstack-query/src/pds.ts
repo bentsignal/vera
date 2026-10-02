@@ -19,12 +19,24 @@ import { mutationOptions } from "@tanstack/react-query";
 
 import { connectedPdsClient, PDS_QUERY_META_KEY } from "./pds-query-client.ts";
 
-export type PdsQueryKey<Request extends AnyPdsQueryRequest> = readonly [
-  "decentralized-convex",
-  "pds",
-  "query",
-  Request,
-];
+export type PdsQueryKey<Request extends AnyPdsQueryRequest> =
+  | readonly ["decentralized-convex", "pds", "query", Request]
+  | readonly [
+      "decentralized-convex",
+      "pds",
+      "session",
+      string,
+      "query",
+      Request,
+    ];
+
+/**
+ * The key prefix of every query in one account session, for invalidating or
+ * removing them together, such as on sign-out.
+ */
+export function pdsSessionQueryKey(session: string) {
+  return ["decentralized-convex", "pds", "session", session] as const;
+}
 
 type QueryData<Request extends AnyPdsQueryRequest> = PdsQueryData<
   DefaultCombinedPdsResult<Request>,
@@ -87,6 +99,8 @@ export interface PdsQueryConfig<
   readonly args: Args;
   readonly options?: PdsQueryBuilderOptions<Request, Data>;
   readonly query: (args: Args) => Request;
+  /** The account session to run as; see `PdsQueryClientOptions.session`. */
+  readonly session?: string;
 }
 
 export interface CompletePdsQueryConfig<
@@ -97,6 +111,8 @@ export interface CompletePdsQueryConfig<
   readonly args: Args;
   readonly options: CompletePdsQueryBuilderOptions<Request, Data>;
   readonly query: (args: Args) => Request;
+  /** The account session to run as; see `PdsQueryClientOptions.session`. */
+  readonly session?: string;
 }
 
 export function pdsQuery<
@@ -119,6 +135,7 @@ export function pdsQuery<
   args,
   options,
   query,
+  session,
 }:
   | CompletePdsQueryConfig<Args, Request, Data>
   | PdsQueryConfig<Args, Request, Data>):
@@ -126,7 +143,7 @@ export function pdsQuery<
   | PdsQueryOptions<Request, Data> {
   // The overloads preserve whether the literal strict flag was supplied.
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  return pdsQueryOptions(query(args), options) as
+  return pdsQueryOptions(query(args), options, session) as
     | CompletePdsQueryOptions<Request, Data>
     | PdsQueryOptions<Request, Data>;
 }
@@ -136,6 +153,7 @@ function pdsQueryOptions<Request extends AnyPdsQueryRequest>(
   options?:
     | CompletePdsQueryBuilderOptions<Request, unknown>
     | PdsQueryBuilderOptions<Request, unknown>,
+  session?: string,
 ) {
   const {
     initialResponseTimeout,
@@ -150,15 +168,17 @@ function pdsQueryOptions<Request extends AnyPdsQueryRequest>(
       ? {}
       : { revealPartialResultsAfter }),
   };
-  const queryKey: PdsQueryKey<typeof request> = [
-    "decentralized-convex",
-    "pds",
-    "query",
-    request,
-  ];
+  const queryKey: PdsQueryKey<typeof request> =
+    session === undefined
+      ? ["decentralized-convex", "pds", "query", request]
+      : [...pdsSessionQueryKey(session), "query", request];
   const sharedOptions = {
     meta: {
-      [PDS_QUERY_META_KEY]: { options: executionOptions, request },
+      [PDS_QUERY_META_KEY]: {
+        options: executionOptions,
+        request,
+        ...(session === undefined ? {} : { session }),
+      },
     },
     queryKey,
     ...tanStackOptions,
@@ -167,7 +187,10 @@ function pdsQueryOptions<Request extends AnyPdsQueryRequest>(
     return {
       ...sharedOptions,
       queryFn: ({ client }: { client: QueryClient }) =>
-        connectedPdsClient(client).queryComplete(request, executionOptions),
+        connectedPdsClient(client, session).queryComplete(
+          request,
+          executionOptions,
+        ),
       staleTime: tanStackOptions.staleTime ?? Infinity,
     };
   }
@@ -178,7 +201,7 @@ function pdsQueryOptions<Request extends AnyPdsQueryRequest>(
       PdsRequestResult<Request>
     >(),
     queryFn: ({ client }: { client: QueryClient }) =>
-      connectedPdsClient(client).query(request, executionOptions),
+      connectedPdsClient(client, session).query(request, executionOptions),
     staleTime:
       tanStackOptions.staleTime ??
       ((query: Query<unknown, Error, QueryData<Request>>) =>
@@ -206,16 +229,18 @@ export interface PdsMutationConfig<
     UseMutationOptions<PdsRequestResult<Request>, Error, Args, Context>,
     "mutationFn"
   >;
+  /** The account session to run as; see `PdsQueryClientOptions.session`. */
+  readonly session?: string;
 }
 
 export function pdsMutation<
   Args,
   Request extends PdsRequest<unknown, "mutation">,
   Context = unknown,
->({ mutation, options }: PdsMutationConfig<Args, Request, Context>) {
+>({ mutation, options, session }: PdsMutationConfig<Args, Request, Context>) {
   return mutationOptions<PdsRequestResult<Request>, Error, Args, Context>({
     ...options,
     mutationFn: (args: Args, { client }) =>
-      connectedPdsClient(client).mutate(mutation(args)),
+      connectedPdsClient(client, session).mutate(mutation(args)),
   });
 }

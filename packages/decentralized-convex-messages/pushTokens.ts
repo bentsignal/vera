@@ -1,10 +1,15 @@
 import type { MutationCtx } from "./_generated/server.js";
 
-function findToken(ctx: MutationCtx, token: string) {
-  return ctx.db
+/**
+ * A device signed into several accounts registers its token once per
+ * account, and gets each account's notifications.
+ */
+async function findToken(ctx: MutationCtx, self: string, token: string) {
+  const rows = await ctx.db
     .query("pushTokens")
     .withIndex("by_token", (index) => index.eq("token", token))
-    .unique();
+    .collect();
+  return rows.find((row) => row.accountId === self) ?? null;
 }
 
 export async function registerPushToken(
@@ -12,12 +17,9 @@ export async function registerPushToken(
   self: string,
   token: string,
 ) {
-  const existing = await findToken(ctx, token);
+  const existing = await findToken(ctx, self, token);
   if (existing === null) {
     await ctx.db.insert("pushTokens", { accountId: self, token });
-  } else if (existing.accountId !== self) {
-    // The device signed into a different account.
-    await ctx.db.patch(existing._id, { accountId: self });
   }
   return null;
 }
@@ -27,7 +29,7 @@ export async function unregisterPushToken(
   self: string,
   token: string,
 ) {
-  const existing = await findToken(ctx, token);
-  if (existing?.accountId === self) await ctx.db.delete(existing._id);
+  const existing = await findToken(ctx, self, token);
+  if (existing !== null) await ctx.db.delete(existing._id);
   return null;
 }

@@ -1,22 +1,21 @@
-import type { AuthClient } from "@convex-dev/better-auth/react";
 import type { DiscoveredPds } from "@decentralized-convex/client";
 import type { ReactNode } from "react";
-import { createContext, use, useEffect, useState } from "react";
+import { createContext, use } from "react";
 import { Pressable, Text, View } from "react-native";
-// eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
-import { DecentralizedConvexClient } from "@decentralized-convex/client";
-import { PdsQueryClient } from "@decentralized-convex/tanstack-query";
-import { ConvexReactClient } from "convex/react";
+import { useQueries } from "@tanstack/react-query";
 
-import type { HomeAuthClient } from "./auth-client";
-import { createHomeAuthClient } from "./auth-client";
-import { createFederationAuthTokenFetcher } from "./federation-auth";
+import type { AccountSession } from "./account-session";
+import { env } from "~/env";
+import { accountSession, verifyAccountSession } from "./account-session";
+import { useStoredAccounts } from "./account-store";
 import { discoverHome } from "./home";
 
 interface Session {
-  readonly authClient: HomeAuthClient;
+  /** Every signed-in account, in the order they were added. */
+  readonly accounts: readonly AccountSession[];
+  /** The account Chats and Spaces are narrowed to, or null for all. */
+  readonly filter: string | null;
+  /** This build's home PDS, where new accounts sign in. */
   readonly home: DiscoveredPds;
 }
 
@@ -31,8 +30,8 @@ export function useSession() {
 }
 
 /**
- * Finds the home PDS, then provides its Better Auth session, Convex client,
- * and federated TanStack queries to everything below.
+ * Finds the home PDS of every signed-in account (and of this build, for new
+ * sign-ins), then provides each account's live session to everything below.
  */
 export function SessionProvider({
   children,
@@ -41,75 +40,67 @@ export function SessionProvider({
   children: ReactNode;
   fallback: ReactNode;
 }) {
-  const home = useQuery({
-    queryFn: discoverHome,
-    queryKey: ["vera", "home"],
-    retry: 3,
-    select: (discovered) => discovered,
-    staleTime: Infinity,
+  const stored = useStoredAccounts();
+  const domains = [
+    ...new Set([
+      env.veraDomain,
+      ...stored.accounts.map((account) => account.domain),
+    ]),
+  ];
+  const homes = useQueries({
+    queries: domains.map((domain) => ({
+      queryFn: () => discoverHome(domain),
+      queryKey: ["vera", "home", domain],
+      retry: 3,
+      select: (discovered: DiscoveredPds) => discovered,
+      staleTime: Infinity,
+    })),
   });
-  if (home.data !== undefined) {
-    return <HomeSession home={home.data}>{children}</HomeSession>;
-  }
-  if (home.isError) {
-    return <Unreachable onRetry={() => void home.refetch()} />;
-  }
-  return fallback;
-}
-
-function HomeSession({
-  children,
-  home,
-}: {
-  children: ReactNode;
-  home: DiscoveredPds;
-}) {
-  const queryClient = useQueryClient();
-  const [session] = useState(() => ({
-    authClient: createHomeAuthClient(home),
-    home,
-  }));
-  const [convex] = useState(
-    () =>
-      new ConvexReactClient(home.manifest.deploymentUrl, {
-        unsavedChangesWarning: false,
-      }),
+  const homeByDomain = new Map(
+    homes.flatMap((home, index) =>
+      home.data === undefined ? [] : [[domains[index], home.data] as const],
+    ),
   );
-
-  // Connect during the first render, because child effects start queries
-  // before a parent effect would run. The effect reconnects whenever React
-  // re-runs it (Fast Refresh does), since connecting again is a no-op.
-  const [pdsQueryClient] = useState(() => {
-    const client = new PdsQueryClient(
-      new DecentralizedConvexClient({
-        getAuthToken: createFederationAuthTokenFetcher(
-          session.authClient,
-          home,
-        ),
-        pds: { home },
-      }),
+  const home = homeByDomain.get(env.veraDomain);
+  if (homes.some((query) => query.isError)) {
+    return (
+      <Unreachable
+        onRetry={() => {
+          for (const query of homes) {
+            if (query.isError) void query.refetch();
+          }
+        }}
+      />
     );
-    client.connect(queryClient);
-    return client;
+  }
+  if (home === undefined || homeByDomain.size < domains.length) {
+    return fallback;
+  }
+  const accounts = stored.accounts.flatMap((account) => {
+    const accountHome = homeByDomain.get(account.domain);
+    return accountHome === undefined
+      ? []
+      : [accountSession(account, accountHome)];
   });
-  // eslint-disable-next-line no-restricted-syntax -- Keeps the PDS query client attached to TanStack Query while mounted.
-  useEffect(
-    () => pdsQueryClient.connect(queryClient),
-    [pdsQueryClient, queryClient],
-  );
-
   return (
-    <SessionContext value={session}>
-      <ConvexBetterAuthProvider
-        // The provider's type erases the concrete Better Auth plugins.
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        authClient={session.authClient as unknown as AuthClient}
-        client={convex}
-      >
-        {children}
-      </ConvexBetterAuthProvider>
+    <SessionContext value={{ accounts, filter: stored.filter, home }}>
+      <VerifySessions accounts={accounts} />
+      {children}
     </SessionContext>
   );
+}
+
+/** Drops accounts whose sessions ended elsewhere, once per app run. */
+function VerifySessions({ accounts }: { accounts: readonly AccountSession[] }) {
+  useQueries({
+    queries: accounts.map((account) => ({
+      queryFn: () => verifyAccountSession(account),
+      queryKey: ["vera", "verify-session", account.storagePrefix],
+      select: (valid: boolean) => valid,
+      staleTime: Infinity,
+    })),
+  });
+  return null;
 }
 
 function Unreachable({ onRetry }: { onRetry: () => void }) {

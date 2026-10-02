@@ -1,15 +1,24 @@
 import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
+import { FromSection, useFromAccount } from "~/features/compose/from-section";
 import { NewAddressRow } from "~/features/compose/new-address-row";
 import { PeopleSection } from "~/features/compose/people-section";
 import { useCompose } from "~/features/compose/use-compose";
+import { AccountScope } from "~/features/messaging/account";
 
-export default function NewMessageScreen() {
+function NewMessage({
+  from,
+  onChangeFrom,
+}: {
+  from: string;
+  onChangeFrom: (address: string) => void;
+}) {
   const compose = useCompose();
   return (
     <NativeHost style={{ flex: 1 }}>
       <FieldGroup>
+        <FromSection from={from} onChange={onChangeFrom} />
         <FieldGroup.Section>
           <TextInput
             key={compose.fieldKey}
@@ -57,5 +66,15 @@ export default function NewMessageScreen() {
         />
       </FieldGroup>
     </NativeHost>
+  );
+}
+
+export default function NewMessageScreen() {
+  const { from, setFrom } = useFromAccount();
+  return (
+    // Changing accounts starts the message over.
+    <AccountScope key={from} address={from}>
+      <NewMessage from={from} onChangeFrom={setFrom} />
+    </AccountScope>
   );
 }

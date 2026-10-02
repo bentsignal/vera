@@ -19,6 +19,7 @@ export function toAddress(input: string) {
 
 /** Whether an address belongs to a Vera account, once known. */
 export function useAccountExists(address: string | null) {
+  const { address: session } = useAccount();
   const { data } = useQuery(
     pdsQuery({
       args: { accountId: address ?? "" },
@@ -28,12 +29,14 @@ export function useAccountExists(address: string | null) {
           pdsResult(result)?.some((profile) => profile !== null),
       },
       query: pds.accounts.getProfile,
+      session,
     }),
   );
   return address === null ? undefined : data;
 }
 
 export function useMyProfile() {
+  const { address } = useAccount();
   const { data } = useQuery(
     pdsQuery({
       args: {},
@@ -47,15 +50,16 @@ export function useMyProfile() {
         },
       },
       query: pds.accounts.getMyProfile,
+      session: address,
     }),
   );
   const upsert = useMutation(
-    pdsMutation({ mutation: pds.accounts.upsertMyProfile }),
+    pdsMutation({ mutation: pds.accounts.upsertMyProfile, session: address }),
   );
   return { profile: data, update: upsert.mutateAsync };
 }
 
-/** Creates the signed-in account's profile the first time the app opens. */
+/** Creates the account's profile the first time the app opens with it. */
 export function useEnsureProfile() {
   const { username } = useAccount();
   const { profile, update } = useMyProfile();

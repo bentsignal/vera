@@ -4,11 +4,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
+import { AccountScope } from "~/features/messaging/account";
 import { useSpaceActions } from "~/features/messaging/spaces";
 
-export default function NewChannelScreen() {
+function NewChannel({ spaceId }: { spaceId: string }) {
   const router = useRouter();
-  const { spaceId } = useLocalSearchParams<{ spaceId: string }>();
   const { createChannel } = useSpaceActions();
   const [name, setName] = useState("");
 
@@ -42,5 +42,17 @@ export default function NewChannelScreen() {
         </FieldGroup.Section>
       </FieldGroup>
     </NativeHost>
+  );
+}
+
+export default function NewChannelScreen() {
+  const { account, spaceId } = useLocalSearchParams<{
+    account?: string;
+    spaceId: string;
+  }>();
+  return (
+    <AccountScope address={account}>
+      <NewChannel spaceId={spaceId} />
+    </AccountScope>
   );
 }

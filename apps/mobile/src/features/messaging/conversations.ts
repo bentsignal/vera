@@ -6,13 +6,13 @@ import type {
 import { useEffect, useRef, useState } from "react";
 import * as Crypto from "expo-crypto";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
-import { useAccount } from "./account";
+import { useAccount, useVisibleAccounts } from "./account";
 import { useMessageWindow } from "./message-window";
 import { useProfiles } from "./profiles";
 import { pdsResult } from "./results";
@@ -49,50 +49,76 @@ function preview(message: PdsMessage | null, self: string, name: string) {
   return `${prefix || `${name}: `}${count > 1 ? `${count} attachments` : noun}`;
 }
 
-export function useInbox() {
-  const { address } = useAccount();
-  const { data: conversations } = useQuery(
-    pdsQuery({
-      args: {},
-      options: { select: pdsResult },
-      query: pds.messages.inbox,
-    }),
+function summarize(
+  account: string,
+  conversation: Conversation,
+  profileOf: ReturnType<typeof useProfiles>,
+) {
+  function displayName(address: string) {
+    return profileOf(address).displayName;
+  }
+  const other =
+    conversation.kind === "direct"
+      ? conversation.members.find((member) => member !== account)
+      : undefined;
+  return {
+    account,
+    id: conversation.conversationId,
+    key: `${account} ${conversation.conversationId}`,
+    kind: conversation.kind,
+    avatarSeed: other ?? conversation.conversationId,
+    avatarUrl: other === undefined ? null : profileOf(other).avatarUrl,
+    lastActivityAt: new Date(
+      conversation.lastMessage?.sentAt ?? conversation.updatedAt,
+    ),
+    lastMessage: preview(
+      conversation.lastMessage,
+      account,
+      displayName(conversation.lastMessage?.authorId ?? ""),
+    ),
+    memberIds: conversation.members,
+    title: conversationTitle(conversation, account, displayName),
+    unreadCount: conversation.unreadCount,
+  } satisfies ConversationSummary;
+}
+
+/**
+ * Conversations across the visible accounts (or just `account`), newest
+ * first. Each summary says which account it belongs to.
+ */
+export function useInbox({ account }: { account?: string } = {}) {
+  const visible = useVisibleAccounts();
+  const accounts =
+    account === undefined ? visible.map((item) => item.address) : [account];
+  const inboxes = useQueries({
+    queries: accounts.map((session) =>
+      pdsQuery({
+        args: {},
+        options: { select: pdsResult },
+        query: pds.messages.inbox,
+        session,
+      }),
+    ),
+  });
+  const conversations = inboxes.flatMap((inbox, index) =>
+    (inbox.data ?? []).map((conversation) => ({
+      account: accounts[index] ?? "",
+      conversation,
+    })),
   );
   const profileOf = useProfiles(
-    conversations?.flatMap((conversation) => conversation.members) ?? [],
+    conversations.flatMap(({ conversation }) => conversation.members),
   );
-  function displayName(account: string) {
-    return profileOf(account).displayName;
-  }
-  const summaries = conversations?.map((conversation) => {
-    const other =
-      conversation.kind === "direct"
-        ? conversation.members.find((member) => member !== address)
-        : undefined;
-    return {
-      id: conversation.conversationId,
-      kind: conversation.kind,
-      avatarSeed: other ?? conversation.conversationId,
-      avatarUrl: other === undefined ? null : profileOf(other).avatarUrl,
-      lastActivityAt: new Date(
-        conversation.lastMessage?.sentAt ?? conversation.updatedAt,
-      ),
-      lastMessage: preview(
-        conversation.lastMessage,
-        address,
-        displayName(conversation.lastMessage?.authorId ?? ""),
-      ),
-      memberIds: conversation.members,
-      title: conversationTitle(conversation, address, displayName),
-      unreadCount: conversation.unreadCount,
-    } satisfies ConversationSummary;
-  });
+  const summaries = conversations.map((item) =>
+    summarize(item.account, item.conversation, profileOf),
+  );
   // Order by the last message, matching the times shown on each row.
-  summaries?.sort(
+  summaries.sort(
     (left, right) =>
       right.lastActivityAt.getTime() - left.lastActivityAt.getTime(),
   );
-  return { conversations: summaries, isLoading: summaries === undefined };
+  const isLoading = inboxes.every((inbox) => inbox.data === undefined);
+  return { conversations: isLoading ? undefined : summaries, isLoading };
 }
 
 export function useConversation(conversationId: string) {
@@ -102,6 +128,7 @@ export function useConversation(conversationId: string) {
       args: { conversationId },
       options: { select: (result) => pdsResult(result)?.[0] },
       query: pds.messages.conversation,
+      session: address,
     }),
   );
   const profileOf = useProfiles(data?.members ?? []);
@@ -126,8 +153,11 @@ interface PendingMessage {
 }
 
 function usePendingMessages(conversationId: string) {
+  const { address } = useAccount();
   const [pending, setPending] = useState<PendingMessage[]>([]);
-  const send = useMutation(pdsMutation({ mutation: pds.messages.send }));
+  const send = useMutation(
+    pdsMutation({ mutation: pds.messages.send, session: address }),
+  );
 
   function markFailed(messageId: string) {
     setPending((current) =>
@@ -161,7 +191,7 @@ function usePendingMessages(conversationId: string) {
  */
 export function useMessages(conversationId: string, anchor?: string) {
   const { address } = useAccount();
-  const view = useMessageWindow(conversationId, anchor);
+  const view = useMessageWindow(address, conversationId, anchor);
   const { pending, sendMessage } = usePendingMessages(conversationId);
   const confirmed = new Set(view.messages.map((message) => message.messageId));
   const atLatest = !view.hasNewer;
@@ -194,8 +224,9 @@ export function useMessages(conversationId: string, anchor?: string) {
 
 /** Marks the conversation read up to the newest message while it is open. */
 export function useMarkRead(conversationId: string, newestSentAt?: number) {
+  const { address } = useAccount();
   const { mutate } = useMutation(
-    pdsMutation({ mutation: pds.messages.markRead }),
+    pdsMutation({ mutation: pds.messages.markRead, session: address }),
   );
   const lastMarked = useRef(0);
   // eslint-disable-next-line no-restricted-syntax -- Read state lives on the server and must follow messages arriving while the screen is open.

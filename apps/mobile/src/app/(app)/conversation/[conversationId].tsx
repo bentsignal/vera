@@ -12,7 +12,7 @@ import { showActionSheet } from "~/components/action-sheet";
 import { Composer } from "~/features/conversation/composer";
 import { MessageList } from "~/features/conversation/message-list";
 import { useDevTools } from "~/features/dev/dev-tools";
-import { useAccount } from "~/features/messaging/account";
+import { AccountScope, useAccount } from "~/features/messaging/account";
 import {
   AttachmentError,
   useAttachmentUploader,
@@ -133,17 +133,21 @@ function Conversation({
 }
 
 export default function ConversationScreen() {
-  const { conversationId, messageId, title } = useLocalSearchParams<{
+  const { account, conversationId, messageId, title } = useLocalSearchParams<{
+    /** The signed-in account this conversation is opened as. */
+    account?: string;
     conversationId: string;
     messageId?: string;
     title?: string;
   }>();
   return (
-    <Conversation
-      key={`${conversationId}:${messageId ?? ""}`}
-      conversationId={conversationId}
-      anchorId={messageId}
-      initialTitle={title}
-    />
+    <AccountScope address={account}>
+      <Conversation
+        key={`${account ?? ""}:${conversationId}:${messageId ?? ""}`}
+        conversationId={conversationId}
+        anchorId={messageId}
+        initialTitle={title}
+      />
+    </AccountScope>
   );
 }

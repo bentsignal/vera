@@ -73,7 +73,7 @@ async function exchangeToken(
   return exchangeOf(await exchange.json());
 }
 
-async function homeToken(authClient: HomeAuthClient) {
+export async function homeToken(authClient: HomeAuthClient) {
   const { data } = await authClient.convex.token({
     fetchOptions: { throw: false },
   });

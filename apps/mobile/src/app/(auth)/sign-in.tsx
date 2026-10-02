@@ -8,17 +8,17 @@ import { SymbolIcon } from "~/components/symbol-icon";
 import { env } from "~/env";
 import { DevSignIn } from "~/features/dev/dev-sign-in";
 import { signIn } from "~/features/session/passkeys";
-import { useSession } from "~/features/session/session-provider";
+import { usePendingSignIn } from "~/features/session/pending-sign-in";
 
 const StyledSafeAreaView = withUniwind(SafeAreaView);
 
 export default function SignInScreen() {
-  const { authClient } = useSession();
+  const pendingSignIn = usePendingSignIn();
   const [pending, setPending] = useState(false);
 
   async function submit() {
     setPending(true);
-    const error = await signIn(authClient);
+    const error = await signIn(pendingSignIn);
     setPending(false);
     if (error !== null) Alert.alert("Sign In Failed", error);
   }

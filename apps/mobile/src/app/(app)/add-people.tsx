@@ -4,12 +4,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
+import { AccountScope } from "~/features/messaging/account";
 import { toAddress, useAccountExists } from "~/features/messaging/directory";
 import { useSpaceActions } from "~/features/messaging/spaces";
 
-export default function AddPeopleScreen() {
+function AddPeople({ spaceId }: { spaceId: string }) {
   const router = useRouter();
-  const { spaceId } = useLocalSearchParams<{ spaceId: string }>();
   const { addMembers } = useSpaceActions();
   const [query, setQuery] = useState("");
   const address = toAddress(query);
@@ -53,5 +53,17 @@ export default function AddPeopleScreen() {
         </FieldGroup.Section>
       </FieldGroup>
     </NativeHost>
+  );
+}
+
+export default function AddPeopleScreen() {
+  const { account, spaceId } = useLocalSearchParams<{
+    account?: string;
+    spaceId: string;
+  }>();
+  return (
+    <AccountScope address={account}>
+      <AddPeople spaceId={spaceId} />
+    </AccountScope>
   );
 }

@@ -1,62 +1,18 @@
-import { FieldGroup, Text, TextInput } from "@expo/ui";
+import { FieldGroup } from "@expo/ui";
 
-import { showActionSheet } from "~/components/action-sheet";
 import { NativeHost } from "~/components/native-host";
 import { TabTitle } from "~/components/tab-title";
-import { DeveloperSection } from "~/features/dev/developer-section";
-import { useAccount } from "~/features/messaging/account";
-import { AccountSection } from "~/features/settings/account-section";
+import { AccountsSection } from "~/features/settings/accounts-section";
 import { DisplaySection } from "~/features/settings/display-section";
-import { ProfileSection } from "~/features/settings/profile-section";
-import { useProfileEditor } from "~/features/settings/use-profile-editor";
-import { dismissKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 export default function SettingsScreen() {
-  const { address } = useAccount();
-  const profile = useProfileEditor();
-  const photoActions = [
-    { label: "Take Photo", onPress: () => void profile.changePhoto("camera") },
-    {
-      label: "Choose from Library",
-      onPress: () => void profile.changePhoto("library"),
-    },
-    ...(profile.avatarUrl === null
-      ? []
-      : [
-          {
-            destructive: true,
-            label: "Remove Photo",
-            onPress: () => void profile.removePhoto(),
-          },
-        ]),
-  ];
-
   return (
     <>
       <TabTitle title="Settings" />
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup modifiers={dismissKeyboardOnScroll}>
-          <ProfileSection
-            displayName={profile.displayName}
-            address={address}
-            avatarUrl={profile.avatarUrl}
-            onChangePhoto={() => showActionSheet(photoActions)}
-          />
-          <FieldGroup.Section title="Display Name">
-            <TextInput
-              key={String(profile.isLoaded)}
-              defaultValue={profile.savedName}
-              placeholder="Your name"
-              autoComplete="name"
-              onChangeText={profile.changeName}
-            />
-            <FieldGroup.SectionFooter>
-              <Text>Shown to people you message instead of your address.</Text>
-            </FieldGroup.SectionFooter>
-          </FieldGroup.Section>
+        <FieldGroup>
+          <AccountsSection />
           <DisplaySection />
-          <DeveloperSection />
-          <AccountSection />
         </FieldGroup>
       </NativeHost>
     </>

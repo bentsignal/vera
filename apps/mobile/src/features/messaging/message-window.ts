@@ -32,13 +32,13 @@ const openedAtByConversation = new Map<string, number>();
 /** Past this, so many messages may have arrived that a fresh window is better. */
 const REUSE_WINDOW_MS = 10 * 60 * 1000;
 
-function latestWindow(conversationId: string, reopen = false) {
-  const previous = openedAtByConversation.get(conversationId);
+function latestWindow(windowKey: string, reopen = false) {
+  const previous = openedAtByConversation.get(windowKey);
   const openedAt =
     !reopen && previous !== undefined && Date.now() - previous < REUSE_WINDOW_MS
       ? previous
       : Date.now();
-  openedAtByConversation.set(conversationId, openedAt);
+  openedAtByConversation.set(windowKey, openedAt);
   return {
     anchor: undefined,
     pages: [{ before: openedAt + 1 }, { after: openedAt }],
@@ -85,11 +85,14 @@ function mergePages(pages: readonly { data?: { messages: PdsMessage[] } }[]) {
  * A scrollable window over a conversation, oldest first, that can open at
  * the latest message or around a specific one and grow in either direction.
  */
-export function useMessageWindow(conversationId: string, anchor?: string) {
+export function useMessageWindow(
+  session: string,
+  conversationId: string,
+  anchor?: string,
+) {
+  const windowKey = `${session} ${conversationId}`;
   const [view, setView] = useState<View>(() =>
-    anchor === undefined
-      ? latestWindow(conversationId)
-      : anchoredWindow(anchor),
+    anchor === undefined ? latestWindow(windowKey) : anchoredWindow(anchor),
   );
   const pages = useQueries({
     queries: view.pages.map((cursor) =>
@@ -102,6 +105,7 @@ export function useMessageWindow(conversationId: string, anchor?: string) {
           },
         },
         query: pds.messages.list,
+        session,
       }),
     ),
   });
@@ -151,7 +155,7 @@ export function useMessageWindow(conversationId: string, anchor?: string) {
     isLoading:
       pages.some((page) => page.data === undefined) && messages.length === 0,
     /** Drops the loaded pages and reopens at the latest message. */
-    jumpToLatest: () => setView(latestWindow(conversationId, true)),
+    jumpToLatest: () => setView(latestWindow(windowKey, true)),
     loadNewer,
     loadOlder,
     messages,

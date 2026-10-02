@@ -4,7 +4,9 @@ import Add from "@expo/material-symbols/add.xml";
 
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
+import { useVisibleAccounts } from "~/features/messaging/account";
 import { useSpaces } from "~/features/messaging/spaces";
+import { AccountToolbar } from "~/features/session/account-toolbar";
 import { SpaceRow } from "~/features/spaces/space-row";
 
 function EmptySpaces() {
@@ -23,23 +25,26 @@ function EmptySpaces() {
 export default function SpacesScreen() {
   const router = useRouter();
   const { isLoading, spaces } = useSpaces();
+  const showAccount = useVisibleAccounts().length > 1;
   return (
     <>
       <TabTitle title="Spaces" />
-      <Stack.Toolbar placement="right">
+      <AccountToolbar>
         <Stack.Toolbar.Button
           icon={Platform.OS === "ios" ? "plus" : Add}
           accessibilityLabel="New space"
           onPress={() => router.push("/new-space")}
         />
-      </Stack.Toolbar>
+      </AccountToolbar>
       <ScreenList
         data={spaces}
-        keyExtractor={(space) => space.spaceId}
+        keyExtractor={(space) => space.key}
         ListEmptyComponent={
           isLoading ? <ActivityIndicator className="pt-24" /> : <EmptySpaces />
         }
-        renderItem={({ item }) => <SpaceRow space={item} />}
+        renderItem={({ item }) => (
+          <SpaceRow space={item} showAccount={showAccount} />
+        )}
       />
     </>
   );

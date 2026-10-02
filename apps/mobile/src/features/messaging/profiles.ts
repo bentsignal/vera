@@ -2,6 +2,7 @@ import { useQueries } from "@tanstack/react-query";
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
+import { useAccount } from "./account";
 import { pdsResult } from "./results";
 
 export function usernameOf(address: string) {
@@ -10,6 +11,7 @@ export function usernameOf(address: string) {
 
 /** Profiles by address, falling back to the username and no photo. */
 export function useProfiles(addresses: readonly string[]) {
+  const { address: session } = useAccount();
   const unique = [...new Set(addresses)];
   const profiles = useQueries({
     queries: unique.map((accountId) =>
@@ -20,6 +22,7 @@ export function useProfiles(addresses: readonly string[]) {
             pdsResult(result)?.find((profile) => profile !== null),
         },
         query: pds.accounts.getProfile,
+        session,
       }),
     ),
   });

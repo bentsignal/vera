@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 
+import { AccountScope, useAccounts } from "~/features/messaging/account";
 import { useEnsureProfile } from "~/features/messaging/directory";
 import {
   useNotificationRouting,
@@ -8,10 +9,29 @@ import {
 
 export const unstable_settings = { anchor: "(tabs)" };
 
-export default function AppLayout() {
+/** Keeps one signed-in account's profile and notifications set up. */
+function AccountUpkeep() {
   useEnsureProfile();
   usePushRegistration();
+  return null;
+}
+
+export default function AppLayout() {
+  const accounts = useAccounts();
   useNotificationRouting();
+  return (
+    <>
+      {accounts.map((account) => (
+        <AccountScope key={account.address} address={account.address}>
+          <AccountUpkeep />
+        </AccountScope>
+      ))}
+      <AppStack />
+    </>
+  );
+}
+
+function AppStack() {
   return (
     <Stack screenOptions={{ headerBackButtonDisplayMode: "minimal" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -36,6 +56,15 @@ export default function AppLayout() {
           sheetAllowedDetents: [0.5, 1],
           sheetGrabberVisible: true,
           title: "New Message",
+        }}
+      />
+      <Stack.Screen
+        name="add-account"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6, 1],
+          sheetGrabberVisible: true,
+          title: "Add Account",
         }}
       />
       <Stack.Screen

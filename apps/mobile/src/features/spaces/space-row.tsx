@@ -1,14 +1,26 @@
-import type { Space } from "@decentralized-convex/messages";
 import { Pressable, Text, View } from "react-native";
 import { Link } from "expo-router";
 
+import type { AccountSpace } from "~/features/messaging/spaces";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { usernameOf } from "~/features/messaging/profiles";
 
-export function SpaceRow({ space }: { space: Space }) {
+export function SpaceRow({
+  space,
+  showAccount,
+}: {
+  space: AccountSpace;
+  /** Names the account the space belongs to, when several show. */
+  showAccount: boolean;
+}) {
   return (
     <Link
       href={{
-        params: { name: space.name, spaceId: space.spaceId },
+        params: {
+          account: space.account,
+          name: space.name,
+          spaceId: space.spaceId,
+        },
         pathname: "/spaces/[spaceId]",
       }}
       asChild
@@ -28,7 +40,11 @@ export function SpaceRow({ space }: { space: Space }) {
               {space.name}
             </Text>
             <Text numberOfLines={1} className="text-subhead text-muted">
-              {`${space.members.length} members · ${space.channels.length} channels`}
+              {[
+                `${space.members.length} members`,
+                `${space.channels.length} channels`,
+                ...(showAccount ? [usernameOf(space.account)] : []),
+              ].join(" · ")}
             </Text>
           </View>
           {space.unreadCount > 0 && (
