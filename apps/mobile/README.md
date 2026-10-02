@@ -51,8 +51,8 @@ Local runs default to `dev.vera.chat`; read the domain through `~/env`.
 ## Layout
 
 - `src/app`: routes. `(auth)` holds welcome, create account, and sign in;
-  `(app)/(tabs)` holds Chats, Spaces, and Settings, each with its own native
-  stack; conversations and the new-message sheet sit above the tabs.
+  `(app)/(tabs)` holds Chats, Spaces, Settings, and Search, each with its own
+  native stack; conversations and the new-message sheet sit above the tabs.
 - `src/features`: screen building blocks grouped by feature.
 - `src/components`, `src/lib`: shared components and helpers.
   `lib/ui-modifiers` holds per-platform `@expo/ui` modifier presets.
@@ -70,6 +70,17 @@ Local runs default to `dev.vera.chat`; read the domain through `~/env`.
 - `plugins/with-ios-scene-lifecycle.cjs`: adopts the UIScene life cycle that
   the iOS 27 SDK requires. Expo SDK 58 does this in its template; remove the
   plugin when upgrading.
+- `patches/react-native-screens@4.26.2.patch` (repo root, registered in the
+  root `package.json` under `pnpm.patchedDependencies`): on iOS 27 and newer,
+  react-native-screens still renders Expo Router's `role="search"` tab as an
+  ordinary tab. The patch builds the tab bar from `UITab`s and makes the
+  Search screen a `UISearchTab` set as the `prominentTabIdentifier`, so it
+  sits apart from the other tabs with the field over the keyboard. Older iOS
+  keeps the library's stock `setViewControllers` path.
+  `src/features/search/native-search.ts` focuses the field when the tab is
+  selected. Remove the patch file and the `patchedDependencies` entry once
+  react-native-screens or Expo Router ships a working search tab on iOS 27,
+  then run `pnpm install` and rebuild.
 - `assets/icons` and `plugins/with-alternate-icons.cjs`: one Liquid Glass
   Icon Composer icon per color theme. Indigo is the primary icon; the rest
   are iOS alternate icons chosen in Settings. See `assets/icons/README.md`.

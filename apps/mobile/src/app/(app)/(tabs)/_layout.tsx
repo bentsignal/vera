@@ -3,6 +3,10 @@ import { useCSSVariable } from "uniwind";
 
 import { useInbox } from "~/features/messaging/conversations";
 import { useSpaces } from "~/features/messaging/spaces";
+import {
+  blurNativeSearch,
+  focusNativeSearch,
+} from "~/features/search/native-search";
 
 export default function TabsLayout() {
   const accent = useCSSVariable("--color-accent");
@@ -47,7 +51,11 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="gear" md="settings" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="search" role="search">
+      <NativeTabs.Trigger
+        name="search"
+        role="search"
+        listeners={{ blur: blurNativeSearch, focus: focusNativeSearch }}
+      >
         <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
       </NativeTabs.Trigger>

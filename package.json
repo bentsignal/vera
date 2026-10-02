@@ -36,5 +36,10 @@
     "turbo": "2.8.17",
     "typescript": "catalog:"
   },
-  "prettier": "@acme/prettier-config"
+  "prettier": "@acme/prettier-config",
+  "pnpm": {
+    "patchedDependencies": {
+      "react-native-screens@4.26.2": "patches/react-native-screens@4.26.2.patch"
+    }
+  }
 }
