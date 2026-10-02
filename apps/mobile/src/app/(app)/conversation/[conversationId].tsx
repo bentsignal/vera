@@ -49,6 +49,7 @@ function Conversation({
   const uploadAttachments = useAttachmentUploader();
   const devTools = useDevTools();
   const [uploading, setUploading] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(56);
   useMarkRead(conversationId, messages.newestSentAt);
   useActiveConversation(conversationId);
 
@@ -85,9 +86,7 @@ function Conversation({
     <View className="bg-background flex-1">
       <Stack.Title>{heading}</Stack.Title>
       <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
-        {messages.isLoading ? (
-          <ActivityIndicator className="flex-1" />
-        ) : (
+        {messages.isLoading ? null : (
           <MessageList
             key={messages.viewKey}
             messages={messages.messages}
@@ -101,10 +100,16 @@ function Conversation({
             onEndReached={messages.loadNewer}
             onJumpToLatest={messages.jumpToLatest}
             bottomInset={insets.bottom}
+            composerHeight={composerHeight}
           />
         )}
       </KeyboardGestureArea>
-      <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
+      <KeyboardStickyView
+        offset={{ closed: 0, opened: insets.bottom }}
+        // Floats over the messages, which scroll all the way to the bottom.
+        style={{ bottom: 0, left: 0, position: "absolute", right: 0 }}
+        onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
+      >
         {uploading && (
           <View className="flex-row items-center justify-center gap-2 py-1">
             <ActivityIndicator size="small" />

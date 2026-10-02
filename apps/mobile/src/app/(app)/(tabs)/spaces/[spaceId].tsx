@@ -1,4 +1,5 @@
 import { Alert } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Button, FieldGroup } from "@expo/ui";
 
@@ -49,22 +50,25 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
   return (
     <>
       <Stack.Title>{space.name}</Stack.Title>
-      <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
-          <ChannelsSection space={space} />
-          <MembersSection space={space} />
-          {space.role !== "owner" && (
-            <FieldGroup.Section>
-              <Button
-                label="Leave Space"
-                variant="text"
-                modifiers={destructive}
-                onPress={() => leave(space.name)}
-              />
-            </FieldGroup.Section>
-          )}
-        </FieldGroup>
-      </NativeHost>
+      {/* Fades in once loaded instead of popping in. */}
+      <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
+        <NativeHost style={{ flex: 1 }}>
+          <FieldGroup>
+            <ChannelsSection space={space} />
+            <MembersSection space={space} />
+            {space.role !== "owner" && (
+              <FieldGroup.Section>
+                <Button
+                  label="Leave Space"
+                  variant="text"
+                  modifiers={destructive}
+                  onPress={() => leave(space.name)}
+                />
+              </FieldGroup.Section>
+            )}
+          </FieldGroup>
+        </NativeHost>
+      </Animated.View>
     </>
   );
 }
