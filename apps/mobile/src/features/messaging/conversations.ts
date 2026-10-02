@@ -15,7 +15,7 @@ import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useAccount, useVisibleAccounts } from "./account";
 import { useMessageWindow } from "./message-window";
-import { useProfiles } from "./profiles";
+import { useProfiles, useProfileState } from "./profiles";
 import { useReactions } from "./reactions";
 import { pdsResult } from "./results";
 
@@ -111,18 +111,20 @@ export function useInbox({ account }: { account?: string } = {}) {
       conversation,
     })),
   );
-  const profileOf = useProfiles(
+  const profiles = useProfileState(
     conversations.flatMap(({ conversation }) => conversation.members),
   );
   const summaries = conversations.map((item) =>
-    summarize(item.account, item.conversation, profileOf),
+    summarize(item.account, item.conversation, profiles.profileOf),
   );
   // Order by the last message, matching the times shown on each row.
   summaries.sort(
     (left, right) =>
       right.lastActivityAt.getTime() - left.lastActivityAt.getTime(),
   );
-  const isLoading = inboxes.every((inbox) => inbox.data === undefined);
+  // Wait for names too, so rows never switch from usernames to names.
+  const isLoading =
+    inboxes.every((inbox) => inbox.data === undefined) || profiles.isLoading;
   return { conversations: isLoading ? undefined : summaries, isLoading };
 }
 

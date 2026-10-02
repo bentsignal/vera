@@ -23,6 +23,17 @@
         "simulator": true
       }
     },
+    "internal": {
+      "extends": "base",
+      "distribution": "internal",
+      "environment": "development",
+      "env": {
+        "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
     "preview": {
       "extends": "base",
       "distribution": "store",

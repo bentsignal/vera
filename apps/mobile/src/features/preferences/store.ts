@@ -19,7 +19,7 @@ export interface Preferences {
 const DEFAULTS = {
   appearance: "system",
   messageLayout: "bubbles",
-  theme: "green",
+  theme: "blue",
 } satisfies Preferences;
 
 function pick<Value extends string>(

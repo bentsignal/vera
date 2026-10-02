@@ -3,7 +3,6 @@ import { Stack, useRouter } from "expo-router";
 import EditSquare from "@expo/material-symbols/edit_square.xml";
 import { pds } from "@vera/backend/pds";
 
-import { HeaderFade } from "~/components/header-fade";
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { ConversationRow } from "~/features/inbox/conversation-row";
@@ -42,6 +41,7 @@ export default function ChatsScreen() {
         />
       </AccountToolbar>
       <ScreenList
+        ready={!isLoading}
         data={visible}
         keyExtractor={(conversation) => conversation.key}
         ListEmptyComponent={isLoading ? null : <EmptyInbox />}
@@ -67,7 +67,6 @@ export default function ChatsScreen() {
           />
         )}
       />
-      <HeaderFade />
     </>
   );
 }
