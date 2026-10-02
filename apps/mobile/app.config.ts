@@ -1,5 +1,16 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
+/** Themes with an alternate app icon; indigo is the primary icon. */
+const ALTERNATE_ICON_THEMES = [
+  "blue",
+  "teal",
+  "green",
+  "orange",
+  "pink",
+  "purple",
+  "graphite",
+];
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Vera",
@@ -12,6 +23,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   platforms: ["ios", "android"],
   ios: {
+    // Liquid Glass icon from Icon Composer; see assets/icons/README.md.
+    icon: "./assets/icons/vera-indigo.icon",
     bundleIdentifier: "chat.vera.app",
     supportsTablet: true,
     // Passkeys use the permanent relying party ID `vera.chat`.
@@ -21,16 +34,23 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "chat.vera.app",
     adaptiveIcon: {
-      backgroundColor: "#3B3BD6",
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      backgroundColor: "#4F46E5",
+      foregroundImage: "./assets/icons/vera-indigo-android-foreground.png",
+      monochromeImage: "./assets/icons/vera-android-monochrome.png",
     },
     predictiveBackGestureEnabled: true,
   },
   plugins: [
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
+    [
+      "./plugins/with-alternate-icons.cjs",
+      {
+        icons: ALTERNATE_ICON_THEMES.map(
+          (theme) => `./assets/icons/vera-${theme}.icon`,
+        ),
+      },
+    ],
     "expo-router",
     [
       "expo-image-picker",
