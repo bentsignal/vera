@@ -1,52 +1,58 @@
-# App icons
+# App icon
 
-One Liquid Glass icon per color theme, made as Icon Composer documents.
-The design follows the Messages icon: a plain white speech bubble on a
-vertical gradient (light), and the bubble filled with that gradient on a
-near-black background (dark). In the tinted appearance the bubble is
-white on dark, so iOS tints it. `family-preview.png` shows every theme,
-light over dark.
+One Liquid Glass icon, `vera.icon`, made as an Icon Composer document. It
+is a top-down aloe vera (Vera is named after the plant): two rings of six
+curved leaves, like a pinwheel. It replaced a Messages-style speech bubble
+that App Review would likely have rejected. The concepts it was chosen from
+are in PR #52.
 
-- `vera-<theme>.icon`: Icon Composer bundles (one SVG bubble layer with
-  glass, specular, and dark and tinted fills). `vera-blue.icon` is the
-  primary iOS icon (`ios.icon` in `app.config.ts`); the other seven are
-  iOS alternate icons, added to the Xcode project by
-  `plugins/with-alternate-icons.cjs` and chosen in Settings → Themes.
-- `previews/<theme>-light.png` and `previews/<theme>-dark.png`: 180px
-  pre-masked `ictool` renders (8-bit sRGB) that Settings shows as icon
-  choices.
-- `vera-android-foreground.png` (also the monochrome layer) and
+Appearances:
+
+- Light: pale glass leaves on a green gradient.
+- Dark: green leaves on near-black.
+- Clear and tinted: gray leaves on near-black, which iOS turns into glass
+  or tints.
+
+Alternate leaves sit in separate layers with slightly different fills, so
+overlapping leaves read as separate leaves. App color themes don't change
+the icon.
+
+Files:
+
+- `vera.icon`: the Icon Composer bundle (`ios.icon` in `app.config.ts`).
+  One SVG layer per ring half, with light, dark, and tinted fills.
+- `vera-android-foreground.png`, `vera-android-monochrome.png`, and
   `vera-android-background.png`: Android adaptive icon layers.
-  Android uses the default theme only; switching icons is iOS-only.
-- `../images/icon.png` (square, opaque) and `../images/splash-icon.png`
-  (the bubble in the default theme) are flat renders of the same bubble.
-  `render-previews.swift` renders them in its `primary` theme.
-
-Themes: blue (default), green, teal, indigo, purple, pink, orange,
-graphite. Green uses the Messages icon's colors (#53F06D to #1FD13C); blue
-is the default because a green Messages lookalike is likelier to draw App
-Review objections.
+- `../images/icon.png`: square, opaque, flat icon (the Expo fallback and the
+  welcome screen).
+- `../images/splash-icon-light.png` (green leaves, shown on white) and
+  `../images/splash-icon-dark.png` (pale leaves, shown on black): the splash
+  screen in each color scheme.
 
 ## Editing
 
-`build-icons.py` writes every `.icon` bundle, `palette.json`, and the
-previews from one SVG path and the colors at its top, so change the design
-there rather than in Icon Composer. Then render the full-size appearances
-with Apple's renderer and look at them:
+`build-icons.py` writes `vera.icon` from the leaf geometry and colors at
+its top, then runs `render-flat.swift` for the flat assets. Change the
+design there, not in Icon Composer. Then render every iOS appearance with
+Apple's renderer and look at them:
 
 ```sh
-python3 build-icons.py --check /tmp/vera-icons   # Default, Dark, TintedDark per theme
-swift render-previews.swift "$PWD"               # Android layers, icon.png, splash, family preview
+python3 build-icons.py --check /tmp/vera-icons   # Default, Dark, Clear*, Tinted*
 ```
+
+A layer's light fill must be the unqualified entry in its
+`fill-specializations`. If it is a plain `fill` instead, `ictool` and iOS
+ignore the dark fill.
 
 To render one appearance by hand:
 
 ```sh
 ICTOOL="/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool"
-"$ICTOOL" "$PWD/vera-green.icon" --export-image --output-file /tmp/green-dark.png \
+"$ICTOOL" "$PWD/vera.icon" --export-image --output-file /tmp/vera-dark.png \
   --platform iOS --rendition Dark --width 1024 --height 1024 --scale 1
 ```
 
-Renditions include `Default`, `Dark`, `TintedDark`, and `ClearLight`.
-`ictool` exports are pre-masked previews, not source art. `ictool` cannot
-open documents inside the Codex sandbox; run it from a normal shell.
+Renditions are `Default`, `Dark`, `ClearLight`, `ClearDark`, `TintedLight`,
+and `TintedDark`. `ictool` exports are pre-masked previews, not source art.
+`ictool` cannot open documents inside the Codex sandbox; run it from a
+normal shell.

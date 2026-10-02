@@ -1,51 +1,86 @@
-"""Writes the Vera Icon Composer bundles and their previews.
+"""Writes the Vera app icon, an Icon Composer document, and its flat renders.
 
-    python3 build-icons.py                  # bundles, palette.json, previews/ (app Settings)
-    python3 build-icons.py --documents-only # bundles and palette.json only
-    python3 build-icons.py --check DIR      # also 1024px Default/Dark/TintedDark renders in DIR
+    python3 build-icons.py              # vera.icon, then render-flat.swift
+    python3 build-icons.py --check DIR  # also every iOS appearance at 1024px in DIR
 
-The design follows the Messages icon: one plain white speech bubble on a
-vertical gradient in light mode, and the bubble filled with that gradient on
-a near-black background in dark mode.
+The icon is a top-down aloe vera (Vera is named after the plant): two rings
+of six curved leaves, like a pinwheel. Light is pale glass leaves on a green
+gradient; dark is green leaves on near-black; tinted and clear use gray
+leaves, which iOS tints.
 """
 
 from pathlib import Path
 import json
+import math
 import shutil
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent
 ICTOOL = "/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool"
+RENDITIONS = ("Default", "Dark", "ClearLight", "ClearDark", "TintedLight", "TintedDark")
+# Aloe green, for checking the tinted renditions (ictool's hue scale is not HSB).
+TINT_HUE = .47
 
-# Light background gradient (top, bottom); the dark bubble uses the same
-# colors. Green matches the Messages icon (#53F06D to #1FD13C).
-THEMES = {
-    "indigo": ("#8c87ff", "#4a40e6"),
-    "blue": ("#5cc0ff", "#0a74f5"),
-    "teal": ("#5ae6d6", "#0fa596"),
-    "green": ("#53f06d", "#1fd13c"),
-    "orange": ("#ffb340", "#fa6e0a"),
-    "pink": ("#ff7fb4", "#e62e7a"),
-    "purple": ("#bb88ff", "#7a3ced"),
-    "graphite": ("#9a9aa0", "#4a4a4e"),
-}
-# Graphite's dark bubble is silver; its light gradient would vanish on black.
-DARK_BUBBLE = {"graphite": ("#e2e2e7", "#a4a4aa")}
-# Near-black dark background, as in the Messages icon.
+BACKGROUND = ("#a6e57f", "#2f9e5a")
 DARK_BACKGROUND = ("#313131", "#141414")
-# Tint hue for checking the tinted appearance (ictool's hue scale is not HSB).
-TINT_HUE = {"indigo": .7, "blue": .63, "teal": .55, "green": .5, "orange": .07, "pink": .93, "purple": .78, "graphite": .6}
 
-# A wide rounded oval with a small tail at the lower left, in a 1024 canvas.
-PATH = (
-    "M 142 496 C 142 323 301 192 512 192 C 723 192 882 323 882 496 "
-    "C 882 669 723 800 512 800 C 445 800 379 785 322 757 "
-    "C 290 782 238 804 190 806 C 178 806 174 796 182 789 "
-    "C 216 758 222 708 193 650 C 160 603 142 550 142 496 Z"
-)
-PREVIEW_SIZE = 180
-SRGB = "/System/Library/ColorSync/Profiles/sRGB Profile.icc"
+# (count, length, width, first leaf angle) per ring, outermost first. The
+# inner ring sits between the outer ring's leaves.
+RINGS = ((6, 372, 120, -90), (6, 268, 106, -60))
+# Leaf fills per ring as (alternate leaf a, alternate leaf b). Neighbors
+# differ slightly so overlapping leaves read as separate leaves.
+LIGHT = (("#e4f7d8", "#cfeac0"), ("#ffffff", "#eef7e8"))
+DARK = ((("#3fae62", "#237a45"), ("#389c58", "#1f6d3e")),
+        (("#8bd77a", "#4fb565"), ("#7cc56c", "#46a35b")))
+TINTED = (("#b0b0b0", "#9c9c9c"), ("#ffffff", "#e6e6e6"))
+BEND = .3
+
+
+def f(x):
+    return f"{x:.1f}"
+
+
+def poly(points):
+    return "M " + " L ".join(f"{f(x)} {f(y)}" for x, y in points) + " Z"
+
+
+def half_width(t, width):
+    """An almond profile: narrow base, widest near a third, pointed tip."""
+    def raw(u):
+        return (u + .1) ** .6 * (1 - u) ** .95
+    return width / 2 * raw(t) / max(raw(i / 200) for i in range(201))
+
+
+def leaf(angle, length, width, cx=512, cy=512, n=64):
+    """A leaf from the center at `angle` degrees, curving clockwise."""
+    a = math.radians(angle)
+    ux, uy = math.cos(a), math.sin(a)
+    nx, ny = -uy, ux
+    left, right = [], []
+    for i in range(n + 1):
+        t = i / n
+        x = cx + ux * length * t + nx * BEND * length * t * t
+        y = cy + uy * length * t + ny * BEND * length * t * t
+        dx, dy = ux + nx * 2 * BEND * t, uy + ny * 2 * BEND * t
+        d = math.hypot(dx, dy)
+        px, py = -dy / d, dx / d
+        h = half_width(t, width)
+        left.append((x + px * h, y + py * h))
+        right.append((x - px * h, y - py * h))
+    # Round the base off behind the center.
+    h0 = half_width(0, width)
+    base = [(cx - nx * h0 * math.cos(math.pi * k / 12) - ux * .6 * h0 * math.sin(math.pi * k / 12),
+             cy - ny * h0 * math.cos(math.pi * k / 12) - uy * .6 * h0 * math.sin(math.pi * k / 12))
+            for k in range(1, 12)]
+    return poly(left + right[::-1] + base)
+
+
+def svg(paths):
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+        + "".join(f'<path fill="#ffffff" d="{d}"/>' for d in paths) + "</svg>\n"
+    )
 
 
 def rgb(h):
@@ -56,99 +91,87 @@ def color(h):
     return "extended-srgb:" + ",".join(f"{x:.5f}" for x in (*rgb(h), 1))
 
 
-def gradient(pair):
-    return {"linear-gradient": [color(pair[0]), color(pair[1])]}
+def fill(v):
+    return {"linear-gradient": [color(v[0]), color(v[1])]} if isinstance(v, tuple) else {"solid": color(v)}
 
 
-def svg():
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
-        f'viewBox="0 0 1024 1024"><path fill="#ffffff" d="{PATH}"/></svg>\n'
-    )
+def layer_names(ring, parity):
+    return f"Ring {ring + 1}{'ab'[parity]}", f"ring-{ring + 1}{'ab'[parity]}.svg"
 
 
-def document(theme):
-    light = THEMES[theme]
-    bubble = DARK_BUBBLE.get(theme, light)
-    return {
-        "fill": gradient(light),
-        "fill-specializations": [
-            {"appearance": "dark", "value": gradient(DARK_BACKGROUND)},
-            {"appearance": "tinted", "value": gradient(DARK_BACKGROUND)},
-        ],
-        "groups": [{
-            "name": "Bubble",
-            "layers": [{
-                "image-name": "bubble.svg",
-                "name": "Bubble",
+def document():
+    groups = []
+    for ring in range(len(RINGS)):
+        layers = []
+        for parity in (0, 1):
+            name, image = layer_names(ring, parity)
+            layers.append({
+                "image-name": image,
+                "name": name,
                 "glass": True,
-                "opacity": .95,
+                # The light fill must be the unqualified specialization: with
+                # a plain "fill", ictool and iOS ignore the dark one.
                 "fill-specializations": [
-                    {"appearance": "dark", "value": gradient(bubble)},
-                    {"appearance": "tinted", "value": {"solid": color("#ffffff")}},
+                    {"value": fill(LIGHT[ring][parity])},
+                    {"appearance": "dark", "value": fill(DARK[ring][parity])},
+                    {"appearance": "tinted", "value": fill(TINTED[ring][parity])},
                 ],
-            }],
+            })
+        groups.append({
+            "name": f"Ring {ring + 1}",
+            "layers": layers,
             "shadow": {"kind": "layer-color", "opacity": .5},
             "shadow-specializations": [
                 {"appearance": "dark", "value": {"kind": "neutral", "opacity": .5}},
                 {"appearance": "tinted", "value": {"kind": "neutral", "opacity": .5}},
             ],
             "specular": True,
-            "translucency": {"enabled": True, "value": .3},
-        }],
+            "translucency": {"enabled": True, "value": .1},
+        })
+    return {
+        "fill": fill(BACKGROUND),
+        "fill-specializations": [
+            {"appearance": "dark", "value": fill(DARK_BACKGROUND)},
+            {"appearance": "tinted", "value": fill(DARK_BACKGROUND)},
+        ],
+        # Icon Composer lists groups front to back: the inner ring on top.
+        "groups": groups[::-1],
         "supported-platforms": {"squares": "shared"},
     }
 
 
-def write_bundle(theme):
-    bundle = ROOT / f"vera-{theme}.icon"
+def write_bundle():
+    bundle = ROOT / "vera.icon"
     shutil.rmtree(bundle, ignore_errors=True)
     (bundle / "Assets").mkdir(parents=True)
-    (bundle / "Assets" / "bubble.svg").write_text(svg())
-    (bundle / "icon.json").write_text(json.dumps(document(theme), indent=2) + "\n")
+    for ring, (count, length, width, start) in enumerate(RINGS):
+        leaves = [leaf(start + 360 * i / count, length, width) for i in range(count)]
+        for parity in (0, 1):
+            (bundle / "Assets" / layer_names(ring, parity)[1]).write_text(svg(leaves[parity::2]))
+    (bundle / "icon.json").write_text(json.dumps(document(), indent=2) + "\n")
     return bundle
 
 
-def render(bundle, theme, rendition, output, size):
+def render(bundle, rendition, output, size):
     args = [
         ICTOOL, str(bundle), "--export-image", "--output-file", str(output),
         "--platform", "iOS", "--rendition", rendition,
         "--width", str(size), "--height", str(size), "--scale", "1",
     ]
-    if rendition == "TintedDark":
-        args += ["--tint-color", str(TINT_HUE[theme]), "--tint-strength", "0" if theme == "graphite" else "0.8"]
-    subprocess.run(args, check=True)
+    if rendition.startswith("Tinted"):
+        args += ["--tint-color", str(TINT_HUE), "--tint-strength", "0.8"]
+    subprocess.run(args, check=True, capture_output=True)
 
 
 def main():
-    palette = {}
-    bundles = {}
-    for theme, (top, bottom) in THEMES.items():
-        bundles[theme] = write_bundle(theme)
-        bubble = DARK_BUBBLE.get(theme, (top, bottom))
-        palette[theme] = {
-            "light_top": top, "light_bottom": bottom,
-            "dark_top": DARK_BACKGROUND[0], "dark_bottom": DARK_BACKGROUND[1],
-            "dark_bubble_top": bubble[0], "dark_bubble_bottom": bubble[1],
-        }
-    (ROOT / "palette.json").write_text(json.dumps(palette, indent=2) + "\n")
-    if "--documents-only" in sys.argv:
-        return
-    previews = ROOT / "previews"
-    previews.mkdir(exist_ok=True)
-    for theme, bundle in bundles.items():
-        for label, rendition in (("light", "Default"), ("dark", "Dark")):
-            output = previews / f"{theme}-{label}.png"
-            render(bundle, theme, rendition, output, PREVIEW_SIZE)
-            # ictool writes 16-bit Display P3; 8-bit sRGB is a third the size.
-            subprocess.run(["sips", "-m", SRGB, str(output), "--out", str(output)], check=True, capture_output=True)
+    bundle = write_bundle()
+    subprocess.run(["swift", str(ROOT / "render-flat.swift"), str(ROOT)], check=True)
     if "--check" in sys.argv:
         check = Path(sys.argv[sys.argv.index("--check") + 1])
         check.mkdir(parents=True, exist_ok=True)
-        for theme, bundle in bundles.items():
-            for rendition in ("Default", "Dark", "TintedDark"):
-                print(theme, rendition, flush=True)
-                render(bundle, theme, rendition, check / f"{theme}-{rendition}.png", 1024)
+        for rendition in RENDITIONS:
+            render(bundle, rendition, check / f"{rendition}.png", 1024)
+            print(rendition, flush=True)
 
 
 if __name__ == "__main__":

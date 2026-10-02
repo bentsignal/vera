@@ -30,7 +30,6 @@
     "better-auth": "~1.6.33",
     "convex": "catalog:",
     "expo": "~57.0.26",
-    "expo-alternate-app-icons": "^8.0.0",
     "expo-blur": "~57.0.3",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.20",

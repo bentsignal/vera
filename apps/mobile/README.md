@@ -181,7 +181,7 @@ with `development: true`) and send to that token through the Expo push API.
   selected. Remove the patch file and the `patchedDependencies` entry once
   react-native-screens or Expo Router ships a working search tab on iOS 27,
   then run `pnpm install` and rebuild.
-- `assets/icons` and `plugins/with-alternate-icons.cjs`: one Liquid Glass
-  Icon Composer icon per color theme, styled after the Messages icon. Green
-  is the primary icon and the default theme; the rest are iOS alternate
-  icons chosen in Settings → Themes. See `assets/icons/README.md`.
+- `assets/icons`: the app icon, a top-down aloe vera made as a Liquid Glass
+  Icon Composer document, and the flat Android, fallback, and splash images
+  rendered from it. Color themes don't change the icon. See
+  `assets/icons/README.md`.
