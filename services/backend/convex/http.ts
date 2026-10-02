@@ -33,4 +33,14 @@ http.route({
   path: "/.well-known/assetlinks.json",
 });
 
+// vera.chat points at this deployment for passkeys; people visiting it
+// belong on the website.
+http.route({
+  handler: httpAction(() =>
+    Promise.resolve(Response.redirect("https://www.vera.chat", 302)),
+  ),
+  method: "GET",
+  path: "/",
+});
+
 export default http;
