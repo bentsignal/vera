@@ -70,6 +70,21 @@ friends, and later asks the agent to deactivate it. The repo skill
   (BSX), `wrangler` (Cloudflare). If a CLI lacks a feature, use the dashboard
   through Chrome.
 
+## Current setup (2026-10-01)
+
+| Thing                        | Value                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| Convex production            | `disciplined-hyena-211`, account domain `vera.chat`                                   |
+| Convex development           | `perceptive-magpie-29`, account domain `dev.vera.chat`                                |
+| Custom domain                | `vera.chat` → production HTTP actions (`ALIAS convex.domains`, `_convex_domains` TXT) |
+| Discovery records            | `_pds.vera.chat`, `_pds.dev.vera.chat` (Vercel DNS)                                   |
+| Apple team                   | `39K6A9FP99` (bundle `chat.vera.app`)                                                 |
+| EAS project                  | `@directedbyshawn/vera`, `5680db13-57a8-4b74-ae41-1f52abbda0b1`                       |
+| Android dev keystore SHA-256 | `E6:A1:C5:45:…:44:5F` (in `PASSKEY_ANDROID_CERT_SHA256`)                              |
+
+Store builds signed by Google Play App Signing need that key's fingerprint
+added to `PASSKEY_ANDROID_CERT_SHA256` and `PASSKEY_ORIGINS` too.
+
 ## Decentralization
 
 Only Vera's own server runs for now, and self-hosting tooling is out of scope.
