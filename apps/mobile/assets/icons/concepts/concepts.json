@@ -1,0 +1,82 @@
+[
+  {
+    "id": "b01",
+    "name": "Round"
+  },
+  {
+    "id": "b02",
+    "name": "Corner"
+  },
+  {
+    "id": "b03",
+    "name": "Duo"
+  },
+  {
+    "id": "b04",
+    "name": "Typing"
+  },
+  {
+    "id": "b05",
+    "name": "Thread"
+  },
+  {
+    "id": "b06",
+    "name": "Ring"
+  },
+  {
+    "id": "b07",
+    "name": "Card"
+  },
+  {
+    "id": "b08",
+    "name": "Monogram"
+  },
+  {
+    "id": "b09",
+    "name": "Drop"
+  },
+  {
+    "id": "b10",
+    "name": "Sprout"
+  },
+  {
+    "id": "a01",
+    "name": "Rosette"
+  },
+  {
+    "id": "a02",
+    "name": "Layered"
+  },
+  {
+    "id": "a03",
+    "name": "Spiral"
+  },
+  {
+    "id": "a04",
+    "name": "Bloom"
+  },
+  {
+    "id": "a05",
+    "name": "Toothed"
+  },
+  {
+    "id": "a06",
+    "name": "Faceted"
+  },
+  {
+    "id": "a07",
+    "name": "Speckled"
+  },
+  {
+    "id": "a08",
+    "name": "Dew"
+  },
+  {
+    "id": "a09",
+    "name": "Side view"
+  },
+  {
+    "id": "a10",
+    "name": "Pinwheel"
+  }
+]
