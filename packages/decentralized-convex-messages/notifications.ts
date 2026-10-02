@@ -1,8 +1,11 @@
+import type { AccountProfile } from "@decentralized-convex/accounts";
+import { accountsProtocol } from "@decentralized-convex/accounts";
 import { v } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel.js";
 import { internal } from "./_generated/api.js";
 import {
+  env,
   internalAction,
   internalMutation,
   internalQuery,
@@ -42,14 +45,23 @@ export const targets = internalQuery({
     return {
       body: previewText(message),
       conversationId: conversation.conversationId,
+      conversationName: await conversationName(ctx, conversation),
       messageId: message.messageId,
       kind: conversation.kind,
       recipients,
-      title: await title(ctx, conversation, message),
+      senderId: message.authorId,
+      senderName: message.authorName,
     };
   },
 });
 
+/**
+ * Sends one Expo push per recipient device. iOS shows it as a communication
+ * notification: the app's Notification Service Extension reads `data`
+ * (sender, avatar, conversation) and turns it into a message intent, so the
+ * sender's photo becomes the icon. Without the extension, the title is the
+ * sender and the subtitle names the group or channel.
+ */
 export const send = internalAction({
   args: { messageId: v.string() },
   handler: async (ctx, { messageId }) => {
@@ -57,6 +69,8 @@ export const send = internalAction({
       messageId,
     });
     if (target === null || target.recipients.length === 0) return;
+    const sender = await senderProfile(target.senderId);
+    const senderName = sender?.displayName ?? target.senderName;
 
     for (
       let start = 0;
@@ -73,12 +87,21 @@ export const send = internalAction({
             data: {
               accountId,
               conversationId: target.conversationId,
+              conversationName: target.conversationName,
               kind: target.kind,
               messageId: target.messageId,
+              senderAvatarUrl: sender?.avatarUrl ?? null,
+              senderId: target.senderId,
+              senderName,
             },
+            // Lets the iOS Notification Service Extension rewrite it.
+            mutableContent: true,
             sound: "default",
+            ...(target.conversationName === null
+              ? {}
+              : { subtitle: target.conversationName }),
             threadId: target.conversationId,
-            title: target.title,
+            title: senderName,
             to: token,
           })),
         ),
@@ -143,15 +166,13 @@ function previewText(message: Doc<"messages">) {
   return count === 1 ? `Sent a ${noun}` : `Sent ${count} attachments`;
 }
 
-async function title(
+/** The group or channel name shown under the sender; null for DMs. */
+async function conversationName(
   ctx: Parameters<typeof getConversation>[0],
   conversation: Doc<"conversations">,
-  message: Doc<"messages">,
 ) {
-  if (conversation.kind === "direct") return message.authorName;
-  if (conversation.kind === "group") {
-    return `${message.authorName} in ${conversation.name ?? "a group"}`;
-  }
+  if (conversation.kind === "direct") return null;
+  if (conversation.kind === "group") return conversation.name ?? "Group";
   const space =
     conversation.spaceId === undefined
       ? null
@@ -162,5 +183,60 @@ async function title(
           )
           .unique();
   const channel = `#${conversation.name ?? "channel"}`;
-  return `${message.authorName} in ${space === null ? channel : `${space.name} ${channel}`}`;
+  return space === null ? channel : `${space.name} ${channel}`;
+}
+
+/**
+ * The sender's Accounts profile, for their current display name and photo.
+ * Messages are stored on the author's home PDS, so the profile is on this
+ * deployment, but a Convex Component cannot read a sibling Component. It
+ * asks this PDS's public root router instead, exactly as a client would
+ * (`accounts.getProfile` needs no session). Messages requires `accounts`,
+ * so the plugin is always installed. Any failure returns null and the
+ * notification falls back to the name stored on the message.
+ */
+async function senderProfile(accountId: string) {
+  try {
+    const response = await fetch(`${env.CONVEX_CLOUD_URL}/api/query`, {
+      body: JSON.stringify({
+        args: {
+          lastChanged: accountsProtocol.lastChanged,
+          operation: { args: { accountId }, type: "getProfile" },
+          plugin: accountsProtocol.name,
+          version: accountsProtocol.version,
+        },
+        format: "json",
+        path: "pds:dispatchQuery",
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (!response.ok) return null;
+    return parseProfile(await response.json());
+  } catch (error) {
+    console.error("Sender profile lookup failed", error);
+    return null;
+  }
+}
+
+/** Reads `{ status, value: { value: profile } }` from the Convex HTTP API. */
+function parseProfile(body: unknown): AccountProfile | null {
+  const result = field(field(body, "value"), "value");
+  const displayName = field(result, "displayName");
+  const avatarUrl = field(result, "avatarUrl");
+  const accountId = field(result, "accountId");
+  if (typeof displayName !== "string" || typeof accountId !== "string") {
+    return null;
+  }
+  return {
+    accountId,
+    avatarUrl: typeof avatarUrl === "string" ? avatarUrl : null,
+    displayName,
+  };
+}
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null
+    ? Reflect.get(value, key)
+    : undefined;
 }
