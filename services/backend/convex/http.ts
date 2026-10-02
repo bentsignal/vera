@@ -5,6 +5,7 @@ import {
 import { httpRouter } from "convex/server";
 
 import { httpAction } from "./_generated/server";
+import { androidAssetLinks, appleAppSiteAssociation } from "./appAssociation";
 import { authComponent, createAuth } from "./auth";
 import app from "./convex.config";
 import { requireEnvironment } from "./lib";
@@ -19,6 +20,27 @@ registerFederationRoutes(http, httpAction, {
       deploymentUrl: requireEnvironment("CONVEX_CLOUD_URL"),
       httpUrl: requireEnvironment("CONVEX_SITE_URL"),
     }),
+});
+
+http.route({
+  handler: appleAppSiteAssociation,
+  method: "GET",
+  path: "/.well-known/apple-app-site-association",
+});
+http.route({
+  handler: androidAssetLinks,
+  method: "GET",
+  path: "/.well-known/assetlinks.json",
+});
+
+// vera.chat points at this deployment for passkeys; people visiting it
+// belong on the website.
+http.route({
+  handler: httpAction(() =>
+    Promise.resolve(Response.redirect("https://www.vera.chat", 302)),
+  ),
+  method: "GET",
+  path: "/",
 });
 
 export default http;
