@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { Image } from "expo-image";
 
 import { cn } from "~/lib/cn";
 
@@ -36,11 +37,24 @@ function backgroundFor(seed: string) {
 export function Avatar({
   name,
   size = "md",
+  uri,
 }: {
   name: string;
   size?: keyof typeof SIZES;
+  /** Profile photo; initials show while it loads or when absent. */
+  uri?: string | null;
 }) {
   const { box, text } = SIZES[size];
+  if (uri) {
+    return (
+      <Image
+        accessibilityLabel={name}
+        source={{ uri }}
+        contentFit="cover"
+        className={cn("rounded-full", box)}
+      />
+    );
+  }
   return (
     <View
       accessibilityLabel={name}

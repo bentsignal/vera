@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { ActivityIndicator, Alert, Text, View } from "react-native";
 import {
   KeyboardAvoidingView,
   useKeyboardState,
@@ -8,58 +8,63 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { withUniwind } from "uniwind";
 
-import type { Message } from "~/features/conversation/types";
+import type { AttachmentSource } from "~/features/messaging/attachments";
 import { ActionSheet } from "~/components/action-sheet";
 import { Composer } from "~/features/conversation/composer";
 import { MessageList } from "~/features/conversation/message-list";
-import { me } from "~/mock/people";
-import { findThread } from "~/mock/threads";
+import { useAccount } from "~/features/messaging/account";
+import { useAttachmentUploader } from "~/features/messaging/attachments";
+import {
+  useConversation,
+  useMarkRead,
+  useMessages,
+} from "~/features/messaging/conversations";
+import { useActiveConversation } from "~/features/notifications/push";
 
 const StyledKeyboardAvoidingView = withUniwind(KeyboardAvoidingView);
 
-// Attachment upload arrives with file storage.
 const ATTACHMENT_SOURCES = [
-  { label: "Photos & Videos" },
-  { label: "Camera" },
-  { label: "Files" },
-];
+  { label: "Photos & Videos", source: "library" },
+  { label: "Camera", source: "camera" },
+  { label: "Files", source: "files" },
+] as const;
 
-function NotFound() {
+function CenteredMessage({ text }: { text: string }) {
   return (
     <View className="bg-background flex-1 items-center justify-center">
-      <Stack.Title>Not Found</Stack.Title>
-      <Text className="text-body text-muted">
-        This conversation doesn't exist.
-      </Text>
+      <Text className="text-body text-muted">{text}</Text>
     </View>
   );
 }
 
-function Conversation({
-  title,
-  kind,
-  initialMessages,
-}: {
-  title: string;
-  kind: "direct" | "group" | "channel";
-  initialMessages: Message[];
-}) {
-  const [messages, setMessages] = useState(initialMessages);
+function Conversation({ conversationId }: { conversationId: string }) {
+  const { address } = useAccount();
+  const { conversation, displayName, isLoading, title } =
+    useConversation(conversationId);
+  const messages = useMessages(conversationId);
+  const uploadAttachments = useAttachmentUploader();
   const [attaching, setAttaching] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const keyboardVisible = useKeyboardState((state) => state.isVisible);
   const headerHeight = useHeaderHeight();
+  useMarkRead(conversationId, messages.newestSentAt);
+  useActiveConversation(conversationId);
 
-  function send(body: string) {
-    setMessages((current) => [
-      ...current,
-      {
-        id: `local-${Date.now()}`,
-        authorId: me.id,
-        sentAt: new Date(),
-        body,
-        attachments: [],
-      },
-    ]);
+  async function attach(source: AttachmentSource) {
+    setAttaching(false);
+    setUploading(true);
+    const attachments = await uploadAttachments(source).catch(() => null);
+    setUploading(false);
+    if (attachments === null) {
+      Alert.alert("Upload Failed", "Couldn't upload that. Try again.");
+    } else if (attachments.length > 0) {
+      messages.sendMessage("", attachments);
+    }
+  }
+
+  if (isLoading) return <CenteredMessage text="" />;
+  if (conversation === undefined) {
+    return <CenteredMessage text="This conversation doesn't exist." />;
   }
 
   return (
@@ -69,16 +74,30 @@ function Conversation({
       className="bg-background flex-1"
     >
       <Stack.Title>{title}</Stack.Title>
-      <MessageList messages={messages} showAuthors={kind !== "direct"} />
+      <MessageList
+        messages={messages.messages}
+        self={address}
+        authorName={conversation.kind === "direct" ? undefined : displayName}
+        onEndReached={messages.loadOlder}
+      />
+      {uploading && (
+        <View className="flex-row items-center justify-center gap-2 py-1">
+          <ActivityIndicator size="small" />
+          <Text className="text-footnote text-muted">Uploading…</Text>
+        </View>
+      )}
       <Composer
-        onSend={send}
+        onSend={(body) => messages.sendMessage(body)}
         onAttach={() => setAttaching(true)}
         keyboardVisible={keyboardVisible}
       />
       <ActionSheet
         isPresented={attaching}
         onDismiss={() => setAttaching(false)}
-        actions={ATTACHMENT_SOURCES}
+        actions={ATTACHMENT_SOURCES.map(({ label, source }) => ({
+          label,
+          onPress: () => void attach(source),
+        }))}
       />
     </StyledKeyboardAvoidingView>
   );
@@ -86,14 +105,5 @@ function Conversation({
 
 export default function ConversationScreen() {
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
-  const thread = findThread(conversationId);
-  if (!thread) return <NotFound />;
-  return (
-    <Conversation
-      key={conversationId}
-      title={thread.title}
-      kind={thread.kind}
-      initialMessages={thread.messages}
-    />
-  );
+  return <Conversation key={conversationId} conversationId={conversationId} />;
 }

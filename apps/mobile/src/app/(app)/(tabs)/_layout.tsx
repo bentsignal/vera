@@ -1,12 +1,19 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useCSSVariable } from "uniwind";
 
-import { inbox } from "~/mock/inbox";
-
-const unreadChats = inbox.filter(({ unreadCount }) => unreadCount > 0).length;
+import { useInbox } from "~/features/messaging/conversations";
+import { useSpaces } from "~/features/messaging/spaces";
 
 export default function TabsLayout() {
   const accent = useCSSVariable("--color-accent");
+  const { conversations } = useInbox();
+  const { spaces } = useSpaces();
+  const unreadChats = (conversations ?? []).filter(
+    ({ unreadCount }) => unreadCount > 0,
+  ).length;
+  const unreadSpaces = spaces.filter(
+    ({ unreadCount }) => unreadCount > 0,
+  ).length;
   return (
     <NativeTabs tintColor={typeof accent === "string" ? accent : undefined}>
       <NativeTabs.Trigger name="(chats)">
@@ -30,6 +37,11 @@ export default function TabsLayout() {
           sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
           md="grid_view"
         />
+        {unreadSpaces > 0 && (
+          <NativeTabs.Trigger.Badge>
+            {String(unreadSpaces)}
+          </NativeTabs.Trigger.Badge>
+        )}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>

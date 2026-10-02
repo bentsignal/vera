@@ -54,14 +54,20 @@ export function MessageBubble({
         <Text className="text-caption text-muted px-3">{authorName}</Text>
       )}
       {message.attachments.map((attachment) => (
-        <AttachmentView key={attachment.id} attachment={attachment} />
+        <AttachmentView key={attachment.url} attachment={attachment} />
       ))}
       {message.body && <Body text={message.body} isOwn={isOwn} />}
       {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} />}
-      {endsGroup && (
-        <Text className="text-caption text-muted px-1">
-          {formatTime(message.sentAt)}
-        </Text>
+      {message.status === "failed" ? (
+        <Text className="text-caption text-destructive px-1">Not sent</Text>
+      ) : (
+        endsGroup && (
+          <Text className="text-caption text-muted px-1">
+            {message.status === "sending"
+              ? "Sending…"
+              : formatTime(message.sentAt)}
+          </Text>
+        )
       )}
     </View>
   );

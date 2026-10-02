@@ -34,6 +34,17 @@ export default ({ config }: ConfigContext): ExpoConfig =>
     plugins: [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          cameraPermission: "Vera uses the camera to send photos and videos.",
+          microphonePermission: "Vera uses the microphone to record videos.",
+          photosPermission: "Vera uses your photos to send them in messages.",
+        },
+      ],
+      ["expo-notifications", { color: "#3B3BD6" }],
+      "expo-secure-store",
+      "expo-video",
+      [
         "expo-splash-screen",
         {
           image: "./assets/images/splash-icon.png",

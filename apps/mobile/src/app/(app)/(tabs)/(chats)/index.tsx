@@ -1,11 +1,20 @@
 import { useState } from "react";
-import { FlatList, Platform, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Text,
+  View,
+} from "react-native";
 import { Stack, useRouter } from "expo-router";
+import { useMutation } from "@tanstack/react-query";
+import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import EditSquare from "@expo/material-symbols/edit_square.xml";
+import { pds } from "@vera/backend/pds";
 
 import type { ConversationSummary } from "~/features/inbox/types";
 import { ConversationRow } from "~/features/inbox/conversation-row";
-import { inbox } from "~/mock/inbox";
+import { useInbox } from "~/features/messaging/conversations";
 
 function matches(conversation: ConversationSummary, query: string) {
   const needle = query.trim().toLowerCase();
@@ -32,21 +41,17 @@ function EmptyInbox({ searching }: { searching: boolean }) {
 
 export default function ChatsScreen() {
   const router = useRouter();
-  const [conversations, setConversations] = useState(inbox);
+  const { conversations, isLoading } = useInbox();
   const [query, setQuery] = useState("");
-  const visible = conversations.filter((conversation) =>
+  const markRead = useMutation(
+    pdsMutation({ mutation: pds.messages.markRead }),
+  );
+  const leave = useMutation(
+    pdsMutation({ mutation: pds.messages.leaveConversation }),
+  );
+  const visible = (conversations ?? []).filter((conversation) =>
     matches(conversation, query),
   );
-
-  function markRead(id: string) {
-    setConversations((current) =>
-      current.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)),
-    );
-  }
-
-  function remove(id: string) {
-    setConversations((current) => current.filter((c) => c.id !== id));
-  }
 
   return (
     <>
@@ -68,12 +73,20 @@ export default function ChatsScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode="on-drag"
         className="bg-background"
-        ListEmptyComponent={<EmptyInbox searching={query.length > 0} />}
+        ListEmptyComponent={
+          isLoading ? (
+            <ActivityIndicator className="pt-24" />
+          ) : (
+            <EmptyInbox searching={query.length > 0} />
+          )
+        }
         renderItem={({ item }) => (
           <ConversationRow
             conversation={item}
-            onMarkRead={markRead}
-            onDelete={remove}
+            onMarkRead={(conversationId) =>
+              markRead.mutate({ conversationId, readAt: Date.now() })
+            }
+            onLeave={(conversationId) => leave.mutate({ conversationId })}
           />
         )}
       />

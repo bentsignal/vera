@@ -7,16 +7,18 @@ import { linkButton } from "~/lib/ui-modifiers";
 export function ProfileSection({
   displayName,
   address,
+  avatarUrl,
   onChangePhoto,
 }: {
   displayName: string;
   address: string;
+  avatarUrl: string | null;
   onChangePhoto: () => void;
 }) {
   return (
     <FieldGroup.Section>
       <ListItem
-        leading={<Avatar name={displayName} size="lg" />}
+        leading={<Avatar name={displayName} size="lg" uri={avatarUrl} />}
         supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
         onPress={onChangePhoto}
       >

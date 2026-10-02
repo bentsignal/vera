@@ -1,14 +1,26 @@
-import { Text, View } from "react-native";
+import { useState } from "react";
+import { Alert, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { withUniwind } from "uniwind";
 
 import { ProminentButton } from "~/components/prominent-button";
 import { SymbolIcon } from "~/components/symbol-icon";
-import { signIn } from "~/mock/session";
+import { signIn } from "~/features/session/passkeys";
+import { useSession } from "~/features/session/session-provider";
 
 const StyledSafeAreaView = withUniwind(SafeAreaView);
 
 export default function SignInScreen() {
+  const { authClient } = useSession();
+  const [pending, setPending] = useState(false);
+
+  async function submit() {
+    setPending(true);
+    const error = await signIn(authClient);
+    setPending(false);
+    if (error !== null) Alert.alert("Sign In Failed", error);
+  }
+
   return (
     <StyledSafeAreaView
       edges={["bottom"]}
@@ -28,7 +40,11 @@ export default function SignInScreen() {
           never asks for a password.
         </Text>
       </View>
-      <ProminentButton label="Sign In with Passkey" onPress={signIn} />
+      <ProminentButton
+        label="Sign In with Passkey"
+        disabled={pending}
+        onPress={() => void submit()}
+      />
     </StyledSafeAreaView>
   );
 }

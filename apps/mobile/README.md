@@ -18,14 +18,22 @@ pnpm --filter @vera/mobile dev      # Metro only, for an installed dev build
 
 The passkey entitlement (`webcredentials:vera.chat`) makes `expo run:ios`
 require an Apple Development signing identity, even for the simulator. Without
-one, build unsigned for the simulator:
+one, build for the simulator with local ("Sign to Run Locally") signing. Fully
+unsigned builds lose their entitlements, and SecureStore then cannot reach the
+keychain:
 
 ```sh
 npx expo prebuild --platform ios
 xcodebuild -workspace ios/Vera.xcworkspace -scheme Vera -configuration Debug \
-  -sdk iphonesimulator -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+  -sdk iphonesimulator -derivedDataPath ios/build CODE_SIGN_IDENTITY=- \
+  CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=39K6A9FP99 \
+  PROVISIONING_PROFILE_SPECIFIER= build
 xcrun simctl install booted ios/build/Build/Products/Debug-iphonesimulator/Vera.app
 ```
+
+Passkeys do not work on these builds: iOS only allows them for apps signed by
+the team listed in `vera.chat`'s Apple app site association. Test sign-in on a
+device with an EAS development build.
 
 ## EAS
 
@@ -48,8 +56,15 @@ Local runs default to `dev.vera.chat`; read the domain through `~/env`.
 - `src/features`: screen building blocks grouped by feature.
 - `src/components`, `src/lib`: shared components and helpers.
   `lib/ui-modifiers` holds per-platform `@expo/ui` modifier presets.
-- `src/mock`: placeholder data and the fake session. Delete it as real data
-  from the PDS replaces each piece.
+- `src/features/session`: discovers the home PDS from the build's account
+  domain, creates the Better Auth (passkeys) and Convex clients, and connects
+  federated TanStack queries. Passkey sign-up and sign-in are in
+  `passkeys.ts`.
+- `src/features/messaging`: TanStack hooks over the PDS `messages` and
+  `accounts` plugins (inbox, messages with optimistic sends, spaces,
+  profiles) and attachment uploads.
+- `src/features/notifications`: Expo push registration and notification
+  routing.
 - `plugins/with-ios-scene-lifecycle.ts`: adopts the UIScene life cycle that
   the iOS 27 SDK requires. Expo SDK 58 does this in its template; remove the
   plugin when upgrading.
