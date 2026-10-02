@@ -26,7 +26,7 @@ interface LocalFile {
 
 export type AttachmentSource = "camera" | "files" | "library";
 
-async function pick(source: AttachmentSource) {
+async function pick(source: AttachmentSource, imagesOnly: boolean) {
   if (source === "files") {
     const result = await DocumentPicker.getDocumentAsync({
       copyToCacheDirectory: true,
@@ -42,11 +42,14 @@ async function pick(source: AttachmentSource) {
     }));
   }
   const options = {
-    allowsMultipleSelection: source === "library",
-    mediaTypes: ["images", "videos"],
+    allowsMultipleSelection: source === "library" && !imagesOnly,
+    // Profile photos get the square crop editor.
+    allowsEditing: imagesOnly,
+    aspect: [1, 1],
+    mediaTypes: imagesOnly ? ["images"] : ["images", "videos"],
     preferredAssetRepresentationMode:
       ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-    quality: 0.8,
+    quality: imagesOnly ? 0.7 : 0.8,
     selectionLimit: MAX_ATTACHMENTS,
     videoMaxDuration: MAX_VIDEO_SECONDS,
   } satisfies ImagePicker.ImagePickerOptions;
@@ -122,8 +125,8 @@ export function useAttachmentUploader() {
   }
 
   /** Returns uploaded attachments, or an empty list when cancelled. */
-  return async (source: AttachmentSource) => {
-    const files = (await pick(source)).slice(0, MAX_ATTACHMENTS);
+  return async (source: AttachmentSource, { imagesOnly = false } = {}) => {
+    const files = (await pick(source, imagesOnly)).slice(0, MAX_ATTACHMENTS);
     if (
       files.some(
         (file) =>

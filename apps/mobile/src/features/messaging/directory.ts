@@ -38,8 +38,13 @@ export function useMyProfile() {
     pdsQuery({
       args: {},
       options: {
-        select: (result) =>
-          pdsResult(result)?.find((profile) => profile !== null) ?? null,
+        // undefined while loading; null once the PDS says there is none.
+        select: (result) => {
+          const sources = pdsResult(result);
+          return sources === undefined
+            ? undefined
+            : (sources.find((profile) => profile !== null) ?? null);
+        },
       },
       query: pds.accounts.getMyProfile,
     }),

@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Stack } from "expo-router";
 import { FieldGroup, Text, TextInput } from "@expo/ui";
 
-import { ActionSheet } from "~/components/action-sheet";
+import { showActionSheet } from "~/components/action-sheet";
 import { NativeHost } from "~/components/native-host";
 import { DeveloperSection } from "~/features/dev/developer-section";
 import { useAccount } from "~/features/messaging/account";
@@ -14,7 +13,6 @@ import { useProfileEditor } from "~/features/settings/use-profile-editor";
 export default function SettingsScreen() {
   const { address } = useAccount();
   const profile = useProfileEditor();
-  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const photoActions = [
     { label: "Take Photo", onPress: () => void profile.changePhoto("camera") },
     {
@@ -23,7 +21,13 @@ export default function SettingsScreen() {
     },
     ...(profile.avatarUrl === null
       ? []
-      : [{ label: "Remove Photo", onPress: () => void profile.removePhoto() }]),
+      : [
+          {
+            destructive: true,
+            label: "Remove Photo",
+            onPress: () => void profile.removePhoto(),
+          },
+        ]),
   ];
 
   return (
@@ -35,10 +39,11 @@ export default function SettingsScreen() {
             displayName={profile.displayName}
             address={address}
             avatarUrl={profile.avatarUrl}
-            onChangePhoto={() => setAvatarSheetOpen(true)}
+            onChangePhoto={() => showActionSheet(photoActions)}
           />
           <FieldGroup.Section title="Display Name">
             <TextInput
+              key={String(profile.isLoaded)}
               defaultValue={profile.savedName}
               placeholder="Your name"
               autoComplete="name"
@@ -55,11 +60,6 @@ export default function SettingsScreen() {
           <AccountSection />
         </FieldGroup>
       </NativeHost>
-      <ActionSheet
-        isPresented={avatarSheetOpen}
-        onDismiss={() => setAvatarSheetOpen(false)}
-        actions={photoActions}
-      />
     </>
   );
 }

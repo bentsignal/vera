@@ -27,7 +27,11 @@ export function ConversationRow({
     >
       <Link.Trigger>
         <Pressable className="active:bg-fill flex-row items-center gap-3 pl-4">
-          <Avatar name={title} />
+          <Avatar
+            name={title}
+            seed={conversation.avatarSeed}
+            uri={conversation.avatarUrl}
+          />
           <View className="border-b-hairline border-separator flex-1 gap-0.5 py-3 pr-4">
             <View className="flex-row items-baseline gap-2">
               <Text

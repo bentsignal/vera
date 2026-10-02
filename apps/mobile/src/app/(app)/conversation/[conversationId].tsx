@@ -9,7 +9,7 @@ import { useHeaderHeight } from "expo-router/react-navigation";
 import { withUniwind } from "uniwind";
 
 import type { AttachmentSource } from "~/features/messaging/attachments";
-import { ActionSheet } from "~/components/action-sheet";
+import { showActionSheet } from "~/components/action-sheet";
 import { Composer } from "~/features/conversation/composer";
 import { MessageList } from "~/features/conversation/message-list";
 import { useDevTools } from "~/features/dev/dev-tools";
@@ -48,7 +48,6 @@ function Conversation({ conversationId }: { conversationId: string }) {
   const messages = useMessages(conversationId);
   const uploadAttachments = useAttachmentUploader();
   const devTools = useDevTools();
-  const [attaching, setAttaching] = useState(false);
   const [uploading, setUploading] = useState(false);
   const keyboardVisible = useKeyboardState((state) => state.isVisible);
   const headerHeight = useHeaderHeight();
@@ -56,7 +55,6 @@ function Conversation({ conversationId }: { conversationId: string }) {
   useActiveConversation(conversationId);
 
   async function attach(source: AttachmentSource) {
-    setAttaching(false);
     setUploading(true);
     const attachments = await uploadAttachments(source).catch(
       (error: unknown) =>
@@ -101,16 +99,15 @@ function Conversation({ conversationId }: { conversationId: string }) {
           messages.sendMessage(body);
           devTools.replyToMe(conversationId);
         }}
-        onAttach={() => setAttaching(true)}
+        onAttach={() =>
+          showActionSheet(
+            ATTACHMENT_SOURCES.map(({ label, source }) => ({
+              label,
+              onPress: () => void attach(source),
+            })),
+          )
+        }
         keyboardVisible={keyboardVisible}
-      />
-      <ActionSheet
-        isPresented={attaching}
-        onDismiss={() => setAttaching(false)}
-        actions={ATTACHMENT_SOURCES.map(({ label, source }) => ({
-          label,
-          onPress: () => void attach(source),
-        }))}
       />
     </StyledKeyboardAvoidingView>
   );

@@ -18,7 +18,7 @@ export function NewAddressRow({
   return (
     <FieldGroup.Section>
       <ListItem
-        leading={<Avatar name={address} size="sm" />}
+        leading={<Avatar name={address} seed={address} size="sm" />}
         supportingText={
           <Text textStyle={secondaryTextStyle}>
             {exists === false ? "No Vera account" : address}

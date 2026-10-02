@@ -76,25 +76,26 @@ function HomeSession({
       }),
   );
 
-  // Connect during the first render: child effects start queries before a
-  // parent effect would run.
-  const [federation] = useState(() => {
-    const client = new DecentralizedConvexClient({
-      getAuthToken: createFederationAuthTokenFetcher(session.authClient, home),
-      pds: { home },
-    });
-    return {
-      client,
-      disconnect: new PdsQueryClient(client).connect(queryClient),
-    };
+  // Connect during the first render, because child effects start queries
+  // before a parent effect would run. The effect reconnects whenever React
+  // re-runs it (Fast Refresh does), since connecting again is a no-op.
+  const [pdsQueryClient] = useState(() => {
+    const client = new PdsQueryClient(
+      new DecentralizedConvexClient({
+        getAuthToken: createFederationAuthTokenFetcher(
+          session.authClient,
+          home,
+        ),
+        pds: { home },
+      }),
+    );
+    client.connect(queryClient);
+    return client;
   });
-  // eslint-disable-next-line no-restricted-syntax -- Closes the PDS connections when the session unmounts.
+  // eslint-disable-next-line no-restricted-syntax -- Keeps the PDS query client attached to TanStack Query while mounted.
   useEffect(
-    () => () => {
-      federation.disconnect();
-      void federation.client.close();
-    },
-    [federation],
+    () => pdsQueryClient.connect(queryClient),
+    [pdsQueryClient, queryClient],
   );
 
   return (

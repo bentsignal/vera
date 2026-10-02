@@ -28,7 +28,9 @@ export function useProfileEditor() {
   }
 
   async function changePhoto(source: "camera" | "library") {
-    const [photo] = await uploadAttachments(source).catch(() => []);
+    const [photo] = await uploadAttachments(source, { imagesOnly: true }).catch(
+      () => [],
+    );
     if (photo?.kind !== "image") return;
     await update({ avatarUrl: photo.url, displayName: savedName }).catch(() =>
       Alert.alert("Couldn't Update Photo", "Try again in a moment."),
@@ -37,6 +39,8 @@ export function useProfileEditor() {
 
   return {
     avatarUrl,
+    /** False until the PDS answers; the name field remounts when it does. */
+    isLoaded: profile !== undefined,
     changeName,
     changePhoto,
     displayName: draftName?.trim() ? draftName.trim() : savedName,
