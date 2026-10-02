@@ -25,14 +25,17 @@ Files:
   `vera-android-background.png`: Android adaptive icon layers.
 - `../images/icon.png`: square, opaque, flat icon (the Expo fallback and the
   welcome screen).
-- `../images/splash-icon-light.png` (green leaves, shown on white) and
-  `../images/splash-icon-dark.png` (pale leaves, shown on black): the splash
-  screen in each color scheme.
+- `../images/splash-icon.png`: the splash screen, the dark icon's green
+  leaves on white (light mode) or black (dark mode). It is an `ictool` glass
+  render, so it matches the icon. `ictool` can't render a transparent
+  background, so `build-icons.py` renders it on black and on white, and
+  `render-flat.swift` recovers the transparency from the difference.
 
 ## Editing
 
 `build-icons.py` writes `vera.icon` from the leaf geometry and colors at
-its top, then runs `render-flat.swift` for the flat assets. Change the
+its top, renders the splash leaves, then runs `render-flat.swift` for the
+flat assets and the splash image. Change the
 design there, not in Icon Composer. Then render every iOS appearance with
 Apple's renderer and look at them:
 
