@@ -10,26 +10,36 @@
 
 import type {
   ActionBuilder,
-  GenericActionCtx,
-  GenericDatabaseReader,
-  GenericDatabaseWriter,
-  GenericMutationCtx,
-  GenericQueryCtx,
   HttpActionBuilder,
   MutationBuilder,
   QueryBuilder,
+  GenericActionCtx,
+  GenericMutationCtx,
+  GenericQueryCtx,
+  GenericDatabaseReader,
+  GenericDatabaseWriter,
 } from "convex/server";
 import {
   actionGeneric,
   httpActionGeneric,
+  queryGeneric,
+  mutationGeneric,
   internalActionGeneric,
   internalMutationGeneric,
   internalQueryGeneric,
-  mutationGeneric,
-  queryGeneric,
 } from "convex/server";
-
 import type { DataModel } from "./dataModel.js";
+
+/**
+ * Typesafe environment variables.
+ *
+ * This includes platform-provided env vars and any variables declared in
+ * `convex.config.ts`.
+ */
+type Env = {
+  readonly CONVEX_CLOUD_URL: string;
+  readonly CONVEX_SITE_URL: string;
+};
 
 /**
  * Define a query in this Convex app's public API.
@@ -107,6 +117,8 @@ export const internalAction: ActionBuilder<DataModel, "internal"> =
  * @returns The wrapped function. Import this function from `convex/http.js` and route it to hook it up.
  */
 export const httpAction: HttpActionBuilder = httpActionGeneric;
+export const env: Env = (globalThis as unknown as { process: { env: Env } })
+  .process.env;
 
 /**
  * A set of services for use within Convex query functions.

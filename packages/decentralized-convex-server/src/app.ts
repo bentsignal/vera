@@ -71,8 +71,12 @@ export interface ComponentInstall {
  * Connects a host's auth implementation to the public PDS auth protocol.
  * Vendor-specific adapters own their runtime integration details.
  */
+/**
+ * Public auth metadata for a PDS. The auth system's own Convex Component, if
+ * any, goes in `components`: Convex requires Component imports to be written
+ * directly in `convex.config.ts`.
+ */
 export interface PdsAuthAdapter {
-  readonly component?: ComponentDefinition | ComponentInstall;
   descriptor(): NonNullable<FederationDescriptor["auth"]>;
 }
 
@@ -134,7 +138,6 @@ export function definePdsApp<
   plugins,
 }: PdsAppOptions<Plugins>): PdsAppDefinition<Plugins> {
   const app = defineApp(appOptions);
-  if (auth?.component !== undefined) installComponent(app, auth.component);
   for (const install of components) {
     installComponent(app, install);
   }

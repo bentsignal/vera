@@ -40,18 +40,42 @@ The root exposes Better Auth plus one generic PDS query and mutation. Message
 schema and behavior live entirely in `@decentralized-convex/messages`; account
 profiles live in `@decentralized-convex/accounts`.
 
-For local federation testing, create `.env.a.local` and `.env.b.local` from
-`.env.example`, then deploy each target:
+Better Auth is Vera's current authentication choice through
+`@decentralized-convex/auth-better-auth`; other hosts can supply adapters for
+their own auth system. Convex requires Component imports to be written directly
+in `convex.config.ts`, so the Better Auth Component is installed there through
+`components` rather than through the adapter.
+
+## Accounts and sign-in
+
+Passkeys are the only credential. Sign-up sends the invite code and username as
+the passkey registration `context`; the server checks both when issuing
+registration options, checks again after the passkey is verified, then redeems
+the invite, creates the account, and starts a session. Invite codes are managed
+with the operator functions in `convex/invites.ts` (see the `invite-codes`
+agent skill).
+
+## Deployments
+
+Both deployments live in the Convex project `vera` (team BSX).
+
+- Production backs TestFlight and store builds. Account domain `vera.chat`.
+- `perceptive-magpie-29` is the shared development deployment. Account domain
+  `dev.vera.chat`.
 
 ```sh
-pnpm --filter @vera/backend deploy:a
-pnpm --filter @vera/backend deploy:b
+pnpm --filter @vera/backend dev      # push to the development deployment
+pnpm --filter @vera/backend deploy   # deploy to production
 ```
 
-Each deployment needs its own `FEDERATION_DOMAIN`. Better Auth is Vera's
-current authentication choice through `@decentralized-convex/auth-better-auth`;
-other hosts can supply adapters for their own auth system. The same backend is
-currently deployed to the independent A and B development deployments.
+Environment variables on each deployment:
+
+| Name                 | Example             | Purpose                                   |
+| -------------------- | ------------------- | ----------------------------------------- |
+| `FEDERATION_DOMAIN`  | `vera.chat`         | Domain in every account address           |
+| `PASSKEY_RP_ID`      | `vera.chat`         | WebAuthn relying party ID (permanent)     |
+| `PASSKEY_ORIGINS`    | `https://vera.chat` | Comma-separated accepted WebAuthn origins |
+| `BETTER_AUTH_SECRET` | random              | Better Auth signing secret                |
 
 ## Public discovery
 

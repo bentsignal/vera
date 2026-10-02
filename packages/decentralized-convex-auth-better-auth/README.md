@@ -11,12 +11,13 @@ import { betterAuthPdsPlugin } from "@decentralized-convex/auth-better-auth/runt
 
 export const pdsAuth = betterAuthAdapter({
   accountDomain: () => env.FEDERATION_DOMAIN,
-  component: betterAuthComponent,
   issuer: () => env.CONVEX_SITE_URL,
 });
 
+// convex.config.ts: Convex requires Component imports to appear here directly.
 export default definePdsApp({
   auth: pdsAuth,
+  components: [betterAuthComponent],
   plugins: [accounts, messages],
 });
 

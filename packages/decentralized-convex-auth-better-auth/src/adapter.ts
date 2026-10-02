@@ -12,7 +12,6 @@ export interface BetterAuthPdsUser {
 
 export interface BetterAuthPdsAdapterOptions {
   readonly accountDomain: ResolvableString;
-  readonly component: NonNullable<PdsAuthAdapter["component"]>;
   readonly getAccountId?: (user: BetterAuthPdsUser) => string;
   readonly issuer: ResolvableString;
   readonly jwksUrl?: ResolvableString;
@@ -37,7 +36,6 @@ export function betterAuthAdapter(
   options: BetterAuthPdsAdapterOptions,
 ): BetterAuthPdsAdapter {
   return {
-    component: options.component,
     descriptor: () => {
       const issuer = resolve(options.issuer);
       return {
