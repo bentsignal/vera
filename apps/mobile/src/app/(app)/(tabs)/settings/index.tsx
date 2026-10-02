@@ -1,6 +1,5 @@
 import { FieldGroup } from "@expo/ui";
 
-import { HeaderFade } from "~/components/header-fade";
 import { NativeHost } from "~/components/native-host";
 import { TabTitle } from "~/components/tab-title";
 import { AccountsSection } from "~/features/settings/accounts-section";
@@ -11,7 +10,7 @@ import { ThemesSection } from "~/features/settings/themes-section";
 export default function SettingsScreen() {
   return (
     <>
-      <TabTitle title="Settings" />
+      <TabTitle title="Settings" background="--color-background-grouped" />
       <NativeHost style={{ flex: 1 }}>
         <FieldGroup>
           <AccountsSection />
@@ -20,7 +19,6 @@ export default function SettingsScreen() {
           <ExperimentsSection />
         </FieldGroup>
       </NativeHost>
-      <HeaderFade background="--color-background-grouped" />
     </>
   );
 }

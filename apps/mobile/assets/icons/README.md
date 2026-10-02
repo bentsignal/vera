@@ -8,7 +8,7 @@ white on dark, so iOS tints it. `family-preview.png` shows every theme,
 light over dark.
 
 - `vera-<theme>.icon`: Icon Composer bundles (one SVG bubble layer with
-  glass, specular, and dark and tinted fills). `vera-green.icon` is the
+  glass, specular, and dark and tinted fills). `vera-blue.icon` is the
   primary iOS icon (`ios.icon` in `app.config.ts`); the other seven are
   iOS alternate icons, added to the Xcode project by
   `plugins/with-alternate-icons.cjs` and chosen in Settings → Themes.
@@ -16,13 +16,16 @@ light over dark.
   pre-masked `ictool` renders (8-bit sRGB) that Settings shows as icon
   choices.
 - `vera-android-foreground.png` (also the monochrome layer) and
-  `vera-green-android-background.png`: Android adaptive icon layers.
-  Android uses green only; switching icons is iOS-only.
+  `vera-android-background.png`: Android adaptive icon layers.
+  Android uses the default theme only; switching icons is iOS-only.
 - `../images/icon.png` (square, opaque) and `../images/splash-icon.png`
-  (the bubble in green) are flat renders of the same bubble.
+  (the bubble in the default theme) are flat renders of the same bubble.
+  `render-previews.swift` renders them in its `primary` theme.
 
-Themes: green (default), teal, blue, indigo, purple, pink, orange,
-graphite. Green uses the Messages icon's colors (#53F06D to #1FD13C).
+Themes: blue (default), green, teal, indigo, purple, pink, orange,
+graphite. Green uses the Messages icon's colors (#53F06D to #1FD13C); blue
+is the default because a green Messages lookalike is likelier to draw App
+Review objections.
 
 ## Editing
 

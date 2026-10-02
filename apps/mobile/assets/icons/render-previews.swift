@@ -1,9 +1,9 @@
-// Renders the flat icon assets from the bubble in vera-green.icon and the
-// colors in palette.json:
-//   vera-android-foreground.png        Android adaptive foreground and monochrome
-//   vera-green-android-background.png  Android adaptive background
-//   ../images/icon.png                 square, opaque fallback icon
-//   ../images/splash-icon.png          green bubble for the splash screen
+// Renders the flat icon assets from the bubble and the colors in
+// palette.json, in the default theme (`primary`):
+//   vera-android-foreground.png  Android adaptive foreground and monochrome
+//   vera-android-background.png  Android adaptive background
+//   ../images/icon.png           square, opaque fallback icon
+//   ../images/splash-icon.png    the bubble for the splash screen
 //   family-preview.png                 every theme, light over dark (from previews/)
 // Usage: swift render-previews.swift "$PWD" (after build-icons.py).
 import AppKit
@@ -22,7 +22,9 @@ func color(_ c: [CGFloat], _ a: CGFloat = 1) -> CGColor { CGColor(colorSpace: sp
 
 let palette = try! JSONSerialization.jsonObject(
   with: Data(contentsOf: root.appendingPathComponent("palette.json"))) as! [String: [String: String]]
-let green = [rgb(palette["green"]!["light_top"]!), rgb(palette["green"]!["light_bottom"]!)]
+/// The default theme: its icon is the primary app icon.
+let primary = "blue"
+let colors = [rgb(palette[primary]!["light_top"]!), rgb(palette[primary]!["light_bottom"]!)]
 
 // The bubble path uses only absolute M, C, and Z commands.
 let svg = try! String(contentsOf: root.appendingPathComponent("vera-green.icon/Assets/bubble.svg"), encoding: .utf8)
@@ -62,28 +64,28 @@ func placeBubble(_ ctx: CGContext, size: Int, width: CGFloat) {
   ctx.translateBy(x: c, y: c); ctx.scaleBy(x: s, y: s); ctx.translateBy(x: -box.midX, y: -box.midY)
 }
 
-// Android: white bubble inside the 66% safe zone, on the green gradient.
+// Android: white bubble inside the 66% safe zone, on the theme gradient.
 let foreground = context(1024)
 placeBubble(foreground, size: 1024, width: 520)
 foreground.addPath(bubble); foreground.setFillColor(color([1, 1, 1])); foreground.fillPath()
 write(foreground, "vera-android-foreground.png")
 let background = context(1024, opaque: true)
-verticalGradient(background, green, top: 1024, bottom: 0)
-write(background, "vera-green-android-background.png")
+verticalGradient(background, colors, top: 1024, bottom: 0)
+write(background, "vera-android-background.png")
 
 // Square opaque icon: the light appearance without glass.
 let icon = context(1024, opaque: true)
-verticalGradient(icon, green, top: 1024, bottom: 0)
+verticalGradient(icon, colors, top: 1024, bottom: 0)
 placeBubble(icon, size: 1024, width: box.width)
-icon.setShadow(offset: CGSize(width: 0, height: 10), blur: 24, color: color([0, 0.3, 0.05], 0.25))
+icon.setShadow(offset: CGSize(width: 0, height: 10), blur: 24, color: color([0, 0.1, 0.3], 0.25))
 icon.addPath(bubble); icon.setFillColor(color([1, 1, 1])); icon.fillPath()
 write(icon, "../images/icon.png")
 
-// Splash: the bubble in green, filling the canvas.
+// Splash: the bubble in the theme gradient, filling the canvas.
 let splash = context(512)
 placeBubble(splash, size: 512, width: 496)
 splash.addPath(bubble); splash.clip()
-verticalGradient(splash, green, top: box.minY, bottom: box.maxY)
+verticalGradient(splash, colors, top: box.minY, bottom: box.maxY)
 write(splash, "../images/splash-icon.png")
 
 // Family preview: each theme's ictool preview, light row over dark row.

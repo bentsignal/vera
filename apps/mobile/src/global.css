@@ -16,10 +16,10 @@
       --color-subtle: rgba(60, 60, 67, 0.3);
       --color-separator: rgba(60, 60, 67, 0.29);
       --color-fill: rgba(118, 118, 128, 0.12);
-      --color-accent: #34c759;
+      --color-accent: #007aff;
       --color-on-accent: #ffffff;
       --color-bubble-incoming: #e9e9eb;
-      --color-bubble-outgoing: #24a845;
+      --color-bubble-outgoing: #007aff;
       --color-destructive: #ff3b30;
     }
 
@@ -32,10 +32,10 @@
       --color-subtle: rgba(235, 235, 245, 0.3);
       --color-separator: rgba(84, 84, 88, 0.65);
       --color-fill: rgba(118, 118, 128, 0.24);
-      --color-accent: #30d158;
+      --color-accent: #0a84ff;
       --color-on-accent: #ffffff;
       --color-bubble-incoming: #26252a;
-      --color-bubble-outgoing: #24a845;
+      --color-bubble-outgoing: #0a84ff;
       --color-destructive: #ff453a;
     }
   }

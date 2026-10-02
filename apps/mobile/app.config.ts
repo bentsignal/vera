@@ -1,15 +1,24 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-/** Themes with an alternate app icon; green is the primary icon. */
+/** Themes with an alternate app icon; blue is the primary icon. */
 const ALTERNATE_ICON_THEMES = [
+  "green",
   "indigo",
-  "blue",
   "teal",
   "orange",
   "pink",
   "purple",
   "graphite",
 ];
+
+const NOTIFICATION_SERVICE_BUNDLE_ID = "chat.vera.app.NotificationService";
+
+/**
+ * Builds the iOS Notification Service Extension that shows message pushes
+ * as communication notifications (sender photo, sender title). Off until
+ * the extension has signing credentials; see README.md.
+ */
+const notificationExtension = process.env.VERA_NOTIFICATION_EXTENSION === "1";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -24,7 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   platforms: ["ios", "android"],
   ios: {
     // Liquid Glass icon from Icon Composer; see assets/icons/README.md.
-    icon: "./assets/icons/vera-green.icon",
+    icon: "./assets/icons/vera-blue.icon",
     bundleIdentifier: "chat.vera.app",
     supportsTablet: true,
     // Passkeys use the permanent relying party ID `vera.chat`.
@@ -34,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "chat.vera.app",
     adaptiveIcon: {
-      backgroundImage: "./assets/icons/vera-green-android-background.png",
+      backgroundImage: "./assets/icons/vera-android-background.png",
       foregroundImage: "./assets/icons/vera-android-foreground.png",
       monochromeImage: "./assets/icons/vera-android-foreground.png",
     },
@@ -60,7 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         photosPermission: "Vera uses your photos to send them in messages.",
       },
     ],
-    ["expo-notifications", { color: "#34C759" }],
+    ["expo-notifications", { color: "#007AFF" }],
     "expo-secure-store",
     "expo-video",
     [
@@ -72,12 +81,39 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         dark: { backgroundColor: "#000000" },
       },
     ],
+    [
+      "./plugins/with-notification-service.cjs",
+      {
+        bundleIdentifier: NOTIFICATION_SERVICE_BUNDLE_ID,
+        enabled: notificationExtension,
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
   },
   extra: {
-    eas: { projectId: "5680db13-57a8-4b74-ae41-1f52abbda0b1" },
+    eas: {
+      projectId: "5680db13-57a8-4b74-ae41-1f52abbda0b1",
+      ...(notificationExtension
+        ? {
+            // Tells EAS to sign the extension target as well.
+            build: {
+              experimental: {
+                ios: {
+                  appExtensions: [
+                    {
+                      bundleIdentifier: NOTIFICATION_SERVICE_BUNDLE_ID,
+                      entitlements: {},
+                      targetName: "NotificationService",
+                    },
+                  ],
+                },
+              },
+            },
+          }
+        : {}),
+    },
   },
 });

@@ -6,11 +6,15 @@ import {
   KeyboardStickyView,
 } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import type { AttachmentSource } from "~/features/messaging/attachments";
 import { showActionSheet } from "~/components/action-sheet";
 import { Composer } from "~/features/conversation/composer";
+import {
+  CONVERSATION_HEADER_HEIGHT,
+  ConversationHeader,
+} from "~/features/conversation/conversation-header";
 import { MessageList } from "~/features/conversation/message-list";
 import { useDevTools } from "~/features/dev/dev-tools";
 import { AccountScope, useAccount } from "~/features/messaging/account";
@@ -99,6 +103,15 @@ function FloatingComposer({
   );
 }
 
+/** The other person in a direct conversation, whose photo heads it. */
+function otherMember(
+  conversation: ReturnType<typeof useConversation>["conversation"],
+  self: string,
+) {
+  if (conversation?.kind !== "direct") return undefined;
+  return conversation.members.find((member) => member !== self);
+}
+
 function Conversation({
   conversationId,
   anchorId,
@@ -108,6 +121,7 @@ function Conversation({
   anchorId?: string;
   initialTitle?: string;
 }) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { address } = useAccount();
   const { conversation, isLoading, profileOf, title } =
@@ -120,6 +134,7 @@ function Conversation({
 
   // The title from the opening screen shows until the conversation loads.
   const heading = title === "" ? (initialTitle ?? "") : title;
+  const other = otherMember(conversation, address);
   if (!isLoading && conversation === undefined) {
     return (
       <View className="bg-background flex-1 items-center justify-center">
@@ -127,6 +142,7 @@ function Conversation({
         <Text className="text-body text-muted">
           This conversation doesn't exist.
         </Text>
+        <ConversationHeader title={heading} avatarUrl={null} />
       </View>
     );
   }
@@ -149,11 +165,23 @@ function Conversation({
             onEndReached={messages.loadNewer}
             onJumpToLatest={messages.jumpToLatest}
             bottomInset={insets.bottom}
+            topInset={CONVERSATION_HEADER_HEIGHT}
             composerHeight={composerHeight}
             onToggleReaction={messages.toggleReaction}
           />
         )}
       </KeyboardGestureArea>
+      <ConversationHeader
+        title={heading}
+        kind={conversation?.kind}
+        avatarUrl={other === undefined ? null : profileOf(other).avatarUrl}
+        onOpenInfo={() =>
+          router.push({
+            params: { account: address, conversationId, title: heading },
+            pathname: "/conversation-info/[conversationId]",
+          })
+        }
+      />
       <FloatingComposer
         conversationId={conversationId}
         onHeight={setComposerHeight}

@@ -25,7 +25,7 @@ export interface Preferences {
 const DEFAULTS = {
   appearance: "system",
   messageLayout: "bubbles",
-  theme: "green",
+  theme: "blue",
   pressExperiment: "menu",
   reactionsExperiment: "badge",
 } satisfies Preferences;
