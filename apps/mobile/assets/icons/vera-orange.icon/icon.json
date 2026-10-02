@@ -1,0 +1,63 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "extended-srgb:0.93576,0.48918,0.25671,1.00000",
+      "extended-srgb:0.66071,0.24847,0.03388,1.00000"
+    ]
+  },
+  "fill-specializations": [
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "extended-srgb:0.12976,0.07251,0.04271,1.00000",
+          "extended-srgb:0.08006,0.04571,0.02782,1.00000"
+        ]
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": {
+        "solid": "extended-srgb:0.09020,0.09020,0.09804,1.00000"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "Vera bubble",
+      "layers": [
+        {
+          "image-name": "bubble-v.svg",
+          "name": "Bubble with V counterform",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.91765,0.34510,0.04706,1.00000"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.22
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.12
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

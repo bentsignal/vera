@@ -27,15 +27,18 @@ Work through these in roughly this order; check items off as PRs merge.
       display name.
 - [x] Headers show the raw route name (`[spaceId]`, `[conversationId]`) for a
       frame before data loads.
-- [ ] A stray search bar can appear on the Chats tab when pulling down.
+- [x] A stray search bar can appear on the Chats tab when pulling down.
+      (Gone since search moved to its own tab; a recorded slow pull on Chats
+      shows no search bar.)
 
 ## Design changes
 
 - [x] Large titles ("Chats", "Spaces") line up with their toolbar buttons.
 - [x] Space screen: plus buttons on the right of the "Text Channels" and
       "Members" section headers replace the bottom buttons.
-- [ ] Space screen: try the space name in the header that hands off to the
-      centered title on scroll (may be reverted).
+- [x] Space screen: try the space name in the header that hands off to the
+      centered title on scroll (may be reverted). (Native large title: the
+      space name collapses into the centered title as the list scrolls.)
 - [x] Chat screen: transparent header with a gradient fade so messages get
       more room (Slack-style).
 - [x] Message layout setting: bubbles (current) or stacked rows with avatars
@@ -46,8 +49,9 @@ Work through these in roughly this order; check items off as PRs merge.
       search tab, but react-native-screens still renders it inline rather than
       as the separate trailing button.)
 - [x] Color themes (accent sets) chosen in Settings.
-- [ ] Alternate app icons, including dark and tinted variants, made with Icon
-      Composer through Codex.
+- [x] Alternate app icons, including dark and tinted variants, made with Icon
+      Composer through Codex. (iOS only; Android keeps the indigo icon. See
+      `apps/mobile/assets/icons/README.md`.)
 
 ## Lists and long conversations
 
