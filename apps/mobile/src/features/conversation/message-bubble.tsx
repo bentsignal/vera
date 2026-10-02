@@ -4,8 +4,9 @@ import type { Message } from "./types";
 import { Avatar } from "~/components/avatar";
 import { cn } from "~/lib/cn";
 import { AttachmentView } from "./attachment-view";
+import { useIsLifted } from "./lifted";
 import { LinkPreviewCard } from "./link-preview-card";
-import { LongPressMessage, ReactionChips } from "./message-actions";
+import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
 import { RevealedTime, SlideWithReveal } from "./reveal";
 
@@ -50,6 +51,8 @@ function Body({
   isOwn: boolean;
   tail: boolean;
 }) {
+  // The tail's cutout is page-colored, so it would show over the overlay.
+  const lifted = useIsLifted();
   return (
     <View
       className={cn(
@@ -58,7 +61,7 @@ function Body({
       )}
       style={{ borderCurve: "continuous" }}
     >
-      {tail && <Tail isOwn={isOwn} />}
+      {tail && !lifted && <Tail isOwn={isOwn} />}
       <Text
         className={cn(
           "text-body leading-[22px]",
@@ -140,10 +143,13 @@ function BubbleColumn({
       {name !== undefined && (
         <Text className="text-caption text-muted px-3">{name}</Text>
       )}
-      <LongPressMessage message={message}>
+      <InteractiveMessage
+        message={message}
+        align={isOwn ? "end" : "start"}
+        shape="bubble"
+      >
         <Content message={message} isOwn={isOwn} endsGroup={endsGroup} />
-      </LongPressMessage>
-      <ReactionChips message={message} align={isOwn ? "end" : "start"} />
+      </InteractiveMessage>
       <MessageMeta message={message} delivered={delivered} />
     </View>
   );

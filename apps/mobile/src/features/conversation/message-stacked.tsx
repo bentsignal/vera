@@ -6,7 +6,7 @@ import { cn } from "~/lib/cn";
 import { formatTime } from "~/lib/format";
 import { AttachmentView } from "./attachment-view";
 import { LinkPreviewCard } from "./link-preview-card";
-import { LongPressMessage, ReactionChips } from "./message-actions";
+import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
 
 const AVATAR_COLUMN = 36;
@@ -43,7 +43,7 @@ export function MessageStacked({
             )}
           </View>
         )}
-        <LongPressMessage message={message}>
+        <InteractiveMessage message={message} align="start" shape="card">
           <SendingFade status={message.status}>
             <View className="items-start gap-1">
               {message.body && (
@@ -59,8 +59,7 @@ export function MessageStacked({
               )}
             </View>
           </SendingFade>
-        </LongPressMessage>
-        <ReactionChips message={message} align="start" />
+        </InteractiveMessage>
         <MessageMeta message={message} delivered={false} />
       </View>
     </View>

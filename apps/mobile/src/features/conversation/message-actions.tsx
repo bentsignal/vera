@@ -1,41 +1,30 @@
 import type { ReactNode } from "react";
 import type { View as NativeView } from "react-native";
 import { createContext, use, useRef, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
+import type { MenuTarget, TargetAlign } from "./glass-message-menu";
+import type { PreviewShape } from "./native-message-menu";
 import type { Message } from "./types";
-import { QUICK_REACTIONS } from "~/features/messaging/reactions";
-import { cn } from "~/lib/cn";
-import { canCopy, copyText, impact, selectionTick } from "~/lib/native-extras";
-
-interface Rect {
-  readonly height: number;
-  readonly width: number;
-  readonly x: number;
-  readonly y: number;
-}
-
-interface Target {
-  readonly message: Message;
-  readonly rect: Rect;
-}
+import { usePreference } from "~/features/preferences/store";
+import { impact, selectionTick } from "~/lib/native-extras";
+import { GlassMessageMenu } from "./glass-message-menu";
+import { hasNativeMessageMenu, NativeMessageMenu } from "./native-message-menu";
 
 interface MessageActions {
-  readonly open: (target: Target) => void;
+  readonly open: (target: MenuTarget) => void;
   readonly toggleReaction: (messageId: string, emoji: string) => void;
 }
 
 const MessageActionsContext = createContext<MessageActions | null>(null);
 
-function useMessageActions() {
+export function useMessageActions() {
   const actions = use(MessageActionsContext);
   if (actions === null) {
     throw new Error("Messages must render inside MessageActionsProvider");
@@ -43,109 +32,9 @@ function useMessageActions() {
   return actions;
 }
 
-const EMOJI_SIZE = 44;
-const PICKER_PADDING = 6;
-const PICKER_HEIGHT = EMOJI_SIZE + PICKER_PADDING * 2;
-const PICKER_WIDTH = QUICK_REACTIONS.length * EMOJI_SIZE + PICKER_PADDING * 2;
-const GAP = 8;
-
-/** Where the picker sits: above the message, or below it near the top. */
-function pickerPosition(
-  rect: Rect,
-  screen: { height: number; width: number },
-  topInset: number,
-) {
-  const left = Math.min(
-    Math.max(12, rect.x + rect.width / 2 - PICKER_WIDTH / 2),
-    screen.width - PICKER_WIDTH - 12,
-  );
-  const above = rect.y - PICKER_HEIGHT - GAP;
-  const top =
-    above > topInset + 56
-      ? above
-      : Math.min(
-          rect.y + rect.height + GAP,
-          screen.height - PICKER_HEIGHT - 40,
-        );
-  return { left, top };
-}
-
-function ReactionPicker({
-  target,
-  onClose,
-  onReact,
-}: {
-  target: Target;
-  onClose: () => void;
-  onReact: (emoji: string) => void;
-}) {
-  const screen = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const { left, top } = pickerPosition(target.rect, screen, insets.top);
-  const mine = new Set(
-    target.message.reactions
-      .filter((reaction) => reaction.mine)
-      .map((reaction) => reaction.emoji),
-  );
-  const { body } = target.message;
-  return (
-    <Pressable
-      accessibilityLabel="Close reactions"
-      className="flex-1 bg-black/25"
-      onPress={onClose}
-    >
-      <Animated.View
-        entering={ZoomIn.duration(160)}
-        className="bg-background-elevated absolute flex-row rounded-full shadow-lg"
-        style={{ left, padding: PICKER_PADDING, top, width: PICKER_WIDTH }}
-      >
-        {QUICK_REACTIONS.map((emoji) => (
-          <Pressable
-            key={emoji}
-            accessibilityRole="button"
-            accessibilityLabel={`React ${emoji}`}
-            onPress={() => onReact(emoji)}
-            className={cn(
-              "items-center justify-center rounded-full active:opacity-60",
-              mine.has(emoji) && "bg-accent/20",
-            )}
-            style={{ height: EMOJI_SIZE, width: EMOJI_SIZE }}
-          >
-            <Text style={{ fontSize: 26 }}>{emoji}</Text>
-          </Pressable>
-        ))}
-      </Animated.View>
-      {canCopy && body !== undefined && (
-        <Animated.View
-          entering={FadeIn.duration(160)}
-          className="absolute"
-          style={{
-            left: Math.min(target.rect.x, screen.width - 140),
-            top: Math.min(
-              target.rect.y + target.rect.height + GAP,
-              screen.height - 120,
-            ),
-          }}
-        >
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              copyText(body);
-              onClose();
-            }}
-            className="bg-background-elevated rounded-xl px-4 py-2.5 shadow-lg active:opacity-70"
-          >
-            <Text className="text-body text-foreground">Copy</Text>
-          </Pressable>
-        </Animated.View>
-      )}
-    </Pressable>
-  );
-}
-
 /**
- * Long-press actions for the messages below: a reaction picker (and Copy)
- * floating over the conversation, and reaction toggles for the chips.
+ * Long-press actions for the messages below: the glass reaction overlay
+ * (the native menu presents itself) and reaction toggles for the badges.
  */
 export function MessageActionsProvider({
   onToggleReaction,
@@ -154,106 +43,113 @@ export function MessageActionsProvider({
   onToggleReaction: (messageId: string, emoji: string) => void;
   children: ReactNode;
 }) {
-  const [target, setTarget] = useState<Target | null>(null);
+  const [target, setTarget] = useState<MenuTarget | null>(null);
   return (
     <MessageActionsContext
       value={{ open: setTarget, toggleReaction: onToggleReaction }}
     >
       {children}
-      <Modal
-        transparent
-        visible={target !== null}
-        animationType="fade"
-        onRequestClose={() => setTarget(null)}
-      >
-        {target !== null && (
-          <ReactionPicker
-            target={target}
-            onClose={() => setTarget(null)}
-            onReact={(emoji) => {
-              selectionTick();
-              onToggleReaction(target.message.id, emoji);
-              setTarget(null);
-            }}
-          />
-        )}
-      </Modal>
+      {target !== null && (
+        <GlassMessageMenu
+          target={target}
+          onReact={(emoji) => onToggleReaction(target.message.id, emoji)}
+          onClosed={() => setTarget(null)}
+        />
+      )}
     </MessageActionsContext>
   );
 }
 
-/** Long press (with a haptic tap) opens the reaction picker for a message. */
-export function LongPressMessage({
+/** Press-and-hold squeezes the message a little, as iOS does. */
+const PRESS_SCALE = 0.96;
+const LONG_PRESS_MS = 320;
+
+/**
+ * Opens the glass overlay on a long press, lifting a copy of `children`
+ * from where the message sits.
+ */
+function GlassLongPress({
   message,
+  align,
+  shape,
   children,
 }: {
   message: Message;
+  align: TargetAlign;
+  shape: PreviewShape;
   children: ReactNode;
 }) {
   const { open } = useMessageActions();
   const ref = useRef<NativeView>(null);
+  const scale = useSharedValue(1);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
   return (
     <Pressable
       ref={ref}
-      delayLongPress={280}
+      delayLongPress={LONG_PRESS_MS}
       disabled={message.status !== undefined}
+      onPressIn={() => {
+        scale.set(withTiming(PRESS_SCALE, { duration: LONG_PRESS_MS }));
+      }}
+      onPressOut={() => {
+        scale.set(withSpring(1, { damping: 14, stiffness: 320 }));
+      }}
       onLongPress={() => {
         impact();
+        scale.set(withSpring(1, { damping: 14, stiffness: 320 }));
         ref.current?.measureInWindow((x, y, width, height) =>
-          open({ message, rect: { height, width, x, y } }),
+          open({
+            align,
+            message,
+            preview: children,
+            rect: { height, width, x, y },
+            shape,
+          }),
         );
       }}
     >
-      {children}
+      <Animated.View style={style}>{children}</Animated.View>
     </Pressable>
   );
 }
 
-/** Reaction counts under a message (Slack-style); tap one to toggle yours. */
-export function ReactionChips({
+/**
+ * A message that opens its actions on a long press, as the Experiments
+ * setting picks: the system context menu or the glass overlay.
+ */
+export function LongPressMessage({
   message,
   align,
+  shape,
+  children,
 }: {
   message: Message;
-  align: "end" | "start";
+  /** Which side the message sits on; the reaction bar lines up with it. */
+  align: TargetAlign;
+  shape: PreviewShape;
+  children: ReactNode;
 }) {
+  const press = usePreference("pressExperiment");
   const { toggleReaction } = useMessageActions();
-  if (message.reactions.length === 0) return null;
+  if (press === "menu" && hasNativeMessageMenu) {
+    return (
+      <NativeMessageMenu
+        message={message}
+        shape={shape}
+        onReact={(emoji) => {
+          selectionTick();
+          toggleReaction(message.id, emoji);
+        }}
+      >
+        {children}
+      </NativeMessageMenu>
+    );
+  }
   return (
-    <View
-      className={cn(
-        "flex-row flex-wrap gap-1 pt-1",
-        align === "end" ? "justify-end" : "justify-start",
-      )}
-    >
-      {message.reactions.map((reaction) => (
-        <Pressable
-          key={reaction.emoji}
-          accessibilityRole="button"
-          accessibilityLabel={`${reaction.emoji} ${reaction.count}`}
-          accessibilityState={{ selected: reaction.mine }}
-          onPress={() => {
-            selectionTick();
-            toggleReaction(message.id, reaction.emoji);
-          }}
-          className={cn(
-            "flex-row items-center gap-1 rounded-full border px-2 py-0.5 active:opacity-70",
-            reaction.mine
-              ? "border-accent bg-accent/15"
-              : "bg-fill border-transparent",
-          )}
-        >
-          <Text style={{ fontSize: 14 }}>{reaction.emoji}</Text>
-          <Text
-            className={cn(
-              "text-footnote font-semibold",
-              reaction.mine ? "text-accent" : "text-muted",
-            )}
-          >
-            {reaction.count}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <GlassLongPress message={message} align={align} shape={shape}>
+      {children}
+    </GlassLongPress>
   );
 }
