@@ -1,16 +1,11 @@
-import {
-  ActivityIndicator,
-  FlatList,
-  Platform,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import EditSquare from "@expo/material-symbols/edit_square.xml";
 import { pds } from "@vera/backend/pds";
 
+import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { ConversationRow } from "~/features/inbox/conversation-row";
 import { useInbox } from "~/features/messaging/conversations";
@@ -49,12 +44,9 @@ export default function ChatsScreen() {
           onPress={() => router.push("/new-message")}
         />
       </Stack.Toolbar>
-      <FlatList
+      <ScreenList
         data={visible}
         keyExtractor={(conversation) => conversation.id}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardDismissMode="on-drag"
-        className="bg-background"
         ListEmptyComponent={
           isLoading ? <ActivityIndicator className="pt-24" /> : <EmptyInbox />
         }
