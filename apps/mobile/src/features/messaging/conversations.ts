@@ -14,7 +14,7 @@ import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useAccount } from "./account";
 import { useMessageWindow } from "./message-window";
-import { useDisplayNames, useProfiles } from "./profiles";
+import { useProfiles } from "./profiles";
 import { pdsResult } from "./results";
 
 export function toMessage(message: PdsMessage) {
@@ -99,11 +99,15 @@ export function useConversation(conversationId: string) {
       query: pds.messages.conversation,
     }),
   );
-  const displayName = useDisplayNames(data?.members ?? []);
+  const profileOf = useProfiles(data?.members ?? []);
+  function displayName(account: string) {
+    return profileOf(account).displayName;
+  }
   return {
     conversation: data ?? undefined,
     displayName,
     isLoading: data === undefined,
+    profileOf,
     title: data ? conversationTitle(data, address, displayName) : "",
   };
 }

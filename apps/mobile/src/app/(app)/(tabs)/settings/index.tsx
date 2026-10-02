@@ -6,7 +6,7 @@ import { NativeHost } from "~/components/native-host";
 import { DeveloperSection } from "~/features/dev/developer-section";
 import { useAccount } from "~/features/messaging/account";
 import { AccountSection } from "~/features/settings/account-section";
-import { AppearancePicker } from "~/features/settings/appearance-picker";
+import { DisplaySection } from "~/features/settings/display-section";
 import { ProfileSection } from "~/features/settings/profile-section";
 import { useProfileEditor } from "~/features/settings/use-profile-editor";
 
@@ -53,9 +53,7 @@ export default function SettingsScreen() {
               <Text>Shown to people you message instead of your address.</Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>
-          <FieldGroup.Section title="Display">
-            <AppearancePicker />
-          </FieldGroup.Section>
+          <DisplaySection />
           <DeveloperSection />
           <AccountSection />
         </FieldGroup>

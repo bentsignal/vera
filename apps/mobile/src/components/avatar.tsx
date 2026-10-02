@@ -18,6 +18,7 @@ const BACKGROUNDS = [
 
 const SIZES = {
   sm: { box: "size-7", text: "text-caption" },
+  row: { box: "size-9", text: "text-footnote" },
   md: { box: "size-12", text: "text-headline" },
   lg: { box: "size-20", text: "text-title" },
 };

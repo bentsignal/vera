@@ -2,9 +2,9 @@ import { Text, View } from "react-native";
 
 import type { Message } from "./types";
 import { cn } from "~/lib/cn";
-import { formatTime } from "~/lib/format";
 import { AttachmentView } from "./attachment-view";
 import { LinkPreviewCard } from "./link-preview-card";
+import { MessageMeta, SendingFade } from "./message-status";
 
 function Body({ text, isOwn }: { text: string; isOwn: boolean }) {
   return (
@@ -28,6 +28,7 @@ function Body({ text, isOwn }: { text: string; isOwn: boolean }) {
   );
 }
 
+/** iMessage-style: your messages on the right, everyone else's on the left. */
 export function MessageBubble({
   message,
   isOwn,
@@ -53,22 +54,22 @@ export function MessageBubble({
       {startsGroup && authorName && (
         <Text className="text-caption text-muted px-3">{authorName}</Text>
       )}
-      {message.attachments.map((attachment) => (
-        <AttachmentView key={attachment.url} attachment={attachment} />
-      ))}
-      {message.body && <Body text={message.body} isOwn={isOwn} />}
-      {message.linkPreview && <LinkPreviewCard preview={message.linkPreview} />}
-      {message.status === "failed" ? (
-        <Text className="text-caption text-destructive px-1">Not sent</Text>
-      ) : (
-        endsGroup && (
-          <Text className="text-caption text-muted px-1">
-            {message.status === "sending"
-              ? "Sending…"
-              : formatTime(message.sentAt)}
-          </Text>
-        )
-      )}
+      <SendingFade status={message.status}>
+        <View className={cn("gap-1", isOwn ? "items-end" : "items-start")}>
+          {message.attachments.map((attachment) => (
+            <AttachmentView key={attachment.url} attachment={attachment} />
+          ))}
+          {message.body && <Body text={message.body} isOwn={isOwn} />}
+          {message.linkPreview && (
+            <LinkPreviewCard preview={message.linkPreview} />
+          )}
+        </View>
+      </SendingFade>
+      <MessageMeta
+        message={message}
+        showTime={endsGroup}
+        align={isOwn ? "end" : "start"}
+      />
     </View>
   );
 }
