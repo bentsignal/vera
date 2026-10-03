@@ -44,15 +44,28 @@ device with an EAS development build.
 
 Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 
-| Profile                 | Use                                  | `EXPO_PUBLIC_VERA_DOMAIN` |
-| ----------------------- | ------------------------------------ | ------------------------- |
-| `development`           | Dev client, only when asked for one  | `dev.vera.chat`           |
-| `development-simulator` | Dev client for the iOS simulator     | `dev.vera.chat`           |
-| `internal`              | Shawn's "development build"          | `dev.vera.chat`           |
-| `preview`               | TestFlight and Play internal testing | `vera.chat`               |
-| `production`            | Store builds                         | `vera.chat`               |
+| Profile                 | Use                                 | `EXPO_PUBLIC_VERA_DOMAIN` |
+| ----------------------- | ----------------------------------- | ------------------------- |
+| `development`           | Dev client, only when asked for one | `dev.vera.chat`           |
+| `development-simulator` | Dev client for the iOS simulator    | `dev.vera.chat`           |
+| `internal`              | Shawn's "development build"         | `dev.vera.chat`           |
+| `production`            | TestFlight and store builds         | `vera.chat`               |
 
-Local runs default to `dev.vera.chat`; read the domain through `~/env`.
+Each profile has the update channel of the same name; releases (internal
+builds, store builds, and over-the-air updates) go through `pnpm release`.
+See [docs/releasing.md](../../docs/releasing.md).
+
+Local runs default to `dev.vera.chat`; read the domain through `~/env`. A
+worktree with an isolated backend (`scripts/backend.sh isolate`) sets its
+own `<branch>.dev.vera.chat` in `apps/mobile/.env.local`.
+
+## Simulator for agents
+
+`scripts/sim.sh` gives each worktree its own simulator and Metro port, with
+a dev client cached per native fingerprint, and navigates through the
+dev-only `globalThis.veraDev` hook (`src/features/dev/automation.ts`) over
+Metro's debugger connection, because iOS asks "Open in Vera?" before every
+`simctl openurl`. The `vera-feature` skill covers it.
 
 Shawn tests changes on standalone `internal` builds: Release JavaScript
 bundled into the app (real performance, no dev server) against the dev PDS,
@@ -69,7 +82,7 @@ eas upload -p ios --build-path /tmp/vera-internal.ipa   # shareable link
 
 ### TestFlight
 
-App Store builds (`preview`, `production`) must come from a release Xcode;
+Store builds (`production`) must come from a release Xcode;
 App Store Connect rejects builds from the default `Xcode-beta`. Build with
 Xcode 27 (`/Applications/Xcode-27.app`), which keeps the iOS 27 detached
 search tab (Xcode 26.5 builds compile the search tab patch out), then upload
@@ -78,9 +91,9 @@ with Apple's uploader, which reads the API key from `~/.appstoreconnect`:
 ```sh
 source ~/.appstoreconnect/vera.env
 DEVELOPER_DIR=/Applications/Xcode-27.app/Contents/Developer \
-  PATH="/opt/homebrew/bin:$PATH" eas build -p ios --profile preview --local \
-  --non-interactive --output /tmp/vera-preview.ipa
-xcrun altool --upload-app -f /tmp/vera-preview.ipa -t ios \
+  PATH="/opt/homebrew/bin:$PATH" eas build -p ios --profile production --local \
+  --non-interactive --output /tmp/vera-production.ipa
+xcrun altool --upload-app -f /tmp/vera-production.ipa -t ios \
   --apiKey "$EXPO_ASC_KEY_ID" --apiIssuer "$EXPO_ASC_ISSUER_ID"
 ```
 
@@ -129,7 +142,7 @@ login. The key lives outside the repo on Shawn's Mac:
 
 ```sh
 source ~/.appstoreconnect/vera.env   # EXPO_ASC_* and EXPO_APPLE_TEAM_*
-expect scripts/eas-credentials.exp internal   # or preview
+expect scripts/eas-credentials.exp internal   # or production
 ```
 
 Two things the key cannot do, done once in the web UI instead: creating the

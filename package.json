@@ -15,6 +15,8 @@
     "format": "turbo run format --continue -- --cache --cache-location .cache/.prettiercache",
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "decentralized-convex:check": "node --experimental-strip-types scripts/check-decentralized-convex-release.ts",
+    "react-doctor": "pnpm dlx react-doctor@0.9.14 apps/mobile --scope changed --blocking warning --no-telemetry --no-supply-chain --no-score --yes",
+    "release": "node --experimental-strip-types scripts/release.ts",
     "lint": "pnpm run decentralized-convex:check && turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
     "lint:ws": "pnpm dlx sherif@latest",

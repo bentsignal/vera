@@ -9,6 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useCSSVariable } from "uniwind";
 
+import { installDevAutomation } from "~/features/dev/automation";
 import { applyStoredPreferences } from "~/features/preferences/store";
 import { queryClient } from "~/features/session/account-session";
 import {
@@ -20,6 +21,7 @@ void SplashScreen.preventAutoHideAsync();
 // The splash is a plain background, so the app fades in over it.
 SplashScreen.setOptions({ duration: 250, fade: true });
 applyStoredPreferences();
+installDevAutomation();
 
 function useNavigationTheme() {
   const scheme = useColorScheme();

@@ -59,6 +59,7 @@ function AppStack() {
           title: "Reactions",
         }}
       />
+      <Stack.Screen name="dev-seed" options={{ headerShown: false }} />
       <Stack.Screen
         name="media"
         options={{

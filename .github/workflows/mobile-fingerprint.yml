@@ -1,0 +1,110 @@
+name: Mobile fingerprint
+
+# Does this PR change native code (anything in the native fingerprint)? If
+# so, merging it means the next release needs a new store build instead of
+# an over-the-air update, so the PR gets the "📱 Native Change" label and a
+# summary of what changed. Advisory: the label is the signal, the check
+# passes. Both fingerprints come from this one job on one OS, so they compare
+# cleanly (fingerprints differ between macOS and Linux).
+on:
+  pull_request:
+    paths:
+      - apps/mobile/**
+      - packages/**
+      - patches/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .github/workflows/mobile-fingerprint.yml
+
+concurrency:
+  group: mobile-fingerprint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      VERA_NOTIFICATION_EXTENSION: "1"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The default checkout is the merge result, which is what main
+          # would become.
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./tooling/github/setup
+
+      - name: Fingerprint the merge result
+        working-directory: apps/mobile
+        run: |
+          mkdir -p "$RUNNER_TEMP/fp/head" "$RUNNER_TEMP/fp/base"
+          for platform in ios android; do
+            npx expo-updates fingerprint:generate --platform "$platform" > "$RUNNER_TEMP/fp/head/$platform.json"
+          done
+
+      - name: Fingerprint the base
+        run: |
+          git checkout --quiet "${{ github.event.pull_request.base.sha }}"
+          pnpm install --frozen-lockfile
+          cd apps/mobile
+          if [ ! -d node_modules/expo-updates ]; then
+            # Bases from before expo-updates have no runtime to compare.
+            echo "none" > "$RUNNER_TEMP/fp/base/missing"
+            exit 0
+          fi
+          for platform in ios android; do
+            npx expo-updates fingerprint:generate --platform "$platform" > "$RUNNER_TEMP/fp/base/$platform.json"
+          done
+
+      - id: compare
+        name: Compare
+        run: |
+          changed=""
+          {
+            echo "## Native fingerprint"
+            echo
+            if [ -f "$RUNNER_TEMP/fp/base/missing" ]; then
+              echo "- 📱 The base has no expo-updates runtime; this PR adds one."
+              changed="ios android"
+            else
+              for platform in ios android; do
+                head_hash="$(jq -r .hash "$RUNNER_TEMP/fp/head/$platform.json")"
+                base_hash="$(jq -r .hash "$RUNNER_TEMP/fp/base/$platform.json")"
+                if [ "$head_hash" = "$base_hash" ]; then
+                  echo "- ✅ **$platform** unchanged: over-the-air compatible"
+                  continue
+                fi
+                changed="$changed $platform"
+                echo "- 📱 **$platform** changed: the next release needs a store build"
+                jq -r -n \
+                  --slurpfile h "$RUNNER_TEMP/fp/head/$platform.json" \
+                  --slurpfile b "$RUNNER_TEMP/fp/base/$platform.json" '
+                    ($b[0].sources | map({ (.filePath // .id): .hash }) | add // {}) as $bm
+                    | $h[0].sources[]
+                    | select($bm[(.filePath // .id)] != .hash)
+                    | "  - \(.type): `\(.filePath // .id)`"'
+              done
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "changed=${changed# }" >> "$GITHUB_OUTPUT"
+
+      - name: Label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ steps.compare.outputs.changed }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          label="📱 Native Change"
+          gh label create "$label" --color d93f0b --force \
+            --description "Changes native code; the next release needs a store build, not an OTA update" \
+            --repo "$GITHUB_REPOSITORY"
+          if [ -n "$CHANGED" ]; then
+            gh pr edit "$PR" --add-label "$label" --repo "$GITHUB_REPOSITORY"
+          else
+            gh pr edit "$PR" --remove-label "$label" --repo "$GITHUB_REPOSITORY" || true
+          fi

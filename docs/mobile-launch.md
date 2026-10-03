@@ -44,10 +44,14 @@ friends, and later asks the agent to deactivate it. The repo skill
 - Styling with Uniwind (Tailwind v4).
 - iOS and Android. App Store and Play Store submission comes later.
 - No Expo Go. EAS build profiles:
-  - `development`: development client with hot reload, installed directly to
-    Shawn's phone and the iOS simulator.
-  - `preview`: internal/TestFlight testing builds.
-  - `production`: store builds.
+  - `development`: development client with hot reload (only when Shawn asks
+    for a dev client by name).
+  - `internal`: Shawn's standalone test builds against the dev PDS.
+  - `production`: store builds, for TestFlight and the App Store.
+- Over-the-air updates (EAS Update) first; a store build only when native
+  code changed. See [releasing.md](releasing.md).
+- Agent workflow: one T3 Code worktree, agent, and PR per change, merged only
+  on Shawn's approval (`AGENTS.md`, the `vera-feature` skill).
 - EAS account: `directedbyshawn`.
 
 ## Infrastructure
