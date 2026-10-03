@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 
 import type { QueryCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
-import { accountsProtocol } from "./protocol.ts";
+import { accountsProtocol, PROFILE_BIO_MAX_LENGTH } from "./protocol.ts";
 
 export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
   handlers: {
@@ -14,22 +14,24 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         if (displayName.length === 0 || displayName.length > 80) {
           throw new ConvexError({ code: "INVALID_DISPLAY_NAME" });
         }
-
-        const profile = {
-          accountId,
-          avatarUrl: args.avatarUrl,
-          displayName,
-        };
         const existing = await ctx.db
           .query("profiles")
           .withIndex("by_account", (index) => index.eq("accountId", accountId))
           .unique();
+        const savedBio = nextBio(args.bio, existing?.bio);
+        const profile = {
+          accountId,
+          avatarUrl: args.avatarUrl,
+          displayName,
+          ...(savedBio === undefined ? {} : { bio: savedBio }),
+        };
 
         if (existing === null) {
           await ctx.db.insert("profiles", profile);
         } else {
           await ctx.db.patch(existing._id, {
             avatarUrl: profile.avatarUrl,
+            bio: savedBio,
             displayName: profile.displayName,
           });
         }
@@ -73,5 +75,30 @@ async function findProfile(ctx: QueryCtx, accountId: string) {
         accountId: profile.accountId,
         avatarUrl: profile.avatarUrl,
         displayName: profile.displayName,
+        ...(profile.bio === undefined ? {} : { bio: profile.bio }),
       };
+}
+
+/**
+ * The bio to store. An omitted bio keeps the saved one, so name and photo
+ * edits (and clients that predate bios) never clear it; empty clears it.
+ */
+function nextBio(requested: string | undefined, saved: string | undefined) {
+  if (requested === undefined) return saved;
+  const bio = requested.trim();
+  if (!isBioWithinLimit(bio)) {
+    throw new ConvexError({ code: "INVALID_BIO" });
+  }
+  return bio.length === 0 ? undefined : bio;
+}
+
+/**
+ * Counts user-perceived characters (grapheme clusters), as the iOS text
+ * field does, so a bio of emoji that fits on the phone also fits here. The
+ * raw cap stops one "character" from carrying unbounded combining marks.
+ */
+function isBioWithinLimit(bio: string) {
+  if (bio.length > PROFILE_BIO_MAX_LENGTH * 16) return false;
+  const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  return [...graphemes.segment(bio)].length <= PROFILE_BIO_MAX_LENGTH;
 }

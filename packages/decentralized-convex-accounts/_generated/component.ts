@@ -38,7 +38,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           };
           lastChanged: "0.1.0";
           operation: {
-            args: { avatarUrl: null | string; displayName: string };
+            args: {
+              avatarUrl: null | string;
+              bio?: string;
+              displayName: string;
+            };
             type: "upsertMyProfile";
           };
           version: string;
@@ -49,6 +53,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           value: {
             accountId: string;
             avatarUrl: null | string;
+            bio?: string;
             displayName: string;
           };
         },
@@ -78,6 +83,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             value: null | {
               accountId: string;
               avatarUrl: null | string;
+              bio?: string;
               displayName: string;
             };
           }
@@ -87,6 +93,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             value: null | {
               accountId: string;
               avatarUrl: null | string;
+              bio?: string;
               displayName: string;
             };
           },

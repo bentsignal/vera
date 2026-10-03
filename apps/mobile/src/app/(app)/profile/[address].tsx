@@ -66,6 +66,7 @@ function Profile({ address }: { address: string }) {
             name={profile.displayName}
             subtitle={address}
             avatarUrl={profile.avatarUrl}
+            bio={profile.bio}
           />
           {address !== account && (
             <MessageButton address={address} name={profile.displayName} />

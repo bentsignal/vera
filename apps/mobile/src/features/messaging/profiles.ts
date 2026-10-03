@@ -63,7 +63,7 @@ export function useDisplayNames(addresses: readonly string[]) {
 }
 
 /**
- * One person's profile, falling back to the username and no photo.
+ * One person's profile, falling back to the username, no photo, and no bio.
  * `isLoading` holds until their PDS answers, so screens can fade it in.
  */
 export function useProfile(address: string) {
@@ -86,6 +86,7 @@ export function useProfile(address: string) {
   );
   return {
     avatarUrl: data?.avatarUrl ?? null,
+    bio: data?.bio ?? "",
     displayName: data?.displayName ?? usernameOf(address),
     isLoading: data === undefined,
   };

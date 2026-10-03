@@ -74,7 +74,7 @@ export async function seedProfiles(ctx: ActionCtx) {
       ...request,
       identity: botIdentity(bot),
       operation: {
-        args: { avatarUrl: null, displayName: bot.name },
+        args: { avatarUrl: null, bio: bot.bio, displayName: bot.name },
         type: "upsertMyProfile",
       },
     });

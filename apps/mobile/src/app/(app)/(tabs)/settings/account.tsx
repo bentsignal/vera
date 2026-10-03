@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from "expo-router";
+import { PROFILE_BIO_MAX_LENGTH } from "@decentralized-convex/accounts";
 import { FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { showActionSheet } from "~/components/action-sheet";
@@ -50,6 +51,21 @@ function AccountSettings() {
             />
             <FieldGroup.SectionFooter>
               <Text>Shown to people you message instead of your address.</Text>
+            </FieldGroup.SectionFooter>
+          </FieldGroup.Section>
+          <FieldGroup.Section title="Bio">
+            <TextInput
+              key={String(profile.isLoaded)}
+              defaultValue={profile.savedBio}
+              placeholder="A few words about you"
+              multiline
+              maxLength={PROFILE_BIO_MAX_LENGTH}
+              onChangeText={profile.changeBio}
+            />
+            <FieldGroup.SectionFooter>
+              <Text>
+                {`Shown on your profile under your name. Up to ${PROFILE_BIO_MAX_LENGTH} characters.`}
+              </Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>
           <DeveloperSection />

@@ -7,18 +7,21 @@ import { plainRow } from "~/lib/ui-modifiers";
 
 /**
  * The top of a profile or conversation details screen, like a contact
- * card: a large photo, the name, and a secondary line, drawn on the page
- * rather than in a card. Render it first inside a `FieldGroup`.
+ * card: a large photo, the name, a secondary line, and an optional bio,
+ * drawn on the page rather than in a card. Render it first inside a
+ * `FieldGroup`.
  */
 export function ProfileCard({
   name,
   subtitle,
   avatarUrl = null,
+  bio = "",
   glyph,
 }: {
   name: string;
   subtitle: string;
   avatarUrl?: string | null;
+  bio?: string;
   glyph?: AvatarGlyph;
 }) {
   return (
@@ -39,6 +42,14 @@ export function ProfileCard({
         >
           {subtitle}
         </Text>
+        {bio.length > 0 && (
+          <Text
+            style={{ paddingTop: 8 }}
+            textStyle={{ fontSize: 17, textAlign: "center" }}
+          >
+            {bio}
+          </Text>
+        )}
       </Column>
     </FieldGroup.Section>
   );

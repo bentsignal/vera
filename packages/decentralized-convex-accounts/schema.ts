@@ -5,6 +5,7 @@ export default defineSchema({
   profiles: defineTable({
     accountId: v.string(),
     avatarUrl: v.union(v.null(), v.string()),
+    bio: v.optional(v.string()),
     displayName: v.string(),
   }).index("by_account", ["accountId"]),
 });

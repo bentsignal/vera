@@ -10,11 +10,21 @@ import { requireEnvironment } from "./lib";
 // Development only: bot accounts that act through the PDS plugins as
 // themselves. See dev.ts.
 
+// Leo has no bio, so profiles without one stay easy to check. Priya's is
+// near the 150-character limit.
 export const BOTS = [
-  { name: "Maya Chen", username: "maya" },
-  { name: "Jonah Weiss", username: "jonah" },
-  { name: "Priya Natarajan", username: "priya" },
-  { name: "Leo Martins", username: "leo" },
+  {
+    bio: "Climbing, film photos, and too many houseplants.",
+    name: "Maya Chen",
+    username: "maya",
+  },
+  { bio: "Drummer. Always driving.", name: "Jonah Weiss", username: "jonah" },
+  {
+    bio: "Product designer in Brooklyn. Currently learning to make bread that doesn't collapse, and losing to my cat at chess. Ask me about typefaces.",
+    name: "Priya Natarajan",
+    username: "priya",
+  },
+  { bio: "", name: "Leo Martins", username: "leo" },
 ] as const;
 
 export const REPLIES = [
