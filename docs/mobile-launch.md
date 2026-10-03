@@ -42,7 +42,8 @@ friends, and later asks the agent to deactivate it. The repo skill
 - `apps/mobile`: latest Expo SDK and React Native.
 - Native UI through `@expo/ui`; the app should feel as native as possible.
 - Styling with Uniwind (Tailwind v4).
-- iOS and Android. App Store and Play Store submission comes later.
+- iOS and Android. App Store and Play Store submission comes later. Android
+  status and plan: [android.md](android.md).
 - No Expo Go. EAS build profiles:
   - `development`: development client with hot reload, installed directly to
     Shawn's phone and the iOS simulator.
