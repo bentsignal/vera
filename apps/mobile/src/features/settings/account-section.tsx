@@ -4,7 +4,7 @@ import { Button, FieldGroup, Row, Spacer, Text } from "@expo/ui";
 
 import { useAccount } from "~/features/messaging/account";
 import { nativeColors } from "~/lib/colors";
-import { destructive } from "~/lib/ui-modifiers";
+import { destructive, fillRow } from "~/lib/ui-modifiers";
 import { signOutAccount } from "./sign-out";
 
 /** The account's home server and sign-out. */
@@ -32,9 +32,9 @@ export function AccountSection() {
 
   return (
     <FieldGroup.Section>
-      <Row alignment="center">
+      <Row alignment="center" modifiers={fillRow}>
         <Text>Home Server</Text>
-        <Spacer />
+        <Spacer flexible />
         <Text textStyle={{ color: nativeColors.secondaryLabel }}>
           {session.home.domain}
         </Text>

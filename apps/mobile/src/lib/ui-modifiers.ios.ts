@@ -13,6 +13,7 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 
 export const fillWidth = [frame({ maxWidth: Infinity })];
+export const fillRow = [];
 export const prominentButton = [
   buttonStyle("glassProminent"),
   buttonBorderShape("capsule"),

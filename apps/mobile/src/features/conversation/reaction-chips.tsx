@@ -1,12 +1,9 @@
 import { Pressable, Text, View } from "react-native";
 import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
-import { GlassView } from "expo-glass-effect";
-import { withUniwind } from "uniwind";
 
 import type { ReactionSummary } from "~/features/messaging/reactions";
+import { GlassSurface } from "~/components/glass-surface";
 import { cn } from "~/lib/cn";
-
-const StyledGlassView = withUniwind(GlassView);
 
 /** Reactions pop in when they arrive and shrink away when taken back. */
 export const POP_IN = ZoomIn.springify().damping(13).stiffness(260);
@@ -27,9 +24,10 @@ function Chip({
         accessibilityState={{ selected: reaction.mine }}
         onPress={onPress}
       >
-        <StyledGlassView
+        <GlassSurface
           isInteractive
           tintColorClassName={reaction.mine ? "accent-accent/25" : undefined}
+          androidClassName={reaction.mine ? "bg-accent/20" : undefined}
           className="h-[26px] flex-row items-center gap-1 rounded-full px-2"
         >
           <Text style={{ fontSize: 13 }}>{reaction.emoji}</Text>
@@ -41,7 +39,7 @@ function Chip({
           >
             {reaction.count}
           </Text>
-        </StyledGlassView>
+        </GlassSurface>
       </Pressable>
     </Animated.View>
   );

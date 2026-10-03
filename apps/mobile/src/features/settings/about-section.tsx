@@ -4,6 +4,7 @@ import * as Updates from "expo-updates";
 import { FieldGroup, Row, Spacer, Text } from "@expo/ui";
 
 import { nativeColors } from "~/lib/colors";
+import { fillRow } from "~/lib/ui-modifiers";
 
 /** The marketing version and the native build number, such as "0.1.0 (6)". */
 function appVersion() {
@@ -37,9 +38,9 @@ function runningUpdate() {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <Row alignment="center">
+    <Row alignment="center" modifiers={fillRow}>
       <Text>{label}</Text>
-      <Spacer />
+      <Spacer flexible />
       <Text textStyle={{ color: nativeColors.secondaryLabel }}>{value}</Text>
     </Row>
   );

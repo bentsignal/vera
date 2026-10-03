@@ -1,6 +1,7 @@
 import { fillMaxWidth } from "@expo/ui/jetpack-compose/modifiers";
 
 export const fillWidth = [fillMaxWidth()];
+export const fillRow = [fillMaxWidth()];
 export const prominentButton = [fillMaxWidth()];
 export const largeButton = [fillMaxWidth()];
 export const circleButton = [];
