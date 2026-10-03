@@ -34,12 +34,16 @@ in the message:
 
 - `mobile/build/<n>`: store build `n` uploaded to App Store Connect.
 - `mobile/internal/<n>`: an internal build.
-- `mobile/ota/<channel>/<yyyymmddThhmm>`: an update, with its EAS update group.
+- `mobile/ota/<channel>/<yyyymmddThhmmss>` (UTC): an update, with its EAS
+  update group and the update ID the app shows in Settings → About.
+- `backend/deploy/<yyyymmddThhmmss>`: a production Convex deploy
+  (`pnpm release backend production`).
 
 "Changes since the last release" means the merges since the newest
 `mobile/build/*` or `mobile/ota/production/*` tag. `pnpm release plan` prints
 them, whether the release can go over the air (current runtime equals the
-last store build's), and whether the backend changed.
+last store build's), and whether the backend (including `pnpm-lock.yaml`)
+changed since the last production deploy.
 
 `mobile/build/5` (TestFlight build 5, the first one) predates `expo-updates`,
 so the first release after it is a store build.
@@ -49,7 +53,8 @@ so the first release after it is a store build.
 1. **Plan.** On an up-to-date `main`, run `pnpm release plan`. Write the
    release notes from the merged PRs and a test plan of what to try on the
    phone. Send both to Shawn.
-2. **Test build.** Push `main`'s backend to the shared dev deployment. Then:
+2. **Test build.** Push `main`'s backend to the shared dev deployment
+   (`pnpm release backend dev`). Then:
    - OTA release: if the latest internal build has the current runtime,
      publish to the `internal` channel. Otherwise make an internal build.
    - Store release: make an internal build (`pnpm release build internal`)
@@ -58,8 +63,8 @@ so the first release after it is a store build.
    back to step 1).
 4. **Ship.**
    - If the backend changed, deploy it to production first
-     (`npx convex deploy` in `services/backend`). Old app versions keep
-     talking to it, so backend changes must stay compatible with them.
+     (`pnpm release backend production`). Old app versions keep talking to
+     it, so backend changes must stay compatible with them.
    - OTA: `pnpm release ota production "<notes>"`. TestFlight and App Store
      users get it on the next launch.
    - Store: `pnpm release build production` (release Xcode, uploads to App
@@ -73,6 +78,8 @@ so the first release after it is a store build.
 ## Versions
 
 `version` in `app.config.ts` is the marketing version (0.1.0). Build numbers
-increment on their own (EAS remote versioning). Bump the version with a PR
+increment on their own (EAS remote versioning, shared by internal and store
+builds). Internal builds use the same bundle ID, so installing one replaces
+the TestFlight app on that phone. Bump the version with a PR
 after a version is released on the App Store, because Apple closes that
 version to new builds. The runtime version is independent of both.

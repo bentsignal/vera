@@ -1,11 +1,13 @@
 // Mobile releases: what changed since the last one, whether it can ship
 // over the air, and the build, upload, TestFlight, and tagging steps. The
-// `vera-release` agent skill says when to run each; RELEASING.md explains
-// the model.
+// `vera-release` agent skill says when to run each; docs/releasing.md
+// explains the model.
 //
-//   node --experimental-strip-types scripts/release.ts <command>
+//   pnpm release <command>
 //
 //   plan                           changes since the last release, and OTA or store build
+//   backend dev                    push main's functions to the shared dev deployment
+//   backend production             deploy main's functions to production (tags backend/deploy/...)
 //   build internal                 local internal build (dev PDS), uploaded for an install link
 //   build production               local App Store build with release Xcode, uploaded to TestFlight
 //   ota internal|production "msg"  publish an over-the-air update to a channel
@@ -27,12 +29,14 @@ const ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], {
 const MOBILE = join(ROOT, "apps/mobile");
 const APP_ID = "6818656155";
 const FRIENDS_GROUP = "19b050f9-a1aa-4ee8-9c84-3ef3f8716fa4";
+// Every build (test and store) uses release Xcode, so Shawn tests what ships.
 const RELEASE_XCODE = "/Applications/Xcode-27.app/Contents/Developer";
+const SHARED_DEV_DEPLOYMENT = "dev:perceptive-magpie-29";
+const BACKEND_PATHS = ["services/backend", "packages", "pnpm-lock.yaml"];
 const BUILD_ENV = {
   internal: { EXPO_PUBLIC_VERA_DOMAIN: "dev.vera.chat" },
   production: { EXPO_PUBLIC_VERA_DOMAIN: "vera.chat" },
 } as const;
-type Channel = keyof typeof BUILD_ENV;
 
 function run(
   command: string,
@@ -126,8 +130,8 @@ async function asc(method: string, path: string, body?: unknown) {
 /** The iOS runtime version (native fingerprint) of the checked-out code. */
 function fingerprint() {
   const json = output(
-    "npx",
-    ["expo-updates", "fingerprint:generate", "--platform", "ios"],
+    "pnpm",
+    ["exec", "expo-updates", "fingerprint:generate", "--platform", "ios"],
     {
       cwd: MOBILE,
       env: { VERA_NOTIFICATION_EXTENSION: "1" },
@@ -149,20 +153,52 @@ function field(message: string, name: string) {
   return new RegExp(`^${name}: (.+)$`, "m").exec(message)?.[1]?.trim();
 }
 
+/** The newest tag that reached TestFlight or App Store users. */
 function lastRelease() {
   const [tag] = tags("mobile/*").filter(
-    (name) => !name.startsWith("mobile/ota/internal/"),
+    (name) =>
+      name.startsWith("mobile/build/") ||
+      name.startsWith("mobile/ota/production/"),
   );
   return tag;
+}
+
+function tagDate(tag: string) {
+  return git("tag", "--list", tag, "--format=%(creatordate:short)");
+}
+
+function runtimeOf(tag: string | undefined) {
+  return tag === undefined ? undefined : field(tagMessage(tag), "runtime");
+}
+
+/** Files that differ from the last production backend deploy. */
+function backendChanges() {
+  const [deploy] = tags("backend/deploy/*");
+  const base = deploy ?? lastRelease();
+  if (base === undefined) return { base: "nothing", files: ["(no history)"] };
+  const files = git("diff", "--name-only", base, "HEAD", "--", ...BACKEND_PATHS)
+    .split("\n")
+    .filter(
+      (file) =>
+        file !== "" && !file.endsWith(".md") && !file.includes(".test."),
+    );
+  return { base, files };
+}
+
+function stamp() {
+  // UTC, to the second: yyyymmddThhmmss.
+  return new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
 }
 
 function plan() {
   git("fetch", "--quiet", "--tags", "origin");
   const head = git("rev-parse", "--short", "HEAD");
+  if (git("rev-parse", "HEAD") !== git("rev-parse", "origin/main")) {
+    console.log("warning: HEAD is not origin/main; this plan describes HEAD");
+  }
   const release = lastRelease();
   const [build] = tags("mobile/build/*");
-  const shipped =
-    build === undefined ? undefined : field(tagMessage(build), "runtime");
+  const shipped = runtimeOf(build);
   const current = fingerprint();
   const range = release === undefined ? "HEAD" : `${release}..HEAD`;
   // Changes land as merge commits ("Merge pull request #n", PR title in the
@@ -181,55 +217,69 @@ function plan() {
 
   console.log(`HEAD: ${head}`);
   console.log(
-    `last release: ${release ?? "none"}${release === undefined ? "" : ` (${git("log", "-1", "--format=%cs", release)})`}`,
+    `last release: ${release === undefined ? "none" : `${release} (${tagDate(release)})`}`,
   );
   console.log(
     `last store build: ${build ?? "none"}, runtime ${shipped ?? "unknown"}`,
   );
   console.log(`current runtime: ${current}`);
-  if (shipped === current) {
-    console.log("kind: ota (no native change since the last store build)");
-  } else {
-    console.log(
-      "kind: store-build (native code changed, or no expo-updates build has shipped yet)",
-    );
-  }
-  const backend =
-    release === undefined
-      ? "unknown"
-      : git(
-          "diff",
-          "--name-only",
-          release,
-          "HEAD",
-          "--",
-          "services/backend",
-          "packages",
-        )
-          .split("\n")
-          .filter(
-            (file) =>
-              file !== "" && !file.endsWith(".md") && !file.includes(".test."),
-          );
   console.log(
-    `backend: ${
-      backend === "unknown" || backend.length > 0
-        ? "changed; deploy to production before the app ships (npx convex deploy)"
-        : "unchanged"
-    }`,
+    shipped === current
+      ? "kind: ota (no native change since the last store build)"
+      : "kind: store-build (native code changed, or no expo-updates build has shipped yet)",
+  );
+  const backend = backendChanges();
+  console.log(
+    backend.files.length === 0
+      ? `backend: unchanged since ${backend.base}`
+      : `backend: changed since ${backend.base} (${backend.files.length} files); run \`pnpm release backend production\` before the app ships`,
   );
   const [internal] = tags("mobile/internal/*");
-  const internalRuntime =
-    internal === undefined ? undefined : field(tagMessage(internal), "runtime");
+  const internalRuntime = runtimeOf(internal);
   console.log(
-    `internal build: ${internal ?? "none"}${
-      internalRuntime === current
-        ? " (matches; an internal OTA reaches it)"
-        : " (stale; make a new internal build to test)"
+    `internal build: ${
+      internal === undefined
+        ? "none yet; make one to test"
+        : internalRuntime === current
+          ? `${internal} (matches; an internal OTA reaches it)`
+          : `${internal} (older native code; make a new internal build to test)`
     }`,
   );
   console.log(`\nmerged since ${release ?? "the start"}:`);
   console.log(merges.length === 0 ? "- nothing" : merges.join("\n"));
+  console.log(
+    "\nEach merged PR's description has a Release notes section (backend, native change, deploy).",
+  );
+}
+
+function backend(target: string | undefined) {
+  const env = readFileSync(join(ROOT, "services/backend/.env.local"), "utf8");
+  if (target === "dev") {
+    if (existsSync(join(ROOT, "services/backend/.isolated-backend"))) {
+      throw new Error(
+        "this worktree uses an isolated backend; release from a checkout on the shared dev deployment",
+      );
+    }
+    if (!env.includes(`CONVEX_DEPLOYMENT=${SHARED_DEV_DEPLOYMENT}`)) {
+      throw new Error(
+        `services/backend/.env.local must select ${SHARED_DEV_DEPLOYMENT}`,
+      );
+    }
+    requireCleanMain();
+    run("npx", ["convex", "dev", "--once"], {
+      cwd: join(ROOT, "services/backend"),
+    });
+    return;
+  }
+  if (target === "production") {
+    requireCleanMain();
+    run("npx", ["convex", "deploy", "--yes"], {
+      cwd: join(ROOT, "services/backend"),
+    });
+    tag(`backend/deploy/${stamp()}`, [`commit: ${git("rev-parse", "HEAD")}`]);
+    return;
+  }
+  throw new Error("usage: backend dev|production");
 }
 
 /** Reads the runtime version a built IPA will accept updates for. */
@@ -241,7 +291,14 @@ function ipaRuntime(ipa: string) {
   return plist;
 }
 
+function requireNewTag(name: string) {
+  if (git("tag", "--list", name) !== "") {
+    throw new Error(`tag ${name} already exists`);
+  }
+}
+
 function tag(name: string, lines: string[]) {
+  requireNewTag(name);
   run("git", ["tag", "-a", name, "-m", [name, "", ...lines].join("\n")]);
   run("git", ["push", "origin", name]);
   console.log(`tagged ${name}`);
@@ -281,26 +338,31 @@ function build(profile: string | undefined) {
       env: {
         ...apple,
         PATH: `/opt/homebrew/bin:${process.env.PATH ?? ""}`,
-        ...(profile === "production" ? { DEVELOPER_DIR: RELEASE_XCODE } : {}),
+        DEVELOPER_DIR: RELEASE_XCODE,
       },
     },
   );
   const runtime = ipaRuntime(ipa);
+  const expected = fingerprint();
+  if (runtime !== expected) {
+    throw new Error(
+      `the build's runtime ${runtime} is not this checkout's fingerprint ${expected}; updates would never reach it`,
+    );
+  }
   const buildNumber = output("sh", [
     "-c",
     `unzip -p "${ipa}" 'Payload/*.app/Info.plist' | plutil -extract CFBundleVersion raw -`,
   ]);
   const commit = git("rev-parse", "HEAD");
+  const name = `mobile/${profile === "internal" ? "internal" : "build"}/${buildNumber}`;
+  requireNewTag(name);
   if (profile === "internal") {
     run(
       "eas",
       ["upload", "-p", "ios", "--build-path", ipa, "--non-interactive"],
       { cwd: MOBILE },
     );
-    tag(`mobile/internal/${buildNumber}`, [
-      `runtime: ${runtime}`,
-      `commit: ${commit}`,
-    ]);
+    tag(name, [`runtime: ${runtime}`, `commit: ${commit}`]);
   } else {
     run("xcrun", [
       "altool",
@@ -314,10 +376,7 @@ function build(profile: string | undefined) {
       "--apiIssuer",
       apple.EXPO_ASC_ISSUER_ID ?? "",
     ]);
-    tag(`mobile/build/${buildNumber}`, [
-      `runtime: ${runtime}`,
-      `commit: ${commit}`,
-    ]);
+    tag(name, [`runtime: ${runtime}`, `commit: ${commit}`]);
   }
   console.log(`ipa: ${ipa}\nbuild: ${buildNumber}\nruntime: ${runtime}`);
 }
@@ -328,6 +387,17 @@ function ota(channel: string | undefined, message: string | undefined) {
   }
   if (message === undefined) throw new Error("an update needs a message");
   requireCleanMain();
+  // An update only reaches binaries with the same runtime; refuse to publish
+  // one that nothing installed can load.
+  const [binary] = tags(
+    channel === "production" ? "mobile/build/*" : "mobile/internal/*",
+  );
+  const current = fingerprint();
+  if (runtimeOf(binary) !== current) {
+    throw new Error(
+      `no ${channel} binary has runtime ${current} (latest: ${binary ?? "none"}, ${runtimeOf(binary) ?? "no runtime"}); make a build instead`,
+    );
+  }
   const json = output(
     "eas",
     [
@@ -347,21 +417,23 @@ function ota(channel: string | undefined, message: string | undefined) {
       cwd: MOBILE,
       // The fingerprint must match the store build's, which has the extension.
       env: {
-        ...BUILD_ENV[channel as Channel],
+        ...BUILD_ENV[channel],
         VERA_NOTIFICATION_EXTENSION: "1",
       },
     },
   );
   const updates = JSON.parse(json) as {
     group: string;
+    id: string;
     runtimeVersion: string;
   }[];
   const update = updates[0];
   if (update === undefined) throw new Error("eas update returned no update");
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13);
-  tag(`mobile/ota/${channel}/${stamp}`, [
+  tag(`mobile/ota/${channel}/${stamp()}`, [
     `runtime: ${update.runtimeVersion}`,
     `group: ${update.group}`,
+    // The ID the app reports (Updates.updateId).
+    `update: ${update.id}`,
     `commit: ${git("rev-parse", "HEAD")}`,
     "",
     message,
@@ -432,19 +504,26 @@ async function testflight(
     data: [{ id: buildId, type: "builds" }],
   });
   console.log("added to Friends");
-  try {
-    await asc("POST", "/v1/betaAppReviewSubmissions", {
-      data: {
-        relationships: { build: { data: { id: buildId, type: "builds" } } },
-        type: "betaAppReviewSubmissions",
-      },
-    });
+  const existing = (await asc(
+    "GET",
+    `/v1/builds/${buildId}/betaAppReviewSubmission`,
+  )) as { data: { attributes: { betaReviewState: string } } | null };
+  if (existing.data !== null) {
     console.log(
-      "submitted for Beta App Review (Friends see it once Apple approves)",
+      `already in Beta App Review: ${existing.data.attributes.betaReviewState}`,
     );
-  } catch (error) {
-    console.log(`Beta App Review submission: ${String(error)}`);
+    return;
   }
+  // Fails loudly: Friends only get the build once this succeeds.
+  await asc("POST", "/v1/betaAppReviewSubmissions", {
+    data: {
+      relationships: { build: { data: { id: buildId, type: "builds" } } },
+      type: "betaAppReviewSubmissions",
+    },
+  });
+  console.log(
+    "submitted for Beta App Review (Friends see it once Apple approves)",
+  );
 }
 
 async function appstore(buildNumber: string | undefined) {
@@ -507,6 +586,9 @@ switch (command) {
   case "plan":
     plan();
     break;
+  case "backend":
+    backend(args[0]);
+    break;
   case "build":
     build(args[0]);
     break;
@@ -536,7 +618,7 @@ switch (command) {
     console.log(
       readFileSync(new URL(import.meta.url), "utf8")
         .split("\n")
-        .slice(0, 18)
+        .slice(0, 20)
         .join("\n"),
     );
     process.exitCode = 2;

@@ -239,7 +239,7 @@ case "$command" in
   relaunch) require_up && launch && echo "relaunched" ;;
   shot)
     require_up
-    xcrun simctl io "$UDID" screenshot "$EVIDENCE/${1:?name}.png" >/dev/null
+    xcrun simctl io "$UDID" screenshot "$EVIDENCE/${1:?name}.png" >/dev/null 2>&1
     echo "$EVIDENCE/$1.png"
     ;;
   record) record "${1:?name}" ;;

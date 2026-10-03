@@ -36,7 +36,8 @@ Shawn starts each feature or fix in its own T3 Code worktree and thread
 - Changes to Convex functions or data get an isolated backend
   (`scripts/backend.sh isolate`). App-only changes use the shared dev PDS.
 - Verify in this worktree's own simulator (`scripts/sim.sh`), never another
-  worktree's or a shared one.
+  worktree's or a shared one. Shut it down (`scripts/sim.sh down`) as soon as
+  you have your evidence, before reporting; never leave simulators running.
 - UI changes need screenshots (before and after where something changed);
   motion and gestures need a video. Upload with `scripts/evidence.sh` and put
   them in the PR description. Never commit PR assets.
@@ -74,7 +75,8 @@ At the end of every run, run these in order:
 1. `pnpm run lint`
 2. `pnpm run typecheck`
 3. `pnpm run test`
-4. `pnpm run react-doctor --base origin/main` when the app changed
+4. `pnpm run react-doctor --base origin/main` when the app changed (use
+   the PR's base branch if it isn't `main`)
 
 If all succeed, run `pnpm run format:fix`, then summarize the changes.
 

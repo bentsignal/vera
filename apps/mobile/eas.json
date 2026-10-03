@@ -36,7 +36,8 @@
       "ios": {
         "buildConfiguration": "Release"
       },
-      "channel": "internal"
+      "channel": "internal",
+      "autoIncrement": true
     },
     "production": {
       "extends": "base",

@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # Every PR, whatever its base (stacked PRs target feature branches;
+  # `"*"` would skip bases with a slash).
   pull_request:
-    branches: ["*"]
   push:
     branches: ["main"]
   merge_group:
