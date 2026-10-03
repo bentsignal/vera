@@ -164,6 +164,28 @@ signed-in Chrome. Draft the listing copy and screenshots, then get his
 approval before submitting. After Apple releases a version, open a PR that
 bumps `version` in `app.config.ts`.
 
+## Verifying an update reached people
+
+After `ota production`:
+
+- Ask the update server what a binary's runtime gets (the tag lists each
+  platform's runtime and update ID). It should return that update's ID,
+  and 204 for any other runtime:
+
+  ```sh
+  curl -s https://u.expo.dev/5680db13-57a8-4b74-ae41-1f52abbda0b1 \
+    -H "expo-platform: ios" -H "expo-runtime-version: <ios-runtime>" \
+    -H "expo-channel-name: production" -H "expo-protocol-version: 1" \
+    -H "accept: multipart/mixed" | grep -oE '"id":"[^"]+"' | head -1
+  ```
+
+- On a device, Settings → About shows the running update's ID after the app
+  is opened twice (download, then run). Without a signed-in account, install
+  the production APK on a throwaway emulator, open it twice, and read
+  `adb logcat | grep dev.expo.updates`: the first launch logs
+  "DownloadComplete" and "NEW_UPDATE_LOADED", the second "No update
+  available". Delete the emulator afterwards.
+
 ## Rolling back
 
 - A bad OTA: republish the previous good group to the channel:
