@@ -193,6 +193,13 @@ Done when:
 
 ## Working notes
 
+- Release builds (`pnpm release build ... --android`) run out of Gradle
+  metaspace with the template's JVM defaults. Shawn's Mac has
+  `org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g ...` in
+  `~/.gradle/gradle.properties`, which overrides the project's; set the same
+  on any other machine. (A config plugin would also work, but its options
+  would change the iOS runtime too.)
+
 - Run `eas` from `apps/mobile`. From the repo root it fails with "EAS project
   not configured" and leaves a stub `app.json` behind.
 - New worktrees have no `node_modules`; run `pnpm install` before `eas` or

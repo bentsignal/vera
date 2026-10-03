@@ -11,6 +11,7 @@
 //   build internal [--android]          internal build (dev PDS), uploaded for an install link
 //   build production                    iOS App Store build with release Xcode, uploaded to TestFlight
 //   build production --android          Android production APK (vera.chat), uploaded for an install link
+//   build ... --artifact <ipa|apk>      upload and tag an existing build of this commit instead of building
 //   ota internal|production "msg"       over-the-air update for every platform whose binary matches
 //   testflight <build> <notes.md>  What to Test, Friends group, Beta App Review
 //   appstore <build>               attach a build to the App Store version and submit it
@@ -297,11 +298,24 @@ function backend(target: string | undefined) {
 
 /** Reads the runtime version a built IPA will accept updates for. */
 function ipaRuntime(ipa: string) {
-  const plist = output("sh", [
+  const declared = output("sh", [
     "-c",
     `unzip -p "${ipa}" 'Payload/*.app/Expo.plist' | plutil -extract EXUpdatesRuntimeVersion raw -`,
   ]);
-  return plist;
+  return resolveRuntime(
+    declared,
+    ipa,
+    "Payload/*.app/EXUpdates.bundle/fingerprint",
+  );
+}
+
+/**
+ * With the fingerprint policy the binary declares `file:fingerprint`, and
+ * the hash computed at build time sits in a file inside it.
+ */
+function resolveRuntime(declared: string, archive: string, file: string) {
+  if (declared !== "file:fingerprint") return declared;
+  return output("unzip", ["-p", archive, file]).trim();
 }
 
 function requireNewTag(name: string) {
@@ -326,39 +340,46 @@ function requireCleanMain() {
   }
 }
 
-function build(profile: string | undefined, platformFlag: string | undefined) {
+function build(profile: string | undefined, flags: string[]) {
   if (profile !== "internal" && profile !== "production") {
-    throw new Error("usage: build internal|production [--android]");
+    throw new Error(
+      "usage: build internal|production [--android] [--artifact <ipa|apk>]",
+    );
   }
   requireCleanMain();
-  if (platformFlag === "--android") {
-    buildAndroid(profile);
+  // Reuses a finished build from this commit (say, after a failed upload)
+  // instead of building again; the runtime check still applies.
+  const artifactIndex = flags.indexOf("--artifact");
+  const artifact = artifactIndex === -1 ? undefined : flags[artifactIndex + 1];
+  if (flags.includes("--android")) {
+    buildAndroid(profile, artifact);
     return;
   }
-  const ipa = join(tmpdir(), `vera-${profile}-${Date.now()}.ipa`);
+  const ipa = artifact ?? join(tmpdir(), `vera-${profile}-${Date.now()}.ipa`);
   const apple = appleEnv();
-  run(
-    "eas",
-    [
-      "build",
-      "-p",
-      "ios",
-      "--profile",
-      profile,
-      "--local",
-      "--non-interactive",
-      "--output",
-      ipa,
-    ],
-    {
-      cwd: MOBILE,
-      env: {
-        ...apple,
-        PATH: `/opt/homebrew/bin:${process.env.PATH ?? ""}`,
-        DEVELOPER_DIR: RELEASE_XCODE,
+  if (artifact === undefined)
+    run(
+      "eas",
+      [
+        "build",
+        "-p",
+        "ios",
+        "--profile",
+        profile,
+        "--local",
+        "--non-interactive",
+        "--output",
+        ipa,
+      ],
+      {
+        cwd: MOBILE,
+        env: {
+          ...apple,
+          PATH: `/opt/homebrew/bin:${process.env.PATH ?? ""}`,
+          DEVELOPER_DIR: RELEASE_XCODE,
+        },
       },
-    },
-  );
+    );
   const runtime = requireRuntime(ipaRuntime(ipa), "ios");
   const buildNumber = output("sh", [
     "-c",
@@ -417,35 +438,43 @@ function aapt2() {
  * against the dev PDS, and `production-apk` against vera.chat for testers
  * until Play internal testing exists. See docs/android.md.
  */
-function buildAndroid(profile: "internal" | "production") {
-  const apk = join(tmpdir(), `vera-${profile}-${Date.now()}.apk`);
+function buildAndroid(
+  profile: "internal" | "production",
+  artifact: string | undefined,
+) {
+  const apk = artifact ?? join(tmpdir(), `vera-${profile}-${Date.now()}.apk`);
   const androidHome =
     process.env.ANDROID_HOME ?? join(homedir(), "Library/Android/sdk");
-  run(
-    "eas",
-    [
-      "build",
-      "-p",
-      "android",
-      "--profile",
-      profile === "internal" ? "internal" : "production-apk",
-      "--local",
-      "--non-interactive",
-      "--output",
-      apk,
-    ],
-    {
-      cwd: MOBILE,
-      env: {
-        ANDROID_HOME: androidHome,
-        JAVA_HOME: output("/usr/libexec/java_home", ["-v", "17"]),
+  if (artifact === undefined)
+    run(
+      "eas",
+      [
+        "build",
+        "-p",
+        "android",
+        "--profile",
+        profile === "internal" ? "internal" : "production-apk",
+        "--local",
+        "--non-interactive",
+        "--output",
+        apk,
+      ],
+      {
+        cwd: MOBILE,
+        env: {
+          ANDROID_HOME: androidHome,
+          JAVA_HOME: output("/usr/libexec/java_home", ["-v", "17"]),
+        },
       },
-    },
-  );
+    );
   const resources = output(aapt2(), ["dump", "resources", apk]);
   const runtime = requireRuntime(
-    /expo_runtime_version[^\n]*\n\s*\(\) "([^"]+)"/.exec(resources)?.[1] ??
-      "unknown",
+    resolveRuntime(
+      /expo_runtime_version[^\n]*\n\s*\(\) "([^"]+)"/.exec(resources)?.[1] ??
+        "unknown",
+      apk,
+      "assets/fingerprint",
+    ),
     "android",
   );
   const versionCode =
@@ -684,7 +713,7 @@ switch (command) {
     backend(args[0]);
     break;
   case "build":
-    build(args[0], args[1]);
+    build(args[0], args.slice(1));
     break;
   case "ota":
     ota(args[0], args[1]);
