@@ -74,6 +74,8 @@ scripts/sim.sh status
   don't disturb anyone else's data.
 - Let Shawn watch: call the T3 `device_open` tool with the simulator UDID
   that `up` prints. It returns the exact `agent-device` command and flags.
+  Run `agent-device open chat.vera.app "${F[@]}"` once before other
+  agent-device commands (they fail with "Run open first" otherwise).
   Use agent-device for taps, typing, scrolling, and gestures (`snapshot -i`,
   `press @e3`, `fill`, `longpress`, `scroll`). In zsh, put the flags in an
   array (`F=(--platform ios ...)` then `"$F[@]"`), because a flags string
@@ -101,7 +103,11 @@ links to the MP4.
 
 - UI changes: screenshots of every changed screen. For changes to an
   existing screen, put the "before" shots (taken in step 1) next to the
-  "after" shots in a two-column table.
+  "after" shots in a two-column table, at the same scroll position so they
+  line up (`agent-device scroll`).
+- Update, channel, or release behavior can't be seen in the simulator: the
+  dev client has no channel or update ID. Say so in the PR and give Shawn
+  the steps to check it on an internal build.
 - Motion, gestures, and transitions: a short video (5–15 s).
 - Backend-only changes: show the behavior through the app if it's visible
   there. Otherwise paste the `npx convex run` output.
@@ -115,23 +121,32 @@ Run, in order, and fix everything:
 pnpm run lint
 pnpm run typecheck
 pnpm run test
-pnpm run react-doctor --base origin/main   # when apps/mobile changed
+pnpm run react-doctor --base origin/<PR base>   # when apps/mobile changed
 pnpm run format:fix
 ```
 
+React Doctor's closing advice ("ask the user if they would like to set it
+up", "run npx react-doctor@latest") doesn't apply: it's set up through
+`pnpm run react-doctor`. Turbo shares its cache across worktrees, so cached
+task output can show the main checkout's paths. That's a replay, not a run
+in another worktree.
+
 ## 7. Open the PR and stop
 
-Commit with a clear message, push, and open the PR against `main`:
+Commit with a clear message, push, and open the PR against `main` (or, for
+a change stacked on another unmerged PR, against that PR's branch):
 
 ```sh
-gh pr create --fill-first --body-file <body.md>
+gh pr create --base main --title "<title>" --body-file <body.md>
 ```
 
 Follow `.github/pull_request_template.md`: summary, evidence, how it was
 tested, the backend used, and whether native code changed. Link it to the
 thread with the T3 `link_pull_request` tool. Review your own diff
 (`gh pr diff`) as a skeptical reviewer would, and fix what you find. Wait for
-CI (`gh pr checks --watch`) and fix failures. If the "📱 Native Change"
+CI (`gh pr checks --watch`) and fix failures. Make sure the CI workflow
+actually ran (lint, typecheck, test, format, react-doctor, bundle), not just
+the fingerprint check. If the "📱 Native Change"
 label appears, say so: the next release then needs a store build.
 
 Then tell Shawn it's ready, with the PR link, a two-line summary, and

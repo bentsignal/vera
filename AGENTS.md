@@ -74,7 +74,8 @@ At the end of every run, run these in order:
 1. `pnpm run lint`
 2. `pnpm run typecheck`
 3. `pnpm run test`
-4. `pnpm run react-doctor --base origin/main` when the app changed
+4. `pnpm run react-doctor --base origin/main` when the app changed (use
+   the PR's base branch if it isn't `main`)
 
 If all succeed, run `pnpm run format:fix`, then summarize the changes.
 

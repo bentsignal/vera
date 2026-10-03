@@ -32,6 +32,9 @@ pnpm release plan
 gh pr view <n> --json title,body   # for each merged PR it lists
 ```
 
+Each merged PR's description ends with a "Release notes" section (backend,
+native change, deploy needed); start from those.
+
 Send Shawn:
 
 - **Kind:** over the air (`kind: ota`) or a store build (`kind: store-build`),
@@ -47,11 +50,16 @@ Then go straight to step 2 unless he says otherwise.
 
 ## 2. Put a test build on his phone
 
-The test build runs against the dev PDS, so update it to `main` first:
+The test build runs against the dev PDS, so update it to `main` first. This
+refuses to run from a worktree with an isolated backend:
 
 ```sh
-(cd services/backend && npx convex dev --once)   # shared dev deployment, from main
+pnpm release backend dev
 ```
+
+Internal builds share the App Store build's bundle ID, so installing one
+replaces the TestFlight app on Shawn's phone. Tell him; he goes back to
+TestFlight once the store build is out.
 
 - **OTA release, internal build current** (`plan` says "matches"):
 
@@ -59,8 +67,10 @@ The test build runs against the dev PDS, so update it to `main` first:
   pnpm release ota internal "<one-line summary>"
   ```
 
-  Tell Shawn to open the internal build, then close and reopen it to load the
-  update.
+  Tell Shawn to open the internal build, close it, and open it again: the
+  first launch downloads the update, the next runs it. Settings → About shows
+  the running update's ID, which matches the `update:` line of the tag.
+  `ota` refuses if no internal build has the current runtime.
 
 - **Otherwise** (store release, or the internal build is stale):
 
@@ -79,10 +89,11 @@ explicit approval of this release.
 
 ## 4. Ship
 
-If the backend changed, deploy it before the app:
+If `plan` says the backend changed, deploy it before the app. This tags
+`backend/deploy/<stamp>`, which the next `plan` compares against:
 
 ```sh
-(cd services/backend && npx convex deploy --yes)
+pnpm release backend production
 ```
 
 **Over the air:**
@@ -100,7 +111,8 @@ pnpm release testflight <build> /tmp/whats-new.md
 ```
 
 `testflight` waits for processing, sets What to Test, adds the build to
-Friends, and submits it for Beta App Review. The Team group (Shawn) gets
+Friends, and submits it for Beta App Review. It fails loudly if the
+submission fails; don't tell Shawn Friends will get it unless it succeeded. The Team group (Shawn) gets
 every build without review. Tell Shawn the build number and that Friends
 will see it after Apple's review, usually within a day.
 
@@ -149,9 +161,12 @@ bumps `version` in `app.config.ts`.
 ## Gotchas
 
 - `eas build --local` needs fastlane from Homebrew first on `PATH`.
-  `pnpm release build` sets that up. Store builds must use
+  `pnpm release build` sets that up, and builds both kinds with
   `/Applications/Xcode-27.app` (App Store Connect rejects Xcode-beta builds,
-  error 90534). The script sets `DEVELOPER_DIR`.
+  error 90534), so the test build matches what ships. It also checks the
+  built runtime against the checkout's fingerprint before uploading.
+- Build numbers come from EAS (remote, auto-incremented for internal and
+  store builds alike), so internal and store builds never share a number.
 - Uploads go through `xcrun altool`, because `eas submit --non-interactive`
   refuses an API key from the environment.
 - `ota` sets `VERA_NOTIFICATION_EXTENSION=1` and the channel's
