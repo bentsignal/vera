@@ -22,9 +22,9 @@ app icon (aloe pinwheel, single icon) and the splash; that work is settled.
       scrolls with the content, and the glass bar takes over with the small
       centered title once it scrolls past. Same for Spaces and Settings.
       Drop the title glow.
-- [ ] Notifications show photos (or initials) and never the old icon: needs
-      the notification service extension, which needs Shawn's one-time
-      credentials step.
+- [x] Notifications show photos (or initials) and never the old icon: the
+      notification service extension ships in every EAS build since #58
+      (credentials set up through the App Store Connect API key).
 
 ## Parked: message threads (do last, together)
 

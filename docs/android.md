@@ -218,10 +218,15 @@ Done when:
       an Android-only transparent image (`expo-splash-screen` needs one).
 - [ ] Screenshot every screen on the emulator against `dev.vera.chat`, and
       replace the "Expected gaps" table with confirmed issues.
-- [ ] Set up Firebase and FCM V1 for push.
-- [ ] Build the production APK (`pnpm release build production --android`,
+- [ ] Set up Firebase and FCM V1 for push. Blocked 2026-10-03: the Codex CLI
+      login had expired (`codex login`), so the Firebase console steps
+      haven't run. The prompt is in this doc's Push notifications section.
+- [x] Build the production APK (`pnpm release build production --android`,
       the `production-apk` profile), confirm the EAS keystore fingerprint,
-      and send the friend a link.
+      and send the friend a link. Done 2026-10-03: version code 3
+      (`mobile/android/build/3`), signed with the `E6:A1…` key that
+      `assetlinks.json` lists, and an over-the-air update reached it on an
+      emulator.
 - [ ] Fix the Android UI in small PRs: composer and glass surfaces, conversation
       header, message menu, search tab, themes.
 - [ ] Once Shawn's Play account is approved: Play internal testing,
