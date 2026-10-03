@@ -76,3 +76,6 @@ dist/
 legacy/apps/docs/.source/
 
 design
+
+# per-worktree Convex deployment (scripts/backend.sh)
+.isolated-backend

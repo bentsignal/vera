@@ -25,18 +25,39 @@ headless where possible, instead of driving the screen yourself:
 service's CLI or API first. Never open repeated browser tabs or login pages in
 the background; tell Shawn before anything opens on his machine.
 
-## Git workflow
+## Feature workflow
 
-The agent owns git for this repository:
+Shawn starts each feature or fix in its own T3 Code worktree and thread
+(`t3.json` runs `scripts/worktree-setup.sh` on creation). Follow the
+`vera-feature` skill. In short:
 
-- Never commit directly to `main`. Start each change on a short-lived branch
-  from an up-to-date `main`.
+- Work only in the worktree and branch you were given. T3 names the branch;
+  do not rename it.
+- Changes to Convex functions or data get an isolated backend
+  (`scripts/backend.sh isolate`). App-only changes use the shared dev PDS.
+- Verify in this worktree's own simulator (`scripts/sim.sh`), never another
+  worktree's or a shared one. Shut it down (`scripts/sim.sh down`) as soon as
+  you have your evidence, before reporting; never leave simulators running.
+- UI changes need screenshots (before and after where something changed);
+  motion and gestures need a video. Upload with `scripts/evidence.sh` and put
+  them in the PR description. Never commit PR assets.
 - Keep each pull request to one coherent change, with a description covering
-  the summary and the validation that was run.
-- Commit, push, open the PR, review the diff yourself, wait for CI, then merge
-  with a merge commit and delete the branch.
-- Do not leave work uncommitted between sessions. If work must pause, push it to
-  its branch and note its state in the PR.
+  the summary, the evidence, and the validation that was run.
+- Open the PR, review your own diff, wait for CI to pass, then tell Shawn it
+  is ready and **stop**. Merge only after Shawn approves that PR in the
+  thread ("merge it", "ship it", "approved"), with a merge commit, deleting
+  the branch. Approval of one PR is not approval of another.
+- Never commit directly to `main`. Do not leave work uncommitted between
+  sessions; push it and note its state in the PR.
+
+## Releases
+
+Merging does not release anything. When Shawn asks for a release, follow the
+`vera-release` skill ([docs/releasing.md](docs/releasing.md) explains the
+model): list what changed since the last release with a test plan, get a
+test build or update onto his phone, and ship only after he approves.
+Over-the-air updates are the default; a store build happens only when
+native code changed or Apple requires one.
 
 ## Phone builds
 
@@ -54,8 +75,17 @@ At the end of every run, run these in order:
 1. `pnpm run lint`
 2. `pnpm run typecheck`
 3. `pnpm run test`
+4. `pnpm run react-doctor --base origin/main` when the app changed (use
+   the PR's base branch if it isn't `main`)
 
 If all succeed, run `pnpm run format:fix`, then summarize the changes.
+
+Lint enforces the React rules: the React Compiler handles memoization (no
+`useMemo`, `useCallback`, or `memo`); server data goes through TanStack Query
+(`pdsQuery`/`pdsMutation`), never fetched in an effect; and `useEffect` is
+banned except with an `eslint-disable-next-line` comment saying why nothing
+else works. CI also exports the iOS bundle and labels PRs that change native
+code ("📱 Native Change"), since those need a store build to ship.
 
 ## Decentralized Convex release invariant
 

@@ -9,6 +9,8 @@ const NOTIFICATION_SERVICE_BUNDLE_ID = "chat.vera.app.NotificationService";
  */
 const notificationExtension = process.env.VERA_NOTIFICATION_EXTENSION === "1";
 
+const EAS_PROJECT_ID = "5680db13-57a8-4b74-ae41-1f52abbda0b1";
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Vera",
@@ -20,6 +22,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: "./assets/images/icon.png",
   userInterfaceStyle: "automatic",
   platforms: ["ios", "android"],
+  // Over-the-air updates (EAS Update) reach only binaries whose native code
+  // matches: the fingerprint changes whenever native code or config does.
+  // Each build profile has its own channel; see eas.json and docs/releasing.md.
+  runtimeVersion: { policy: "fingerprint" },
+  updates: {
+    url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+    checkAutomatically: "ON_LOAD",
+    fallbackToCacheTimeout: 0,
+  },
   ios: {
     // Liquid Glass icon from Icon Composer; see assets/icons/README.md.
     icon: "./assets/icons/vera.icon",
@@ -76,7 +87,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: "5680db13-57a8-4b74-ae41-1f52abbda0b1",
+      projectId: EAS_PROJECT_ID,
       ...(notificationExtension
         ? {
             // Tells EAS to sign the extension target as well.

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "scripts": [
+    {
+      "name": "Setup Worktree",
+      "command": "scripts/worktree-setup.sh",
+      "icon": "configure",
+      "runOnWorktreeCreate": true
+    },
+    {
+      "name": "Simulator",
+      "command": "scripts/sim.sh up",
+      "icon": "play"
+    }
+  ]
+}

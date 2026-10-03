@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # Every PR, whatever its base (stacked PRs target feature branches;
+  # `"*"` would skip bases with a slash).
   pull_request:
-    branches: ["*"]
   push:
     branches: ["main"]
   merge_group:
@@ -62,3 +63,36 @@ jobs:
 
       - name: Format
         run: pnpm format
+
+  # React-specific problems (effects, state, React Native lists, ...) in the
+  # files this PR touches. Any warning fails it; fix the code rather than
+  # suppressing the rule.
+  react-doctor:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./tooling/github/setup
+
+      - name: React Doctor
+        run: pnpm run react-doctor --base "${{ github.event.pull_request.base.sha }}"
+
+  # The iOS JavaScript bundle still builds (Metro resolution, Babel, the
+  # React Compiler), as release builds and OTA updates will bundle it.
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup
+        uses: ./tooling/github/setup
+
+      - name: Export the iOS bundle
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_VERA_DOMAIN: vera.chat
+        run: pnpm exec expo export --platform ios --output-dir "$RUNNER_TEMP/export"

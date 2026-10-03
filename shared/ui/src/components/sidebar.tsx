@@ -85,7 +85,7 @@ function SidebarProvider({
       }
 
       // This sets the cookie to keep the sidebar state.
-      // eslint-disable-next-line react-compiler/react-compiler
+      // eslint-disable-next-line react-compiler/react-compiler -- Persisting to a cookie is the point of this setter (vendored shadcn sidebar).
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
     [setOpenProp, open],
@@ -614,7 +614,7 @@ function SidebarMenuSkeleton({
 }) {
   // Random width between 50 to 90%.
   const width = React.useMemo(() => {
-    // eslint-disable-next-line react-hooks/purity
+    // eslint-disable-next-line react-hooks/purity -- A random skeleton width, fixed once per mount (vendored shadcn sidebar).
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
 
