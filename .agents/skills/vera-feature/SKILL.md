@@ -46,6 +46,12 @@ start empty: sign in and seed (below). Run Convex CLI commands from
 `services/backend` (`npx convex run`, `npx convex logs`, `npx convex data`).
 They target this worktree's deployment.
 
+After changing a plugin's protocol or schema (`packages/decentralized-convex-*`),
+run `scripts/backend.sh push` before typechecking: it regenerates the
+Component types that `services/backend` and the app compile against. While
+`0.1.0` is unreleased, contract changes don't bump `lastChanged` (see
+`docs/versioning.md`), but keep them backward compatible.
+
 ## 3. Build it
 
 Follow the codebase's patterns and the lint rules: the React Compiler (no
@@ -62,6 +68,7 @@ scripts/sim.sh up             # dev client + this worktree's simulator + Metro
 scripts/sim.sh signin         # dev sign-in as this worktree's test user (wt…)
 scripts/sim.sh seed           # bot DMs, a group, and a space
 scripts/sim.sh open /settings # go to any route; conversation/<id>, profile/<address>, ...
+scripts/sim.sh relaunch       # restart the app, e.g. to drop the keyboard or reset state
 scripts/sim.sh status
 ```
 
@@ -69,13 +76,25 @@ scripts/sim.sh status
   build of a fingerprint takes ~10 minutes; it's shared by every worktree).
   Re-run `up` after changing native code, `app.config.ts`, or `.env.local`.
   JavaScript edits hot-reload; `scripts/sim.sh reload` forces it.
+- Routes with parameters take them as a query string. Read the route file
+  under `apps/mobile/src/app` for the names, such as
+  `/settings/account?account=<address>&title=<name>`.
+- Seed once per account. Running it again reuses the bot DMs but adds
+  another group and space. For a clean slate, sign in as a new username.
 - `signin` takes a username (`scripts/sim.sh signin alice`) for a second
   account. On the shared dev PDS keep to your worktree's `wt…` user so you
   don't disturb anyone else's data.
 - Let Shawn watch: call the T3 `device_open` tool with the simulator UDID
   that `up` prints. It returns the exact `agent-device` command and flags.
   Run `agent-device open chat.vera.app "${F[@]}"` once before other
-  agent-device commands (they fail with "Run open first" otherwise).
+  agent-device commands (they fail with "Run open first" otherwise). It also
+  brings Vera back to the front if `device_open` left the home screen up.
+- agent-device refs (`@e12`) expire after every action: take a fresh
+  `snapshot -i` before each tap or fill. To clear a multiline field, select
+  all through the field's edit menu or hold delete (`longpress <delete key> 4000`);
+  `fill` may not clear it. Each action takes a few seconds, so timing-
+  sensitive behavior (debounces under a second) needs a code-level check
+  instead.
   Use agent-device for taps, typing, scrolling, and gestures (`snapshot -i`,
   `press @e3`, `fill`, `longpress`, `scroll`). In zsh, put the flags in an
   array (`F=(--platform ios ...)` then `"$F[@]"`), because a flags string
@@ -133,7 +152,8 @@ in another worktree.
 
 ## 7. Open the PR and stop
 
-Commit with a clear message, push, and open the PR against `main` (or, for
+Commit with a clear message, push with `git push -u origin HEAD` (the first
+time; never push to the base branch), and open the PR against `main` (or, for
 a change stacked on another unmerged PR, against that PR's branch):
 
 ```sh

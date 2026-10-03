@@ -17,11 +17,10 @@ Each package owns its own root `metadata.ts` and exposes it through the same
 `./metadata` package export:
 
 ```ts
-export const decentralizedConvexPackage =
-  defineDecentralizedConvexPackage({
-    name: "@decentralized-convex/messages",
-    lastChanged: "0.1.0",
-  });
+export const decentralizedConvexPackage = defineDecentralizedConvexPackage({
+  name: "@decentralized-convex/messages",
+  lastChanged: "0.1.0",
+});
 ```
 
 That local `lastChanged` records the ecosystem release in which that package
@@ -57,6 +56,15 @@ The current `pdsReleaseFromApp` and `pdsDescriptorFromApp` functions establish
 that management boundary and derive release state from `definePdsApp`. They do
 not run migrations yet. Until migration execution and persisted upgrade state
 exist, the PDS must not claim that a data upgrade completed automatically.
+
+## Before the first release
+
+`0.1.0` has not been published, so it is still being written: contract and
+schema changes to any package land inside `0.1.0`, `lastChanged` stays
+`0.1.0`, and nothing is bumped. Keep such changes backward compatible
+anyway (new fields optional, old requests still accepted), because Vera's
+own app and PDS deployments already run in production. Versioning starts
+with the first published release.
 
 ## Release procedure
 
