@@ -36,7 +36,8 @@ Shawn starts each feature or fix in its own T3 Code worktree and thread
 - Changes to Convex functions or data get an isolated backend
   (`scripts/backend.sh isolate`). App-only changes use the shared dev PDS.
 - Verify in this worktree's own simulator (`scripts/sim.sh`), never another
-  worktree's or a shared one.
+  worktree's or a shared one. Shut it down (`scripts/sim.sh down`) as soon as
+  you have your evidence, before reporting; never leave simulators running.
 - UI changes need screenshots (before and after where something changed);
   motion and gestures need a video. Upload with `scripts/evidence.sh` and put
   them in the PR description. Never commit PR assets.

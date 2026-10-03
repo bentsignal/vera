@@ -132,6 +132,12 @@ links to the MP4.
   there. Otherwise paste the `npx convex run` output.
 - Never commit evidence. `.cache/` is gitignored.
 
+When you have the evidence, shut the simulator down: `scripts/sim.sh down`
+(it stops Metro, closes the device, and deletes the simulator). Don't leave
+simulators running while you wait for CI or for Shawn; they eat his Mac's
+memory and CPU, and `scripts/sim.sh up` brings one back in about a minute
+with the cached build. Also close it in T3's Device panel (`device_close`).
+
 ## 6. Validate
 
 Run, in order, and fix everything:
@@ -174,15 +180,16 @@ anything he should look at closely. **Stop there.** Don't merge.
 
 ## 8. Feedback and merge
 
-- Feedback: make the changes on the same branch, refresh the evidence if
-  the UI changed, push, and report again.
+- Feedback: make the changes on the same branch, `scripts/sim.sh up` again,
+  refresh the evidence if the UI changed, `scripts/sim.sh down`, push, and
+  report again.
 - Merge only when Shawn approves this PR in the thread ("merge it",
   "approved", "ship it"). Then:
 
   ```sh
   gh pr merge <number> --merge --delete-branch
   scripts/backend.sh teardown   # if isolated: deletes the deployment and DNS record
-  scripts/sim.sh down           # frees the simulator and Metro
+  scripts/sim.sh down           # if one is still up
   ```
 
   Merging does not release anything. Releases are separate (the

@@ -16,8 +16,8 @@ screenshots.
   `production` Android build exists.
 - `app.config.ts` already has the Android package `chat.vera.app`, adaptive
   icons, and predictive back.
-- `eas.json`: `preview` sets `android.buildType: "app-bundle"`; `internal`
-  has no Android settings.
+- `eas.json`: `production` (the store profile; `preview` was folded into it)
+  sets `android.buildType: "app-bundle"`; `internal` has no Android settings.
 - No Firebase project, `google-services.json`, or FCM key, so Android push
   does not work yet.
 - No Google Play Console account yet.
@@ -120,7 +120,7 @@ apps" and installs it. No Google account is needed, and it is signed with
 the EAS key that `assetlinks.json` already lists.
 
 - Add an Android profile that targets production (`vera.chat`, like
-  `preview`) with `android.buildType: "apk"` and `distribution: "internal"`,
+  `production`) with `android.buildType: "apk"` and `distribution: "internal"`,
   so the friend joins the same server as the TestFlight group. Set
   `buildType: "apk"` on `internal` too, for Shawn's own Android testing
   against `dev.vera.chat`.
@@ -137,7 +137,7 @@ the EAS key that `assetlinks.json` already lists.
 3. Upload the first `.aab` by hand in Play Console; Google requires a manual
    first upload before the API can publish.
 4. Create a service account with Play Console access, store its key with EAS,
-   and add `submit.preview.android` to `eas.json` (track `internal`). After
+   and add `submit.production.android` to `eas.json` (track `internal`). After
    that, `eas submit -p android` publishes.
 5. Add testers by email (up to 100). Internal testing has no review, and
    updates arrive through the Play Store.
