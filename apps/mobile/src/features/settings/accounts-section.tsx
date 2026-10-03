@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { Button, FieldGroup, ListItem, Text } from "@expo/ui";
 
@@ -61,9 +60,6 @@ export function AccountsSection() {
         modifiers={linkButton}
         onPress={() => router.push("/add-account")}
       />
-      <FieldGroup.SectionFooter>
-        <Text>{`Vera ${Constants.expoConfig?.version ?? ""}`}</Text>
-      </FieldGroup.SectionFooter>
     </FieldGroup.Section>
   );
 }
