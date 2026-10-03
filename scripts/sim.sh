@@ -238,7 +238,8 @@ front() {
   if [ "$PLATFORM" = ios ]; then
     xcrun simctl launch "$DEVICE" "$BUNDLE_ID" >/dev/null
   else
-    adb_device shell monkey -p "$BUNDLE_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+    # MainActivity is singleTask, so this resumes it rather than restarting.
+    adb_device shell am start -n "$BUNDLE_ID/.MainActivity" >/dev/null 2>&1 || true
   fi
 }
 
