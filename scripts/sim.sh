@@ -169,8 +169,10 @@ up() {
   ensure_client
   ensure_device
   xcrun simctl install "$UDID" "$CLIENT"
-  # Skip the dev menu's first-launch tour so screenshots show the app.
+  # No dev menu tour or floating tools button in screenshots; the dev menu
+  # still opens with Cmd-Ctrl-Z or a shake.
   xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" EXDevMenuIsOnboardingFinished -bool YES
+  xcrun simctl spawn "$UDID" defaults write "$BUNDLE_ID" EXDevMenuShowFloatingActionButton -bool NO
   # A backend switch changes inlined env, so start Metro fresh each time.
   stop_metro
   ensure_metro

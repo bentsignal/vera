@@ -26,8 +26,12 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 upload() {
-  bunny storage files upload "$1" --zone "$ZONE" --to "$prefix/$2" \
-    --content-type "$3" >/dev/null
+  local log
+  log="$(bunny storage files upload "$1" --zone "$ZONE" --to "$prefix/$2" \
+    --content-type "$3" 2>&1)" || {
+    echo "$log" >&2
+    exit 1
+  }
   echo "$CDN/$prefix/$2"
 }
 
