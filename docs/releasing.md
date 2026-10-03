@@ -6,10 +6,17 @@ the release with the `vera-release` skill and
 
 ## Binaries, channels, and runtimes
 
-| Binary         | Built with                              | PDS             | Update channel | Who has it                                      |
-| -------------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
-| Internal build | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, by install link                  |
-| Store build    | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
+| Binary           | Built with                              | PDS             | Update channel | Who has it                                      |
+| ---------------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
+| Internal build   | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, by install link                  |
+| Store build      | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
+| Android APK      | `production-apk` (EAS keystore)         | `vera.chat`     | `production`   | Android testers, by install link                |
+| Android internal | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android testing                         |
+
+Android has no Play listing yet, so its testers install APKs from EAS links
+([android.md](android.md)). Over-the-air updates reach them the same way:
+`pnpm release ota production` publishes for every platform whose latest
+production binary has the current runtime.
 
 TestFlight and the App Store run the same binary: Apple promotes a TestFlight
 build to the App Store, so there is one store profile and one production
@@ -23,6 +30,15 @@ any of them makes a new runtime that the old binaries can't run, and that
 needs a new store build. Everything else (screens, logic, styles, assets) can
 ship over the air.
 
+What moves a platform's runtime: native dependencies, patches, config
+plugins and their options (a plugin's options count for both platforms, even
+when they only affect one), and the shared parts of `app.config.ts`. The
+other platform's section (`ios: {}` or `android: {}`) doesn't count, and
+`apps/mobile/fingerprint.config.cjs` excludes `eas.json`, so editing build
+profiles never strands installed binaries. Check before merging anything
+native: `VERA_NOTIFICATION_EXTENSION=1 pnpm exec expo-updates fingerprint:generate --platform ios`
+in `apps/mobile`, before and after.
+
 Fingerprints differ between macOS and Linux. Builds and updates both run on
 Shawn's Mac, so they match. CI's "📱 Native Change" label compares the PR's
 base and head on Linux, which is consistent within that one run.
@@ -32,15 +48,18 @@ base and head on Linux, which is consistent within that one run.
 Every release is an annotated tag on the commit it shipped, with the runtime
 in the message:
 
-- `mobile/build/<n>`: store build `n` uploaded to App Store Connect.
-- `mobile/internal/<n>`: an internal build.
+- `mobile/build/<n>`: iOS store build `n` uploaded to App Store Connect.
+- `mobile/internal/<n>`: an iOS internal build.
+- `mobile/android/build/<versionCode>` and `mobile/android/internal/<versionCode>`:
+  the Android equivalents (production APK and internal APK).
 - `mobile/ota/<channel>/<yyyymmddThhmmss>` (UTC): an update, with its EAS
-  update group and the update ID the app shows in Settings → About.
+  update group and, per platform, the runtime and the update ID the app
+  shows in Settings → About (`ios-update:`, `android-update:`).
 - `backend/deploy/<yyyymmddThhmmss>`: a production Convex deploy
   (`pnpm release backend production`).
 
 "Changes since the last release" means the merges since the newest
-`mobile/build/*` or `mobile/ota/production/*` tag. `pnpm release plan` prints
+`mobile/build/*`, `mobile/android/build/*`, or `mobile/ota/production/*` tag. `pnpm release plan` prints
 them, whether the release can go over the air (current runtime equals the
 last store build's), and whether the backend (including `pnpm-lock.yaml`)
 changed since the last production deploy.

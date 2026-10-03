@@ -72,6 +72,15 @@ scripts/sim.sh relaunch       # restart the app, e.g. to drop the keyboard or re
 scripts/sim.sh status
 ```
 
+Every command takes `--android` first for this worktree's Android emulator
+(`scripts/sim.sh --android up`, `scripts/sim.sh --android shot after`). Both
+platforms share the worktree's Metro. Check Android whenever a change touches
+layout, navigation, platform files (`.ios.tsx`/`.android.tsx`), or native
+config, and put Android screenshots in the PR next to iOS ones. The Android
+dev client is cached the same way (first build of a fingerprint ~10 minutes).
+In T3 Code, `device_open` takes the emulator serial `up` prints
+(`emulator-55xx`), with `platform: "android"`.
+
 - `up` reuses the cached dev client unless native code changed (the first
   build of a fingerprint takes ~10 minutes; it's shared by every worktree).
   Re-run `up` after changing native code, `app.config.ts`, or `.env.local`.
@@ -132,8 +141,9 @@ links to the MP4.
   there. Otherwise paste the `npx convex run` output.
 - Never commit evidence. `.cache/` is gitignored.
 
-When you have the evidence, shut the simulator down: `scripts/sim.sh down`
-(it stops Metro, closes the device, and deletes the simulator). Don't leave
+When you have the evidence, shut the devices down: `scripts/sim.sh down`
+and `scripts/sim.sh --android down` (they delete the simulator or emulator,
+and Metro stops with the last one). Don't leave
 simulators running while you wait for CI or for Shawn; they eat his Mac's
 memory and CPU, and `scripts/sim.sh up` brings one back in about a minute
 with the cached build. Also close it in T3's Device panel (`device_close`).

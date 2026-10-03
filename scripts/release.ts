@@ -5,12 +5,13 @@
 //
 //   pnpm release <command>
 //
-//   plan                           changes since the last release, and OTA or store build
-//   backend dev                    push main's functions to the shared dev deployment
-//   backend production             deploy main's functions to production (tags backend/deploy/...)
-//   build internal                 local internal build (dev PDS), uploaded for an install link
-//   build production               local App Store build with release Xcode, uploaded to TestFlight
-//   ota internal|production "msg"  publish an over-the-air update to a channel
+//   plan                                changes since the last release, and OTA or store build per platform
+//   backend dev                         push main's functions to the shared dev deployment
+//   backend production                  deploy main's functions to production (tags backend/deploy/...)
+//   build internal [--android]          internal build (dev PDS), uploaded for an install link
+//   build production                    iOS App Store build with release Xcode, uploaded to TestFlight
+//   build production --android          Android production APK (vera.chat), uploaded for an install link
+//   ota internal|production "msg"       over-the-air update for every platform whose binary matches
 //   testflight <build> <notes.md>  What to Test, Friends group, Beta App Review
 //   appstore <build>               attach a build to the App Store version and submit it
 //   asc <METHOD> <path> [json]     raw App Store Connect API call
@@ -127,11 +128,23 @@ async function asc(method: string, path: string, body?: unknown) {
   return text === "" ? {} : (JSON.parse(text) as { data?: unknown });
 }
 
-/** The iOS runtime version (native fingerprint) of the checked-out code. */
-function fingerprint() {
+type Platform = "android" | "ios";
+const PLATFORMS: readonly Platform[] = ["ios", "android"];
+
+/** Release tags of a platform's binaries: store (or production APK) and internal. */
+function binaryTagPattern(
+  platform: Platform,
+  channel: "internal" | "production",
+) {
+  const kind = channel === "production" ? "build" : "internal";
+  return platform === "ios" ? `mobile/${kind}/*` : `mobile/android/${kind}/*`;
+}
+
+/** The runtime version (native fingerprint) of the checked-out code. */
+function fingerprint(platform: Platform = "ios") {
   const json = output(
     "pnpm",
-    ["exec", "expo-updates", "fingerprint:generate", "--platform", "ios"],
+    ["exec", "expo-updates", "fingerprint:generate", "--platform", platform],
     {
       cwd: MOBILE,
       env: { VERA_NOTIFICATION_EXTENSION: "1" },
@@ -158,6 +171,7 @@ function lastRelease() {
   const [tag] = tags("mobile/*").filter(
     (name) =>
       name.startsWith("mobile/build/") ||
+      name.startsWith("mobile/android/build/") ||
       name.startsWith("mobile/ota/production/"),
   );
   return tag;
@@ -197,9 +211,6 @@ function plan() {
     console.log("warning: HEAD is not origin/main; this plan describes HEAD");
   }
   const release = lastRelease();
-  const [build] = tags("mobile/build/*");
-  const shipped = runtimeOf(build);
-  const current = fingerprint();
   const range = release === undefined ? "HEAD" : `${release}..HEAD`;
   // Changes land as merge commits ("Merge pull request #n", PR title in the
   // body); anything committed straight to main is listed as it is.
@@ -219,31 +230,33 @@ function plan() {
   console.log(
     `last release: ${release === undefined ? "none" : `${release} (${tagDate(release)})`}`,
   );
-  console.log(
-    `last store build: ${build ?? "none"}, runtime ${shipped ?? "unknown"}`,
-  );
-  console.log(`current runtime: ${current}`);
-  console.log(
-    shipped === current
-      ? "kind: ota (no native change since the last store build)"
-      : "kind: store-build (native code changed, or no expo-updates build has shipped yet)",
-  );
+  for (const platform of PLATFORMS) {
+    const [binary] = tags(binaryTagPattern(platform, "production"));
+    const runtime = fingerprint(platform);
+    const shippedRuntime = runtimeOf(binary);
+    console.log(
+      `${platform}: last production build ${binary ?? "none"}; ${
+        shippedRuntime === runtime
+          ? "ota (no native change since it)"
+          : "store-build (native code changed, or no expo-updates build has shipped)"
+      }`,
+    );
+    const [internal] = tags(binaryTagPattern(platform, "internal"));
+    console.log(
+      `${platform}: internal build ${
+        internal === undefined
+          ? "none yet; make one to test"
+          : runtimeOf(internal) === runtime
+            ? `${internal} (matches; an internal OTA reaches it)`
+            : `${internal} (older native code; make a new internal build to test)`
+      }`,
+    );
+  }
   const backend = backendChanges();
   console.log(
     backend.files.length === 0
       ? `backend: unchanged since ${backend.base}`
       : `backend: changed since ${backend.base} (${backend.files.length} files); run \`pnpm release backend production\` before the app ships`,
-  );
-  const [internal] = tags("mobile/internal/*");
-  const internalRuntime = runtimeOf(internal);
-  console.log(
-    `internal build: ${
-      internal === undefined
-        ? "none yet; make one to test"
-        : internalRuntime === current
-          ? `${internal} (matches; an internal OTA reaches it)`
-          : `${internal} (older native code; make a new internal build to test)`
-    }`,
   );
   console.log(`\nmerged since ${release ?? "the start"}:`);
   console.log(merges.length === 0 ? "- nothing" : merges.join("\n"));
@@ -313,11 +326,15 @@ function requireCleanMain() {
   }
 }
 
-function build(profile: string | undefined) {
+function build(profile: string | undefined, platformFlag: string | undefined) {
   if (profile !== "internal" && profile !== "production") {
-    throw new Error("usage: build internal|production");
+    throw new Error("usage: build internal|production [--android]");
   }
   requireCleanMain();
+  if (platformFlag === "--android") {
+    buildAndroid(profile);
+    return;
+  }
   const ipa = join(tmpdir(), `vera-${profile}-${Date.now()}.ipa`);
   const apple = appleEnv();
   run(
@@ -342,19 +359,12 @@ function build(profile: string | undefined) {
       },
     },
   );
-  const runtime = ipaRuntime(ipa);
-  const expected = fingerprint();
-  if (runtime !== expected) {
-    throw new Error(
-      `the build's runtime ${runtime} is not this checkout's fingerprint ${expected}; updates would never reach it`,
-    );
-  }
+  const runtime = requireRuntime(ipaRuntime(ipa), "ios");
   const buildNumber = output("sh", [
     "-c",
     `unzip -p "${ipa}" 'Payload/*.app/Info.plist' | plutil -extract CFBundleVersion raw -`,
   ]);
-  const commit = git("rev-parse", "HEAD");
-  const name = `mobile/${profile === "internal" ? "internal" : "build"}/${buildNumber}`;
+  const name = binaryTagPattern("ios", profile).replace("*", buildNumber);
   requireNewTag(name);
   if (profile === "internal") {
     run(
@@ -362,7 +372,6 @@ function build(profile: string | undefined) {
       ["upload", "-p", "ios", "--build-path", ipa, "--non-interactive"],
       { cwd: MOBILE },
     );
-    tag(name, [`runtime: ${runtime}`, `commit: ${commit}`]);
   } else {
     run("xcrun", [
       "altool",
@@ -376,9 +385,84 @@ function build(profile: string | undefined) {
       "--apiIssuer",
       apple.EXPO_ASC_ISSUER_ID ?? "",
     ]);
-    tag(name, [`runtime: ${runtime}`, `commit: ${commit}`]);
   }
+  tag(name, [`runtime: ${runtime}`, `commit: ${git("rev-parse", "HEAD")}`]);
   console.log(`ipa: ${ipa}\nbuild: ${buildNumber}\nruntime: ${runtime}`);
+}
+
+/** Fails before anything is uploaded if updates could never reach the build. */
+function requireRuntime(runtime: string, platform: Platform) {
+  const expected = fingerprint(platform);
+  if (runtime !== expected) {
+    throw new Error(
+      `the build's runtime ${runtime} is not this checkout's ${platform} fingerprint ${expected}; updates would never reach it`,
+    );
+  }
+  return runtime;
+}
+
+function aapt2() {
+  const tools = join(
+    process.env.ANDROID_HOME ?? join(homedir(), "Library/Android/sdk"),
+    "build-tools",
+  );
+  const [latest] = output("ls", [tools]).split("\n").sort().reverse();
+  if (latest === undefined)
+    throw new Error(`no Android build-tools in ${tools}`);
+  return join(tools, latest, "aapt2");
+}
+
+/**
+ * Android builds are APKs for now (installed from an EAS link): `internal`
+ * against the dev PDS, and `production-apk` against vera.chat for testers
+ * until Play internal testing exists. See docs/android.md.
+ */
+function buildAndroid(profile: "internal" | "production") {
+  const apk = join(tmpdir(), `vera-${profile}-${Date.now()}.apk`);
+  const androidHome =
+    process.env.ANDROID_HOME ?? join(homedir(), "Library/Android/sdk");
+  run(
+    "eas",
+    [
+      "build",
+      "-p",
+      "android",
+      "--profile",
+      profile === "internal" ? "internal" : "production-apk",
+      "--local",
+      "--non-interactive",
+      "--output",
+      apk,
+    ],
+    {
+      cwd: MOBILE,
+      env: {
+        ANDROID_HOME: androidHome,
+        JAVA_HOME: output("/usr/libexec/java_home", ["-v", "17"]),
+      },
+    },
+  );
+  const resources = output(aapt2(), ["dump", "resources", apk]);
+  const runtime = requireRuntime(
+    /expo_runtime_version[^\n]*\n\s*\(\) "([^"]+)"/.exec(resources)?.[1] ??
+      "unknown",
+    "android",
+  );
+  const versionCode =
+    /versionCode='(\d+)'/.exec(
+      output(aapt2(), ["dump", "badging", apk]),
+    )?.[1] ?? "unknown";
+  const name = binaryTagPattern("android", profile).replace("*", versionCode);
+  requireNewTag(name);
+  run(
+    "eas",
+    ["upload", "-p", "android", "--build-path", apk, "--non-interactive"],
+    {
+      cwd: MOBILE,
+    },
+  );
+  tag(name, [`runtime: ${runtime}`, `commit: ${git("rev-parse", "HEAD")}`]);
+  console.log(`apk: ${apk}\nversion code: ${versionCode}\nruntime: ${runtime}`);
 }
 
 function ota(channel: string | undefined, message: string | undefined) {
@@ -387,15 +471,22 @@ function ota(channel: string | undefined, message: string | undefined) {
   }
   if (message === undefined) throw new Error("an update needs a message");
   requireCleanMain();
-  // An update only reaches binaries with the same runtime; refuse to publish
-  // one that nothing installed can load.
-  const [binary] = tags(
-    channel === "production" ? "mobile/build/*" : "mobile/internal/*",
-  );
-  const current = fingerprint();
-  if (runtimeOf(binary) !== current) {
+  // An update only reaches binaries with the same runtime: publish for the
+  // platforms whose latest binary on this channel matches, and refuse when
+  // none does.
+  const targets = PLATFORMS.filter((platform) => {
+    const [binary] = tags(binaryTagPattern(platform, channel));
+    const current = fingerprint(platform);
+    const matches = runtimeOf(binary) === current;
+    console.log(
+      `${platform}: ${matches ? "publishing" : "skipped"} (latest ${channel} binary ${binary ?? "none"}, runtime ${runtimeOf(binary) ?? "none"}; current ${current})`,
+    );
+    return matches;
+  });
+  const [only] = targets;
+  if (only === undefined) {
     throw new Error(
-      `no ${channel} binary has runtime ${current} (latest: ${binary ?? "none"}, ${runtimeOf(binary) ?? "no runtime"}); make a build instead`,
+      `no ${channel} binary has the current runtime; make a build instead`,
     );
   }
   const json = output(
@@ -407,7 +498,7 @@ function ota(channel: string | undefined, message: string | undefined) {
       "--environment",
       channel === "production" ? "production" : "development",
       "--platform",
-      "ios",
+      targets.length === PLATFORMS.length ? "all" : only,
       "--message",
       message,
       "--non-interactive",
@@ -425,15 +516,18 @@ function ota(channel: string | undefined, message: string | undefined) {
   const updates = JSON.parse(json) as {
     group: string;
     id: string;
+    platform: string;
     runtimeVersion: string;
   }[];
-  const update = updates[0];
-  if (update === undefined) throw new Error("eas update returned no update");
+  const [first] = updates;
+  if (first === undefined) throw new Error("eas update returned no update");
   tag(`mobile/ota/${channel}/${stamp()}`, [
-    `runtime: ${update.runtimeVersion}`,
-    `group: ${update.group}`,
-    // The ID the app reports (Updates.updateId).
-    `update: ${update.id}`,
+    `group: ${first.group}`,
+    // Per platform: the runtime it targets and the ID Settings → About shows.
+    ...updates.flatMap((update) => [
+      `${update.platform}-runtime: ${update.runtimeVersion}`,
+      `${update.platform}-update: ${update.id}`,
+    ]),
     `commit: ${git("rev-parse", "HEAD")}`,
     "",
     message,
@@ -590,7 +684,7 @@ switch (command) {
     backend(args[0]);
     break;
   case "build":
-    build(args[0]);
+    build(args[0], args[1]);
     break;
   case "ota":
     ota(args[0], args[1]);

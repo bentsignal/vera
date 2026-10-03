@@ -160,7 +160,7 @@ State on 2026-10-03:
   `PATH`), emulator, NDK, and JDK 17 and 21 (`JAVA_HOME` is Zulu 21).
 - AVDs: `Pixel_9` and `Medium_Phone_API_36.1` (Google Play images, API 36
   and 36.1).
-- Missing: **Android SDK Command-line Tools** (`~/Library/Android/sdk/cmdline-tools`
+- Missing (installed later that day, see Next steps): **Android SDK Command-line Tools** (`~/Library/Android/sdk/cmdline-tools`
   does not exist, so no `sdkmanager` or `avdmanager`) and the `ANDROID_HOME`
   variable.
 - T3 Code's Settings → Simulator support shows iOS Ready and Android
@@ -203,12 +203,17 @@ Done when:
 
 ## Next steps
 
-- [ ] Install the command-line tools, set `ANDROID_HOME`, and confirm Android
-      works in T3 Code (see above).
-- [ ] Build on the `Pixel_9` emulator against `dev.vera.chat`, screenshot every
-      screen, and replace the "Expected gaps" table with confirmed issues.
+- [x] Install the command-line tools, set `ANDROID_HOME`, and confirm Android
+      works in T3 Code (see above). Done 2026-10-03: T3 lists Android as
+      available, and `scripts/sim.sh --android up` runs Vera in a per-worktree
+      emulator that `device_open` streams (by its `emulator-55xx` serial).
+- [x] Build the app for Android. The build failed until the splash screen got
+      an Android-only transparent image (`expo-splash-screen` needs one).
+- [ ] Screenshot every screen on the emulator against `dev.vera.chat`, and
+      replace the "Expected gaps" table with confirmed issues.
 - [ ] Set up Firebase and FCM V1 for push.
-- [ ] Add the production APK profile, confirm the EAS keystore fingerprint,
+- [ ] Build the production APK (`pnpm release build production --android`,
+      the `production-apk` profile), confirm the EAS keystore fingerprint,
       and send the friend a link.
 - [ ] Fix the Android UI in small PRs: composer and glass surfaces, conversation
       header, message menu, search tab, themes.

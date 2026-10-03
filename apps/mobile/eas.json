@@ -37,7 +37,10 @@
         "buildConfiguration": "Release"
       },
       "channel": "internal",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "extends": "base",
@@ -51,6 +54,13 @@
       "channel": "production",
       "android": {
         "buildType": "app-bundle"
+      }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   },
