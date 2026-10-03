@@ -165,20 +165,18 @@ function plan() {
     build === undefined ? undefined : field(tagMessage(build), "runtime");
   const current = fingerprint();
   const range = release === undefined ? "HEAD" : `${release}..HEAD`;
-  const merges = git(
-    "log",
-    "--first-parent",
-    "--merges",
-    "--format=%s%n%b%x1e",
-    range,
-  )
+  // Changes land as merge commits ("Merge pull request #n", PR title in the
+  // body); anything committed straight to main is listed as it is.
+  const merges = git("log", "--first-parent", "--format=%s%n%b%x1e", range)
     .split("\x1e")
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
       const [subject = "", title = ""] = entry.split("\n");
-      const pr = /#(\d+)/.exec(subject)?.[1];
-      return `- ${title || subject}${pr === undefined ? "" : ` (#${pr})`}`;
+      const pr = /^Merge pull request #(\d+)/.exec(subject)?.[1];
+      return pr === undefined
+        ? `- ${subject} (direct commit)`
+        : `- ${title || subject} (#${pr})`;
     });
 
   console.log(`HEAD: ${head}`);
