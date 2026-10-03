@@ -82,10 +82,11 @@ async function findProfile(ctx: QueryCtx, accountId: string) {
 /**
  * The bio to store. An omitted bio keeps the saved one, so name and photo
  * edits (and clients that predate bios) never clear it; empty clears it.
+ * Runs of blank lines become one, so a bio can't stretch the profile page.
  */
 function nextBio(requested: string | undefined, saved: string | undefined) {
   if (requested === undefined) return saved;
-  const bio = requested.trim();
+  const bio = requested.trim().replace(/\n\s*\n\s*/g, "\n\n");
   if (!isBioWithinLimit(bio)) {
     throw new ConvexError({ code: "INVALID_BIO" });
   }
