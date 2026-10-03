@@ -102,7 +102,11 @@ pnpm release backend production
 pnpm release ota production "<release notes, one paragraph>"
 ```
 
-**Store build:**
+`ota` publishes for each platform whose latest production binary
+(`mobile/build/*` for iOS, `mobile/android/build/*` for Android) has the
+current runtime, and says which it skipped.
+
+**Store build (iOS):**
 
 ```sh
 pnpm release build production            # Xcode 27, App Store signing, uploads to App Store Connect
@@ -116,8 +120,19 @@ submission fails; don't tell Shawn Friends will get it unless it succeeded. The 
 every build without review. Tell Shawn the build number and that Friends
 will see it after Apple's review, usually within a day.
 
-Both commands tag the release (`mobile/build/<n>`, `mobile/ota/production/...`)
-and push the tag. Report what shipped, the tag, and anything that didn't
+**Android build** (when `plan` says Android needs one): until Play internal
+testing exists, testers install a production APK from an EAS link:
+
+```sh
+pnpm release build production --android   # production-apk profile, vera.chat; prints the install link
+```
+
+Send the link to the Android testers (Shawn forwards it). Internal Android
+builds for Shawn: `pnpm release build internal --android`.
+
+Every command tags the release (`mobile/build/<n>`,
+`mobile/android/build/<versionCode>`, `mobile/ota/production/...`) and pushes
+the tag. Report what shipped, the tag, and anything that didn't
 work.
 
 ## 5. App Store (only when Shawn asks)

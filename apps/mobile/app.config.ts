@@ -71,6 +71,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         // colors match the app background, which fades in over them.
         backgroundColor: "#FFFFFF",
         dark: { backgroundColor: "#000000" },
+        // Android's splash API always draws an icon slot; a transparent
+        // image keeps it blank (with no image the build fails).
+        android: { image: "./assets/images/splash-android-blank.png" },
       },
     ],
     [
