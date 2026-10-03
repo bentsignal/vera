@@ -18,8 +18,8 @@ export function installDevAutomation() {
   Object.assign(globalThis, {
     veraDev: {
       open(path: string) {
-        if (!isAppPath(path)) throw new Error(`Not an app path: ${path}`);
-        router.push(path);
+        if (!path.startsWith("/")) throw new Error(`Not an app path: ${path}`);
+        if (isAppPath(path)) router.push(path);
       },
       reload() {
         DevSettings.reload();
