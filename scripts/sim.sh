@@ -232,8 +232,19 @@ app_eval() {
 # Moves the app to a route through the dev-only `veraDev` hook over Metro's
 # debugger connection. Deep links would work too, but iOS asks "Open in
 # Vera?" before every `simctl openurl`, which scripts cannot answer.
+# Brings the running app to the front without restarting it. On a fresh
+# simulator, SpringBoard can come up over the app after it launches.
+front() {
+  if [ "$PLATFORM" = ios ]; then
+    xcrun simctl launch "$DEVICE" "$BUNDLE_ID" >/dev/null
+  else
+    adb_device shell monkey -p "$BUNDLE_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+  fi
+}
+
 open_path() {
   local path="/${1#/}"
+  front
   app_eval "globalThis.veraDev.open($(node -p 'JSON.stringify(process.argv[1])' "$path"))" >/dev/null
   echo "opened $path"
 }
@@ -250,7 +261,10 @@ launch() {
       "$BUNDLE_ID" >/dev/null
   fi
   for _ in $(seq 1 120); do
-    app_eval "typeof globalThis.veraDev" 2>/dev/null | grep -q object && return
+    if app_eval "typeof globalThis.veraDev" 2>/dev/null | grep -q object; then
+      front
+      return
+    fi
     sleep 1
   done
   echo "the app did not finish loading; see $STATE_DIR/metro.log" >&2
