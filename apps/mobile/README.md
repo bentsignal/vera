@@ -13,11 +13,14 @@ There is no Expo Go build. `ios/` and `android/` are generated
 ```sh
 pnpm --filter @vera/mobile ios      # build, install, and start Metro (iOS)
 pnpm --filter @vera/mobile android  # same for Android
-pnpm --filter @vera/mobile dev      # Metro only (Vera Dev), for an installed dev client
+pnpm --filter @vera/mobile dev      # Metro only, for an installed dev build
 ```
 
-These build Vera itself (`chat.vera.app`). Agents use `scripts/sim.sh` and
-`scripts/phone.sh` instead, which build and serve Vera Dev (below).
+These build and serve Vera itself (`chat.vera.app`); prefix them with
+`APP_VARIANT=development` for Vera Dev. Agents use `scripts/sim.sh` and
+`scripts/phone.sh` instead, which build and serve Vera Dev (below). Don't
+edit `package.json` scripts to set it: the native fingerprint hashes them,
+so Vera's runtime would change.
 
 The passkey entitlement (`webcredentials:vera.chat`) makes `expo run:ios`
 require an Apple Development signing identity, even for the simulator. Without

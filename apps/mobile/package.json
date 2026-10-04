@@ -7,7 +7,7 @@
   "scripts": {
     "android": "expo run:android",
     "clean": "git clean -xdf .cache .expo .turbo android ios node_modules",
-    "dev": "APP_VARIANT=development expo start --dev-client",
+    "dev": "expo start",
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .gitignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .gitignore",
     "ios": "expo run:ios",
