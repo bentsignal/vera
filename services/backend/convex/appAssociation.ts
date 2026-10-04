@@ -27,29 +27,28 @@ export const appleAppSiteAssociation = httpAction(() =>
 );
 
 /**
- * `PASSKEY_ANDROID_PACKAGE` and `PASSKEY_ANDROID_CERT_SHA256` (the signing
- * certificate fingerprints, colon-separated hex).
+ * `PASSKEY_ANDROID_PACKAGE` (comma-separated: Vera and Vera Dev) and
+ * `PASSKEY_ANDROID_CERT_SHA256` (the signing certificate fingerprints,
+ * colon-separated hex). Every package is listed with every fingerprint.
  */
 export const androidAssetLinks = httpAction(() => {
-  const [packageName = ""] = list("PASSKEY_ANDROID_PACKAGE");
+  const packages = list("PASSKEY_ANDROID_PACKAGE");
   const fingerprints = list("PASSKEY_ANDROID_CERT_SHA256");
   return Promise.resolve(
     json(
-      packageName === "" || fingerprints.length === 0
+      fingerprints.length === 0
         ? []
-        : [
-            {
-              relation: [
-                "delegate_permission/common.get_login_creds",
-                "delegate_permission/common.handle_all_urls",
-              ],
-              target: {
-                namespace: "android_app",
-                package_name: packageName,
-                sha256_cert_fingerprints: fingerprints,
-              },
+        : packages.map((packageName) => ({
+            relation: [
+              "delegate_permission/common.get_login_creds",
+              "delegate_permission/common.handle_all_urls",
+            ],
+            target: {
+              namespace: "android_app",
+              package_name: packageName,
+              sha256_cert_fingerprints: fingerprints,
             },
-          ],
+          })),
     ),
   );
 });

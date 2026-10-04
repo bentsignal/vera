@@ -1,12 +1,13 @@
-"""Writes the Vera app icon, an Icon Composer document, and its flat renders.
+"""Writes the Vera app icons, Icon Composer documents, and their flat renders.
 
-    python3 build-icons.py              # vera.icon, then render-flat.swift
-    python3 build-icons.py --check DIR  # also every iOS appearance at 1024px in DIR
+    python3 build-icons.py              # vera.icon and vera-dev.icon, then render-flat.swift
+    python3 build-icons.py --check DIR  # also every iOS appearance at 1024px in DIR/<icon>
 
 The icon is a top-down aloe vera (Vera is named after the plant): two rings
 of six curved leaves, like a pinwheel. Light is pale glass leaves on a green
 gradient; dark is green leaves on near-black; tinted and clear use gray
-leaves, which iOS tints.
+leaves, which iOS tints. Vera Dev (the dev variant, app.config.ts) is the
+same icon in amber, so the two apps differ at a glance.
 """
 
 from pathlib import Path
@@ -22,7 +23,6 @@ RENDITIONS = ("Default", "Dark", "ClearLight", "ClearDark", "TintedLight", "Tint
 # Aloe green, for checking the tinted renditions (ictool's hue scale is not HSB).
 TINT_HUE = .47
 
-BACKGROUND = ("#a6e57f", "#2f9e5a")
 DARK_BACKGROUND = ("#313131", "#141414")
 
 # (count, length, width, first leaf angle) per ring, outermost first. The
@@ -30,10 +30,22 @@ DARK_BACKGROUND = ("#313131", "#141414")
 RINGS = ((6, 372, 120, -90), (6, 268, 106, -60))
 # Leaf fills per ring as (alternate leaf a, alternate leaf b). Neighbors
 # differ slightly so overlapping leaves read as separate leaves.
-LIGHT = (("#e4f7d8", "#cfeac0"), ("#ffffff", "#eef7e8"))
-DARK = ((("#3fae62", "#237a45"), ("#389c58", "#1f6d3e")),
-        (("#8bd77a", "#4fb565"), ("#7cc56c", "#46a35b")))
 TINTED = (("#b0b0b0", "#9c9c9c"), ("#ffffff", "#e6e6e6"))
+# Per icon: the light background, and the light and dark leaf fills.
+ICONS = {
+    "vera": {
+        "background": ("#a6e57f", "#2f9e5a"),
+        "light": (("#e4f7d8", "#cfeac0"), ("#ffffff", "#eef7e8")),
+        "dark": ((("#3fae62", "#237a45"), ("#389c58", "#1f6d3e")),
+                 (("#8bd77a", "#4fb565"), ("#7cc56c", "#46a35b"))),
+    },
+    "vera-dev": {
+        "background": ("#ffcf70", "#ec8a1e"),
+        "light": (("#fdeed6", "#f7dfba"), ("#ffffff", "#fff4e4")),
+        "dark": ((("#e9962f", "#b0611a"), ("#d98928", "#a05716")),
+                 (("#ffcb6b", "#f0a03c"), ("#f2bd5f", "#e39234"))),
+    },
+}
 BEND = .3
 
 
@@ -99,7 +111,7 @@ def layer_names(ring, parity):
     return f"Ring {ring + 1}{'ab'[parity]}", f"ring-{ring + 1}{'ab'[parity]}.svg"
 
 
-def document():
+def document(icon):
     groups = []
     for ring in range(len(RINGS)):
         layers = []
@@ -112,8 +124,8 @@ def document():
                 # The light fill must be the unqualified specialization: with
                 # a plain "fill", ictool and iOS ignore the dark one.
                 "fill-specializations": [
-                    {"value": fill(LIGHT[ring][parity])},
-                    {"appearance": "dark", "value": fill(DARK[ring][parity])},
+                    {"value": fill(icon["light"][ring][parity])},
+                    {"appearance": "dark", "value": fill(icon["dark"][ring][parity])},
                     {"appearance": "tinted", "value": fill(TINTED[ring][parity])},
                 ],
             })
@@ -129,7 +141,7 @@ def document():
             "translucency": {"enabled": True, "value": .1},
         })
     return {
-        "fill": fill(BACKGROUND),
+        "fill": fill(icon["background"]),
         "fill-specializations": [
             {"appearance": "dark", "value": fill(DARK_BACKGROUND)},
             {"appearance": "tinted", "value": fill(DARK_BACKGROUND)},
@@ -140,15 +152,15 @@ def document():
     }
 
 
-def write_bundle():
-    bundle = ROOT / "vera.icon"
+def write_bundle(name):
+    bundle = ROOT / f"{name}.icon"
     shutil.rmtree(bundle, ignore_errors=True)
     (bundle / "Assets").mkdir(parents=True)
     for ring, (count, length, width, start) in enumerate(RINGS):
         leaves = [leaf(start + 360 * i / count, length, width) for i in range(count)]
         for parity in (0, 1):
             (bundle / "Assets" / layer_names(ring, parity)[1]).write_text(svg(leaves[parity::2]))
-    (bundle / "icon.json").write_text(json.dumps(document(), indent=2) + "\n")
+    (bundle / "icon.json").write_text(json.dumps(document(ICONS[name]), indent=2) + "\n")
     return bundle
 
 
@@ -164,14 +176,15 @@ def render(bundle, rendition, output, size):
 
 
 def main():
-    bundle = write_bundle()
-    subprocess.run(["swift", str(ROOT / "render-flat.swift"), str(ROOT)], check=True)
-    if "--check" in sys.argv:
-        check = Path(sys.argv[sys.argv.index("--check") + 1])
-        check.mkdir(parents=True, exist_ok=True)
-        for rendition in RENDITIONS:
-            render(bundle, rendition, check / f"{rendition}.png", 1024)
-            print(rendition, flush=True)
+    for name in ICONS:
+        bundle = write_bundle(name)
+        subprocess.run(["swift", str(ROOT / "render-flat.swift"), str(ROOT), name], check=True)
+        if "--check" in sys.argv:
+            check = Path(sys.argv[sys.argv.index("--check") + 1]) / name
+            check.mkdir(parents=True, exist_ok=True)
+            for rendition in RENDITIONS:
+                render(bundle, rendition, check / f"{rendition}.png", 1024)
+                print(name, rendition, flush=True)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,12 @@ pnpm --filter @vera/mobile android  # same for Android
 pnpm --filter @vera/mobile dev      # Metro only, for an installed dev build
 ```
 
+These build and serve Vera itself (`chat.vera.app`); prefix them with
+`APP_VARIANT=development` for Vera Dev. Agents use `scripts/sim.sh` and
+`scripts/phone.sh` instead, which build and serve Vera Dev (below). Don't
+edit `package.json` scripts to set it: the native fingerprint hashes them,
+so Vera's runtime would change.
+
 The passkey entitlement (`webcredentials:vera.chat`) makes `expo run:ios`
 require an Apple Development signing identity, even for the simulator. Without
 one, build for the simulator with local ("Sign to Run Locally") signing. Fully
@@ -38,18 +44,49 @@ way, such as `vera:///settings`.
 
 Passkeys do not work on these builds: iOS only allows them for apps signed by
 the team listed in `vera.chat`'s Apple app site association. Test sign-in on a
-device with an EAS development build.
+phone with Vera Dev (`scripts/phone.sh`).
+
+## Vera Dev
+
+`APP_VARIANT=development` (`app.config.ts`) builds **Vera Dev**: bundle ID
+and package `chat.vera.app.dev`, name "Vera Dev", scheme `vera-dev`, the
+amber icon (`assets/icons/vera-dev.icon`), and its own Firebase app
+(`google-services.json` is Vera's, `google-services.dev.json` Vera Dev's).
+It installs next to Vera, so Shawn's phone keeps the TestFlight or App Store
+app on production while Vera Dev runs against the dev PDS. Every
+development binary is Vera Dev (the simulator and phone dev clients and
+internal builds); only store builds are Vera. Store fingerprints don't
+depend on the variant: Vera's config is unchanged without `APP_VARIANT`.
+
+The phone holds one Vera Dev at a time:
+
+- **The dev client, day to day.** `scripts/phone.sh up` builds it (once per
+  native fingerprint, cached in `~/Library/Caches/vera` for every worktree),
+  starts the worktree's Metro, and prints an install link and an open link,
+  each with a QR code PNG. The open link
+  (`vera-dev://expo-development-client/?url=http://<tailnet IP>:<port>`)
+  loads the worktree's JavaScript over Tailscale, so Shawn's phone reaches it
+  anywhere, and edits hot-reload. A worktree with an isolated backend serves
+  that backend's domain, which starts with no accounts: sign in there with
+  `vera-dev:///dev-sign-in?username=<name>`.
+- **An internal build, before a release** (`pnpm release build internal`):
+  Release JavaScript bundled in, real performance, the `internal` update
+  channel. Installing it replaces the dev client; Shawn reinstalls the dev
+  client from its link afterwards (`scripts/phone.sh link`).
+
+Dev clients are Debug builds: slower, with the dev menu, and no update
+channel. Check performance, updates, and channels on an internal build.
 
 ## EAS
 
 Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 
-| Profile                 | Use                                 | `EXPO_PUBLIC_VERA_DOMAIN` |
-| ----------------------- | ----------------------------------- | ------------------------- |
-| `development`           | Dev client, only when asked for one | `dev.vera.chat`           |
-| `development-simulator` | Dev client for the iOS simulator    | `dev.vera.chat`           |
-| `internal`              | Shawn's "development build"         | `dev.vera.chat`           |
-| `production`            | TestFlight and store builds         | `vera.chat`               |
+| Profile                 | App      | Use                                    | `EXPO_PUBLIC_VERA_DOMAIN` |
+| ----------------------- | -------- | -------------------------------------- | ------------------------- |
+| `development`           | Vera Dev | Phone dev client (`scripts/phone.sh`)  | `dev.vera.chat`           |
+| `development-simulator` | Vera Dev | Dev client for the iOS simulator (EAS) | `dev.vera.chat`           |
+| `internal`              | Vera Dev | Release test build (`pnpm release`)    | `dev.vera.chat`           |
+| `production`            | Vera     | TestFlight and store builds            | `vera.chat`               |
 
 Each profile has the update channel of the same name; releases (internal
 builds, store builds, and over-the-air updates) go through `pnpm release`.
@@ -62,21 +99,29 @@ own `<branch>.dev.vera.chat` in `apps/mobile/.env.local`.
 ## Simulator for agents
 
 `scripts/sim.sh` gives each worktree its own simulator and Metro port, with
-a dev client cached per native fingerprint, and navigates through the
-dev-only `globalThis.veraDev` hook (`src/features/dev/automation.ts`) over
-Metro's debugger connection, because iOS asks "Open in Vera?" before every
-`simctl openurl`. The `vera-feature` skill covers it.
+a Vera Dev dev client (built locally, no notification extension) cached per
+native fingerprint, and navigates through the dev-only `globalThis.veraDev`
+hook (`src/features/dev/automation.ts`) over Metro's debugger connection,
+because iOS asks "Open in Vera?" before every `simctl openurl`. The
+simulators and `scripts/phone.sh` share the worktree's Metro
+(`scripts/lib/metro.sh`). The `vera-feature` skill covers both.
 
-Shawn tests changes on standalone `internal` builds: Release JavaScript
-bundled into the app (real performance, no dev server) against the dev PDS,
-so dev tools stay on. Build locally and install over the network or with the
-EAS link:
+Internal builds by hand (`pnpm release build internal` does this, plus the
+runtime check, the upload, and the tag):
 
 ```sh
 PATH="/opt/homebrew/bin:$PATH" eas build -p ios --profile internal --local \
   --non-interactive --output /tmp/vera-internal.ipa
-eas upload -p ios --build-path /tmp/vera-internal.ipa   # shareable link
+scripts/install-page.sh /tmp/vera-internal.ipa internal/ios/manual "Internal build."   # install page
 ```
+
+Install pages for Vera Dev live on bunny.net (`scripts/install-page.sh`),
+not EAS: EAS's free plan caps uploads of local builds (it ran out on
+2026-10-04). iOS installs them from an `itms-services` manifest, on the
+devices in the ad hoc profile only; open the page in Safari. To keep the
+bill small, each upload first deletes build folders over 30 days old
+(`dev-client/`, `internal/`; PR evidence stays), and `scripts/phone.sh`
+uploads a cached dev client again if its page was deleted.
 
 (Local builds need fastlane from Homebrew ahead of any rbenv shim.)
 
@@ -124,15 +169,17 @@ conversation. Its source is `plugins/notification-service/`; the
 prebuild, gives the app the Communication Notifications entitlement
 (`com.apple.developer.usernotifications.communication`), lists
 `INSendMessageIntent` in `NSUserActivityTypes`, and app.config.ts registers
-`chat.vera.app.NotificationService` with EAS
+`<bundle ID>.NotificationService` with EAS
 (`extra.eas.build.experimental.ios.appExtensions`). If the extension fails or
 runs out of time, iOS shows the plain push.
 
 The extension ships in every EAS build: `eas.json` sets
 `VERA_NOTIFICATION_EXTENSION=1` for each profile. Local prebuilds without the
-flag leave it out. The App ID `chat.vera.app` has Communication Notifications
-enabled, and EAS holds ad hoc and App Store profiles for both
-`chat.vera.app` and `chat.vera.app.NotificationService`.
+flag leave it out. The App IDs `chat.vera.app` and `chat.vera.app.dev` have
+Communication Notifications enabled. EAS holds ad hoc and App Store profiles
+for `chat.vera.app` and `chat.vera.app.NotificationService`, and ad hoc
+profiles for `chat.vera.app.dev` and `chat.vera.app.dev.NotificationService`
+(Vera Dev).
 
 ## Apple credentials
 
@@ -142,12 +189,19 @@ login. The key lives outside the repo on Shawn's Mac:
 
 ```sh
 source ~/.appstoreconnect/vera.env   # EXPO_ASC_* and EXPO_APPLE_TEAM_*
-expect scripts/eas-credentials.exp internal   # or production
+expect scripts/eas-credentials.exp internal   # or development, production
+expect scripts/eas-credentials.exp development android
 ```
+
+The script sets the dev variant for the `development` and `internal`
+profiles and registers new App IDs. Its capability sync can report success
+without changing anything (it did for `chat.vera.app.dev`): check an App ID
+with `pnpm release asc GET '/v1/bundleIds?filter[identifier]=<id>&include=bundleIdCapabilities'`
+and add missing ones with `POST /v1/bundleIdCapabilities`.
 
 Two things the key cannot do, done once in the web UI instead: creating the
 App Store Connect app record ("Vera Chat", Apple ID `6818656155`; "Vera" was
-taken) and enabling Communication Notifications on the App ID (Apple's API
+taken) and enabling Communication Notifications on an App ID (Apple's API
 has no such capability type). After changing an App ID capability, delete
 the `[expo]` profiles for it and rerun the script so the profiles include it.
 

@@ -94,6 +94,14 @@ So any build signed with that key should pass passkeys. Confirm the key is
 EAS's Android keystore for `chat.vera.app` (`eas credentials -p android`
 from `apps/mobile`).
 
+Vera Dev (`chat.vera.app.dev`, the dev variant; see
+[apps/mobile/README.md](../apps/mobile/README.md#vera-dev)) has its own EAS
+keystore, SHA-256 `4E:FC:68:9E:…:79:3B`
+(`android:apk-key-hash:TvxonvnUUjQSonX-2UvhMyi_rV5NIPB2HL-YRzPueTs`). Since
+2026-10-04 both deployments list both packages in `PASSKEY_ANDROID_PACKAGE`
+and both keys in `PASSKEY_ANDROID_CERT_SHA256` and `PASSKEY_ORIGINS`;
+`assetlinks.json` lists every package with every key.
+
 Other signing keys need both values added, on both deployments:
 
 - **Google Play App Signing** re-signs Play builds with Google's key. Copy its
@@ -238,7 +246,10 @@ Done when:
       `~/.config/vera/fcm-service-account.json` on Shawn's Mac, never in the
       repo. `apps/mobile/google-services.json` (public identifiers) is
       committed and set as `android.googleServicesFile`, which changes the
-      Android runtime only.
+      Android runtime only. Vera Dev is a second Firebase Android app,
+      `chat.vera.app.dev` (`google-services.dev.json`, so Vera's file and
+      runtime don't change), and its EAS credentials use the same FCM V1
+      key (2026-10-04).
 - [ ] Fix the Android UI in small PRs: composer and glass surfaces, conversation
       header, message menu, search tab, themes.
 - [ ] Once Shawn's Play account is approved: Play internal testing,

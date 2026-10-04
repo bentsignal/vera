@@ -1,6 +1,16 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const NOTIFICATION_SERVICE_BUNDLE_ID = "chat.vera.app.NotificationService";
+/**
+ * `APP_VARIANT=development` builds "Vera Dev": its own bundle ID, name,
+ * scheme, and icon, so it installs next to the TestFlight or App Store app.
+ * Every development binary uses it: the simulator and phone dev clients
+ * (scripts/sim.sh, scripts/phone.sh) and internal builds (eas.json). Only
+ * store builds are Vera. See apps/mobile/README.md.
+ */
+const dev = process.env.APP_VARIANT === "development";
+
+const BUNDLE_ID = dev ? "chat.vera.app.dev" : "chat.vera.app";
+const NOTIFICATION_SERVICE_BUNDLE_ID = `${BUNDLE_ID}.NotificationService`;
 
 /**
  * Builds the iOS Notification Service Extension that shows message pushes
@@ -13,10 +23,10 @@ const EAS_PROJECT_ID = "5680db13-57a8-4b74-ae41-1f52abbda0b1";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Vera",
+  name: dev ? "Vera Dev" : "Vera",
   slug: "vera",
   owner: "directedbyshawn",
-  scheme: "vera",
+  scheme: dev ? "vera-dev" : "vera",
   version: "0.1.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
@@ -33,25 +43,32 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   ios: {
     // Liquid Glass icon from Icon Composer; see assets/icons/README.md.
-    icon: "./assets/icons/vera.icon",
-    bundleIdentifier: "chat.vera.app",
+    icon: dev ? "./assets/icons/vera-dev.icon" : "./assets/icons/vera.icon",
+    bundleIdentifier: BUNDLE_ID,
     supportsTablet: true,
     // Passkeys use the permanent relying party ID `vera.chat`.
     associatedDomains: ["webcredentials:vera.chat"],
     config: { usesNonExemptEncryption: false },
   },
   android: {
-    package: "chat.vera.app",
+    package: BUNDLE_ID,
     adaptiveIcon: {
-      backgroundImage: "./assets/icons/vera-android-background.png",
-      foregroundImage: "./assets/icons/vera-android-foreground.png",
+      backgroundImage: dev
+        ? "./assets/icons/vera-dev-android-background.png"
+        : "./assets/icons/vera-android-background.png",
+      foregroundImage: dev
+        ? "./assets/icons/vera-dev-android-foreground.png"
+        : "./assets/icons/vera-android-foreground.png",
       monochromeImage: "./assets/icons/vera-android-monochrome.png",
     },
     predictiveBackGestureEnabled: true,
     // Firebase project vera-c5690: Expo push reaches Android through FCM.
     // Public client identifiers only; the FCM V1 service account key lives
-    // in EAS credentials, not here (see docs/android.md).
-    googleServicesFile: "./google-services.json",
+    // in EAS credentials, not here (see docs/android.md). Vera Dev is its
+    // own Firebase Android app.
+    googleServicesFile: dev
+      ? "./google-services.dev.json"
+      : "./google-services.json",
   },
   plugins: [
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.

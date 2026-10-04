@@ -57,9 +57,10 @@ refuses to run from a worktree with an isolated backend:
 pnpm release backend dev
 ```
 
-Internal builds share the App Store build's bundle ID, so installing one
-replaces the TestFlight app on Shawn's phone. Tell him; he goes back to
-TestFlight once the store build is out.
+Internal builds are Vera Dev (`chat.vera.app.dev`), so the TestFlight app
+stays on his phone. Installing one replaces the Vera Dev dev client he uses
+day to day; tell him so, and that he reinstalls the dev client from its
+link after the release (`scripts/phone.sh link` prints it).
 
 - **OTA release, internal build current** (`plan` says "matches"):
 
@@ -78,7 +79,9 @@ TestFlight once the store build is out.
   pnpm release build internal     # ~15 min; prints the install link
   ```
 
-  Send him the link (it's the "development build" he knows).
+  It prints the install page (on bunny.net; open it in Safari). Send him
+  the link with a QR code embedded (`scripts/qr.sh <url> /tmp/internal.png`,
+  then `![install](/tmp/internal.png)`).
 
 ## 3. Wait for Shawn
 
@@ -207,12 +210,18 @@ After `ota production`:
   `/Applications/Xcode-27.app` (App Store Connect rejects Xcode-beta builds,
   error 90534), so the test build matches what ships. It also checks the
   built runtime against the checkout's fingerprint before uploading.
-- Build numbers come from EAS (remote, auto-incremented for internal and
-  store builds alike), so internal and store builds never share a number.
+- Build numbers come from EAS (remote, auto-incremented), counted per app:
+  Vera Dev's internal builds and Vera's store builds each have their own
+  sequence, and their tags (`mobile/internal/*`, `mobile/build/*`) never
+  mix.
+- Internal builds and internal OTAs use the dev variant
+  (`APP_VARIANT=development`), so their runtime differs from the store
+  build's. `pnpm release` handles it; `plan` compares each channel against
+  its own fingerprint.
 - Uploads go through `xcrun altool`, because `eas submit --non-interactive`
   refuses an API key from the environment.
 - `ota` sets `VERA_NOTIFICATION_EXTENSION=1` and the channel's
-  `EXPO_PUBLIC_VERA_DOMAIN`. Without the first the runtime doesn't match the
+  `EXPO_PUBLIC_VERA_DOMAIN` (and `APP_VARIANT` for internal). Without the first the runtime doesn't match the
   store build; without the second the update points at the wrong PDS. Don't
   run `eas update` by hand.
 - Signing problems: `expect apps/mobile/scripts/eas-credentials.exp production`

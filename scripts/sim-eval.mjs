@@ -12,12 +12,13 @@ if (port === undefined || expression === undefined) {
 const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) =>
   r.json(),
 );
-// Metro serves the worktree's iOS simulator and Android emulator at once;
-// VERA_DEVICE picks one by the start of the device name Metro reports.
+// Metro serves the worktree's iOS simulator, Android emulator, and Shawn's
+// phone at once; VERA_DEVICE picks one by the start of the device name
+// Metro reports.
 const device = process.env.VERA_DEVICE;
 const target = targets.find(
   (t) =>
-    t.appId === "chat.vera.app" &&
+    t.appId === "chat.vera.app.dev" &&
     t.webSocketDebuggerUrl &&
     (device === undefined || device === "" || t.deviceName?.startsWith(device)),
 );

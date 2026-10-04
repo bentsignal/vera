@@ -111,8 +111,8 @@ Environment variables on each deployment:
 | `PASSKEY_RP_ID`               | `vera.chat`                          | WebAuthn relying party ID (permanent)         |
 | `PASSKEY_ORIGINS`             | `https://vera.chat`                  | Comma-separated accepted WebAuthn origins     |
 | `BETTER_AUTH_SECRET`          | random                               | Better Auth signing secret                    |
-| `PASSKEY_APPLE_APP_IDS`       | `39K6A9FP99.chat.vera.app`           | Apps listed in the Apple app site association |
-| `PASSKEY_ANDROID_PACKAGE`     | `chat.vera.app`                      | Android app listed in `assetlinks.json`       |
+| `PASSKEY_APPLE_APP_IDS`       | `39K6A9FP99.chat.vera.app,...`       | Apps listed in the Apple app site association |
+| `PASSKEY_ANDROID_PACKAGE`     | `chat.vera.app,chat.vera.app.dev`    | Android apps listed in `assetlinks.json`      |
 | `PASSKEY_ANDROID_CERT_SHA256` | `AB:CD:...`                          | Comma-separated Android signing fingerprints  |
 | `BUNNY_S3_ENDPOINT`           | `https://ny-s3.storage.bunnycdn.com` | bunny.net Storage S3 endpoint                 |
 | `BUNNY_S3_REGION`             | `ny`                                 | Region used to sign uploads                   |

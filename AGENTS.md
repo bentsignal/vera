@@ -65,12 +65,30 @@ native code changed or Apple requires one.
 
 ## Phone builds
 
-When Shawn asks for a "development build" (or a build for his iPhone), make
-the standalone `internal` EAS build: Release JavaScript bundled into the app,
-against the dev PDS, no dev server needed. Never build the dev client (the
-`development` profile) unless he asks for a "dev client" by name. See
-[apps/mobile/README.md](apps/mobile/README.md#eas) for the build and upload
-commands.
+Shawn's phone has two Vera apps side by side: **Vera** (TestFlight or the
+App Store, production) and **Vera Dev** (`chat.vera.app.dev`, amber icon,
+dev PDS). Every development binary is Vera Dev; only store builds are Vera.
+See [apps/mobile/README.md](apps/mobile/README.md#vera-dev).
+
+- **Day to day, Vera Dev is the dev client.** To let Shawn try a change on
+  his phone, run `scripts/phone.sh up` (`--android` for his Android phone)
+  in your worktree. It serves the worktree's Metro over the tailnet and
+  prints an open link and a QR code: send both, with the QR PNG embedded.
+  JavaScript changes then hot-reload on his phone with no build.
+- **Native builds only when native code changed.** `phone.sh up` builds a
+  new dev client (about 15 minutes) only when the worktree's native
+  fingerprint has none yet, and prints its install link. Tell Shawn when he
+  has to install one; otherwise he only opens the link.
+- **Before a release, an internal build** (`pnpm release build internal`,
+  the `vera-release` skill) replaces the dev client in the Vera Dev slot so
+  he can test the release as it will ship. Afterwards he reinstalls the dev
+  client from its link (`scripts/phone.sh link`); no rebuild needed.
+- When Shawn asks for a "build on his phone" or a "development build"
+  without a release, that means `scripts/phone.sh up`, not an internal
+  build. Make an internal build outside a release only when he asks for one
+  by name, or to check update or channel behavior, which a dev client can't
+  show.
+- `scripts/phone.sh down` when he's done with it, like the simulators.
 
 ## Required validation after changes
 

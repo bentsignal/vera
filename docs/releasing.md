@@ -6,12 +6,20 @@ the release with the `vera-release` skill and
 
 ## Binaries, channels, and runtimes
 
-| Binary           | Built with                              | PDS             | Update channel | Who has it                                      |
-| ---------------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
-| Internal build   | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, by install link                  |
-| Store build      | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
-| Android APK      | `production-apk` (EAS keystore)         | `vera.chat`     | `production`   | Android testers, by install link                |
-| Android internal | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android testing                         |
+| Binary           | App      | Built with                              | PDS             | Update channel | Who has it                                      |
+| ---------------- | -------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
+| Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
+| Android APK      | Vera     | `production-apk` (EAS keystore)         | `vera.chat`     | `production`   | Android testers, by install link                |
+| Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone during a release, by install link |
+| Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone during a release          |
+| Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
+
+Vera and Vera Dev are separate apps (`chat.vera.app`, `chat.vera.app.dev`;
+see [apps/mobile/README.md](../apps/mobile/README.md#vera-dev)), so Shawn's
+phone keeps the TestFlight app on production through a release test. Vera
+Dev holds one binary at a time: the internal build replaces the dev client
+for the release test, and Shawn reinstalls the dev client from its link
+(`scripts/phone.sh link`) afterwards.
 
 Android has no Play listing yet, so its testers install APKs from EAS links
 ([android.md](android.md)). Over-the-air updates reach them the same way:
@@ -37,7 +45,9 @@ other platform's section (`ios: {}` or `android: {}`) doesn't count, and
 `apps/mobile/fingerprint.config.cjs` excludes `eas.json`, so editing build
 profiles never strands installed binaries. Check before merging anything
 native: `VERA_NOTIFICATION_EXTENSION=1 pnpm exec expo-updates fingerprint:generate --platform ios`
-in `apps/mobile`, before and after.
+in `apps/mobile`, before and after. Vera Dev's runtime (internal builds) is
+the same command with `APP_VARIANT=development`; `pnpm release` computes
+each channel's own.
 
 Fingerprints differ between macOS and Linux. Builds and updates both run on
 Shawn's Mac, so they match. CI's "📱 Native Change" label compares the PR's
@@ -98,7 +108,6 @@ so the first release after it is a store build.
 
 `version` in `app.config.ts` is the marketing version (0.1.0). Build numbers
 increment on their own (EAS remote versioning, shared by internal and store
-builds). Internal builds use the same bundle ID, so installing one replaces
-the TestFlight app on that phone. Bump the version with a PR
+builds, counted separately for Vera and Vera Dev). Bump the version with a PR
 after a version is released on the App Store, because Apple closes that
 version to new builds. The runtime version is independent of both.

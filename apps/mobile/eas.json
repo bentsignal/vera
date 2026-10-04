@@ -14,6 +14,7 @@
       "distribution": "internal",
       "environment": "development",
       "env": {
+        "APP_VARIANT": "development",
         "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat",
         "VERA_NOTIFICATION_EXTENSION": "1"
       },
@@ -30,6 +31,7 @@
       "distribution": "internal",
       "environment": "development",
       "env": {
+        "APP_VARIANT": "development",
         "EXPO_PUBLIC_VERA_DOMAIN": "dev.vera.chat",
         "VERA_NOTIFICATION_EXTENSION": "1"
       },

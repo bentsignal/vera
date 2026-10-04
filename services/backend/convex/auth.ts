@@ -127,7 +127,8 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
         },
       },
     },
-    trustedOrigins: ["vera://"],
+    // The app's schemes: Vera, and Vera Dev (the dev variant, app.config.ts).
+    trustedOrigins: ["vera://", "vera-dev://"],
   });
 }
 
