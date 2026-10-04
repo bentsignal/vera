@@ -21,9 +21,13 @@ CLIs (such as UAV) or Claude Code auto memory for this project.
 For anything that needs a browser, dashboard, or GUI (for example the Convex,
 Vercel, or bunny.net dashboards), use the Codex CLI with the GPT 6.1 Sol model,
 headless where possible, instead of driving the screen yourself:
-`codex exec -m gpt-6.1-sol "<task>"`. Prefer each
+`codex exec -m gpt-6.1-sol -s danger-full-access "<task>" < /dev/null`
+(run it from the repo, since Codex refuses untrusted directories, and close
+stdin or it waits for input). Prefer each
 service's CLI or API first. Never open repeated browser tabs or login pages in
-the background; tell Shawn before anything opens on his machine.
+the background; tell Shawn before anything opens on his machine. Shawn has
+authorized accepting service terms (Firebase, Google Cloud, and similar) for
+Vera's own accounts; say so in the Codex prompt, or Codex stops at them.
 
 ## Feature workflow
 
