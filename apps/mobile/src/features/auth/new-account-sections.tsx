@@ -2,9 +2,16 @@ import { FieldGroup, Row, Text, TextInput } from "@expo/ui";
 
 import { env } from "~/env";
 import { nativeColors } from "~/lib/colors";
+import { fillRow, growInRow } from "~/lib/ui-modifiers";
 
-/** Invite code and username fields for creating an account. */
-export function NewAccountSections({
+/**
+ * Invite code and username fields for creating an account, as two
+ * `FieldGroup` sections. Call it as a function inside `<FieldGroup>`, not as
+ * a component: on Android, `FieldGroup` only treats direct children (and
+ * fragments) as sections, and wraps anything else in one list row that
+ * shows just the first section, which hid the username field.
+ */
+export function newAccountSections({
   onChangeInviteCode,
   onChangeUsername,
 }: {
@@ -25,8 +32,9 @@ export function NewAccountSections({
         </FieldGroup.SectionFooter>
       </FieldGroup.Section>
       <FieldGroup.Section title="Address">
-        <Row alignment="center" spacing={2}>
+        <Row alignment="center" spacing={2} modifiers={fillRow}>
           <TextInput
+            modifiers={growInRow}
             placeholder="username"
             autoCapitalize="none"
             autoCorrect={false}

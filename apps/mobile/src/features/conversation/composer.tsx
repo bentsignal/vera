@@ -1,17 +1,16 @@
 import { useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import { GlassView } from "expo-glass-effect";
 import { withUniwind } from "uniwind";
 
+import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { cn } from "~/lib/cn";
 
 const StyledTextInput = withUniwind(TextInput);
-const StyledGlassView = withUniwind(GlassView);
-
 /** Every control in the composer shares this height so they line up. */
 const CONTROL = 40;
 const SEND = 32;
@@ -71,13 +70,25 @@ export function Composer({
   }
 
   return (
-    <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
+    <View
+      className={cn(
+        "flex-row items-end gap-2 px-3 pt-2 pb-2",
+        // No glass on Android: a solid bar keeps messages from showing
+        // through behind the field.
+        Platform.OS === "android" && "bg-background border-separator",
+      )}
+      style={
+        Platform.OS === "android"
+          ? { borderTopWidth: StyleSheet.hairlineWidth }
+          : undefined
+      }
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Add attachment"
         onPress={onAttach}
       >
-        <StyledGlassView
+        <GlassSurface
           isInteractive
           className="items-center justify-center rounded-full"
           style={{ height: CONTROL, width: CONTROL }}
@@ -88,9 +99,9 @@ export function Composer({
             weight="semibold"
             tintColorClassName="accent-foreground"
           />
-        </StyledGlassView>
+        </GlassSurface>
       </Pressable>
-      <StyledGlassView
+      <GlassSurface
         className="flex-1 justify-center rounded-[20px]"
         style={{ minHeight: CONTROL }}
       >
@@ -110,7 +121,7 @@ export function Composer({
           cursorColorClassName="accent-accent"
         />
         <SendButton visible={canSend} onPress={send} />
-      </StyledGlassView>
+      </GlassSurface>
     </View>
   );
 }

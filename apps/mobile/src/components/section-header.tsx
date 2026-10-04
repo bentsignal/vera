@@ -1,6 +1,6 @@
 import { Button, Icon, Row, Spacer, Text } from "@expo/ui";
 
-import { linkButton } from "~/lib/ui-modifiers";
+import { fillRow, linkButton } from "~/lib/ui-modifiers";
 
 const PLUS = Icon.select({
   android: import("@expo/material-symbols/add.xml"),
@@ -20,9 +20,9 @@ export function SectionHeaderWithAdd({
   onAdd: () => void;
 }) {
   return (
-    <Row alignment="center">
+    <Row alignment="center" modifiers={fillRow}>
       <Text>{title}</Text>
-      <Spacer />
+      <Spacer flexible />
       <Button modifiers={linkButton} onPress={onAdd}>
         <Icon name={PLUS} size={16} />
       </Button>

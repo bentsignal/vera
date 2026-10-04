@@ -1,20 +1,18 @@
 import type { SymbolViewProps } from "expo-symbols";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
   LayoutAnimationConfig,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GlassView } from "expo-glass-effect";
 import { useRouter } from "expo-router";
-import { useCSSVariable, withUniwind } from "uniwind";
+import { useCSSVariable } from "uniwind";
 
 import type { ConversationKind } from "~/features/inbox/types";
 import { Avatar } from "~/components/avatar";
+import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
-
-const StyledGlassView = withUniwind(GlassView);
 
 /** Matches the native glass bar buttons. */
 const BUTTON = 44;
@@ -43,11 +41,8 @@ const EDGE = 14;
 function TopEdge() {
   const insets = useSafeAreaInsets();
   const color = useCSSVariable("--color-background");
-  if (
-    Platform.OS !== "ios" ||
-    typeof color !== "string" ||
-    !/^#[0-9a-f]{6}$/i.test(color)
-  ) {
+  if (Platform.OS === "android") return <AndroidBar />;
+  if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color)) {
     return null;
   }
   const height = insets.top + EDGE;
@@ -59,6 +54,24 @@ function TopEdge() {
       style={{
         experimental_backgroundImage: `linear-gradient(180deg, ${color}e6 0%, ${color}b3 ${solid}%, ${color}00 100%)`,
         height,
+      }}
+    />
+  );
+}
+
+/**
+ * Android has no glass to read messages through, so the header sits on a
+ * solid bar with a hairline, like a Material top app bar.
+ */
+function AndroidBar() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      pointerEvents="none"
+      className="bg-background border-separator absolute top-0 right-0 left-0"
+      style={{
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        height: insets.top + CONVERSATION_HEADER_HEIGHT + 6,
       }}
     />
   );
@@ -80,7 +93,7 @@ function GlassCircleButton({
       hitSlop={6}
       onPress={onPress}
     >
-      <StyledGlassView
+      <GlassSurface
         isInteractive
         className="items-center justify-center rounded-full"
         style={{ height: BUTTON, width: BUTTON }}
@@ -91,7 +104,7 @@ function GlassCircleButton({
           weight="semibold"
           tintColorClassName="accent-foreground"
         />
-      </StyledGlassView>
+      </GlassSurface>
     </Pressable>
   );
 }
@@ -134,7 +147,7 @@ function NameCapsule({ title }: { title: string }) {
       entering={FadeIn.duration(200)}
       style={{ marginTop: -CAPSULE_OVERLAP }}
     >
-      <StyledGlassView
+      <GlassSurface
         className="flex-row items-center gap-1 rounded-full px-2.5"
         style={{ height: CAPSULE, maxWidth: 220 }}
       >
@@ -150,7 +163,7 @@ function NameCapsule({ title }: { title: string }) {
           weight="bold"
           tintColorClassName="accent-muted"
         />
-      </StyledGlassView>
+      </GlassSurface>
     </Animated.View>
   );
 }

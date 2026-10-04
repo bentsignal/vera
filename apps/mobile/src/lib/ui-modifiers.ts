@@ -5,6 +5,13 @@ import type { ModifierConfig } from "@expo/ui/swift-ui/modifiers";
  * `.android.ts` variants hold the real values; other platforms get none.
  */
 export const fillWidth = [] satisfies ModifierConfig[];
+/**
+ * A settings row that spans its section, so a flexible `Spacer` pushes the
+ * value to the trailing edge. Only Compose needs it.
+ */
+export const fillRow = [] satisfies ModifierConfig[];
+/** A field that takes the rest of its `Row`, leaving room for a suffix. */
+export const growInRow = [] satisfies ModifierConfig[];
 export const prominentButton = [] satisfies ModifierConfig[];
 export const largeButton = [] satisfies ModifierConfig[];
 export const circleButton = [] satisfies ModifierConfig[];

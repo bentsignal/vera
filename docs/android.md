@@ -216,8 +216,21 @@ Done when:
       emulator that `device_open` streams (by its `emulator-55xx` serial).
 - [x] Build the app for Android. The build failed until the splash screen got
       an Android-only transparent image (`expo-splash-screen` needs one).
-- [ ] Screenshot every screen on the emulator against `dev.vera.chat`, and
-      replace the "Expected gaps" table with confirmed issues.
+- [x] Screenshot the main screens on the emulator against `dev.vera.chat`
+      (2026-10-03, #67). Worked as-is: Chats, Spaces, search (a Material
+      search field from the header icon), image messages, the keyboard,
+      and the long-press reaction menu. Fixed in #67: glass surfaces had no
+      background (now a Material tonal fill via `GlassSurface`), messages
+      showed through the conversation header and composer (now solid bars),
+      and settings values ran into their labels.
+- [ ] Remaining polish: the Appearance and Messages pickers are Material's
+      wide exposed-dropdown fields (`@expo/ui` ignores `appearance` on
+      Android), and filled buttons use Material's primary derived from the
+      accent seed (a muted slate blue) rather than the exact accent. Both
+      need Android-specific components (`@expo/ui/jetpack-compose` `Button`
+      `colors`, a `DropdownMenu` picker). Not yet reviewed: profile,
+      conversation info, new message, spaces and channels, media viewer,
+      dark mode.
 - [ ] Set up Firebase and FCM V1 for push. Blocked 2026-10-03: the Codex CLI
       login had expired (`codex login`), so the Firebase console steps
       haven't run. The prompt is in this doc's Push notifications section.

@@ -5,15 +5,12 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
 } from "react-native-reanimated";
-import { GlassView } from "expo-glass-effect";
-import { withUniwind } from "uniwind";
 
 import type { MenuTarget, TargetAlign } from "./glass-message-menu";
+import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { QUICK_REACTIONS } from "~/features/messaging/reactions";
 import { cn } from "~/lib/cn";
-
-const StyledGlassView = withUniwind(GlassView);
 
 const EMOJI = 44;
 const BAR_PADDING = 5;
@@ -100,9 +97,10 @@ export function ReactionBar({
       className="absolute"
       style={[{ ...position, height: BAR_HEIGHT, width: BAR_WIDTH }, style]}
     >
-      <StyledGlassView
+      <GlassSurface
         isInteractive
         className="flex-1 flex-row items-center rounded-full"
+        androidClassName="bg-background-elevated"
         style={{ paddingHorizontal: BAR_PADDING }}
       >
         {QUICK_REACTIONS.map((emoji) => {
@@ -119,7 +117,7 @@ export function ReactionBar({
             />
           );
         })}
-      </StyledGlassView>
+      </GlassSurface>
     </Animated.View>
   );
 }
@@ -148,7 +146,10 @@ export function ActionMenu({
       className="absolute"
       style={[{ ...position, width: MENU_WIDTH }, style]}
     >
-      <StyledGlassView className="overflow-hidden rounded-[24px] py-1.5">
+      <GlassSurface
+        className="overflow-hidden rounded-[24px] py-1.5"
+        androidClassName="bg-background-elevated"
+      >
         {actions.map((action) => (
           <Pressable
             key={action.label}
@@ -165,7 +166,7 @@ export function ActionMenu({
             />
           </Pressable>
         ))}
-      </StyledGlassView>
+      </GlassSurface>
     </Animated.View>
   );
 }

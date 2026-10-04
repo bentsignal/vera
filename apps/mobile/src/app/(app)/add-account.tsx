@@ -5,7 +5,7 @@ import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
 import { env } from "~/env";
-import { NewAccountSections } from "~/features/auth/new-account-sections";
+import { newAccountSections } from "~/features/auth/new-account-sections";
 import { isValidUsername, normalizeUsername } from "~/features/auth/username";
 import { devSignIn } from "~/features/dev/dev-tools";
 import { storedAccounts } from "~/features/session/account-store";
@@ -70,10 +70,10 @@ export default function AddAccountScreen() {
             />
           </FieldGroup.Section>
         )}
-        <NewAccountSections
-          onChangeInviteCode={setInviteCode}
-          onChangeUsername={setUsername}
-        />
+        {newAccountSections({
+          onChangeInviteCode: setInviteCode,
+          onChangeUsername: setUsername,
+        })}
         <FieldGroup.Section>
           <Button
             label="Create Account"
