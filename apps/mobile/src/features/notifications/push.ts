@@ -52,7 +52,9 @@ Notifications.setNotificationHandler({
 });
 
 export async function getPushToken() {
-  if (!Device.isDevice) return null;
+  // The iOS Simulator has no APNs token for this app. Android emulators
+  // with Google Play services receive FCM pushes like phones do.
+  if (!Device.isDevice && Platform.OS !== "android") return null;
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("messages", {
       importance: Notifications.AndroidImportance.HIGH,
