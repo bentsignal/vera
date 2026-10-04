@@ -6,7 +6,7 @@ import { FieldGroup } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
 import { ProminentButton } from "~/components/prominent-button";
-import { NewAccountSections } from "~/features/auth/new-account-sections";
+import { newAccountSections } from "~/features/auth/new-account-sections";
 import { isValidUsername, normalizeUsername } from "~/features/auth/username";
 import { createAccount } from "~/features/session/passkeys";
 import { usePendingSignIn } from "~/features/session/pending-sign-in";
@@ -36,10 +36,10 @@ export default function CreateAccountScreen() {
     <View className="bg-background-grouped flex-1">
       <NativeHost style={{ flex: 1 }}>
         <FieldGroup>
-          <NewAccountSections
-            onChangeInviteCode={setInviteCode}
-            onChangeUsername={setUsername}
-          />
+          {newAccountSections({
+            onChangeInviteCode: setInviteCode,
+            onChangeUsername: setUsername,
+          })}
         </FieldGroup>
       </NativeHost>
       <KeyboardStickyView offset={{ opened: insets.bottom }}>
