@@ -18,11 +18,12 @@
 #   status           devices, port, Metro, and backend
 #   down             delete this platform's device; stops Metro when no device is left
 #
-# Each dev client (a Debug build with no notification extension) is built
-# once per native fingerprint and cached in ~/Library/Caches/vera, so
-# worktrees only rebuild when native code changed. JavaScript, including the
-# account domain from `scripts/backend.sh isolate`, comes from this worktree's
-# Metro, which both platforms share.
+# Each dev client (Vera Dev, the dev variant in app.config.ts, as a Debug
+# build with no notification extension) is built once per native fingerprint
+# and cached in ~/Library/Caches/vera, so worktrees only rebuild when native
+# code changed. JavaScript, including the account domain from
+# `scripts/backend.sh isolate`, comes from this worktree's Metro, which both
+# platforms and scripts/phone.sh share (scripts/lib/metro.sh).
 set -euo pipefail
 
 PLATFORM=ios
@@ -36,29 +37,29 @@ MOBILE="$ROOT/apps/mobile"
 STATE_DIR="$ROOT/.cache/sim"
 EVIDENCE="$ROOT/.cache/evidence"
 CACHE="$HOME/Library/Caches/vera"
-BUNDLE_ID="chat.vera.app"
+BUNDLE_ID="chat.vera.app.dev"
 IOS_DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
 ANDROID_BASE_AVD="Pixel_9"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 ADB="$ANDROID_HOME/platform-tools/adb"
 mkdir -p "$STATE_DIR" "$EVIDENCE" "$CACHE"
+# shellcheck source=lib/metro.sh
+. "$ROOT/scripts/lib/metro.sh"
 
 slug() {
   basename "$ROOT" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
 }
-hash_of() { printf '%s' "$1" | cksum | cut -d' ' -f1; }
 
 # State: Metro is shared; each platform keeps its own device.
 load() {
-  PORT="" METRO_PID="" DEVICE="" SERIAL="" EMULATOR_PID="" RECORD_PID=""
-  # shellcheck disable=SC1091
-  [ -f "$STATE_DIR/metro" ] && . "$STATE_DIR/metro"
+  DEVICE="" SERIAL="" EMULATOR_PID="" RECORD_PID=""
+  load_metro
   # shellcheck disable=SC1090
   [ -f "$STATE_DIR/$PLATFORM" ] && . "$STATE_DIR/$PLATFORM"
   return 0
 }
 save() {
-  printf 'PORT=%s\nMETRO_PID=%s\n' "$PORT" "$METRO_PID" >"$STATE_DIR/metro"
+  save_metro
   printf 'DEVICE=%s\nSERIAL=%s\nEMULATOR_PID=%s\nRECORD_PID=%s\n' \
     "$DEVICE" "$SERIAL" "$EMULATOR_PID" "$RECORD_PID" >"$STATE_DIR/$PLATFORM"
 }
@@ -80,11 +81,14 @@ fingerprint() {
 
 build_ios_client() {
   env -u VERA_NOTIFICATION_EXTENSION npx expo prebuild --platform ios --clean </dev/null
-  xcodebuild -workspace ios/Vera.xcworkspace -scheme Vera -configuration Debug \
+  # Prebuild names the project after the app ("Vera Dev" → VeraDev).
+  local project
+  project="$(basename ios/*.xcworkspace .xcworkspace)"
+  xcodebuild -workspace "ios/$project.xcworkspace" -scheme "$project" -configuration Debug \
     -sdk iphonesimulator -derivedDataPath ios/build CODE_SIGN_IDENTITY=- \
     CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=39K6A9FP99 \
     PROVISIONING_PROFILE_SPECIFIER= -quiet build
-  cp -R ios/build/Build/Products/Debug-iphonesimulator/Vera.app "$1"
+  cp -R "ios/build/Build/Products/Debug-iphonesimulator/$project.app" "$1"
 }
 
 build_android_client() {
@@ -180,39 +184,6 @@ install_client() {
   fi
 }
 
-port_in_use() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
-
-metro_running() {
-  [ -n "$METRO_PID" ] && kill -0 "$METRO_PID" 2>/dev/null &&
-    curl -fsS "http://127.0.0.1:$PORT/status" 2>/dev/null | grep -q running
-}
-
-start_metro() {
-  PORT=$((8100 + $(hash_of "$ROOT") % 800))
-  while port_in_use "$PORT"; do PORT=$((PORT + 1)); done
-  (
-    cd "$MOBILE"
-    nohup npx expo start --dev-client --port "$PORT" </dev/null >"$STATE_DIR/metro.log" 2>&1 &
-    echo $! >"$STATE_DIR/metro.pid"
-  )
-  METRO_PID="$(cat "$STATE_DIR/metro.pid")"
-  for _ in $(seq 1 60); do
-    curl -fsS "http://127.0.0.1:$PORT/status" 2>/dev/null | grep -q running && return
-    sleep 1
-  done
-  echo "Metro did not start; see $STATE_DIR/metro.log" >&2
-  exit 1
-}
-
-stop_metro() {
-  if [ -n "$METRO_PID" ] && kill -0 "$METRO_PID" 2>/dev/null; then
-    # Only the Metro this script started, and its children.
-    pkill -TERM -P "$METRO_PID" 2>/dev/null || true
-    kill -TERM "$METRO_PID" 2>/dev/null || true
-  fi
-  METRO_PID=""
-}
-
 # Metro's debugger targets are named after the device (the simulator's name
 # on iOS, the model on Android). Each worktree has its own Metro, so this
 # only has to tell the two platforms apart.
@@ -258,7 +229,7 @@ launch() {
     adb_device reverse "tcp:$PORT" "tcp:$PORT" >/dev/null
     adb_device shell am force-stop "$BUNDLE_ID"
     adb_device shell am start -a android.intent.action.VIEW \
-      -d "vera://expo-development-client/?url=$(node -p "encodeURIComponent('http://127.0.0.1:$PORT')")" \
+      -d "vera-dev://expo-development-client/?url=$(node -p "encodeURIComponent('http://127.0.0.1:$PORT')")" \
       "$BUNDLE_ID" >/dev/null
   fi
   for _ in $(seq 1 120); do
@@ -277,11 +248,7 @@ up() {
   ensure_client
   "ensure_${PLATFORM}_device"
   install_client
-  # A backend switch changes inlined env, so start Metro fresh unless the
-  # other platform is using it.
-  if ! metro_running; then
-    start_metro
-  fi
+  ensure_metro
   save
   launch
   [ "$PLATFORM" = ios ] && open -ga Simulator
@@ -368,16 +335,8 @@ down() {
   DEVICE="" SERIAL="" EMULATOR_PID="" RECORD_PID=""
   save
   rm -f "$STATE_DIR/$PLATFORM"
-  # Metro stops with the last device.
-  local other=ios
-  [ "$PLATFORM" = ios ] && other=android
-  if [ ! -f "$STATE_DIR/$other" ]; then
-    stop_metro
-    rm -f "$STATE_DIR/metro"
-    echo "$PLATFORM device and Metro stopped"
-  else
-    echo "$PLATFORM device stopped; Metro keeps running for $other"
-  fi
+  echo "$PLATFORM device stopped"
+  release_metro
 }
 
 command="${1:-status}"

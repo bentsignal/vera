@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "863019500780",
+    "project_id": "vera-c5690",
+    "storage_bucket": "vera-c5690.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:863019500780:android:a754eb9971524773df51c9",
+        "android_client_info": {
+          "package_name": "chat.vera.app.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_NbLfiDj-FHCZobcl5bQKK5hs4OrrPJs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

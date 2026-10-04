@@ -16,8 +16,9 @@ export function createHomeAuthClient(
     baseURL: home.manifest.httpUrl,
     plugins: [
       convexClient(),
+      // The scheme (the origin the PDS checks) comes from app.config.ts:
+      // `vera`, or `vera-dev` for Vera Dev.
       expoClient({
-        scheme: "vera",
         storage: SecureStore,
         storagePrefix,
       }),

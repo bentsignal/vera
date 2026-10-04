@@ -1,18 +1,19 @@
-// Renders the flat icon assets from vera.icon (its SVG leaves and the fills
+// Renders the flat icon assets from <name>.icon (its SVG leaves and the fills
 // in icon.json), without Liquid Glass:
-//   vera-android-foreground.png   Android adaptive foreground (light leaves)
-//   vera-android-monochrome.png   Android themed icon (white leaves)
-//   vera-android-background.png   Android adaptive background
-//   ../images/icon.png            square, opaque fallback icon
+//   <name>-android-foreground.png  Android adaptive foreground (light leaves)
+//   <name>-android-background.png  Android adaptive background
+//   vera-android-monochrome.png    Android themed icon (white leaves; `vera` only)
+//   ../images/icon.png             square, opaque fallback icon (`vera` only)
 // A thin transparent gap separates overlapping leaves, standing in for the
 // glass edges.
-// Usage: swift render-flat.swift "$PWD" (build-icons.py runs it).
+// Usage: swift render-flat.swift "$PWD" vera|vera-dev (build-icons.py runs it).
 import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 
 let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
-let bundle = root.appendingPathComponent("vera.icon")
+let name = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "vera"
+let bundle = root.appendingPathComponent("\(name).icon")
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 let document = try! JSONSerialization.jsonObject(
   with: Data(contentsOf: bundle.appendingPathComponent("icon.json"))) as! [String: Any]
@@ -118,17 +119,21 @@ let iconWidth = max(box.width, box.height) // Their size on the Icon Composer ca
 // Android: leaves inside the 66% safe zone of the adaptive icon.
 let foreground = context(1024)
 foreground.draw(leaves(size: 1024, width: 600, appearance: .light), in: full)
-write(foreground, "vera-android-foreground.png")
-let monochrome = context(1024)
-monochrome.draw(leaves(size: 1024, width: 600, appearance: .light, white: true), in: full)
-write(monochrome, "vera-android-monochrome.png")
+write(foreground, "\(name)-android-foreground.png")
 let androidBackground = context(1024, opaque: true)
 drawBackground(androidBackground, 1024)
-write(androidBackground, "vera-android-background.png")
+write(androidBackground, "\(name)-android-background.png")
 
-// Square opaque icon: the light appearance without glass.
-let icon = context(1024, opaque: true)
-drawBackground(icon, 1024)
-icon.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: CGColor(colorSpace: space, components: [0, 0.2, 0.05, 0.25])!)
-icon.draw(leaves(size: 1024, width: iconWidth, appearance: .light), in: full)
-write(icon, "../images/icon.png")
+// The monochrome leaves and the fallback icon are Vera's alone.
+if name == "vera" {
+  let monochrome = context(1024)
+  monochrome.draw(leaves(size: 1024, width: 600, appearance: .light, white: true), in: full)
+  write(monochrome, "vera-android-monochrome.png")
+
+  // Square opaque icon: the light appearance without glass.
+  let icon = context(1024, opaque: true)
+  drawBackground(icon, 1024)
+  icon.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: CGColor(colorSpace: space, components: [0, 0.2, 0.05, 0.25])!)
+  icon.draw(leaves(size: 1024, width: iconWidth, appearance: .light), in: full)
+  write(icon, "../images/icon.png")
+}

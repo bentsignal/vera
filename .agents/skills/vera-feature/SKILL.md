@@ -95,7 +95,7 @@ In T3 Code, `device_open` takes the emulator serial `up` prints
   don't disturb anyone else's data.
 - Let Shawn watch: call the T3 `device_open` tool with the simulator UDID
   that `up` prints. It returns the exact `agent-device` command and flags.
-  Run `agent-device open chat.vera.app "${F[@]}"` once before other
+  Run `agent-device open chat.vera.app.dev "${F[@]}"` once before other
   agent-device commands (they fail with "Run open first" otherwise). It also
   brings Vera back to the front if `device_open` left the home screen up.
 - agent-device refs (`@e12`) expire after every action: take a fresh
@@ -115,6 +115,45 @@ In T3 Code, `device_open` takes the emulator serial `up` prints
   (`xcrun simctl ui <udid> appearance dark`). Check Metro's log
   (`.cache/sim/metro.log`) for red boxes and warnings you introduced.
 
+## 4b. Put it on Shawn's phone
+
+The simulator is your check. Shawn checks on his phone, in Vera Dev (the dev
+variant, `chat.vera.app.dev`, amber icon; the TestFlight app stays beside
+it). Do this when he asks to try a change, and offer it whenever a change is
+something he should feel, not just see (gestures, keyboard, haptics,
+notifications, passkeys, performance on a device):
+
+```sh
+scripts/phone.sh up             # iPhone; --android for his Android phone
+scripts/phone.sh link           # the links and QR codes again
+scripts/phone.sh down           # when he's done
+```
+
+- `up` reuses the dev client for this worktree's native fingerprint, or
+  builds one (about 15 minutes, once per fingerprint, shared by every
+  worktree) when native code changed. Then it starts the worktree's Metro
+  (the same one the simulators use) and prints:
+  - an **install** link, which Shawn needs only when `up` built a new dev
+    client, or when an internal build or an older dev client is in the Vera
+    Dev slot;
+  - an **open** link (`vera-dev://expo-development-client/?url=...`) that
+    points Vera Dev at this worktree's Metro over the tailnet.
+- Send Shawn the open link with its QR code embedded
+  (`![open](/abs/path/.cache/sim/phone-ios-open.png)`, from `up`'s output),
+  plus the install link and its QR code when he needs it. Say plainly
+  whether he has to install something.
+- JavaScript edits then hot-reload on his phone. Re-run `up` after native
+  changes, `app.config.ts`, or `.env.local`.
+- Never make an internal build for this. Those are for releases (the
+  `vera-release` skill), or when Shawn asks for one by name, or to check
+  update or channel behavior, which a dev client can't show.
+- With an isolated backend, Vera Dev talks to this worktree's domain, which
+  has no accounts. Tell Shawn to sign in with
+  `vera-dev:///dev-sign-in?username=<name>` (or make a QR code of it), and
+  that the account is a throwaway.
+- `down` before you report, unless Shawn is still trying it; it leaves
+  Metro to the simulators if one is up.
+
 ## 5. Capture evidence
 
 ```sh
@@ -133,9 +172,9 @@ links to the MP4.
   existing screen, put the "before" shots (taken in step 1) next to the
   "after" shots in a two-column table, at the same scroll position so they
   line up (`agent-device scroll`).
-- Update, channel, or release behavior can't be seen in the simulator: the
-  dev client has no channel or update ID. Say so in the PR and give Shawn
-  the steps to check it on an internal build.
+- Update, channel, or release behavior can't be seen in the simulator or a
+  dev client: neither has a channel or update ID. Say so in the PR and give
+  Shawn the steps to check it on an internal build.
 - Motion, gestures, and transitions: a short video (5–15 s).
 - Backend-only changes: show the behavior through the app if it's visible
   there. Otherwise paste the `npx convex run` output.

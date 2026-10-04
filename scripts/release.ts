@@ -8,7 +8,7 @@
 //   plan                                changes since the last release, and OTA or store build per platform
 //   backend dev                         push main's functions to the shared dev deployment
 //   backend production                  deploy main's functions to production (tags backend/deploy/...)
-//   build internal [--android]          internal build (dev PDS), uploaded for an install link
+//   build internal [--android]          internal build (Vera Dev, dev PDS), uploaded for an install link
 //   build production                    iOS App Store build with release Xcode, uploaded to TestFlight
 //   build production --android          Android production APK (vera.chat), uploaded for an install link
 //   build ... --artifact <ipa|apk>      upload and tag an existing build of this commit instead of building
@@ -35,10 +35,16 @@ const FRIENDS_GROUP = "19b050f9-a1aa-4ee8-9c84-3ef3f8716fa4";
 const RELEASE_XCODE = "/Applications/Xcode-27.app/Contents/Developer";
 const SHARED_DEV_DEPLOYMENT = "dev:perceptive-magpie-29";
 const BACKEND_PATHS = ["services/backend", "packages", "pnpm-lock.yaml"];
+// What each channel's binaries are built with (eas.json): internal builds
+// are Vera Dev, the dev variant (app.config.ts).
 const BUILD_ENV = {
-  internal: { EXPO_PUBLIC_VERA_DOMAIN: "dev.vera.chat" },
+  internal: {
+    APP_VARIANT: "development",
+    EXPO_PUBLIC_VERA_DOMAIN: "dev.vera.chat",
+  },
   production: { EXPO_PUBLIC_VERA_DOMAIN: "vera.chat" },
 } as const;
+type Channel = keyof typeof BUILD_ENV;
 
 function run(
   command: string,
@@ -133,22 +139,26 @@ type Platform = "android" | "ios";
 const PLATFORMS: readonly Platform[] = ["ios", "android"];
 
 /** Release tags of a platform's binaries: store (or production APK) and internal. */
-function binaryTagPattern(
-  platform: Platform,
-  channel: "internal" | "production",
-) {
+function binaryTagPattern(platform: Platform, channel: Channel) {
   const kind = channel === "production" ? "build" : "internal";
   return platform === "ios" ? `mobile/${kind}/*` : `mobile/android/${kind}/*`;
 }
 
-/** The runtime version (native fingerprint) of the checked-out code. */
-function fingerprint(platform: Platform = "ios") {
+/**
+ * The runtime version (native fingerprint) of the checked-out code for a
+ * channel's binaries. Vera Dev has its own bundle ID, so its runtime differs
+ * from the store build's.
+ */
+function fingerprint(platform: Platform, channel: Channel) {
   const json = output(
     "pnpm",
     ["exec", "expo-updates", "fingerprint:generate", "--platform", platform],
     {
       cwd: MOBILE,
-      env: { VERA_NOTIFICATION_EXTENSION: "1" },
+      env: {
+        APP_VARIANT: channel === "internal" ? "development" : "",
+        VERA_NOTIFICATION_EXTENSION: "1",
+      },
     },
   );
   return (JSON.parse(json) as { hash: string }).hash;
@@ -233,11 +243,10 @@ function plan() {
   );
   for (const platform of PLATFORMS) {
     const [binary] = tags(binaryTagPattern(platform, "production"));
-    const runtime = fingerprint(platform);
     const shippedRuntime = runtimeOf(binary);
     console.log(
       `${platform}: last production build ${binary ?? "none"}; ${
-        shippedRuntime === runtime
+        shippedRuntime === fingerprint(platform, "production")
           ? "ota (no native change since it)"
           : "store-build (native code changed, or no expo-updates build has shipped)"
       }`,
@@ -247,7 +256,7 @@ function plan() {
       `${platform}: internal build ${
         internal === undefined
           ? "none yet; make one to test"
-          : runtimeOf(internal) === runtime
+          : runtimeOf(internal) === fingerprint(platform, "internal")
             ? `${internal} (matches; an internal OTA reaches it)`
             : `${internal} (older native code; make a new internal build to test)`
       }`,
@@ -380,7 +389,7 @@ function build(profile: string | undefined, flags: string[]) {
         },
       },
     );
-  const runtime = requireRuntime(ipaRuntime(ipa), "ios");
+  const runtime = requireRuntime(ipaRuntime(ipa), "ios", profile);
   const buildNumber = output("sh", [
     "-c",
     `unzip -p "${ipa}" 'Payload/*.app/Info.plist' | plutil -extract CFBundleVersion raw -`,
@@ -388,11 +397,7 @@ function build(profile: string | undefined, flags: string[]) {
   const name = binaryTagPattern("ios", profile).replace("*", buildNumber);
   requireNewTag(name);
   if (profile === "internal") {
-    run(
-      "eas",
-      ["upload", "-p", "ios", "--build-path", ipa, "--non-interactive"],
-      { cwd: MOBILE },
-    );
+    installPage(ipa, `internal/ios/${buildNumber}`, `Internal build ${buildNumber}.`);
   } else {
     run("xcrun", [
       "altool",
@@ -411,9 +416,26 @@ function build(profile: string | undefined, flags: string[]) {
   console.log(`ipa: ${ipa}\nbuild: ${buildNumber}\nruntime: ${runtime}`);
 }
 
+/**
+ * Vera Dev's install page on bunny.net (scripts/install-page.sh); EAS's free
+ * plan caps uploads of local builds.
+ */
+function installPage(artifact: string, prefix: string, description: string) {
+  const url = output(join(ROOT, "scripts/install-page.sh"), [
+    artifact,
+    prefix,
+    description,
+  ]);
+  console.log(`install page: ${url}`);
+}
+
 /** Fails before anything is uploaded if updates could never reach the build. */
-function requireRuntime(runtime: string, platform: Platform) {
-  const expected = fingerprint(platform);
+function requireRuntime(
+  runtime: string,
+  platform: Platform,
+  channel: Channel,
+) {
+  const expected = fingerprint(platform, channel);
   if (runtime !== expected) {
     throw new Error(
       `the build's runtime ${runtime} is not this checkout's ${platform} fingerprint ${expected}; updates would never reach it`,
@@ -438,10 +460,7 @@ function aapt2() {
  * against the dev PDS, and `production-apk` against vera.chat for testers
  * until Play internal testing exists. See docs/android.md.
  */
-function buildAndroid(
-  profile: "internal" | "production",
-  artifact: string | undefined,
-) {
+function buildAndroid(profile: Channel, artifact: string | undefined) {
   const apk = artifact ?? join(tmpdir(), `vera-${profile}-${Date.now()}.apk`);
   const androidHome =
     process.env.ANDROID_HOME ?? join(homedir(), "Library/Android/sdk");
@@ -476,6 +495,7 @@ function buildAndroid(
       "assets/fingerprint",
     ),
     "android",
+    profile,
   );
   const versionCode =
     /versionCode='(\d+)'/.exec(
@@ -483,13 +503,15 @@ function buildAndroid(
     )?.[1] ?? "unknown";
   const name = binaryTagPattern("android", profile).replace("*", versionCode);
   requireNewTag(name);
-  run(
-    "eas",
-    ["upload", "-p", "android", "--build-path", apk, "--non-interactive"],
-    {
-      cwd: MOBILE,
-    },
-  );
+  if (profile === "internal") {
+    installPage(apk, `internal/android/${versionCode}`, `Internal build ${versionCode}.`);
+  } else {
+    run(
+      "eas",
+      ["upload", "-p", "android", "--build-path", apk, "--non-interactive"],
+      { cwd: MOBILE },
+    );
+  }
   tag(name, [`runtime: ${runtime}`, `commit: ${git("rev-parse", "HEAD")}`]);
   console.log(`apk: ${apk}\nversion code: ${versionCode}\nruntime: ${runtime}`);
 }
@@ -505,7 +527,7 @@ function ota(channel: string | undefined, message: string | undefined) {
   // none does.
   const targets = PLATFORMS.filter((platform) => {
     const [binary] = tags(binaryTagPattern(platform, channel));
-    const current = fingerprint(platform);
+    const current = fingerprint(platform, channel);
     const matches = runtimeOf(binary) === current;
     console.log(
       `${platform}: ${matches ? "publishing" : "skipped"} (latest ${channel} binary ${binary ?? "none"}, runtime ${runtimeOf(binary) ?? "none"}; current ${current})`,
@@ -535,7 +557,8 @@ function ota(channel: string | undefined, message: string | undefined) {
     ],
     {
       cwd: MOBILE,
-      // The fingerprint must match the store build's, which has the extension.
+      // The fingerprint must match the channel's binaries, which have the
+      // extension (and, on internal, the dev variant).
       env: {
         ...BUILD_ENV[channel],
         VERA_NOTIFICATION_EXTENSION: "1",
