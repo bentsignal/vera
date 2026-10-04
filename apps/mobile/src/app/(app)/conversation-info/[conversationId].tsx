@@ -1,7 +1,7 @@
 import type { Conversation } from "@decentralized-convex/messages";
 import { Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { FieldGroup } from "@expo/ui";
 
 import type { AvatarGlyph } from "~/components/avatar";
@@ -23,6 +23,7 @@ interface CardProps {
   subtitle: string;
   avatarUrl?: string | null;
   glyph?: AvatarGlyph;
+  onPressAffiliated?: () => void;
 }
 
 /** The card, then members, alerts, and leaving, as the kind allows. */
@@ -73,6 +74,7 @@ function ChannelDetails({
 }
 
 function Info({ conversationId }: { conversationId: string }) {
+  const router = useRouter();
   const { address } = useAccount();
   const { conversation, isLoading, profileOf, title } =
     useConversation(conversationId);
@@ -100,12 +102,20 @@ function Info({ conversationId }: { conversationId: string }) {
   }
   const other =
     conversation.members.find((member) => member !== address) ?? address;
+  const profile = profileOf(other);
   return (
     <Details
       conversation={conversation}
       card={{
-        avatarUrl: profileOf(other).avatarUrl,
+        avatarUrl: profile.avatarUrl,
         name: title,
+        onPressAffiliated: profile.affiliated
+          ? () =>
+              router.push({
+                params: { account: address, address: other },
+                pathname: "/affiliated",
+              })
+          : undefined,
         subtitle: other,
       }}
     />

@@ -181,6 +181,7 @@ function Conversation({
         title={heading}
         kind={conversation?.kind}
         avatarUrl={other === undefined ? null : profileOf(other).avatarUrl}
+        affiliated={other !== undefined && profileOf(other).affiliated}
         onOpenInfo={() =>
           router.push({
             params: { account: address, conversationId, title: heading },

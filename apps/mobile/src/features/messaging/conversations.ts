@@ -73,6 +73,7 @@ function summarize(
     key: `${account} ${conversation.conversationId}`,
     kind: conversation.kind,
     avatarUrl: other === undefined ? null : profileOf(other).avatarUrl,
+    affiliated: other !== undefined && profileOf(other).affiliated,
     lastActivityAt: new Date(
       conversation.lastMessage?.sentAt ?? conversation.updatedAt,
     ),

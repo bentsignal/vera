@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as affiliations from "../affiliations.js";
 import type * as dispatcher from "../dispatcher.js";
 import type * as index from "../index.js";
 import type * as metadata from "../metadata.js";
@@ -21,6 +22,7 @@ import type {
 import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
+  affiliations: typeof affiliations;
   dispatcher: typeof dispatcher;
   index: typeof index;
   metadata: typeof metadata;

@@ -7,6 +7,8 @@ export default defineSchema({
     code: v.string(),
     deactivatedAt: v.optional(v.number()),
     label: v.optional(v.string()),
+    /** Set when the code signs up only this username. */
+    username: v.optional(v.string()),
   }).index("by_code", ["code"]),
   inviteRedemptions: defineTable({
     accountId: v.string(),

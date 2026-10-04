@@ -4,7 +4,12 @@ import { expo } from "@better-auth/expo";
 import { passkey } from "@better-auth/passkey";
 import { createClient } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
-import { formatAddress, parseAddress } from "@decentralized-convex/address";
+import {
+  DEFAULT_RESERVED_USERNAMES,
+  formatAddress,
+  isReservedUsername,
+  parseAddress,
+} from "@decentralized-convex/address";
 import { betterAuthPdsPlugin } from "@decentralized-convex/auth-better-auth/runtime";
 import { APIError } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
@@ -24,16 +29,21 @@ export const authComponent = createClient<DataModel, typeof betterAuthSchema>(
   { local: { schema: betterAuthSchema } },
 );
 
-const RESERVED_USERNAMES = new Set([
-  "admin",
-  "administrator",
-  "help",
-  "root",
-  "security",
-  "support",
-  "system",
+/**
+ * Names nobody can sign up with unless their invite code is for that name
+ * (`invites:create` with `username`).
+ */
+const RESERVED_USERNAMES = [
+  ...DEFAULT_RESERVED_USERNAMES,
   "vera",
-]);
+  "vera_app",
+  "vera_chat",
+  "vera_help",
+  "vera_official",
+  "vera_support",
+  "vera_team",
+  "team_vera",
+];
 
 /** Client-supplied context for passkey-first sign-up. */
 interface SignUpRequest {
@@ -123,15 +133,21 @@ async function validateSignUp(
     throw new APIError("BAD_REQUEST", { code: "INVALID_USERNAME" });
   }
   const normalizedUsername = address.slice(0, address.lastIndexOf("@"));
-  if (RESERVED_USERNAMES.has(normalizedUsername)) {
-    throw new APIError("BAD_REQUEST", { code: "USERNAME_TAKEN" });
-  }
-  const inviteActive = await requireActionCtx(ctx).runQuery(
-    internal.invites.isActive,
+  const invite = await requireActionCtx(ctx).runQuery(
+    internal.invites.findActive,
     { code: inviteCode },
   );
-  if (!inviteActive) {
+  if (invite === null) {
     throw new APIError("FORBIDDEN", { code: "INVITE_CODE_INACTIVE" });
+  }
+  if (invite.username !== null && invite.username !== normalizedUsername) {
+    throw new APIError("FORBIDDEN", { code: "INVITE_CODE_FOR_OTHER_USERNAME" });
+  }
+  if (
+    invite.username === null &&
+    isReservedUsername(normalizedUsername, RESERVED_USERNAMES)
+  ) {
+    throw new APIError("BAD_REQUEST", { code: "USERNAME_TAKEN" });
   }
   if (
     (await endpoint.context.internalAdapter.findUserByEmail(address)) !== null

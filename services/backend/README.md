@@ -55,6 +55,31 @@ the invite, creates the account, and starts a session. Invite codes are managed
 with the operator functions in `convex/invites.ts` (see the `invite-codes`
 agent skill).
 
+Usernames that look official are reserved: `DEFAULT_RESERVED_USERNAMES` from
+`@decentralized-convex/address` (`admin`, `help`, `support`, `security`, and
+so on) plus Vera's own (`vera`, `vera_support`, ...) in `convex/auth.ts`. The
+check ignores case, dots, dashes, underscores, and trailing digits, so
+`Help_Desk2` is reserved too, and a reserved name fails with
+`USERNAME_TAKEN`. To create one of these accounts yourself, make an invite
+code for that username and sign up with it:
+
+```sh
+npx convex run invites:create '{"label":"support account","username":"support"}'
+```
+
+A code with a `username` signs up only that username.
+
+Accounts that speak for Vera, such as `support@vera.chat`, can be marked
+affiliated. The app then shows a verified check next to their names, and
+tapping it explains that the account is an official account of the domain.
+Only accounts on this deployment's `FEDERATION_DOMAIN` can be affiliated.
+
+```sh
+npx convex run affiliations:add '{"address":"support@vera.chat"}'
+npx convex run affiliations:remove '{"address":"support@vera.chat"}'
+npx convex run affiliations:list
+```
+
 ## Deployments
 
 Both deployments live in the Convex project `vera` (team BSX).

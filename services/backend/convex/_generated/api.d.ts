@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as affiliations from "../affiliations.js";
 import type * as appAssociation from "../appAssociation.js";
 import type * as auth from "../auth.js";
 import type * as bunny from "../bunny.js";
@@ -28,6 +29,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  affiliations: typeof affiliations;
   appAssociation: typeof appAssociation;
   auth: typeof auth;
   bunny: typeof bunny;

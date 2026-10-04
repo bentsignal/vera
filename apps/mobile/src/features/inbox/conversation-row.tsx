@@ -5,6 +5,7 @@ import type { ConversationSummary } from "./types";
 import { Avatar } from "~/components/avatar";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { usernameOf } from "~/features/messaging/profiles";
+import { AffiliatedBadge } from "~/features/profile/affiliated-badge";
 import { formatInboxTimestamp } from "~/lib/format";
 
 export function ConversationRow({
@@ -43,12 +44,15 @@ export function ConversationRow({
           <Avatar name={title} size="list" uri={conversation.avatarUrl} />
           <View className="border-b-hairline border-separator ml-3 min-h-[78px] flex-1 justify-center py-2.5 pr-4">
             <View className="flex-row items-center gap-1.5">
-              <Text
-                numberOfLines={1}
-                className="text-headline text-foreground flex-1 font-semibold"
-              >
-                {title}
-              </Text>
+              <View className="flex-1 flex-row items-center gap-1">
+                <Text
+                  numberOfLines={1}
+                  className="text-headline text-foreground shrink font-semibold"
+                >
+                  {title}
+                </Text>
+                {conversation.affiliated && <AffiliatedBadge size={15} />}
+              </View>
               {showAccount && (
                 <Text numberOfLines={1} className="text-footnote text-accent">
                   {usernameOf(account)}

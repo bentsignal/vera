@@ -3,6 +3,7 @@ import { ConvexError } from "convex/values";
 
 import type { QueryCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
+import { isAffiliated } from "./affiliations.ts";
 import { accountsProtocol } from "./protocol.ts";
 
 export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
@@ -20,6 +21,7 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
           avatarUrl: args.avatarUrl,
           displayName,
         };
+        const affiliated = await isAffiliated(ctx, accountId);
         const existing = await ctx.db
           .query("profiles")
           .withIndex("by_account", (index) => index.eq("accountId", accountId))
@@ -33,7 +35,7 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
             displayName: profile.displayName,
           });
         }
-        return profile;
+        return { ...profile, affiliated };
       },
     },
     queries: {
@@ -71,6 +73,7 @@ async function findProfile(ctx: QueryCtx, accountId: string) {
     ? null
     : {
         accountId: profile.accountId,
+        affiliated: await isAffiliated(ctx, accountId),
         avatarUrl: profile.avatarUrl,
         displayName: profile.displayName,
       };

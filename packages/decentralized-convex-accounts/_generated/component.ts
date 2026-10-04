@@ -23,6 +23,22 @@ import type { FunctionReference } from "convex/server";
  */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
+    affiliations: {
+      listAffiliated: FunctionReference<
+        "query",
+        "internal",
+        {},
+        Array<string>,
+        Name
+      >;
+      setAffiliated: FunctionReference<
+        "mutation",
+        "internal",
+        { accountId: string; affiliated: boolean },
+        null,
+        Name
+      >;
+    };
     dispatcher: {
       dispatchMutation: FunctionReference<
         "mutation",
@@ -48,6 +64,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           type: "upsertMyProfile";
           value: {
             accountId: string;
+            affiliated?: boolean;
             avatarUrl: null | string;
             displayName: string;
           };
@@ -77,6 +94,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             type: "getMyProfile";
             value: null | {
               accountId: string;
+              affiliated?: boolean;
               avatarUrl: null | string;
               displayName: string;
             };
@@ -86,6 +104,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             type: "getProfile";
             value: null | {
               accountId: string;
+              affiliated?: boolean;
               avatarUrl: null | string;
               displayName: string;
             };

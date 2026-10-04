@@ -54,6 +54,7 @@ function MessageButton({ address, name }: { address: string; name: string }) {
 }
 
 function Profile({ address }: { address: string }) {
+  const router = useRouter();
   const { address: account } = useAccount();
   const profile = useProfile(address);
   // Shown once the profile has loaded, fading in rather than popping.
@@ -66,6 +67,15 @@ function Profile({ address }: { address: string }) {
             name={profile.displayName}
             subtitle={address}
             avatarUrl={profile.avatarUrl}
+            onPressAffiliated={
+              profile.affiliated
+                ? () =>
+                    router.push({
+                      params: { account, address },
+                      pathname: "/affiliated",
+                    })
+                : undefined
+            }
           />
           {address !== account && (
             <MessageButton address={address} name={profile.displayName} />
