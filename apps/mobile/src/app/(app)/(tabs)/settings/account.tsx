@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { showActionSheet } from "~/components/action-sheet";
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { DeveloperSection } from "~/features/dev/developer-section";
 import { AccountScope, useAccount } from "~/features/messaging/account";
@@ -33,7 +34,7 @@ function AccountSettings() {
   return (
     <>
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup modifiers={dismissKeyboardOnScroll}>
+        <FieldList modifiers={dismissKeyboardOnScroll}>
           <ProfileSection
             displayName={profile.displayName}
             address={address}
@@ -54,7 +55,7 @@ function AccountSettings() {
           </FieldGroup.Section>
           <DeveloperSection />
           <AccountSection />
-        </FieldGroup>
+        </FieldList>
       </NativeHost>
     </>
   );

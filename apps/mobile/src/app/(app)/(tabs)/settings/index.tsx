@@ -1,5 +1,4 @@
-import { FieldGroup } from "@expo/ui";
-
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { TabTitle } from "~/components/tab-title";
 import { AboutSection } from "~/features/settings/about-section";
@@ -12,12 +11,12 @@ export default function SettingsScreen() {
     <>
       <TabTitle title="Settings" />
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
+        <FieldList>
           <AccountsSection />
           <DisplaySection />
           <ThemesSection />
           <AboutSection />
-        </FieldGroup>
+        </FieldList>
       </NativeHost>
     </>
   );

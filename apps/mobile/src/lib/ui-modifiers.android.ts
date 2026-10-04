@@ -15,3 +15,5 @@ export const plainRow = [fillMaxWidth()];
 export function choiceButton(_label: string, _selected: boolean) {
   return [];
 }
+
+export const nestedListItemColors = { containerColor: "transparent" };

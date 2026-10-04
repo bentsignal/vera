@@ -2,7 +2,7 @@ import { Button, FieldGroup, ListItem, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
 import { secondaryTextStyle } from "~/lib/colors";
-import { linkButton } from "~/lib/ui-modifiers";
+import { linkButton, nestedListItemColors } from "~/lib/ui-modifiers";
 
 export function ProfileSection({
   displayName,
@@ -18,6 +18,7 @@ export function ProfileSection({
   return (
     <FieldGroup.Section>
       <ListItem
+        colors={nestedListItemColors}
         leading={<Avatar name={displayName} size="lg" uri={avatarUrl} />}
         supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
         onPress={onChangePhoto}
