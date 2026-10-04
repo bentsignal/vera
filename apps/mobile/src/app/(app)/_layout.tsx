@@ -51,6 +51,15 @@ function AppStack() {
         options={{ headerTransparent: Platform.OS === "ios", title: "" }}
       />
       <Stack.Screen
+        name="affiliated"
+        options={{
+          headerShown: false,
+          presentation: "formSheet",
+          sheetAllowedDetents: "fitToContents",
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="reactions"
         options={{
           presentation: "formSheet",

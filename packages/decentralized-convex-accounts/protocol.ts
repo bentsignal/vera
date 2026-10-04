@@ -9,6 +9,12 @@ import { decentralizedConvexPackage } from "./metadata.ts";
 
 export const accountProfile = v.object({
   accountId: v.string(),
+  /**
+   * Whether the account's PDS vouches that it speaks for the PDS itself,
+   * such as its support account. A PDS sets this only for its own
+   * accounts. Missing from older PDSs.
+   */
+  affiliated: v.optional(v.boolean()),
   avatarUrl: v.union(v.null(), v.string()),
   displayName: v.string(),
 });

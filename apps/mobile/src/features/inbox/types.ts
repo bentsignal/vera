@@ -21,4 +21,6 @@ export interface ConversationSummary {
   unreadCount: number;
   /** The other person's photo in a direct conversation. */
   avatarUrl: string | null;
+  /** Whether the other person in a direct conversation is verified. */
+  affiliated: boolean;
 }

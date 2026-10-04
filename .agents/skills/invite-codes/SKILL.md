@@ -34,7 +34,9 @@ npx convex run invites:create '{"label":"support account","username":"support"}'
 ```
 
 That code signs up only `support`; once the account exists it can't be used
-again. Shawn signs up with it in the app like any other code.
+again. Shawn signs up with it in the app like any other code. To give the
+account the verified check afterwards, run
+`npx convex run affiliations:add '{"address":"support@vera.chat"}' --prod`.
 
 ## See codes and who used them
 

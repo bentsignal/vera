@@ -69,6 +69,17 @@ npx convex run invites:create '{"label":"support account","username":"support"}'
 
 A code with a `username` signs up only that username.
 
+Accounts that speak for Vera, such as `support@vera.chat`, can be marked
+affiliated. The app then shows a verified check next to their names, and
+tapping it explains that the account is an official account of the domain.
+Only accounts on this deployment's `FEDERATION_DOMAIN` can be affiliated.
+
+```sh
+npx convex run affiliations:add '{"address":"support@vera.chat"}'
+npx convex run affiliations:remove '{"address":"support@vera.chat"}'
+npx convex run affiliations:list
+```
+
 ## Deployments
 
 Both deployments live in the Convex project `vera` (team BSX).

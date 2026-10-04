@@ -13,6 +13,7 @@ import type { ConversationKind } from "~/features/inbox/types";
 import { Avatar } from "~/components/avatar";
 import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { AffiliatedBadge } from "~/features/profile/affiliated-badge";
 
 /** Matches the native glass bar buttons. */
 const BUTTON = 44;
@@ -140,7 +141,13 @@ function HeaderAvatar({
 }
 
 /** The name in a glass capsule with a chevron, tucked under the photo. */
-function NameCapsule({ title }: { title: string }) {
+function NameCapsule({
+  title,
+  affiliated,
+}: {
+  title: string;
+  affiliated: boolean;
+}) {
   if (title === "") return null;
   return (
     <Animated.View
@@ -157,6 +164,7 @@ function NameCapsule({ title }: { title: string }) {
         >
           {title}
         </Text>
+        {affiliated && <AffiliatedBadge size={12} />}
         <SymbolIcon
           name={{ android: "chevron_right", ios: "chevron.right" }}
           size={9}
@@ -178,12 +186,15 @@ export function ConversationHeader({
   title,
   kind,
   avatarUrl,
+  affiliated = false,
   onOpenInfo,
 }: {
   title: string;
   kind?: ConversationKind;
   /** The other person's photo in a direct conversation. */
   avatarUrl: string | null;
+  /** Whether the other person in a direct conversation is verified. */
+  affiliated?: boolean;
   /** Omitted when there is nothing to show, such as a missing conversation. */
   onOpenInfo?: () => void;
 }) {
@@ -217,7 +228,7 @@ export function ConversationHeader({
             className="items-center active:opacity-70"
           >
             <HeaderAvatar title={title} kind={kind} avatarUrl={avatarUrl} />
-            <NameCapsule title={title} />
+            <NameCapsule title={title} affiliated={affiliated} />
           </Pressable>
           <View style={{ marginTop: (AVATAR - BUTTON) / 2, width: BUTTON }}>
             {onOpenInfo !== undefined && (

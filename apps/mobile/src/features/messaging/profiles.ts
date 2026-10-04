@@ -44,6 +44,7 @@ export function useProfileState(addresses: readonly string[]) {
     profileOf: (address: string) => {
       const profile = found.get(address);
       return {
+        affiliated: profile?.affiliated === true,
         avatarUrl: profile?.avatarUrl ?? null,
         displayName: profile?.displayName ?? usernameOf(address),
       };
@@ -85,6 +86,7 @@ export function useProfile(address: string) {
     }),
   );
   return {
+    affiliated: data?.affiliated === true,
     avatarUrl: data?.avatarUrl ?? null,
     displayName: data?.displayName ?? usernameOf(address),
     isLoading: data === undefined,
