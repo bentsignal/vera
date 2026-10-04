@@ -33,12 +33,17 @@ async function findInviteCode(ctx: QueryCtx, code: string) {
     .unique();
 }
 
-/** Whether a sign-up may use this code right now. */
-export const isActive = internalQuery({
+/**
+ * The code if a sign-up may use it right now, with the one username it
+ * signs up (null when any username may use it).
+ */
+export const findActive = internalQuery({
   args: { code: v.string() },
   handler: async (ctx, { code }) => {
     const invite = await findInviteCode(ctx, code);
-    return invite?.active === true;
+    return invite?.active === true
+      ? { username: invite.username ?? null }
+      : null;
   },
 });
 
@@ -54,14 +59,24 @@ export const redeem = internalMutation({
   },
 });
 
-/** Operator command: `npx convex run invites:create '{"label":"..."}'`. */
+/**
+ * Operator command: `npx convex run invites:create '{"label":"..."}'`.
+ * With `username`, the code signs up only that username, even a reserved
+ * one such as `support`, so the operator can claim it.
+ */
 export const create = internalMutation({
-  args: { label: v.optional(v.string()) },
-  handler: async (ctx, { label }) => {
+  args: { label: v.optional(v.string()), username: v.optional(v.string()) },
+  handler: async (ctx, { label, username }) => {
+    const claimed = username?.trim().toLowerCase();
     for (;;) {
       const code = generateInviteCode();
       if ((await findInviteCode(ctx, code)) !== null) continue;
-      await ctx.db.insert("inviteCodes", { active: true, code, label });
+      await ctx.db.insert("inviteCodes", {
+        active: true,
+        code,
+        label,
+        username: claimed,
+      });
       return code;
     }
   },
@@ -103,6 +118,7 @@ export const list = internalQuery({
           createdAt: invite._creationTime,
           deactivatedAt: invite.deactivatedAt ?? null,
           label: invite.label ?? null,
+          username: invite.username ?? null,
         };
       }),
     );

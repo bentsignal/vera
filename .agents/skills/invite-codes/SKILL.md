@@ -23,13 +23,27 @@ exactly as printed. Codes are case-insensitive and the dash is optional, so
 friends can type `k7qm3xpd`. Use a short label describing who the code is for
 (for example `"college friends"`); ask only if Shawn gives no hint.
 
+## Claim a reserved username
+
+Names like `support`, `help`, `admin`, and `vera` are reserved (see
+`services/backend/README.md`), so normal sign-ups can't take them. When Shawn
+wants one of those accounts, make a code for that username:
+
+```sh
+npx convex run invites:create '{"label":"support account","username":"support"}' --prod
+```
+
+That code signs up only `support`; once the account exists it can't be used
+again. Shawn signs up with it in the app like any other code.
+
 ## See codes and who used them
 
 ```sh
 npx convex run invites:list --prod
 ```
 
-Each entry has `code`, `label`, `active`, and `accounts` (the addresses that
+Each entry has `code`, `label`, `active`, `username` (set when the code is
+for one username), and `accounts` (the addresses that
 signed up with it). Summarize this for Shawn instead of pasting raw JSON.
 
 ## Deactivate a code

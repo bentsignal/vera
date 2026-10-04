@@ -15,6 +15,10 @@ const SIGN_UP_ERRORS = new Map([
     "Usernames are 2–32 characters: letters, numbers, dots, dashes, or underscores.",
   ],
   ["INVITE_CODE_INACTIVE", "That invite code isn't valid."],
+  [
+    "INVITE_CODE_FOR_OTHER_USERNAME",
+    "That invite code is for a different username.",
+  ],
   ["USERNAME_TAKEN", "That username is taken."],
 ]);
 
