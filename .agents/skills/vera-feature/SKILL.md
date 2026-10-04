@@ -81,6 +81,17 @@ dev client is cached the same way (first build of a fingerprint ~10 minutes).
 In T3 Code, `device_open` takes the emulator serial `up` prints
 (`emulator-55xx`), with `platform: "android"`.
 
+- `up` waits its turn in the simulator queue, which starts devices one at
+  a time and only while the Mac has free memory, because many worktrees
+  share it. While waiting it prints `simulator queue: position N of M` and
+  why. If it exits with code 75 ("still queued"), run `up` again to keep
+  your place. If your harness can run commands in the background and wake
+  you when they finish, run `up` that way, and push your branch or run
+  validation meanwhile. Never skip the queue with `VERA_SIMQ=off`.
+  `scripts/sim.sh queue` shows every device on the Mac and the line.
+- When others are waiting, the queue shuts down devices unused for 20
+  minutes (no `sim.sh` command). Your next command then says so; run `up`
+  again. Another reason to `down` as soon as you have your evidence.
 - `up` reuses the cached dev client unless native code changed (the first
   build of a fingerprint takes ~10 minutes; it's shared by every worktree).
   Re-run `up` after changing native code, `app.config.ts`, or `.env.local`.

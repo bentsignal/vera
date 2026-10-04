@@ -109,6 +109,20 @@ because iOS asks "Open in Vera?" before every `simctl openurl`. The
 simulators and `scripts/phone.sh` share the worktree's Metro
 (`scripts/lib/metro.sh`). The `vera-feature` skill covers both.
 
+`sim.sh up` waits in the simulator queue (`scripts/simq.ts`) so a dozen
+worktrees asking at once don't swamp the Mac. A small daemon, started on
+first use and gone after ten idle minutes, admits one device at a time,
+waits for each to launch and for memory to settle, and then admits the next
+only if memory pressure is normal and free memory covers the device (iOS
+3 GB, Android 4 GB) plus a reserve (15% of RAM, at least 4 GB). The first
+device always gets in, so a small machine still works. When the head of the
+line can't fit, it shuts down the device unused longest, if that's over 20
+minutes. Tune any of this in `~/.config/vera/simq.json` (`reserveGb`,
+`iosGb`, `androidGb`, `max`, `idleMinutes`); edits apply on the next check.
+`scripts/sim.sh queue` shows the devices, the line, and why it's waiting;
+the log is `~/Library/Caches/vera/simq/daemon.log`. `VERA_SIMQ=off` skips
+the queue entirely.
+
 Internal builds by hand (`pnpm release build internal` does this, plus the
 runtime check, the upload, and the tag):
 
