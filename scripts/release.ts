@@ -255,10 +255,10 @@ function plan() {
     console.log(
       `${platform}: internal build ${
         internal === undefined
-          ? "none yet; make one to test"
+          ? "none (only needed to check update or channel behavior)"
           : runtimeOf(internal) === fingerprint(platform, "internal")
             ? `${internal} (matches; an internal OTA reaches it)`
-            : `${internal} (older native code; make a new internal build to test)`
+            : `${internal} (older native code)`
       }`,
     );
   }

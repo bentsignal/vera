@@ -79,15 +79,15 @@ See [apps/mobile/README.md](apps/mobile/README.md#vera-dev).
   new dev client (about 15 minutes) only when the worktree's native
   fingerprint has none yet, and prints its install link. Tell Shawn when he
   has to install one; otherwise he only opens the link.
-- **Before a release, an internal build** (`pnpm release build internal`,
-  the `vera-release` skill) replaces the dev client in the Vera Dev slot so
-  he can test the release as it will ship. Afterwards he reinstalls the dev
-  client from its link (`scripts/phone.sh link`); no rebuild needed.
-- When Shawn asks for a "build on his phone" or a "development build"
-  without a release, that means `scripts/phone.sh up`, not an internal
-  build. Make an internal build outside a release only when he asks for one
-  by name, or to check update or channel behavior, which a dev client can't
-  show.
+- **Releases are tested in the dev client too**, serving `main` (the
+  `vera-release` skill), so fixes reach his phone without a build. The real
+  app gets tested in TestFlight.
+- When Shawn asks for a "build on his phone" or a "development build",
+  that means `scripts/phone.sh up`, not an internal build. Make an internal
+  build (`pnpm release build internal`) only when he asks for one by name,
+  or to check update or channel behavior, which a dev client can't show.
+  It replaces the dev client in the Vera Dev slot; he reinstalls it from
+  `scripts/phone.sh link`.
 - `scripts/phone.sh down` when he's done with it, like the simulators.
 
 ## Required validation after changes

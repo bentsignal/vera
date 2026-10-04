@@ -1,6 +1,6 @@
 ---
 name: vera-release
-description: Run a Vera mobile release end to end, covering changes since the last release, a test plan, an internal test build or OTA for Shawn, then the over-the-air update or TestFlight store build, and an App Store submission when asked. Use when Shawn asks to release, ship, cut a build, push an update, put something on TestFlight, or submit to the App Store, or asks what changed since the last release.
+description: Run a Vera mobile release end to end, covering changes since the last release, a test plan, testing main in the Vera Dev dev client on Shawn's phone, then the over-the-air update or TestFlight store build, and an App Store submission when asked. Use when Shawn asks to release, ship, cut a build, push an update, put something on TestFlight, or submit to the App Store, or asks what changed since the last release.
 ---
 
 # Releasing Vera
@@ -48,47 +48,39 @@ Send Shawn:
 
 Then go straight to step 2 unless he says otherwise.
 
-## 2. Put a test build on his phone
+## 2. Put main on his phone in the dev client
 
-The test build runs against the dev PDS, so update it to `main` first. This
-refuses to run from a worktree with an isolated backend:
+The release test checks that the features work together and smooths out
+rough edges, so it runs in the Vera Dev dev client, where JavaScript fixes
+reach his phone without a build. The real app gets tested in TestFlight
+(step 4). The dev client runs against the dev PDS, so update it to `main`
+first. This refuses to run from a worktree with an isolated backend:
 
 ```sh
 pnpm release backend dev
+scripts/phone.sh up             # and again with --android for his Android phone
 ```
 
-Internal builds are Vera Dev (`chat.vera.app.dev`), so the TestFlight app
-stays on his phone. Installing one replaces the Vera Dev dev client he uses
-day to day; tell him so, and that he reinstalls the dev client from its
-link after the release (`scripts/phone.sh link` prints it).
+Run `phone.sh up` from the release checkout (detached at `origin/main`, no
+isolated backend). It builds a dev client only when `main`'s native
+fingerprint has none yet (about 15 minutes); otherwise Shawn just opens the
+link. Send the open link and QR code, plus the install link when he needs
+one, as `phone.sh` prints them.
 
-- **OTA release, internal build current** (`plan` says "matches"):
-
-  ```sh
-  pnpm release ota internal "<one-line summary>"
-  ```
-
-  Tell Shawn to open the internal build, close it, and open it again: the
-  first launch downloads the update, the next runs it. Settings → About shows
-  the running update's ID, which matches the `update:` line of the tag.
-  `ota` refuses if no internal build has the current runtime.
-
-- **Otherwise** (store release, or the internal build is stale):
-
-  ```sh
-  pnpm release build internal     # ~15 min; prints the install link
-  ```
-
-  It prints the install page (on bunny.net; open it in Safari). Send him
-  the link with a QR code embedded (`scripts/qr.sh <url> /tmp/internal.png`,
-  then `![install](/tmp/internal.png)`).
+Make an internal build (`pnpm release build internal`, `--android`) or an
+internal OTA (`pnpm release ota internal "<summary>"`) only when Shawn asks
+for one by name, or when the release changes update or channel behavior,
+which a dev client can't show. Installing one replaces the dev client in the
+Vera Dev slot; he reinstalls it from `scripts/phone.sh link`.
 
 ## 3. Wait for Shawn
 
 He tests and either approves ("ship it", "release it", "looks good, send
 it") or asks for fixes. Fixes are ordinary feature PRs (the `vera-feature`
-skill). After they merge, start again at step 1. Don't ship without an
-explicit approval of this release.
+skill); he can try one before it merges with `phone.sh up` from the fix's
+worktree. After they merge, update the release checkout to `origin/main`
+(Metro hot-reloads it) and start again at step 1. Don't ship without an
+explicit approval of this release. `scripts/phone.sh down` once he's done.
 
 ## 4. Ship
 
@@ -108,6 +100,11 @@ pnpm release ota production "<release notes, one paragraph>"
 `ota` publishes for each platform whose latest production binary
 (`mobile/build/*` for iOS, `mobile/android/build/*` for Android) has the
 current runtime, and says which it skipped.
+
+Shawn's TestFlight app gets an OTA at the same moment as everyone else, so
+his check of the real app happens after it's out. Tell him it's live and
+ask him to open Vera twice (download, then run); if something is wrong,
+roll back (below).
 
 **Store build (iOS):**
 

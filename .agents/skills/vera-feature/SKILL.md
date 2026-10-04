@@ -144,9 +144,9 @@ scripts/phone.sh down           # when he's done
   whether he has to install something.
 - JavaScript edits then hot-reload on his phone. Re-run `up` after native
   changes, `app.config.ts`, or `.env.local`.
-- Never make an internal build for this. Those are for releases (the
-  `vera-release` skill), or when Shawn asks for one by name, or to check
-  update or channel behavior, which a dev client can't show.
+- Never make an internal build for this. Those are only for when Shawn
+  asks for one by name, or to check update or channel behavior, which a
+  dev client can't show.
 - With an isolated backend, Vera Dev talks to this worktree's domain, which
   has no accounts. Tell Shawn to sign in with
   `vera-dev:///dev-sign-in?username=<name>` (or make a QR code of it), and

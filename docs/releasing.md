@@ -10,16 +10,16 @@ the release with the `vera-release` skill and
 | ---------------- | -------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
 | Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
 | Android APK      | Vera     | `production-apk` (EAS keystore)         | `vera.chat`     | `production`   | Android testers, by install link                |
-| Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone during a release, by install link |
-| Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone during a release          |
+| Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, for update and channel checks    |
+| Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone, the same                 |
 | Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
 
 Vera and Vera Dev are separate apps (`chat.vera.app`, `chat.vera.app.dev`;
 see [apps/mobile/README.md](../apps/mobile/README.md#vera-dev)), so Shawn's
 phone keeps the TestFlight app on production through a release test. Vera
-Dev holds one binary at a time: the internal build replaces the dev client
-for the release test, and Shawn reinstalls the dev client from its link
-(`scripts/phone.sh link`) afterwards.
+Dev holds one binary at a time: an internal build replaces the dev client,
+and Shawn reinstalls the dev client from its link (`scripts/phone.sh link`)
+afterwards.
 
 Android has no Play listing yet, so its testers install APKs from EAS links
 ([android.md](android.md)). Over-the-air updates reach them the same way:
@@ -82,12 +82,12 @@ so the first release after it is a store build.
 1. **Plan.** On an up-to-date `main`, run `pnpm release plan`. Write the
    release notes from the merged PRs and a test plan of what to try on the
    phone. Send both to Shawn.
-2. **Test build.** Push `main`'s backend to the shared dev deployment
-   (`pnpm release backend dev`). Then:
-   - OTA release: if the latest internal build has the current runtime,
-     publish to the `internal` channel. Otherwise make an internal build.
-   - Store release: make an internal build (`pnpm release build internal`)
-     and send the install link.
+2. **Test in the dev client.** Push `main`'s backend to the shared dev
+   deployment (`pnpm release backend dev`), then serve `main` to Vera Dev
+   on Shawn's phones (`scripts/phone.sh up`). This test is for features
+   and rough edges: JavaScript fixes reach the phone without a build. The
+   real app gets tested in TestFlight. An internal build or internal OTA is
+   only for checking update or channel behavior, or when Shawn asks.
 3. **Shawn tests** and approves, or asks for fixes (normal feature PRs, then
    back to step 1).
 4. **Ship.**
@@ -95,7 +95,8 @@ so the first release after it is a store build.
      (`pnpm release backend production`). Old app versions keep talking to
      it, so backend changes must stay compatible with them.
    - OTA: `pnpm release ota production "<notes>"`. TestFlight and App Store
-     users get it on the next launch.
+     users get it on the next launch, Shawn included, so his check of the
+     real app comes after it's out; a bad update is rolled back.
    - Store: `pnpm release build production` (release Xcode, uploads to App
      Store Connect), then `pnpm release testflight <build> <notes.md>`. The
      Team group gets the build at once; Friends get it after Beta App

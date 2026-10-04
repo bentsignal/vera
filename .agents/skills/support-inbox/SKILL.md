@@ -22,7 +22,7 @@ Each Convex deployment has its own support account and inbox:
 | Deployment                   | Who writes in                        | Command flag                            |
 | ---------------------------- | ------------------------------------ | --------------------------------------- |
 | Production (`vera.chat`)     | real people (TestFlight, App Store)  | `--prod`                                |
-| Shared dev (`dev.vera.chat`) | internal builds, worktree test users | none, from a worktree on the shared PDS |
+| Shared dev (`dev.vera.chat`) | release tests, worktree test users   | none, from a worktree on the shared PDS |
 | Isolated `dev/<branch>`      | that worktree's simulator            | none, from that worktree                |
 
 Bug reports that matter come in on production. Without `--prod`, commands
