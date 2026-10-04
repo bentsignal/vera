@@ -21,6 +21,7 @@ import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as lib from "../lib.js";
 import type * as pds from "../pds.js";
+import type * as support from "../support.js";
 
 import type {
   ApiFromModules,
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   invites: typeof invites;
   lib: typeof lib;
   pds: typeof pds;
+  support: typeof support;
 }>;
 
 /**

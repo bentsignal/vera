@@ -80,6 +80,16 @@ npx convex run affiliations:remove '{"address":"support@vera.chat"}'
 npx convex run affiliations:list
 ```
 
+## Support account
+
+`support@<account domain>` is a verified account that DMs every new account
+a welcome asking for bug reports (a Better Auth `user.create` hook schedules
+`support:welcome`). It creates itself the first time it's needed, so every
+deployment has one without setup. It has no passkey: operators and their
+agents read and answer its inbox with the commands in `convex/support.ts`
+(`support:inbox`, `support:read`, `support:send`, `support:markRead`). Nothing
+replies automatically. See the `support-inbox` agent skill.
+
 ## Deployments
 
 Both deployments live in the Convex project `vera` (team BSX).
