@@ -158,7 +158,7 @@ Chat", Apple ID 6818656155):
   the `invite-codes` skill.
 
 Use `pnpm release asc <METHOD> <path> [json]` for API calls. Use
-`codex exec -m gpt-6-luna -s danger-full-access "<task>" < /dev/null` only
+`codex exec -m gpt-6.1-sol -s danger-full-access "<task>" < /dev/null` only
 for what the API can't do, and tell Shawn first, because it drives his
 signed-in Chrome. Draft the listing copy and screenshots, then get his
 approval before submitting. After Apple releases a version, open a PR that
