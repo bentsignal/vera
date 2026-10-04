@@ -118,7 +118,10 @@ scripts/install-page.sh /tmp/vera-internal.ipa internal/ios/manual "Internal bui
 Install pages for Vera Dev live on bunny.net (`scripts/install-page.sh`),
 not EAS: EAS's free plan caps uploads of local builds (it ran out on
 2026-10-04). iOS installs them from an `itms-services` manifest, on the
-devices in the ad hoc profile only; open the page in Safari.
+devices in the ad hoc profile only; open the page in Safari. To keep the
+bill small, each upload first deletes build folders over 30 days old
+(`dev-client/`, `internal/`; PR evidence stays), and `scripts/phone.sh`
+uploads a cached dev client again if its page was deleted.
 
 (Local builds need fastlane from Homebrew ahead of any rbenv shim.)
 

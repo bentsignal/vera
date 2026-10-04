@@ -82,7 +82,16 @@ ensure_client() {
   hash="$(fingerprint)"
   CLIENT_DIR="$CACHE/$hash"
   BUILT=""
-  [ -f "$CLIENT_DIR/install-url" ] && return
+  if [ -f "$CLIENT_DIR/install-url" ]; then
+    # Install pages over 30 days old are deleted (scripts/install-page.sh);
+    # upload the cached build again if this one's is gone.
+    if ! curl -fsSI "$(cat "$CLIENT_DIR/install-url")" >/dev/null 2>&1; then
+      echo "the install page expired; uploading the cached dev client again"
+      "$ROOT/scripts/install-page.sh" "$CLIENT_DIR/vera-dev.$([ "$PLATFORM" = ios ] && echo ipa || echo apk)" \
+        "dev-client/$PLATFORM/$hash" "Dev client for native fingerprint ${hash:0:12}." >"$CLIENT_DIR/install-url"
+    fi
+    return
+  fi
   lock="$CLIENT_DIR.lock"
   until mkdir "$lock" 2>/dev/null; do
     echo "another worktree is building this dev client; waiting"

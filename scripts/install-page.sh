@@ -6,11 +6,17 @@
 # uploads of local builds. iOS installs ad hoc builds from an HTTPS manifest
 # (itms-services), on registered devices only.
 #
+# Each upload is one folder (`<path prefix>-<random>`). Before uploading,
+# it deletes build folders older than 30 days under `dev-client/` and
+# `internal/`, so builds don't pile up on the bill; PR evidence (`pr/`)
+# stays. scripts/phone.sh re-uploads a cached dev client whose page was
+# deleted.
+#
 #   scripts/install-page.sh <ipa|apk> <path prefix> "<description>"
 set -euo pipefail
 
 artifact="${1:?ipa or apk}"
-prefix="${2:?path prefix}/$(openssl rand -hex 6)"
+prefix="${2:?path prefix}-$(openssl rand -hex 6)"
 description="${3:-}"
 ZONE="vera-evidence"
 CDN="https://vera-evidence.b-cdn.net"
@@ -24,6 +30,24 @@ put() {
     exit 1
   }
 }
+
+# Deletes upload folders older than 30 days in each build directory.
+prune() {
+  local root old
+  for root in dev-client/ios dev-client/android internal/ios internal/android; do
+    old="$(bunny storage files list "$root/" --zone "$ZONE" -o json 2>/dev/null |
+      node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+        let list=[];try{list=JSON.parse(s)}catch{}
+        const cutoff=Date.now()-30*24*3600*1000;
+        for(const f of list) if(f.isDirectory&&Date.parse(f.dateCreated)<cutoff) console.log(f.objectName);
+      })')"
+    for name in $old; do
+      bunny storage files remove "$root/$name/" --zone "$ZONE" --force >/dev/null 2>&1 &&
+        echo "deleted $root/$name (over 30 days old)" >&2
+    done
+  done
+}
+prune
 
 case "$artifact" in
   *.ipa)
