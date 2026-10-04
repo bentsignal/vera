@@ -57,3 +57,5 @@ export function choiceButton(label: string, selected: boolean) {
     ),
   ];
 }
+
+export const nestedListItemColors = { containerColor: "transparent" };

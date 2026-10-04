@@ -10,7 +10,7 @@ import {
 } from "~/features/messaging/account";
 import { useMyProfile } from "~/features/messaging/directory";
 import { secondaryTextStyle } from "~/lib/colors";
-import { linkButton } from "~/lib/ui-modifiers";
+import { linkButton, nestedListItemColors } from "~/lib/ui-modifiers";
 
 function AccountRow() {
   const router = useRouter();
@@ -19,6 +19,7 @@ function AccountRow() {
   const displayName = profile?.displayName ?? username;
   return (
     <ListItem
+      colors={nestedListItemColors}
       leading={
         <Avatar name={displayName} size="md" uri={profile?.avatarUrl ?? null} />
       }

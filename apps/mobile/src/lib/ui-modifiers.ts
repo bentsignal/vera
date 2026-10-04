@@ -24,3 +24,10 @@ export const plainRow = [] satisfies ModifierConfig[];
 export function choiceButton(_label: string, _selected: boolean) {
   return [] satisfies ModifierConfig[];
 }
+
+/**
+ * A `ListItem` inside a `FieldGroup.Section` row. Android draws the section
+ * row as a list item already, so the inner one would paint a second
+ * background; iOS ignores `colors`.
+ */
+export const nestedListItemColors = { containerColor: "transparent" };
