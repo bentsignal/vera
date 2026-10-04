@@ -48,5 +48,5 @@ Shawn tested the round 2 build on his phone. Check items off as PRs merge.
   photo needs the extension, built only with
   `VERA_NOTIFICATION_EXTENSION=1` after Shawn's one-time
   `eas credentials` step (see apps/mobile/README.md).
-- [ ] Shawn picks reaction styles (Settings → Experiments) and the
-      experiment settings are removed.
+- [x] Shawn picks reaction styles (Settings → Experiments) and the
+      experiment settings are removed (round 4: Glass Overlay + Chips).
