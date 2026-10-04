@@ -11,9 +11,28 @@ by replying there. Nothing answers automatically: you read and reply through
 the operator commands in `services/backend/convex/support.ts`, as the
 support account, when Shawn asks.
 
-Run every command from `services/backend`. Production needs `--prod`; use
-the dev deployment only when Shawn says so (dev users are worktree test
-accounts, not real people).
+Run every command from `services/backend`, in any worktree or the main
+checkout. Production needs `--prod`; use the dev deployment only when Shawn
+says so (dev users are worktree test accounts, not real people).
+
+## Environments
+
+Each Convex deployment has its own support account and inbox:
+
+| Deployment                         | Who writes in                        | Command flag                              |
+| ---------------------------------- | ------------------------------------ | ----------------------------------------- |
+| Production (`vera.chat`)           | real people (TestFlight, App Store)  | `--prod`                                  |
+| Shared dev (`dev.vera.chat`)       | internal builds, worktree test users | none, from a worktree on the shared PDS   |
+| Isolated `dev/<branch>`            | that worktree's simulator            | none, from that worktree                  |
+
+Bug reports that matter come in on production. Without `--prod`, commands
+go to whatever deployment `services/backend/.env.local` names (check with
+`scripts/backend.sh status`).
+
+A deployment gets these commands when the backend is deployed to it
+(`pnpm release backend dev` or `production`, see `vera-release`). If
+`support:inbox` fails with "Could not find function", that deployment
+doesn't have them yet: tell Shawn rather than deploying it yourself.
 
 ## Read
 
