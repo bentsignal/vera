@@ -48,6 +48,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: "./assets/icons/vera-android-monochrome.png",
     },
     predictiveBackGestureEnabled: true,
+    // Firebase project vera-c5690: Expo push reaches Android through FCM.
+    // Public client identifiers only; the FCM V1 service account key lives
+    // in EAS credentials, not here (see docs/android.md).
+    googleServicesFile: "./google-services.json",
   },
   plugins: [
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.

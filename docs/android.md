@@ -231,15 +231,14 @@ Done when:
       `colors`, a `DropdownMenu` picker). Not yet reviewed: profile,
       conversation info, new message, spaces and channels, media viewer,
       dark mode.
-- [ ] Set up Firebase and FCM V1 for push. Blocked 2026-10-03: the Codex CLI
-      login had expired (`codex login`), so the Firebase console steps
-      haven't run. The prompt is in this doc's Push notifications section.
-- [x] Build the production APK (`pnpm release build production --android`,
-      the `production-apk` profile), confirm the EAS keystore fingerprint,
-      and send the friend a link. Done 2026-10-03: version code 3
-      (`mobile/android/build/3`), signed with the `E6:A1…` key that
-      `assetlinks.json` lists, and an over-the-air update reached it on an
-      emulator.
+- [x] Set up Firebase and FCM V1 for push (2026-10-04). Firebase project
+      `vera-c5690` (Spark plan, no Analytics) with Android app `chat.vera.app`;
+      FCM V1 on; the Admin SDK service account key is uploaded to EAS
+      (credentials for `chat.vera.app`) and kept at
+      `~/.config/vera/fcm-service-account.json` on Shawn's Mac, never in the
+      repo. `apps/mobile/google-services.json` (public identifiers) is
+      committed and set as `android.googleServicesFile`, which changes the
+      Android runtime only.
 - [ ] Fix the Android UI in small PRs: composer and glass surfaces, conversation
       header, message menu, search tab, themes.
 - [ ] Once Shawn's Play account is approved: Play internal testing,
