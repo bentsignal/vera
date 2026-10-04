@@ -135,6 +135,11 @@ Every command tags the release (`mobile/build/<n>`,
 the tag. Report what shipped, the tag, and anything that didn't
 work.
 
+Then tell the people who reported what shipped: for each released PR whose
+description has a "Support reports" section, send each listed conversation
+the "fixed" message from the `support-inbox` skill. Do it after the
+production OTA or store build is out, never after only the internal build.
+
 ## 5. App Store (only when Shawn asks)
 
 ```sh

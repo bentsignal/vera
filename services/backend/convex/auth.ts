@@ -114,6 +114,19 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
       betterAuthPdsPlugin(pdsAuth),
       ...(devToolsEnabled() ? [devSignIn()] : []),
     ],
+    databaseHooks: {
+      user: {
+        create: {
+          // Every new account hears from the support account first.
+          after: async (user) => {
+            if (!("scheduler" in ctx)) return;
+            await ctx.scheduler.runAfter(0, internal.support.welcome, {
+              accountId: actorFromEmail(user.email),
+            });
+          },
+        },
+      },
+    },
     trustedOrigins: ["vera://"],
   });
 }
