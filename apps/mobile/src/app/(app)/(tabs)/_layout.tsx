@@ -2,7 +2,6 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useCSSVariable } from "uniwind";
 
 import { useInbox } from "~/features/messaging/conversations";
-import { useSpaces } from "~/features/messaging/spaces";
 import {
   blurNativeSearch,
   focusNativeSearch,
@@ -11,28 +10,20 @@ import {
 export default function TabsLayout() {
   const accent = useCSSVariable("--color-accent");
   const { conversations } = useInbox();
-  const { spaces } = useSpaces();
-  const unreadChats = (conversations ?? []).filter(
-    ({ unreadCount }) => unreadCount > 0,
-  ).length;
-  const unreadSpaces = spaces.filter(
+  // Channel unreads count here too, so Spaces has no badge of its own.
+  const unread = (conversations ?? []).filter(
     ({ unreadCount }) => unreadCount > 0,
   ).length;
   return (
     <NativeTabs tintColor={typeof accent === "string" ? accent : undefined}>
-      <NativeTabs.Trigger name="(chats)">
-        <NativeTabs.Trigger.Label>Chats</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="(inbox)">
+        <NativeTabs.Trigger.Label>Inbox</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          sf={{
-            default: "bubble.left.and.bubble.right",
-            selected: "bubble.left.and.bubble.right.fill",
-          }}
-          md="forum"
+          sf={{ default: "tray", selected: "tray.fill" }}
+          md="inbox"
         />
-        {unreadChats > 0 && (
-          <NativeTabs.Trigger.Badge>
-            {String(unreadChats)}
-          </NativeTabs.Trigger.Badge>
+        {unread > 0 && (
+          <NativeTabs.Trigger.Badge>{String(unread)}</NativeTabs.Trigger.Badge>
         )}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="spaces">
@@ -41,11 +32,6 @@ export default function TabsLayout() {
           sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
           md="grid_view"
         />
-        {unreadSpaces > 0 && (
-          <NativeTabs.Trigger.Badge>
-            {String(unreadSpaces)}
-          </NativeTabs.Trigger.Badge>
-        )}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>

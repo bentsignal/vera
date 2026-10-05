@@ -23,4 +23,10 @@ export interface ConversationSummary {
   avatarUrl: string | null;
   /** Whether the other person in a direct conversation is verified. */
   affiliated: boolean;
+  muted: boolean;
+  /** When it was pinned to the top of the inbox, or null. */
+  pinnedAt: number | null;
+  /** The space a channel belongs to. */
+  spaceId: string | null;
+  spaceName: string | null;
 }

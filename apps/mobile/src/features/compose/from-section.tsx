@@ -7,7 +7,7 @@ import { secondaryTextStyle } from "~/lib/colors";
 
 /**
  * Which signed-in account a new conversation or space comes from. Starts
- * at the account Chats is filtered to, or the first one.
+ * at the account the Inbox is filtered to, or the first one.
  */
 export function useFromAccount() {
   const visible = useVisibleAccounts();

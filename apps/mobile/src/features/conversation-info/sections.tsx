@@ -1,12 +1,13 @@
-import { useState } from "react";
+import type { Conversation } from "@decentralized-convex/messages";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
-import { Button, FieldGroup, ListItem, Switch, Text } from "@expo/ui";
+import { Button, FieldGroup, ListItem, Text } from "@expo/ui";
 import { pds } from "@vera/backend/pds";
 
 import { Avatar } from "~/components/avatar";
+import { OptimisticSwitch } from "~/components/optimistic-switch";
 import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";
 import { useOpenProfile } from "~/features/profile/use-open-profile";
@@ -47,32 +48,49 @@ export function MembersSection({ members }: { members: readonly string[] }) {
   );
 }
 
-/** iMessage's "Hide Alerts": mutes notifications for this conversation. */
-export function MuteSection({
-  conversationId,
-  muted,
+/**
+ * Pinning to the top of the Inbox, whether a channel shows there, and
+ * iMessage's "Hide Alerts", which mutes notifications.
+ */
+export function InboxSection({
+  conversation,
 }: {
-  conversationId: string;
-  muted: boolean;
+  conversation: Pick<
+    Conversation,
+    "conversationId" | "kind" | "muted" | "pinnedAt" | "showInInbox"
+  >;
 }) {
   const { address } = useAccount();
-  // Shows the choice right away; the server's answer replaces it.
-  const [choice, setChoice] = useState<boolean | null>(null);
+  const { conversationId } = conversation;
+  const setPinned = useMutation(
+    pdsMutation({ mutation: pds.messages.setPinned, session: address }),
+  );
+  const setShowInInbox = useMutation(
+    pdsMutation({ mutation: pds.messages.setShowInInbox, session: address }),
+  );
   const setMuted = useMutation(
     pdsMutation({ mutation: pds.messages.setMuted, session: address }),
   );
   return (
     <FieldGroup.Section>
-      <Switch
+      {conversation.kind === "channel" && (
+        <OptimisticSwitch
+          label="Show in Inbox"
+          value={conversation.showInInbox !== false}
+          onChange={(show) =>
+            setShowInInbox.mutateAsync({ conversationId, show })
+          }
+        />
+      )}
+      <OptimisticSwitch
+        label="Pin in Inbox"
+        value={conversation.pinnedAt !== undefined}
+        onChange={(pinned) => setPinned.mutateAsync({ conversationId, pinned })}
+      />
+      <OptimisticSwitch
         label="Hide Alerts"
-        value={choice ?? muted}
-        onValueChange={(value) => {
-          setChoice(value);
-          setMuted.mutate(
-            { conversationId, muted: value },
-            { onError: () => setChoice(null) },
-          );
-        }}
+        value={conversation.muted}
+        onChange={(muted) => setMuted.mutateAsync({ conversationId, muted })}
       />
     </FieldGroup.Section>
   );
@@ -97,7 +115,7 @@ export function LeaveSection({
       {
         onPress: () => {
           leave.mutate({ conversationId });
-          // The conversation is gone for you, so go back to Chats.
+          // The conversation is gone for you, so go back to the Inbox.
           router.dismissAll();
         },
         style: "destructive",

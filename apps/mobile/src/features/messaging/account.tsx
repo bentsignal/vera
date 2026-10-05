@@ -40,7 +40,7 @@ export function useRunAs() {
       .catch(() => null);
 }
 
-/** The accounts Chats and Spaces show: the filtered one, or all. */
+/** The accounts the Inbox and Spaces show: the filtered one, or all. */
 export function useVisibleAccounts() {
   const { accounts, filter } = useSession();
   const only = accounts.filter((account) => account.address === filter);

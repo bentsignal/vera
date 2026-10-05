@@ -13,7 +13,7 @@ import { discoverHome } from "./home";
 interface Session {
   /** Every signed-in account, in the order they were added. */
   readonly accounts: readonly AccountSession[];
-  /** The account Chats and Spaces are narrowed to, or null for all. */
+  /** The account the Inbox and Spaces are narrowed to, or null for all. */
   readonly filter: string | null;
   /** This build's home PDS, where new accounts sign in. */
   readonly home: DiscoveredPds;

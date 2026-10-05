@@ -7,9 +7,9 @@ import { FieldGroup } from "@expo/ui";
 import type { AvatarGlyph } from "~/components/avatar";
 import { NativeHost } from "~/components/native-host";
 import {
+  InboxSection,
   LeaveSection,
   MembersSection,
-  MuteSection,
 } from "~/features/conversation-info/sections";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
@@ -26,7 +26,7 @@ interface CardProps {
   onPressAffiliated?: () => void;
 }
 
-/** The card, then members, alerts, and leaving, as the kind allows. */
+/** The card, then inbox and alerts, members, and leaving, as allowed. */
 function Details({
   conversation,
   card,
@@ -34,14 +34,14 @@ function Details({
   conversation: Conversation;
   card: CardProps;
 }) {
-  const { conversationId, kind, members, muted } = conversation;
+  const { conversationId, kind, members } = conversation;
   return (
     <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
       <NativeHost style={{ flex: 1 }}>
         <FieldGroup>
           <ProfileCard {...card} />
+          <InboxSection conversation={conversation} />
           {kind !== "direct" && <MembersSection members={members} />}
-          <MuteSection conversationId={conversationId} muted={muted} />
           {kind === "group" && (
             <LeaveSection conversationId={conversationId} name={card.name} />
           )}
