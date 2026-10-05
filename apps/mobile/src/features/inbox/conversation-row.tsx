@@ -83,10 +83,13 @@ function TopLine({
 export function ConversationRowContent({
   conversation,
   showAccount,
+  separator = true,
 }: {
   conversation: ConversationSummary;
   /** Names the account the conversation belongs to, when several show. */
   showAccount: boolean;
+  /** Draws the hairline under the text (iOS's native rows draw their own). */
+  separator?: boolean;
 }) {
   const { kind, title, lastMessage, unreadCount } = conversation;
   return (
@@ -106,7 +109,9 @@ export function ConversationRowContent({
         uri={conversation.avatarUrl}
         glyph={kind === "channel" ? CHANNEL_GLYPH : undefined}
       />
-      <View className="border-b-hairline border-separator ml-3 min-h-[78px] flex-1 justify-center self-stretch py-2.5 pr-4">
+      <View
+        className={`ml-3 min-h-[78px] flex-1 justify-center self-stretch py-2.5 pr-4 ${separator ? "border-b-hairline border-separator" : ""}`}
+      >
         <TopLine conversation={conversation} showAccount={showAccount} />
         <Text
           numberOfLines={2}

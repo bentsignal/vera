@@ -9,9 +9,10 @@ import {
   SwipeActions,
 } from "@expo/ui/swift-ui";
 import {
+  alignmentGuide,
   buttonStyle,
   frame,
-  listRowBackground,
+  labelStyle,
   listRowInsets,
   listRowSeparator,
   listStyle,
@@ -33,6 +34,8 @@ import {
 
 /** Every row is this tall, so each native row can be sized up front. */
 export const INBOX_ROW_HEIGHT = 84;
+/** Where the text starts (unread gutter, photo, gap): the separator's inset. */
+const TEXT_INSET = 24 + 46 + 12;
 
 const GRAY = "#8e8e93";
 
@@ -59,7 +62,8 @@ function ActionButtons({
       label={action.label}
       systemImage={action.icon.ios}
       role={action.tone === "destructive" ? "destructive" : undefined}
-      modifiers={[tint(colors[action.tone] ?? GRAY)]}
+      // Icons only, as in Messages; the label is for VoiceOver.
+      modifiers={[labelStyle("iconOnly"), tint(colors[action.tone] ?? GRAY)]}
       onPress={() => afterSwipe(action.onPress)}
     />
   ));
@@ -83,7 +87,6 @@ export function InboxRow({
   const router = useRouter();
   const runAs = useRunAs();
   const colors = useToneColors();
-  const background = colorOf(useCSSVariable("--color-background"));
   const { leading, trailing } = inboxSwipeActions(runAs, conversation);
   const { account, id, title } = conversation;
 
@@ -104,12 +107,11 @@ export function InboxRow({
         ]}
       >
         <SwipeActions
+          // The system's own row background and separator, so a swipe
+          // lifts the row into its highlight and the separator blends in.
           modifiers={[
             listRowInsets({ bottom: 0, leading: 0, top: 0, trailing: 0 }),
-            listRowSeparator("hidden"),
-            ...(background === undefined
-              ? []
-              : [listRowBackground(background)]),
+            listRowSeparator("visible", "bottom"),
           ]}
         >
           <ContextMenu>
@@ -124,6 +126,7 @@ export function InboxRow({
                 modifiers={[
                   buttonStyle("plain"),
                   frame({ height: INBOX_ROW_HEIGHT, maxWidth: Infinity }),
+                  alignmentGuide("listRowSeparatorLeading", TEXT_INSET),
                 ]}
                 onPress={open}
               >
@@ -132,6 +135,7 @@ export function InboxRow({
                     <ConversationRowContent
                       conversation={conversation}
                       showAccount={showAccount}
+                      separator={false}
                     />
                   </View>
                 </RNHostView>

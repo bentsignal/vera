@@ -35,7 +35,7 @@ final class NotificationService: UNNotificationServiceExtension {
       interaction.donate { _ in
         // Donation only improves suggestions; show the notification either way.
         let updated = try? request.content.updating(from: intent)
-        self.finish(updated ?? request.content)
+        self.finish(Self.keepingBadge(updated ?? request.content, from: request.content))
       }
     }
   }
@@ -45,6 +45,19 @@ final class NotificationService: UNNotificationServiceExtension {
     let content = original
     lock.unlock()
     if let content { finish(content) }
+  }
+
+  /// The push's app icon badge, which a closed app relies on entirely. The
+  /// copy `updating(from:)` returns may leave it out, so put it back.
+  private static func keepingBadge(
+    _ content: UNNotificationContent,
+    from original: UNNotificationContent
+  ) -> UNNotificationContent {
+    guard let badge = original.badge, content.badge != badge,
+      let copy = content.mutableCopy() as? UNMutableNotificationContent
+    else { return content }
+    copy.badge = badge
+    return copy
   }
 
   /// Delivers once; later calls (for example after a timeout) are ignored.

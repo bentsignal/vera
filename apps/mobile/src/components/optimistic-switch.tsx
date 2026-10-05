@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Switch } from "@expo/ui";
 
 /**
- * A switch for a server setting: it shows the choice right away, and the
- * server's value takes over again if `onChange` fails.
+ * A switch for a server setting: it shows the choice right away, then the
+ * server's value takes over again once `onChange` settles, so a change made
+ * elsewhere (a swipe in the Inbox, another device) shows here too.
  */
 export function OptimisticSwitch({
   label,
@@ -21,7 +22,9 @@ export function OptimisticSwitch({
       value={choice ?? value}
       onValueChange={(next) => {
         setChoice(next);
-        onChange(next).catch(() => setChoice(null));
+        void onChange(next)
+          .catch(() => null)
+          .finally(() => setChoice(null));
       }}
     />
   );

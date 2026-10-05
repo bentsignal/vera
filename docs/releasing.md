@@ -39,7 +39,9 @@ needs a new store build. Everything else (screens, logic, styles, assets) can
 ship over the air.
 
 What moves a platform's runtime: native dependencies, patches, config
-plugins and their options (a plugin's options count for both platforms, even
+plugins and their options, the notification service extension's Swift
+(`plugins/notification-service`, added in `fingerprint.config.cjs`; it
+counts for Android too) (a plugin's options count for both platforms, even
 when they only affect one), and the shared parts of `app.config.ts`. The
 other platform's section (`ios: {}` or `android: {}`) doesn't count, and
 `apps/mobile/fingerprint.config.cjs` excludes `eas.json`, so editing build
