@@ -229,7 +229,7 @@ function menuActions(
         ]
       : [];
   const viewReactions =
-    message.reactions.length > 0
+    (message.reactions?.length ?? 0) > 0
       ? [
           {
             icon: { android: "groups", ios: "person.2" },

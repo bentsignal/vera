@@ -11,7 +11,8 @@ export interface Message {
   body?: string;
   attachments: Attachment[];
   linkPreview?: LinkPreview;
-  reactions: readonly ReactionSummary[];
+  /** Undefined until the message's reactions have loaded. */
+  reactions: readonly ReactionSummary[] | undefined;
   /** Set until the server confirms a message this device sent. */
   status?: "failed" | "sending";
 }

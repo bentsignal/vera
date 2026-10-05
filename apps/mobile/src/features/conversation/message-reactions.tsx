@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { View } from "react-native";
 import { LayoutAnimationConfig } from "react-native-reanimated";
 
@@ -26,6 +27,13 @@ export function InteractiveMessage({
   children: ReactNode;
 }) {
   const { toggleReaction } = useMessageActions();
+  // New messages change which reactions a page asks for, so they reload.
+  // Keep the last ones on screen meanwhile instead of dropping them.
+  const [lastLoaded, setLastLoaded] = useState(message.reactions);
+  if (message.reactions !== undefined && message.reactions !== lastLoaded) {
+    setLastLoaded(message.reactions);
+  }
+  const reactions = message.reactions ?? lastLoaded;
   return (
     // Reactions already there when the row mounts don't pop in on scroll.
     <LayoutAnimationConfig skipEntering>
@@ -33,15 +41,21 @@ export function InteractiveMessage({
         <LongPressMessage message={message} align={align} shape={shape}>
           {children}
         </LongPressMessage>
-        {message.reactions.length > 0 && (
-          <ChipRow
-            reactions={message.reactions}
-            align={align}
-            onToggle={(emoji) => {
-              selectionTick();
-              toggleReaction(message.id, emoji);
-            }}
-          />
+        {reactions !== undefined && (
+          // Nor do the ones that load after the row: only a reaction added
+          // while the thread is open pops in.
+          <LayoutAnimationConfig skipEntering>
+            {reactions.length > 0 && (
+              <ChipRow
+                reactions={reactions}
+                align={align}
+                onToggle={(emoji) => {
+                  selectionTick();
+                  toggleReaction(message.id, emoji);
+                }}
+              />
+            )}
+          </LayoutAnimationConfig>
         )}
       </View>
     </LayoutAnimationConfig>

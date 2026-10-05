@@ -21,7 +21,7 @@ import { pdsResult } from "./results";
 
 export function toMessage(
   message: PdsMessage,
-  reactions: readonly ReactionSummary[] = [],
+  reactions: readonly ReactionSummary[] | undefined,
 ) {
   return {
     attachments: message.attachments,
@@ -212,13 +212,16 @@ export function useMessages(conversationId: string, anchor?: string) {
     ? pending
         .filter((message) => !confirmed.has(message.messageId))
         .map((message) => ({
-          ...toMessage({
-            ...message,
-            authorId: address,
-            authorName: "",
-            conversationId,
-            linkPreview: null,
-          }),
+          ...toMessage(
+            {
+              ...message,
+              authorId: address,
+              authorName: "",
+              conversationId,
+              linkPreview: null,
+            },
+            [],
+          ),
           status: message.failed ? ("failed" as const) : ("sending" as const),
         }))
     : [];

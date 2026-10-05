@@ -76,8 +76,9 @@ export function useReactions(
   const [overrides, setOverrides] = useState<ReadonlyMap<string, boolean>>(
     new Map(),
   );
+  const batches = pageMessageIds.flatMap(chunks);
   const results = useQueries({
-    queries: pageMessageIds.flatMap(chunks).map((messageIds) =>
+    queries: batches.map((messageIds) =>
       pdsQuery({
         args: { conversationId, messageIds },
         options: {
@@ -107,9 +108,16 @@ export function useReactions(
     session,
     overrides,
   );
+  const loaded = new Set(
+    batches.flatMap((messageIds, index) =>
+      results[index]?.data === undefined ? [] : messageIds,
+    ),
+  );
 
   return {
-    reactionsOf: (messageId: string) => reactions.get(messageId) ?? [],
+    /** A message's reactions, or undefined while they are still loading. */
+    reactionsOf: (messageId: string) =>
+      loaded.has(messageId) ? (reactions.get(messageId) ?? []) : undefined,
     toggle: (messageId: string, emoji: string) => {
       const on = !(
         reactions
