@@ -79,12 +79,8 @@ function AppStack() {
       />
       <Stack.Screen
         name="new-message"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
-          title: "New Message",
-        }}
+        // Its own stack: Group continues to a name step.
+        options={{ headerShown: false, presentation: "modal" }}
       />
       <Stack.Screen
         name="add-account"
@@ -97,12 +93,8 @@ function AppStack() {
       />
       <Stack.Screen
         name="new-space"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
-          title: "New Space",
-        }}
+        // Its own stack: the name, then the people to add.
+        options={{ headerShown: false, presentation: "modal" }}
       />
       <Stack.Screen
         name="new-channel"

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Alert } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { FieldGroup, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
+import { sheetIcons } from "~/features/compose/sheet";
 import { AccountScope } from "~/features/messaging/account";
 import { useSpaceActions } from "~/features/messaging/spaces";
 
@@ -22,26 +23,29 @@ function NewChannel({ spaceId }: { spaceId: string }) {
   }
 
   return (
-    <NativeHost style={{ flex: 1 }}>
-      <FieldGroup>
-        <FieldGroup.Section title="Channel Name">
-          <TextInput
-            autoFocus
-            autoCapitalize="none"
-            placeholder="new-channel"
-            onChangeText={setName}
-          />
-        </FieldGroup.Section>
-        <FieldGroup.Section>
-          <Button
-            disabled={name.trim().length === 0 || createChannel.isPending}
-            onPress={() => void create()}
-          >
-            <Text>Create Channel</Text>
-          </Button>
-        </FieldGroup.Section>
-      </FieldGroup>
-    </NativeHost>
+    <>
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon={sheetIcons.done}
+          accessibilityLabel="Create Channel"
+          variant="prominent"
+          disabled={name.trim().length === 0 || createChannel.isPending}
+          onPress={() => void create()}
+        />
+      </Stack.Toolbar>
+      <NativeHost style={{ flex: 1 }}>
+        <FieldGroup>
+          <FieldGroup.Section title="Channel Name">
+            <TextInput
+              autoFocus
+              autoCapitalize="none"
+              placeholder="new-channel"
+              onChangeText={setName}
+            />
+          </FieldGroup.Section>
+        </FieldGroup>
+      </NativeHost>
+    </>
   );
 }
 
