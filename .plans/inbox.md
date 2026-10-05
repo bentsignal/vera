@@ -10,9 +10,11 @@ everything you read and a Spaces tab for browsing and managing spaces.
   first. Its large title (and the collapsed header) says "Inbox".
 - The Inbox lists direct messages, groups, and space channels together,
   newest first. Channel rows show the space name with the channel name.
-- **Pinned** conversations of any kind sit at the top, in the order they
-  were pinned. Pins belong to each account (per membership). Pin and unpin
-  by swipe or long press. No limit; reordering can come later.
+- **Pinned** conversations of any kind sit at the top under a "Pinned"
+  header, in the order they were pinned. Pins belong to each account (per
+  membership). Pin and unpin from a row's long-press menu (iOS) or the
+  conversation's info screen (both platforms). No limit; swipe actions and
+  reordering can come later.
 - **Show in Inbox**: each channel has a per-account setting, on by default
   (including channels created later). Switch it from the space's channel
   list or the channel's info screen. Hidden channels are still read from the
@@ -36,12 +38,12 @@ everything you read and a Spaces tab for browsing and managing spaces.
 
 ## Stack (one PR each)
 
-1. [ ] Create flows: compose sheet (Chat | Group), New Space with toolbar
-       buttons.
-2. [ ] Backend: inbox with channels (that show in the Inbox) and their space
-       name; per-account pin and Show in Inbox.
-3. [ ] Inbox tab: rename, merged list, pins, filter menu, Show in Inbox
-       toggles, Spaces tab without a badge.
+1. [x] Create flows: compose sheet (Chat | Group), New Space with toolbar
+       buttons. (#82)
+2. [x] Backend: inbox with channels (that show in the Inbox) and their space
+       name; per-account pin and Show in Inbox. (#83)
+3. [x] Inbox tab: rename, merged list, pins, filter menu, Show in Inbox
+       toggles, Spaces tab without a badge. (#84)
 
 ## Later: invite links
 

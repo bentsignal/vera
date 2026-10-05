@@ -7,6 +7,7 @@ import { NativeHost } from "~/components/native-host";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useSpace, useSpaceActions } from "~/features/messaging/spaces";
 import { ChannelsSection } from "~/features/spaces/channels-section";
+import { InboxSection } from "~/features/spaces/inbox-section";
 import { MembersSection } from "~/features/spaces/members-section";
 import { destructive } from "~/lib/ui-modifiers";
 
@@ -55,6 +56,7 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
         <NativeHost style={{ flex: 1 }}>
           <FieldGroup>
             <ChannelsSection space={space} />
+            <InboxSection space={space} />
             <MembersSection space={space} />
             {space.role !== "owner" && (
               <FieldGroup.Section>

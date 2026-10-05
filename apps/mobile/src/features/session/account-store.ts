@@ -93,7 +93,7 @@ function load() {
 }
 
 /**
- * Signed-in accounts, and `filter`: the one account Chats and Spaces show,
+ * Signed-in accounts, and `filter`: the one account the Inbox and Spaces show,
  * or null for all of them.
  */
 let state = load();

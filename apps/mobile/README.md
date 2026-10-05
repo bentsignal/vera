@@ -239,7 +239,7 @@ with `development: true`) and send to that token through the Expo push API.
 ## Layout
 
 - `src/app`: routes. `(auth)` holds welcome, create account, and sign in;
-  `(app)/(tabs)` holds Chats, Spaces, Settings, and Search, each with its own
+  `(app)/(tabs)` holds Inbox, Spaces, Settings, and Search, each with its own
   native stack; conversations and the new-message sheet sit above the tabs.
 - `src/features`: screen building blocks grouped by feature.
 - `src/components`, `src/lib`: shared components and helpers.
@@ -252,7 +252,7 @@ with `development: true`) and send to that token through the Expo push API.
 - `src/features/messaging`: TanStack hooks over the PDS `messages` and
   `accounts` plugins (inbox, messages with optimistic sends, spaces,
   profiles) and attachment uploads. `AccountScope` sets the account a screen
-  acts as; Chats, Spaces, and Search combine every visible account.
+  acts as; the Inbox, Spaces, and Search combine every visible account.
 - `src/features/profile` and `src/app/(app)/profile/[address].tsx`: a
   person's profile (photo, display name, address, and a Message button that
   opens the direct conversation as the `account` param). Search's people

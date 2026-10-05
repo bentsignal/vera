@@ -45,9 +45,16 @@ function conversationTitle(
   return displayName(other ?? self);
 }
 
-function preview(message: PdsMessage | null, self: string, name: string) {
+/** The last message, led by its author where several people talk. */
+function preview(
+  message: PdsMessage | null,
+  self: string,
+  name: string,
+  shared: boolean,
+) {
   if (message === null) return "No messages yet";
-  const prefix = message.authorId === self ? "You: " : "";
+  const prefix =
+    message.authorId === self ? "You: " : shared ? `${name}: ` : "";
   if (message.body.length > 0) return `${prefix}${message.body}`;
   const count = message.attachments.length;
   const kind = message.attachments[0]?.kind ?? "file";
@@ -81,8 +88,13 @@ function summarize(
       conversation.lastMessage,
       account,
       displayName(conversation.lastMessage?.authorId ?? ""),
+      conversation.kind !== "direct",
     ),
     memberIds: conversation.members,
+    muted: conversation.muted,
+    pinnedAt: conversation.pinnedAt ?? null,
+    spaceId: conversation.spaceId,
+    spaceName: conversation.spaceName ?? null,
     title: conversationTitle(conversation, account, displayName),
     unreadCount: conversation.unreadCount,
   } satisfies ConversationSummary;
@@ -90,7 +102,8 @@ function summarize(
 
 /**
  * Conversations across the visible accounts (or just `account`), newest
- * first. Each summary says which account it belongs to.
+ * first: direct messages, groups, and the space channels shown in the
+ * inbox. Each summary says which account it belongs to.
  */
 export function useInbox({ account }: { account?: string } = {}) {
   const visible = useVisibleAccounts();
@@ -99,7 +112,7 @@ export function useInbox({ account }: { account?: string } = {}) {
   const inboxes = useQueries({
     queries: accounts.map((session) =>
       pdsQuery({
-        args: {},
+        args: { channels: true },
         options: { select: pdsResult },
         query: pds.messages.inbox,
         session,

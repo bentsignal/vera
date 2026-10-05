@@ -7,7 +7,7 @@ import { setAccountFilter } from "./account-store";
 import { useSession } from "./session-provider";
 
 /**
- * The right side of the Chats and Spaces headers: a menu that narrows them
+ * The right side of the Inbox and Spaces headers: a menu that narrows them
  * to one account (like a mail app's mailbox list, hidden with one account),
  * then the screen's own `children` buttons. Toolbar items must be its
  * direct children, so the menu can't be a separate component.

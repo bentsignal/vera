@@ -8,20 +8,89 @@ import { usernameOf } from "~/features/messaging/profiles";
 import { AffiliatedBadge } from "~/features/profile/affiliated-badge";
 import { formatInboxTimestamp } from "~/lib/format";
 
+const CHANNEL_GLYPH = { android: "tag", ios: "number" } as const;
+
+/** The name, then a channel's space and the muted bell. */
+function Title({ conversation }: { conversation: ConversationSummary }) {
+  return (
+    <View className="flex-1 flex-row items-center gap-1">
+      <Text
+        numberOfLines={1}
+        className="text-headline text-foreground shrink font-semibold"
+      >
+        {conversation.title}
+      </Text>
+      {conversation.affiliated && <AffiliatedBadge size={15} />}
+      {conversation.spaceName !== null && (
+        <Text numberOfLines={1} className="text-subhead text-muted shrink-[2]">
+          {conversation.spaceName}
+        </Text>
+      )}
+      {conversation.muted && (
+        <SymbolIcon
+          accessibilityLabel="Alerts hidden"
+          name={{ android: "notifications_off", ios: "bell.slash.fill" }}
+          size={12}
+          tintColorClassName="accent-muted"
+        />
+      )}
+    </View>
+  );
+}
+
+/** The title line: name, pin, account, time, and chevron. */
+function TopLine({
+  conversation,
+  showAccount,
+}: {
+  conversation: ConversationSummary;
+  showAccount: boolean;
+}) {
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <Title conversation={conversation} />
+      {conversation.pinnedAt !== null && (
+        <SymbolIcon
+          accessibilityLabel="Pinned"
+          name={{ android: "push_pin", ios: "pin.fill" }}
+          size={12}
+          tintColorClassName="accent-muted"
+        />
+      )}
+      {showAccount && (
+        <Text numberOfLines={1} className="text-footnote text-accent">
+          {usernameOf(conversation.account)}
+        </Text>
+      )}
+      <Text className="text-subhead text-muted">
+        {formatInboxTimestamp(conversation.lastActivityAt)}
+      </Text>
+      <SymbolIcon
+        name={{ android: "chevron_right", ios: "chevron.right" }}
+        size={12}
+        weight="semibold"
+        tintColorClassName="accent-subtle"
+      />
+    </View>
+  );
+}
+
 export function ConversationRow({
   conversation,
   showAccount,
   onMarkRead,
+  onTogglePin,
   onLeave,
 }: {
   conversation: ConversationSummary;
   /** Names the account the conversation belongs to, when several show. */
   showAccount: boolean;
   onMarkRead: () => void;
+  onTogglePin: () => void;
   onLeave: () => void;
 }) {
-  const { account, id, kind, title, lastMessage, lastActivityAt, unreadCount } =
-    conversation;
+  const { account, id, kind, title, lastMessage, unreadCount } = conversation;
+  const pinned = conversation.pinnedAt !== null;
   return (
     <Link
       href={{
@@ -41,33 +110,14 @@ export function ConversationRow({
               />
             )}
           </View>
-          <Avatar name={title} size="list" uri={conversation.avatarUrl} />
+          <Avatar
+            name={title}
+            size="list"
+            uri={conversation.avatarUrl}
+            glyph={kind === "channel" ? CHANNEL_GLYPH : undefined}
+          />
           <View className="border-b-hairline border-separator ml-3 min-h-[78px] flex-1 justify-center py-2.5 pr-4">
-            <View className="flex-row items-center gap-1.5">
-              <View className="flex-1 flex-row items-center gap-1">
-                <Text
-                  numberOfLines={1}
-                  className="text-headline text-foreground shrink font-semibold"
-                >
-                  {title}
-                </Text>
-                {conversation.affiliated && <AffiliatedBadge size={15} />}
-              </View>
-              {showAccount && (
-                <Text numberOfLines={1} className="text-footnote text-accent">
-                  {usernameOf(account)}
-                </Text>
-              )}
-              <Text className="text-subhead text-muted">
-                {formatInboxTimestamp(lastActivityAt)}
-              </Text>
-              <SymbolIcon
-                name={{ android: "chevron_right", ios: "chevron.right" }}
-                size={12}
-                weight="semibold"
-                tintColorClassName="accent-subtle"
-              />
-            </View>
+            <TopLine conversation={conversation} showAccount={showAccount} />
             <Text
               numberOfLines={2}
               className="text-subhead text-muted pt-0.5 leading-[20px]"
@@ -79,6 +129,11 @@ export function ConversationRow({
       </Link.Trigger>
       <Link.Preview />
       <Link.Menu>
+        <Link.MenuAction
+          title={pinned ? "Unpin" : "Pin"}
+          icon={pinned ? "pin.slash" : "pin"}
+          onPress={onTogglePin}
+        />
         <Link.MenuAction
           title="Mark as Read"
           icon="envelope.open"

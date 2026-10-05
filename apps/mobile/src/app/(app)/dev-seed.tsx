@@ -6,7 +6,7 @@ import { useDevTools } from "~/features/dev/dev-tools";
 
 /**
  * Dev PDS only: `vera:///dev-seed` gives the signed-in account the bot DMs,
- * group, and space, then opens Chats, so scripts can set up a simulator
+ * group, and space, then opens the Inbox, so scripts can set up a simulator
  * without tapping through Settings.
  */
 export default function DevSeedLink() {
