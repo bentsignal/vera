@@ -23,6 +23,9 @@ Files:
   One SVG layer per ring half, with light, dark, and tinted fills.
 - `vera-android-foreground.png`, `vera-android-monochrome.png`, and
   `vera-android-background.png`: Android adaptive icon layers.
+- `vera-android-notification.png`: Android's notification small icon
+  (white leaves on transparent; the `expo-notifications` plugin's `icon`).
+  iOS badges notifications with the app icon itself.
 - `../images/icon.png`: square, opaque, flat icon (the Expo fallback and the
   welcome screen).
 
