@@ -1,58 +1,60 @@
 import { useState } from "react";
 import { Alert } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { PeoplePicker } from "~/features/compose/people-picker";
+import { sheetIcons } from "~/features/compose/sheet";
+import { usePeopleSearch } from "~/features/compose/use-people-search";
 import { AccountScope } from "~/features/messaging/account";
-import { toAddress, useAccountExists } from "~/features/messaging/directory";
-import { useSpaceActions } from "~/features/messaging/spaces";
+import { useSpace, useSpaceActions } from "~/features/messaging/spaces";
 
 function AddPeople({ spaceId }: { spaceId: string }) {
   const router = useRouter();
   const { addMembers } = useSpaceActions();
-  const [query, setQuery] = useState("");
-  const address = toAddress(query);
-  const exists = useAccountExists(address);
+  const { space } = useSpace(spaceId);
+  const [members, setMembers] = useState<string[]>([]);
+  const search = usePeopleSearch({
+    exclude: (space?.members ?? []).map((member) => member.accountId),
+    selected: members,
+  });
+
+  function toggle(address: string) {
+    if (members.includes(address)) {
+      setMembers(members.filter((member) => member !== address));
+      return;
+    }
+    setMembers([...members, address]);
+    search.clear();
+  }
 
   async function add() {
-    if (address === null) return;
     try {
-      await addMembers.mutateAsync({ members: [address], spaceId });
+      await addMembers.mutateAsync({ members, spaceId });
       router.dismiss();
     } catch {
-      Alert.alert("Couldn't Add Person", "Try again in a moment.");
+      Alert.alert("Couldn't Add People", "Try again in a moment.");
     }
   }
 
   return (
-    <NativeHost style={{ flex: 1 }}>
-      <FieldGroup>
-        <FieldGroup.Section title="Username or Address">
-          <TextInput
-            autoFocus
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            placeholder="username"
-            onChangeText={setQuery}
-          />
-          {exists === false && (
-            <FieldGroup.SectionFooter>
-              <Text>{`No Vera account for ${address ?? ""}.`}</Text>
-            </FieldGroup.SectionFooter>
-          )}
-        </FieldGroup.Section>
-        <FieldGroup.Section>
-          <Button
-            disabled={exists !== true || addMembers.isPending}
-            onPress={() => void add()}
-          >
-            <Text>Add to Space</Text>
-          </Button>
-        </FieldGroup.Section>
-      </FieldGroup>
-    </NativeHost>
+    <>
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon={sheetIcons.done}
+          accessibilityLabel="Add to Space"
+          variant="prominent"
+          disabled={members.length === 0 || addMembers.isPending}
+          onPress={() => void add()}
+        />
+      </Stack.Toolbar>
+      <NativeHost style={{ flex: 1 }}>
+        <FieldList>
+          <PeoplePicker search={search} selected={members} onPress={toggle} />
+        </FieldList>
+      </NativeHost>
+    </>
   );
 }
 
