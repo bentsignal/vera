@@ -5,6 +5,7 @@ import {
 
 import { mutation, query } from "./_generated/server.js";
 import * as conversations from "./conversations.ts";
+import * as inbox from "./inbox.ts";
 import { requireAccountId } from "./model.ts";
 import { messagesProtocol } from "./protocol.ts";
 import * as push from "./pushTokens.ts";
@@ -51,14 +52,18 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
       },
       setMuted: (ctx, { args, identity }) =>
         conversations.setMuted(ctx, requireAccountId(identity), args),
+      setPinned: (ctx, { args, identity }) =>
+        inbox.setPinned(ctx, requireAccountId(identity), args),
+      setShowInInbox: (ctx, { args, identity }) =>
+        inbox.setShowInInbox(ctx, requireAccountId(identity), args),
       unregisterPushToken: (ctx, { args, identity }) =>
         push.unregisterPushToken(ctx, requireAccountId(identity), args.token),
     },
     queries: {
       conversation: (ctx, { args, identity }) =>
         conversations.conversation(ctx, requireAccountId(identity), args),
-      inbox: (ctx, { identity }) =>
-        conversations.inbox(ctx, requireAccountId(identity)),
+      inbox: (ctx, { args, identity }) =>
+        inbox.inbox(ctx, requireAccountId(identity), args),
       list: async (ctx, { args, identity }) => {
         const { page, routes } = await conversations.list(
           ctx,

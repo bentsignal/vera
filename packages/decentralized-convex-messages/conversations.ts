@@ -204,20 +204,6 @@ export async function setMuted(
   return null;
 }
 
-export async function inbox(ctx: QueryCtx, self: string) {
-  const memberships = await ctx.db
-    .query("members")
-    .withIndex("by_account", (index) => index.eq("accountId", self))
-    .collect();
-  const conversations = [];
-  for (const membership of memberships) {
-    const access = await findAccess(ctx, membership.conversationId, self);
-    if (access === null || access.conversation.kind === "channel") continue;
-    conversations.push(await toConversation(ctx, access, self));
-  }
-  return conversations.sort((left, right) => right.updatedAt - left.updatedAt);
-}
-
 export async function conversation(
   ctx: QueryCtx,
   self: string,

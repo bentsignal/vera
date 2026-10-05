@@ -21,6 +21,14 @@ that metadata from home and discovers the current participant PDS deployments.
 import messages from "@decentralized-convex/messages/convex.config";
 ```
 
+`messages.inbox` lists direct messages and groups. With `{ channels: true }`
+it also lists the channels of your spaces, each with its `spaceName`, so an
+app can show every conversation in one inbox. Per-account settings live on
+the member row: `messages.setPinned` pins any conversation (`pinnedAt`), and
+`messages.setShowInInbox` leaves a channel out of that inbox while it stays
+in its space (`showInInbox`, on by default). Channels get a member row the
+first time one of these, or a read, is stored.
+
 Reactions follow the same author-home rule as messages: `messages.react`
 stores your reaction on your home PDS, and `messages.reactions` (given the
 message IDs on screen) gathers reactions from every member's PDS.

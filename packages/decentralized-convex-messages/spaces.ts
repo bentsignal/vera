@@ -1,18 +1,19 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
+import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import type { messagesProtocol } from "./protocol.ts";
+import type { messagesProtocol, Space } from "./protocol.ts";
 import {
   fail,
   getConversation,
+  getMember,
   getSpace,
   getSpaceMember,
   newId,
   normalizeAddress,
   normalizeMembers,
   normalizeName,
-  requireSpaceRole,
-  toSpace,
+  unreadCount,
 } from "./model.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
@@ -193,4 +194,76 @@ export async function spaces(ctx: QueryCtx, self: string) {
 export async function space(ctx: QueryCtx, self: string, spaceId: string) {
   const found = await getSpace(ctx, spaceId);
   return found === null ? null : toSpace(ctx, found, self);
+}
+
+export async function toSpace(
+  ctx: QueryCtx,
+  space: Doc<"spaces">,
+  accountId: string,
+): Promise<Space | null> {
+  const self = await getSpaceMember(ctx, space.spaceId, accountId);
+  if (self === null) return null;
+  const members = await ctx.db
+    .query("spaceMembers")
+    .withIndex("by_space_account", (index) =>
+      index.eq("spaceId", space.spaceId),
+    )
+    .collect();
+  const conversations = await ctx.db
+    .query("conversations")
+    .withIndex("by_space", (index) => index.eq("spaceId", space.spaceId))
+    .collect();
+  const channels = await Promise.all(
+    conversations.map(async (conversation) => {
+      const member = await getMember(
+        ctx,
+        conversation.conversationId,
+        accountId,
+      );
+      return {
+        conversationId: conversation.conversationId,
+        name: conversation.name ?? "",
+        position: conversation.position ?? 0,
+        showInInbox: member?.hiddenFromInbox !== true,
+        unreadCount: await unreadCount(
+          ctx,
+          conversation.conversationId,
+          accountId,
+          member?.lastReadAt ?? self._creationTime,
+        ),
+      };
+    }),
+  );
+  channels.sort(
+    (left, right) =>
+      left.position - right.position || left.name.localeCompare(right.name),
+  );
+  return {
+    channels,
+    members: members.map((member) => ({
+      accountId: member.accountId,
+      role: member.role,
+    })),
+    name: space.name,
+    role: self.role,
+    spaceId: space.spaceId,
+    unreadCount: channels.reduce(
+      (total, channel) => total + channel.unreadCount,
+      0,
+    ),
+  };
+}
+
+export async function requireSpaceRole(
+  ctx: QueryCtx,
+  spaceId: string,
+  accountId: string,
+  role: "member" | "owner",
+) {
+  const space = await getSpace(ctx, spaceId);
+  const member =
+    space === null ? null : await getSpaceMember(ctx, spaceId, accountId);
+  if (space === null || member === null) fail("SPACE_NOT_FOUND");
+  if (role === "owner" && member.role !== "owner") fail("SPACE_OWNER_REQUIRED");
+  return { member, space };
 }

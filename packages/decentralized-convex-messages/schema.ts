@@ -20,12 +20,17 @@ export default defineSchema({
   })
     .index("by_conversation", ["conversationId"])
     .index("by_space", ["spaceId"]),
-  // Direct and group members, plus per-account read state for channels.
+  // Direct and group members, plus per-account read state and settings for
+  // channels.
   members: defineTable({
     accountId: v.string(),
     conversationId: v.string(),
+    // A channel left out of the inbox; it still appears in its space.
+    hiddenFromInbox: v.optional(v.boolean()),
     lastReadAt: v.number(),
     muted: v.boolean(),
+    // When the account pinned the conversation to the top of its inbox.
+    pinnedAt: v.optional(v.number()),
     role: spaceRole,
   })
     .index("by_account", ["accountId"])
