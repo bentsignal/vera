@@ -4,14 +4,15 @@ import Svg, { Path } from "react-native-svg";
 export const TAIL_DROP = 6;
 /** Bubble corner radius, a touch rounder than a capsule's for one line. */
 export const BUBBLE_RADIUS = 20;
+/** How round the end of the tail is. */
+const TIP_RADIUS = 1.5;
 
 /**
- * A rounded bubble with a tail hanging from its bottom edge, just inside the
- * bottom-right corner: the corner keeps its full curve, and the tail grows
- * out of the bottom like a small hook pointing toward the corner. One
- * continuous path, so there is no seam where the tail meets the bubble.
- * `width` and `height` are the bubble's own box; the tail drops `TAIL_DROP`
- * below it.
+ * A rounded bubble with a tail at its bottom-right corner, like iMessage's:
+ * the corner curves in until it bends down into the tail, which ends in a
+ * rounded tip and scoops back up into the bottom edge. One continuous path,
+ * so there is no seam where the tail meets the bubble. `width` and `height`
+ * are the bubble's own box; the tail drops `TAIL_DROP` below it.
  */
 function tailedBubblePath(width: number, height: number) {
   const r = Math.min(BUBBLE_RADIUS, height / 2);
@@ -19,18 +20,20 @@ function tailedBubblePath(width: number, height: number) {
   const w = width;
   const h = height;
   const d = TAIL_DROP;
-  // Where the bottom-right corner's curve meets the bottom edge.
-  const corner = w - r;
+  // Where the tail's scoop meets the bottom edge, short of the left corner.
+  const scoopEnd = Math.max(w - 24, r);
   return [
     `M ${r} 0`,
     `L ${w - r} 0`,
     `C ${w - k} 0 ${w} ${k} ${w} ${r}`,
     `L ${w} ${h - r}`,
-    `C ${w} ${h - k} ${w - k} ${h} ${corner} ${h}`,
-    // Down into the tip, which sits under the end of the corner's curve...
-    `C ${corner - 1} ${h + d * 0.4} ${corner + 1} ${h + d * 0.85} ${corner + 4} ${h + d}`,
-    // ...then a soft scoop back up into the bottom edge, toward the center.
-    `C ${corner - 4} ${h + d} ${corner - 10} ${h + d * 0.5} ${corner - 14} ${h}`,
+    // The corner curves in, then bends down into the tail's outer edge...
+    `C ${w} ${h - 11} ${w - 4} ${h - 6} ${w - 8} ${h - 3}`,
+    `C ${w - 10.5} ${h - 1.1} ${w - 8} ${h + d - TIP_RADIUS - 2.5} ${w - 8} ${h + d - TIP_RADIUS}`,
+    // ...which rounds off at the tip instead of meeting in a point...
+    `A ${TIP_RADIUS} ${TIP_RADIUS} 0 0 1 ${w - 8 - TIP_RADIUS} ${h + d}`,
+    // ...then scoops back up into the bottom edge, toward the center.
+    `C ${w - 13} ${h + d} ${w - 17} ${h} ${scoopEnd} ${h}`,
     `L ${r} ${h}`,
     `C ${k} ${h} 0 ${h - k} 0 ${h - r}`,
     `L 0 ${r}`,

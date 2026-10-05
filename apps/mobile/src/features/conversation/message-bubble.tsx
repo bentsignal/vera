@@ -40,7 +40,7 @@ function Body({
         if (tail) setSize({ height, width });
       }}
       className={cn(
-        "px-3 py-[7px]",
+        "px-3.5 py-2",
         !shaped && (isOwn ? "bg-bubble-outgoing" : "bg-bubble-incoming"),
       )}
       style={{
@@ -175,7 +175,7 @@ export function MessageBubble({
 }) {
   const showAuthor = author !== undefined && !isOwn;
   return (
-    <View className={startsGroup ? "pt-2.5" : "pt-0.5"}>
+    <View className={startsGroup ? "pt-3.5" : "pt-1"}>
       <SlideWithReveal enabled={isOwn}>
         <View
           className={cn(
