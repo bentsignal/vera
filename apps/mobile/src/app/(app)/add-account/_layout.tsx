@@ -1,5 +1,7 @@
 import { Stack } from "expo-router";
 
+export const unstable_settings = { anchor: "index" };
+
 /** Settings' "Add Account": the signed-out screens, in a modal. */
 export default function AddAccountLayout() {
   return (
