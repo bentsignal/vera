@@ -90,6 +90,7 @@ function summarize(
       displayName(conversation.lastMessage?.authorId ?? ""),
       conversation.kind !== "direct",
     ),
+    hasMessages: conversation.lastMessage !== null,
     memberIds: conversation.members,
     muted: conversation.muted,
     pinnedAt: conversation.pinnedAt ?? null,

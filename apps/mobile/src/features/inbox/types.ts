@@ -17,6 +17,8 @@ export interface ConversationSummary {
   title: string;
   memberIds: string[];
   lastMessage: string;
+  /** False until someone sends the first message. */
+  hasMessages: boolean;
   lastActivityAt: Date;
   unreadCount: number;
   /** The other person's photo in a direct conversation. */

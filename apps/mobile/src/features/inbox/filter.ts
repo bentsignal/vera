@@ -6,15 +6,17 @@ function matches(
   show: InboxShow,
   from: InboxFrom,
 ) {
+  // A conversation joins the Inbox with its first message, so nobody sees
+  // an empty chat someone opened with them but never wrote in.
+  if (!conversation.hasMessages) return false;
   if (show === "unread" && conversation.unreadCount === 0) return false;
-  if (from === "everything") return true;
   if (from === "chats") return conversation.kind !== "channel";
   if (from === "channels") return conversation.kind === "channel";
-  return conversation.spaceId === from;
+  return true;
 }
 
 /**
- * The conversations the filter keeps: pinned ones first, in the order they
+ * The conversations the Inbox lists: pinned ones first, in the order they
  * were pinned, then the rest newest first (the order they arrive in).
  */
 export function filterInbox(

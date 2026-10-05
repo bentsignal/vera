@@ -7,7 +7,9 @@ import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { ConversationRow } from "~/features/inbox/conversation-row";
 import { filterInbox } from "~/features/inbox/filter";
-import { FilterToolbar, useInboxFrom } from "~/features/inbox/filter-toolbar";
+import { FilterToolbar } from "~/features/inbox/filter-toolbar";
+import { inboxSwipeActions, togglePin } from "~/features/inbox/swipe-actions";
+import { SwipeRow } from "~/features/inbox/swipe-row";
 import { useRunAs, useVisibleAccounts } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/conversations";
 import { usePreference } from "~/features/preferences/store";
@@ -30,16 +32,10 @@ export default function InboxScreen() {
   const runAs = useRunAs();
   const showAccount = useVisibleAccounts().length > 1;
   const show = usePreference("inboxShow");
-  const from = useInboxFrom();
+  const from = usePreference("inboxFrom");
   const filtered = show !== "all" || from !== "everything";
   const { pinned, rest } = filterInbox(conversations ?? [], show, from);
-  const items = [
-    ...(pinned.length > 0 ? [{ header: "Pinned", key: "pinned" }] : []),
-    ...[...pinned, ...rest].map((conversation) => ({
-      conversation,
-      key: conversation.key,
-    })),
-  ];
+  const items = [...pinned, ...rest];
 
   function empty() {
     if (isLoading) return null;
@@ -74,44 +70,30 @@ export default function InboxScreen() {
         data={items}
         keyExtractor={(item) => item.key}
         ListEmptyComponent={empty()}
-        renderItem={({ item }) =>
-          "header" in item ? (
-            <Text className="text-footnote text-muted px-4 pt-2 pb-1 font-semibold uppercase">
-              {item.header}
-            </Text>
-          ) : (
+        renderItem={({ item }) => (
+          <SwipeRow {...inboxSwipeActions(runAs, item)}>
             <ConversationRow
-              conversation={item.conversation}
+              conversation={item}
               showAccount={showAccount}
               onMarkRead={() =>
                 void runAs(
-                  item.conversation.account,
+                  item.account,
                   pds.messages.markRead({
-                    conversationId: item.conversation.id,
+                    conversationId: item.id,
                     readAt: Date.now(),
                   }),
                 )
               }
-              onTogglePin={() =>
-                void runAs(
-                  item.conversation.account,
-                  pds.messages.setPinned({
-                    conversationId: item.conversation.id,
-                    pinned: item.conversation.pinnedAt === null,
-                  }),
-                )
-              }
+              onTogglePin={() => togglePin(runAs, item)}
               onLeave={() =>
                 void runAs(
-                  item.conversation.account,
-                  pds.messages.leaveConversation({
-                    conversationId: item.conversation.id,
-                  }),
+                  item.account,
+                  pds.messages.leaveConversation({ conversationId: item.id }),
                 )
               }
             />
-          )
-        }
+          </SwipeRow>
+        )}
       />
     </>
   );

@@ -54,7 +54,7 @@ function TopLine({
           accessibilityLabel="Pinned"
           name={{ android: "push_pin", ios: "pin.fill" }}
           size={12}
-          tintColorClassName="accent-muted"
+          tintColorClassName="accent-accent"
         />
       )}
       {showAccount && (

@@ -4,12 +4,7 @@ import FilterAlt from "@expo/material-symbols/filter_alt.xml";
 import FilterList from "@expo/material-symbols/filter_list.xml";
 
 import type { InboxFrom, InboxShow } from "~/features/preferences/store";
-import { useSpaces } from "~/features/messaging/spaces";
-import {
-  isSpaceFilter,
-  setPreference,
-  usePreference,
-} from "~/features/preferences/store";
+import { setPreference } from "~/features/preferences/store";
 
 function filterIcon(filtered: boolean) {
   if (Platform.OS !== "ios") return filtered ? FilterAlt : FilterList;
@@ -20,8 +15,9 @@ function filterIcon(filtered: boolean) {
 
 /**
  * The Inbox's left header button: a menu that narrows it to unread
- * conversations, to chats or channels, or to one space. The icon fills
- * while a filter is on; the choice is saved with the other preferences.
+ * conversations, or to chats or channels. (A space's conversations are on
+ * its screen in Spaces.) The icon fills while a filter is on; the choice is
+ * saved with the other preferences.
  */
 export function FilterToolbar({
   show,
@@ -30,13 +26,6 @@ export function FilterToolbar({
   show: InboxShow;
   from: InboxFrom;
 }) {
-  const { spaces } = useSpaces();
-  // One entry per space, even when several accounts are in it.
-  const spaceNames = new Map<`space:${string}`, string>();
-  for (const space of spaces) {
-    if (isSpaceFilter(space.spaceId)) spaceNames.set(space.spaceId, space.name);
-  }
-  const spaceChoices = [...spaceNames];
   return (
     <Stack.Toolbar placement="left">
       <Stack.Toolbar.Menu
@@ -77,33 +66,7 @@ export function FilterToolbar({
             Channels
           </Stack.Toolbar.MenuAction>
         </Stack.Toolbar.Menu>
-        <Stack.Toolbar.Menu
-          inline
-          title="Spaces"
-          hidden={spaceChoices.length === 0}
-        >
-          {spaceChoices.map(([spaceId, name]) => (
-            <Stack.Toolbar.MenuAction
-              key={spaceId}
-              isOn={from === spaceId}
-              onPress={() => setPreference("inboxFrom", spaceId)}
-            >
-              {name}
-            </Stack.Toolbar.MenuAction>
-          ))}
-        </Stack.Toolbar.Menu>
       </Stack.Toolbar.Menu>
     </Stack.Toolbar>
   );
-}
-
-/** The saved space filter, unless that space is gone (left or deleted). */
-export function useInboxFrom() {
-  const stored = usePreference("inboxFrom");
-  const { isLoading, spaces } = useSpaces();
-  const gone =
-    isSpaceFilter(stored) &&
-    !isLoading &&
-    !spaces.some((space) => space.spaceId === stored);
-  return gone ? "everything" : stored;
 }

@@ -12,8 +12,8 @@ export type Appearance = "dark" | "light" | "system";
 export type MessageLayout = "bubbles" | "stacked";
 /** Which conversations the Inbox lists, by read state. */
 export type InboxShow = "all" | "unread";
-/** Which conversations the Inbox lists, by kind, or one space by its ID. */
-export type InboxFrom = "channels" | "chats" | "everything" | `space:${string}`;
+/** Which conversations the Inbox lists, by kind. */
+export type InboxFrom = "channels" | "chats" | "everything";
 
 export interface Preferences {
   readonly appearance: Appearance;
@@ -57,16 +57,6 @@ function themeOr(value: unknown, fallback: ThemeId) {
   return isThemeId(value) ? value : fallback;
 }
 
-export function isSpaceFilter(value: unknown): value is `space:${string}` {
-  return typeof value === "string" && value.startsWith("space:");
-}
-
-function inboxFromOr(value: unknown, fallback: InboxFrom) {
-  return isSpaceFilter(value)
-    ? value
-    : pick(value, ["everything", "chats", "channels"], fallback);
-}
-
 function fromStored(stored: unknown) {
   if (typeof stored !== "object" || stored === null) return DEFAULTS;
   return {
@@ -90,8 +80,10 @@ function fromStored(stored: unknown) {
       LAYOUTS,
       DEFAULTS.channelLayout,
     ),
-    inboxFrom: inboxFromOr(
+    // A space filter saved by an earlier build reads as Everything.
+    inboxFrom: pick(
       Reflect.get(stored, "inboxFrom"),
+      ["everything", "chats", "channels"],
       DEFAULTS.inboxFrom,
     ),
     inboxShow: pick(

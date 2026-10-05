@@ -84,10 +84,18 @@ Vera Dev slot; he reinstalls it from `scripts/phone.sh link`.
 ## 3. Wait for Shawn
 
 He tests and either approves ("ship it", "release it", "looks good, send
-it") or asks for fixes. Fixes are ordinary feature PRs (the `vera-feature`
-skill); he can try one before it merges with `phone.sh up` from the fix's
-worktree. After they merge, update the release checkout to `origin/main`
-(Metro hot-reloads it) and start again at step 1. Don't ship without an
+it") or asks for fixes. Go through the changes with him one at a time:
+send the steps for one, wait for his verdict, then the next.
+
+Fixes found during the release test happen in the release thread, not new
+T3 threads. Small batches go straight to `main` from the release checkout:
+fix, run the required validation, review the diff, commit, push. Metro
+hot-reloads it on his phones. Use PRs (the `vera-feature` skill) when the
+fixes are many or large; subagents in their own worktrees can take
+independent pieces in parallel. A fix that changes native code needs new
+dev clients (`phone.sh up` builds them). A backend fix goes to the dev PDS
+(`pnpm release backend dev`) before he retests. Once the fixes are in,
+update the release notes and test plan (step 1). Don't ship without an
 explicit approval of this release. `scripts/phone.sh down` once he's done.
 
 ## 4. Ship
