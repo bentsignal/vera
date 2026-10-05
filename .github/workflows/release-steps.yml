@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # No install needed, so no pnpm (setup-node caches it by default).
+          package-manager-cache: false
 
       - name: Check the description's release steps
         env:
