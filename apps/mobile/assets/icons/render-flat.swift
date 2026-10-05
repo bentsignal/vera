@@ -3,6 +3,7 @@
 //   <name>-android-foreground.png  Android adaptive foreground (light leaves)
 //   <name>-android-background.png  Android adaptive background
 //   vera-android-monochrome.png    Android themed icon (white leaves; `vera` only)
+//   vera-android-notification.png  Android notification small icon (white leaves; `vera` only)
 //   ../images/icon.png             square, opaque fallback icon (`vera` only)
 // A thin transparent gap separates overlapping leaves, standing in for the
 // glass edges.
@@ -129,6 +130,13 @@ if name == "vera" {
   let monochrome = context(1024)
   monochrome.draw(leaves(size: 1024, width: 600, appearance: .light, white: true), in: full)
   write(monochrome, "vera-android-monochrome.png")
+
+  // Notification small icon: Android draws only its alpha, so the leaves fill
+  // the 20dp live area of the 24dp icon. Without one it falls back to the
+  // launcher icon, which renders as a blank square.
+  let notification = context(1024)
+  notification.draw(leaves(size: 1024, width: 1024 * 20 / 24, appearance: .light, white: true), in: full)
+  write(notification, "vera-android-notification.png")
 
   // Square opaque icon: the light appearance without glass.
   let icon = context(1024, opaque: true)
