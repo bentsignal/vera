@@ -13,6 +13,8 @@ import type * as dispatcher from "../dispatcher.js";
 import type * as history from "../history.js";
 import type * as inbox from "../inbox.js";
 import type * as index from "../index.js";
+import type * as invites from "../invites.js";
+import type * as links from "../links.js";
 import type * as metadata from "../metadata.js";
 import type * as model from "../model.js";
 import type * as notifications from "../notifications.js";
@@ -36,6 +38,8 @@ const fullApi: ApiFromModules<{
   history: typeof history;
   inbox: typeof inbox;
   index: typeof index;
+  invites: typeof invites;
+  links: typeof links;
   metadata: typeof metadata;
   model: typeof model;
   notifications: typeof notifications;

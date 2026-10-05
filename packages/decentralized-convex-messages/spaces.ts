@@ -79,7 +79,7 @@ export async function renameSpace(
   return null;
 }
 
-/** Any member may invite people into a space. */
+/** Adds people without asking; see `inviteToSpace` for invitations. */
 export async function addSpaceMembers(
   ctx: MutationCtx,
   self: string,
@@ -209,6 +209,12 @@ export async function toSpace(
       index.eq("spaceId", space.spaceId),
     )
     .collect();
+  const invites = await ctx.db
+    .query("spaceInvites")
+    .withIndex("by_space_account", (index) =>
+      index.eq("spaceId", space.spaceId),
+    )
+    .collect();
   const conversations = await ctx.db
     .query("conversations")
     .withIndex("by_space", (index) => index.eq("spaceId", space.spaceId))
@@ -240,6 +246,7 @@ export async function toSpace(
   );
   return {
     channels,
+    invited: invites.map((invite) => invite.accountId),
     members: members.map((member) => ({
       accountId: member.accountId,
       role: member.role,

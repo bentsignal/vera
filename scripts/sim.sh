@@ -7,7 +7,7 @@
 #
 #   up               build or reuse the dev client, boot, start Metro, open the app
 #   signin [user]    dev sign-in (default: this worktree's test user)
-#   seed             bot DMs, a group, and a space for the signed-in account
+#   seed             bot DMs, a group, a space, and a space invite for the signed-in account
 #   open <path>      go to a route, such as `/settings` or `/conversation/<id>`
 #   shot <name>      screenshot to .cache/evidence/<name>.png
 #   record <name>    start a video to .cache/evidence/<name>.mp4

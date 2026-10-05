@@ -89,6 +89,8 @@ export const spaceRole = v.union(v.literal("owner"), v.literal("member"));
 
 export const space = v.object({
   channels: v.array(channel),
+  /** People invited who haven't accepted yet (absent from older PDSs). */
+  invited: v.optional(v.array(v.string())),
   members: v.array(v.object({ accountId: v.string(), role: spaceRole })),
   name: v.string(),
   role: spaceRole,
@@ -97,6 +99,42 @@ export const space = v.object({
 });
 
 export type Space = Infer<typeof space>;
+
+/** A space the caller has been invited to and hasn't answered. */
+export const spaceInvite = v.object({
+  invitedAt: v.number(),
+  invitedBy: v.string(),
+  memberCount: v.number(),
+  name: v.string(),
+  spaceId: v.string(),
+});
+
+export type SpaceInvite = Infer<typeof spaceInvite>;
+
+/** A link anyone signed in can join a space with, until it expires. */
+export const spaceInviteLink = v.object({
+  code: v.string(),
+  createdAt: v.number(),
+  createdBy: v.string(),
+  /** Null when it never expires. */
+  expiresAt: v.union(v.null(), v.number()),
+});
+
+export type SpaceInviteLink = Infer<typeof spaceInviteLink>;
+
+/** The space an invite link leads to, shown before joining it. */
+export const spaceInviteLinkPreview = v.object({
+  expiresAt: v.union(v.null(), v.number()),
+  isMember: v.boolean(),
+  memberCount: v.number(),
+  name: v.string(),
+  spaceId: v.string(),
+});
+
+export type SpaceInviteLinkPreview = Infer<typeof spaceInviteLinkPreview>;
+
+/** The longest an invite link can last before it expires: a year. */
+export const MAX_INVITE_LINK_LIFETIME = 366 * 24 * 60 * 60 * 1000;
 
 /** One account's emoji reaction to a message. */
 export const reaction = v.object({
@@ -197,9 +235,47 @@ export const messagesProtocol = definePluginProtocol({
       args: v.object({ name: v.string(), spaceId: v.string() }),
       returns: v.null(),
     }),
+    /**
+     * Adds people to a space without asking them. Apps from before
+     * invitations call it; newer ones call `inviteToSpace`.
+     */
     addSpaceMembers: defineOperation({
       args: v.object({ members: v.array(v.string()), spaceId: v.string() }),
       returns: v.null(),
+    }),
+    /** Invites people, who join when they accept. Any member may invite. */
+    inviteToSpace: defineOperation({
+      args: v.object({ members: v.array(v.string()), spaceId: v.string() }),
+      returns: v.null(),
+    }),
+    acceptSpaceInvite: defineOperation({
+      args: v.object({ spaceId: v.string() }),
+      returns: v.null(),
+    }),
+    declineSpaceInvite: defineOperation({
+      args: v.object({ spaceId: v.string() }),
+      returns: v.null(),
+    }),
+    /**
+     * Makes a link into a space that lasts `expiresIn` milliseconds, or
+     * forever without it. Any member may make one.
+     */
+    createSpaceInviteLink: defineOperation({
+      args: v.object({
+        expiresIn: v.optional(v.number()),
+        spaceId: v.string(),
+      }),
+      returns: spaceInviteLink,
+    }),
+    /** Turns a link off. Its maker or a space owner may. */
+    revokeSpaceInviteLink: defineOperation({
+      args: v.object({ code: v.string() }),
+      returns: v.null(),
+    }),
+    /** Joins the space a link leads to (a member already stays one). */
+    joinSpaceWithLink: defineOperation({
+      args: v.object({ code: v.string() }),
+      returns: v.object({ spaceId: v.string() }),
     }),
     removeSpaceMember: defineOperation({
       args: v.object({ accountId: v.string(), spaceId: v.string() }),
@@ -269,6 +345,24 @@ export const messagesProtocol = definePluginProtocol({
     space: defineOperation({
       args: v.object({ spaceId: v.string() }),
       returns: v.union(v.null(), space),
+    }),
+    /** Spaces you've been invited to and haven't answered, newest first. */
+    spaceInvites: defineOperation({
+      args: v.object({}),
+      returns: v.array(spaceInvite),
+    }),
+    /**
+     * A space's unexpired invite links: all of them for owners, your own
+     * for members.
+     */
+    spaceInviteLinks: defineOperation({
+      args: v.object({ spaceId: v.string() }),
+      returns: v.array(spaceInviteLink),
+    }),
+    /** Where an invite link leads; null when it's unknown or expired. */
+    spaceInviteLinkPreview: defineOperation({
+      args: v.object({ code: v.string() }),
+      returns: v.union(v.null(), spaceInviteLinkPreview),
     }),
   },
   requires: { accounts: DECENTRALIZED_CONVEX_VERSION },

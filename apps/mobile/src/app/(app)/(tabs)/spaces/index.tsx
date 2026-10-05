@@ -5,8 +5,9 @@ import Add from "@expo/material-symbols/add.xml";
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
 import { useVisibleAccounts } from "~/features/messaging/account";
-import { useSpaces } from "~/features/messaging/spaces";
+import { useSpaceInvites, useSpaces } from "~/features/messaging/spaces";
 import { AccountToolbar } from "~/features/session/account-toolbar";
+import { InvitesRow } from "~/features/spaces/invite-row";
 import { SpaceRow } from "~/features/spaces/space-row";
 
 function EmptySpaces() {
@@ -25,6 +26,8 @@ function EmptySpaces() {
 export default function SpacesScreen() {
   const router = useRouter();
   const { isLoading, spaces } = useSpaces();
+  const invites = useSpaceInvites();
+  const ready = !isLoading && !invites.isLoading;
   const showAccount = useVisibleAccounts().length > 1;
   return (
     <>
@@ -37,10 +40,15 @@ export default function SpacesScreen() {
         />
       </AccountToolbar>
       <ScreenList
-        ready={!isLoading}
+        ready={ready}
         data={spaces}
         keyExtractor={(space) => space.key}
-        ListEmptyComponent={isLoading ? null : <EmptySpaces />}
+        ListHeaderComponent={
+          invites.invites.length > 0 ? (
+            <InvitesRow count={invites.invites.length} />
+          ) : null
+        }
+        ListEmptyComponent={invites.invites.length > 0 ? null : <EmptySpaces />}
         renderItem={({ item }) => (
           <SpaceRow space={item} showAccount={showAccount} />
         )}

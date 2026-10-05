@@ -21,6 +21,7 @@ import {
   seedGroup,
   seedProfiles,
   seedSpace,
+  seedSpaceInvite,
 } from "./devSeed";
 
 // Development only. Bots are ordinary accounts on the dev deployment that
@@ -42,6 +43,7 @@ export const seed = action({
     await seedProfiles(ctx);
     await seedDirects(ctx, me, bots, authors);
     await seedGroup(ctx, me, authors);
+    await seedSpaceInvite(ctx, me, bots);
     return { spaceId: await seedSpace(ctx, me, bots, authors) };
   },
 });

@@ -5,12 +5,16 @@ export {
   channel,
   conversation,
   linkPreview,
+  MAX_INVITE_LINK_LIFETIME,
   MAX_REACTION_MESSAGES,
   MESSAGE_PAGE_SIZE,
   message,
   messagesProtocol,
   reaction,
   space,
+  spaceInvite,
+  spaceInviteLink,
+  spaceInviteLinkPreview,
 } from "./protocol.ts";
 export type {
   Attachment,
@@ -20,4 +24,7 @@ export type {
   Message,
   Reaction,
   Space,
+  SpaceInvite,
+  SpaceInviteLink,
+  SpaceInviteLinkPreview,
 } from "./protocol.ts";

@@ -5,9 +5,14 @@ import { Button, FieldGroup } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
 import { AccountScope, useAccount } from "~/features/messaging/account";
-import { useSpace, useSpaceActions } from "~/features/messaging/spaces";
+import {
+  useSpace,
+  useSpaceActions,
+  useSpaceInviteLinks,
+} from "~/features/messaging/spaces";
 import { ChannelsSection } from "~/features/spaces/channels-section";
 import { InboxSection } from "~/features/spaces/inbox-section";
+import { InviteLinksSection } from "~/features/spaces/invite-links-section";
 import { MembersSection } from "~/features/spaces/members-section";
 import { destructive } from "~/lib/ui-modifiers";
 
@@ -29,9 +34,12 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
   const router = useRouter();
   const { address } = useAccount();
   const { isLoading, space } = useSpace(spaceId);
+  const links = useSpaceInviteLinks(spaceId);
   const { removeMember } = useSpaceActions();
 
-  if (isLoading) return <Stack.Title>{name ?? ""}</Stack.Title>;
+  // Wait for the links too (unless the space is gone), so they don't pop in.
+  if (isLoading || (space !== undefined && links.isLoading))
+    return <Stack.Title>{name ?? ""}</Stack.Title>;
   if (space === undefined) return <Stack.Title>Space Not Found</Stack.Title>;
 
   function leave(name: string) {
@@ -58,6 +66,7 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
             <ChannelsSection space={space} />
             <InboxSection space={space} />
             <MembersSection space={space} />
+            <InviteLinksSection links={links.links} space={space} />
             {space.role !== "owner" && (
               <FieldGroup.Section>
                 <Button

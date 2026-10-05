@@ -12,9 +12,11 @@ import { secondaryTextStyle } from "~/lib/colors";
 export function MembersSection({ space }: { space: Space }) {
   const router = useRouter();
   const { address: account } = useAccount();
-  const profileOf = useProfiles(
-    space.members.map((member) => member.accountId),
-  );
+  const invited = space.invited ?? [];
+  const profileOf = useProfiles([
+    ...space.members.map((member) => member.accountId),
+    ...invited,
+  ]);
   const openProfile = useOpenProfile();
   return (
     <FieldGroup.Section>
@@ -49,6 +51,24 @@ export function MembersSection({ space }: { space: Space }) {
           onPress={() => openProfile(member.accountId)}
         >
           {profileOf(member.accountId).displayName}
+        </ListItem>
+      ))}
+      {invited.map((address) => (
+        <ListItem
+          key={address}
+          leading={
+            <Avatar
+              name={profileOf(address).displayName}
+              size="sm"
+              uri={profileOf(address).avatarUrl}
+            />
+          }
+          supportingText={
+            <Text textStyle={secondaryTextStyle}>{`${address} · Invited`}</Text>
+          }
+          onPress={() => openProfile(address)}
+        >
+          {profileOf(address).displayName}
         </ListItem>
       ))}
     </FieldGroup.Section>

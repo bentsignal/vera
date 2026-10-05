@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import { Stack } from "expo-router";
 
-/** The New Space sheet: a name, then the people to add. */
+/** The New Space sheet: a name, then the people to invite. */
 export default function NewSpaceLayout() {
   return (
     <Stack
@@ -12,7 +12,7 @@ export default function NewSpaceLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "New Space" }} />
-      <Stack.Screen name="people" options={{ title: "Add People" }} />
+      <Stack.Screen name="people" options={{ title: "Invite People" }} />
     </Stack>
   );
 }
