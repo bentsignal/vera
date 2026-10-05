@@ -10,6 +10,7 @@ import { BUBBLE_RADIUS, TAIL_DROP, TailedBubble } from "./bubble-shape";
 import { LinkPreviewCard } from "./link-preview-card";
 import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
+import { visibleBody } from "./message-text";
 import { RevealedTime, SlideWithReveal } from "./reveal";
 
 /** Width of the avatar column beside incoming bubbles in group chats. */
@@ -78,15 +79,16 @@ function Content({
   isOwn: boolean;
   endsGroup: boolean;
 }) {
+  const body = visibleBody(message);
   return (
     <SendingFade status={message.status}>
       <View className={cn("gap-0.5", isOwn ? "items-end" : "items-start")}>
         {message.attachments.map((attachment) => (
           <AttachmentView key={attachment.url} attachment={attachment} />
         ))}
-        {message.body && (
+        {body !== undefined && (
           <Body
-            text={message.body}
+            text={body}
             isOwn={isOwn}
             tail={endsGroup && !message.linkPreview}
           />
