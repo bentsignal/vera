@@ -8,6 +8,7 @@ import { AttachmentView } from "./attachment-view";
 import { LinkPreviewCard } from "./link-preview-card";
 import { InteractiveMessage } from "./message-reactions";
 import { MessageMeta, SendingFade } from "./message-status";
+import { visibleBody } from "./message-text";
 
 const AVATAR_COLUMN = 36;
 
@@ -21,6 +22,7 @@ export function MessageStacked({
   author: { avatarUrl: string | null; displayName: string };
   startsGroup: boolean;
 }) {
+  const body = visibleBody(message);
   return (
     <View
       className={cn("flex-row gap-3 px-4", startsGroup ? "pt-3" : "pt-0.5")}
@@ -46,10 +48,8 @@ export function MessageStacked({
         <InteractiveMessage message={message} align="start" shape="card">
           <SendingFade status={message.status}>
             <View className="items-start gap-1">
-              {message.body && (
-                <Text className="text-body text-foreground">
-                  {message.body}
-                </Text>
+              {body !== undefined && (
+                <Text className="text-body text-foreground">{body}</Text>
               )}
               {message.attachments.map((attachment) => (
                 <AttachmentView key={attachment.url} attachment={attachment} />

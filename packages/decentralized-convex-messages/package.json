@@ -15,6 +15,7 @@
     "format": "prettier --check . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .prettierignore",
     "lint": "eslint --flag unstable_native_nodejs_ts_config --ignore-pattern _generated",
+    "test": "node --experimental-strip-types --test *.test.ts",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {

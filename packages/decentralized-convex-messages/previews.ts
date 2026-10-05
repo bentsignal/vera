@@ -7,9 +7,9 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server.js";
+import { previewedUrl } from "./links.ts";
 import { linkPreview } from "./protocol.ts";
 
-const URL_PATTERN = /https?:\/\/[^\s<>"']+/i;
 const FETCH_TIMEOUT_MS = 5_000;
 const MAX_HTML_LENGTH = 512 * 1024;
 const MAX_TEXT_LENGTH = 300;
@@ -45,7 +45,7 @@ export const unfurl = internalAction({
     const body = await ctx.runQuery(internal.previews.messageBody, {
       messageId,
     });
-    const url = body?.match(URL_PATTERN)?.[0]?.replace(/[).,!?]+$/, "");
+    const url = body === null ? undefined : previewedUrl(body);
     if (url === undefined) return;
     try {
       const preview = await fetchPreview(url);

@@ -82,7 +82,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         photosPermission: "Vera uses your photos to send them in messages.",
       },
     ],
-    ["expo-notifications", { color: "#007AFF" }],
+    [
+      "expo-notifications",
+      {
+        // Android's notification small icon: white leaves it tints with
+        // `color`. iOS badges notifications with the app icon instead.
+        icon: "./assets/icons/vera-android-notification.png",
+        color: "#007AFF",
+      },
+    ],
     "expo-secure-store",
     "expo-video",
     [

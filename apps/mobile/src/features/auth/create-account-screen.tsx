@@ -1,4 +1,5 @@
-import { useState } from "react";
+import type { TextInputRef } from "@expo/ui";
+import { useRef, useState } from "react";
 import { View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,6 +10,7 @@ import { ProminentButton } from "~/components/prominent-button";
 import { createAccount } from "~/features/session/passkeys";
 import { usePendingSignIn } from "~/features/session/pending-sign-in";
 import { useAuthFlow } from "./auth-flow";
+import { INVITE_CODE_LENGTH } from "./invite-code";
 import { newAccountSections } from "./new-account-sections";
 import { isValidUsername, normalizeUsername } from "./username";
 
@@ -19,16 +21,17 @@ export function CreateAccountScreen() {
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
   const [pending, setPending] = useState(false);
+  const usernameRef = useRef<TextInputRef>(null);
   const canSubmit =
     !pending &&
-    inviteCode.trim().length > 0 &&
+    inviteCode.length === INVITE_CODE_LENGTH &&
     isValidUsername(normalizeUsername(username));
 
   async function submit() {
     setPending(true);
     await attempt("Couldn't Create Account", () =>
       createAccount(pendingSignIn, {
-        inviteCode: inviteCode.trim(),
+        inviteCode,
         username: normalizeUsername(username),
       }),
     );
@@ -40,8 +43,10 @@ export function CreateAccountScreen() {
       <NativeHost style={{ flex: 1 }}>
         <FieldGroup>
           {newAccountSections({
+            inviteCode,
             onChangeInviteCode: setInviteCode,
             onChangeUsername: setUsername,
+            usernameRef,
           })}
         </FieldGroup>
       </NativeHost>
