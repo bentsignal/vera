@@ -1,8 +1,11 @@
-import { FieldGroup, Row, Text, TextInput } from "@expo/ui";
+import type { RefObject } from "react";
+import type { TextInputRef } from "@expo/ui";
+import { FieldGroup, RNHostView, Row, Text, TextInput } from "@expo/ui";
 
 import { env } from "~/env";
 import { nativeColors } from "~/lib/colors";
 import { fillRow, growInRow } from "~/lib/ui-modifiers";
+import { InviteCodeInput } from "./invite-code-input";
 
 /**
  * Invite code and username fields for creating an account, as two
@@ -10,23 +13,31 @@ import { fillRow, growInRow } from "~/lib/ui-modifiers";
  * a component: on Android, `FieldGroup` only treats direct children (and
  * fragments) as sections, and wraps anything else in one list row that
  * shows just the first section, which hid the username field.
+ *
+ * A complete invite code moves the cursor on to the username field, which
+ * `usernameRef` points at.
  */
 export function newAccountSections({
+  inviteCode,
   onChangeInviteCode,
   onChangeUsername,
+  usernameRef,
 }: {
+  inviteCode: string;
   onChangeInviteCode: (value: string) => void;
   onChangeUsername: (value: string) => void;
+  usernameRef: RefObject<TextInputRef | null>;
 }) {
   return (
     <>
       <FieldGroup.Section title="Invite Code">
-        <TextInput
-          placeholder="Enter your invite code"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          onChangeText={onChangeInviteCode}
-        />
+        <RNHostView matchContents>
+          <InviteCodeInput
+            value={inviteCode}
+            onChangeText={onChangeInviteCode}
+            onComplete={() => usernameRef.current?.focus()}
+          />
+        </RNHostView>
         <FieldGroup.SectionFooter>
           <Text>Vera is invite-only for now. Ask a friend for a code.</Text>
         </FieldGroup.SectionFooter>
@@ -34,6 +45,7 @@ export function newAccountSections({
       <FieldGroup.Section title="Address">
         <Row alignment="center" spacing={2} modifiers={fillRow}>
           <TextInput
+            ref={usernameRef}
             modifiers={growInRow}
             placeholder="username"
             autoCapitalize="none"
