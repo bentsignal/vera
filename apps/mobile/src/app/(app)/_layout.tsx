@@ -88,12 +88,7 @@ function AppStack() {
       />
       <Stack.Screen
         name="add-account"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6, 1],
-          sheetGrabberVisible: true,
-          title: "Add Account",
-        }}
+        options={{ headerShown: false, presentation: "modal" }}
       />
       <Stack.Screen
         name="new-space"
