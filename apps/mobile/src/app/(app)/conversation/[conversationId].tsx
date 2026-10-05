@@ -28,7 +28,7 @@ import {
   useMessages,
 } from "~/features/messaging/conversations";
 import { useActiveConversation } from "~/features/notifications/push";
-import { usePreference } from "~/features/preferences/store";
+import { useMessageLayout } from "~/features/preferences/store";
 
 const ATTACHMENT_SOURCES = [
   { label: "Photos & Videos", source: "library" },
@@ -112,6 +112,11 @@ function otherMember(
   return conversation.members.find((member) => member !== self);
 }
 
+/** The title from the opening screen shows until the conversation loads. */
+function headingFor(title: string, initialTitle: string | undefined) {
+  return title === "" ? (initialTitle ?? "") : title;
+}
+
 function Conversation({
   conversationId,
   anchorId,
@@ -126,14 +131,13 @@ function Conversation({
   const { address } = useAccount();
   const { conversation, isLoading, profileOf, title } =
     useConversation(conversationId);
-  const layout = usePreference("messageLayout");
+  const layout = useMessageLayout(conversation?.kind);
   const messages = useMessages(conversationId, anchorId);
   const [composerHeight, setComposerHeight] = useState(56);
   useMarkRead(conversationId, messages.newestSentAt);
   useActiveConversation(conversationId);
 
-  // The title from the opening screen shows until the conversation loads.
-  const heading = title === "" ? (initialTitle ?? "") : title;
+  const heading = headingFor(title, initialTitle);
   const other = otherMember(conversation, address);
   if (!isLoading && conversation === undefined) {
     return (
@@ -151,7 +155,7 @@ function Conversation({
     <View className="bg-background flex-1">
       <Stack.Title>{heading}</Stack.Title>
       <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
-        {messages.isLoading ? null : (
+        {messages.isLoading || layout === undefined ? null : (
           <MessageList
             key={messages.viewKey}
             messages={messages.messages}

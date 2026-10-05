@@ -42,7 +42,8 @@ Work through these in roughly this order; check items off as PRs merge.
 - [x] Chat screen: transparent header with a gradient fade so messages get
       more room (Slack-style).
 - [x] Message layout setting: bubbles (current) or stacked rows with avatars
-      on the left (Slack/Discord-style).
+      on the left (Slack/Discord-style). Chosen separately for one-on-one
+      (default bubbles), group chats, and spaces (both default stacked).
 - [x] Smoother sending state than "Sending…" text under the bubble.
 - [x] New message search: debounce lookups and show "No users found".
 - [x] Search uses the iOS 26+ separate search tab in the tab bar. (It is a
