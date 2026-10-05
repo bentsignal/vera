@@ -65,6 +65,16 @@ test build or update onto his phone, and ship only after he approves.
 Over-the-air updates are the default; a store build happens only when
 native code changed or Apple requires one.
 
+**Extra release steps go in [docs/next-release.md](docs/next-release.md),
+in the PR that needs them.** Some changes need more from a release than
+`pnpm release` does: a deploy outside Convex (such as `infra/`), console or
+account setup, environment variables, an order to do things in, or a check
+after shipping. List each one there (what, when, the commands, and how to
+verify it) in that same PR, and say so on the PR's "Extra release steps"
+line. Another agent runs releases and only knows what that file says; CI
+fails a PR without the line, and production builds and updates stop until
+the steps are done.
+
 ## Phone builds
 
 Shawn's phone has two Vera apps side by side: **Vera** (TestFlight or the

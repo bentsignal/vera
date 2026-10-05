@@ -1,0 +1,32 @@
+name: Release steps
+
+# Every PR says whether it adds steps the next release must do beyond
+# `pnpm release`, and puts them in docs/next-release.md
+# (scripts/check-release-steps.ts). Reruns when the description is edited.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+concurrency:
+  group: release-steps-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  release-steps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          # No install needed, so no pnpm (setup-node caches it by default).
+          package-manager-cache: false
+
+      - name: Check the description's release steps
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node --experimental-strip-types scripts/check-release-steps.ts

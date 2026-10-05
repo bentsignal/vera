@@ -13,6 +13,9 @@
 //   build production --android          Android production APK (vera.chat), uploaded for an install link
 //   build ... --artifact <ipa|apk>      upload and tag an existing build of this commit instead of building
 //   ota internal|production "msg"       over-the-air update for every platform whose binary matches
+//   ... --next-release-done             production builds and updates refuse to run while
+//                                       docs/next-release.md lists steps, until this confirms
+//                                       the ones due by then are done
 //   testflight <build> <notes.md>  What to Test, Friends group, Beta App Review
 //   appstore <build>               attach a build to the App Store version and submit it
 //   asc <METHOD> <path> [json]     raw App Store Connect API call
@@ -210,6 +213,38 @@ function backendChanges() {
   return { base, files };
 }
 
+/**
+ * The one-off steps docs/next-release.md lists for the next release: its
+ * section headings, indented by level. Empty when there are none.
+ */
+function nextReleaseSteps() {
+  const file = join(ROOT, "docs/next-release.md");
+  if (!existsSync(file)) return [];
+  return readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => /^#{2,3} /.test(line))
+    .map((line) => line.replace(/^## /, "- ").replace(/^### /, "  - "));
+}
+
+/**
+ * Production builds and updates are where a missed step reaches users, so
+ * they stop while docs/next-release.md lists steps, until
+ * `--next-release-done` confirms the ones due by now are done.
+ */
+function requireNextReleaseSteps() {
+  const steps = nextReleaseSteps();
+  if (steps.length === 0 || process.argv.includes("--next-release-done")) {
+    return;
+  }
+  throw new Error(
+    [
+      "docs/next-release.md lists extra steps for this release:",
+      ...steps,
+      "Read it, do every step due before this command (each says when), verify them, then rerun with --next-release-done.",
+    ].join("\n"),
+  );
+}
+
 function stamp() {
   // UTC, to the second: yyyymmddThhmmss.
   return new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
@@ -272,6 +307,15 @@ function plan() {
   console.log(merges.length === 0 ? "- nothing" : merges.join("\n"));
   console.log(
     "\nEach merged PR's description has a Release notes section (backend, native change, deploy).",
+  );
+  const steps = nextReleaseSteps();
+  console.log(
+    steps.length === 0
+      ? "\nextra release steps: none (docs/next-release.md)"
+      : [
+          "\nEXTRA RELEASE STEPS (docs/next-release.md): this release must do every one, in order. Read the file, put them in the plan and the report.",
+          ...steps,
+        ].join("\n"),
   );
 }
 
@@ -356,6 +400,7 @@ function build(profile: string | undefined, flags: string[]) {
     );
   }
   requireCleanMain();
+  if (profile === "production") requireNextReleaseSteps();
   // Reuses a finished build from this commit (say, after a failed upload)
   // instead of building again; the runtime check still applies.
   const artifactIndex = flags.indexOf("--artifact");
@@ -397,7 +442,11 @@ function build(profile: string | undefined, flags: string[]) {
   const name = binaryTagPattern("ios", profile).replace("*", buildNumber);
   requireNewTag(name);
   if (profile === "internal") {
-    installPage(ipa, `internal/ios/${buildNumber}`, `Internal build ${buildNumber}.`);
+    installPage(
+      ipa,
+      `internal/ios/${buildNumber}`,
+      `Internal build ${buildNumber}.`,
+    );
   } else {
     run("xcrun", [
       "altool",
@@ -430,11 +479,7 @@ function installPage(artifact: string, prefix: string, description: string) {
 }
 
 /** Fails before anything is uploaded if updates could never reach the build. */
-function requireRuntime(
-  runtime: string,
-  platform: Platform,
-  channel: Channel,
-) {
+function requireRuntime(runtime: string, platform: Platform, channel: Channel) {
   const expected = fingerprint(platform, channel);
   if (runtime !== expected) {
     throw new Error(
@@ -504,7 +549,11 @@ function buildAndroid(profile: Channel, artifact: string | undefined) {
   const name = binaryTagPattern("android", profile).replace("*", versionCode);
   requireNewTag(name);
   if (profile === "internal") {
-    installPage(apk, `internal/android/${versionCode}`, `Internal build ${versionCode}.`);
+    installPage(
+      apk,
+      `internal/android/${versionCode}`,
+      `Internal build ${versionCode}.`,
+    );
   } else {
     run(
       "eas",
@@ -522,6 +571,7 @@ function ota(channel: string | undefined, message: string | undefined) {
   }
   if (message === undefined) throw new Error("an update needs a message");
   requireCleanMain();
+  if (channel === "production") requireNextReleaseSteps();
   // An update only reaches binaries with the same runtime: publish for the
   // platforms whose latest binary on this channel matches, and refuse when
   // none does.
