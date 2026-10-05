@@ -79,6 +79,10 @@ so the first release after it is a store build.
 
 ## The flow
 
+[next-release.md](next-release.md) lists one-off steps the next release
+needs beyond this flow (extra deploys, setup, checks after shipping). Every
+release works through it, and afterwards a PR removes the finished steps.
+
 1. **Plan.** On an up-to-date `main`, run `pnpm release plan`. Write the
    release notes from the merged PRs and a test plan of what to try on the
    phone. Send both to Shawn.

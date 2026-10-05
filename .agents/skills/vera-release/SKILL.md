@@ -6,6 +6,13 @@ description: Run a Vera mobile release end to end, covering changes since the la
 # Releasing Vera
 
 Read `docs/releasing.md` first; it explains channels, runtimes, and tags.
+
+**Then read `docs/next-release.md`.** It lists one-off steps this release
+needs beyond this skill, such as deploys `pnpm release` doesn't run, their
+order, and checks after shipping. Do every step it lists, at the point it
+says, and verify each one. A step you can't do blocks the release: tell
+Shawn. Include its steps in the plan (step 1) and the report (step 4), and
+after shipping open a PR that removes the finished ones.
 Releases always come from `origin/main`, never from a feature branch.
 Nothing reaches users without Shawn's explicit go-ahead at step 4.
 
@@ -33,7 +40,8 @@ gh pr view <n> --json title,body   # for each merged PR it lists
 ```
 
 Each merged PR's description ends with a "Release notes" section (backend,
-native change, deploy needed); start from those.
+native change, deploy needed); start from those, together with
+`docs/next-release.md`.
 
 Send Shawn:
 
