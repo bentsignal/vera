@@ -92,6 +92,11 @@ explicit approval of this release. `scripts/phone.sh down` once he's done.
 
 ## 4. Ship
 
+While `docs/next-release.md` lists steps, `pnpm release build production`
+and `ota production` refuse to run until you add `--next-release-done`.
+Only add it once every step that file puts before that command is done and
+verified. The flag is your confirmation; don't use it to get past the check.
+
 If `plan` says the backend changed, deploy it before the app. This tags
 `backend/deploy/<stamp>`, which the next `plan` compares against:
 

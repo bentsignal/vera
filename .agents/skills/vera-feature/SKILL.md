@@ -173,7 +173,18 @@ gh pr create --base main --title "<title>" --body-file <body.md>
 ```
 
 Follow `.github/pull_request_template.md`: summary, evidence, how it was
-tested, the backend used, and whether native code changed. Link it to the
+tested, the backend used, whether native code changed, and extra release
+steps.
+
+**Extra release steps.** If the next release has to do anything for this
+change beyond `pnpm release` (deploy something outside Convex such as
+`infra/`, set up a console or account, set environment variables, deploy in
+a particular order, check something after shipping), add it to
+`docs/next-release.md` in this PR: what, when, the commands, and how to
+verify it. Then fill the template's "Extra release steps" line with what you
+added, or `none`. Another agent runs the release and only learns about these
+steps from that file; the "Release steps" CI check fails without the line.
+Note the steps when you tell Shawn the PR is ready. Link it to the
 thread with the T3 `link_pull_request` tool. Review your own diff
 (`gh pr diff`) as a skeptical reviewer would, and fix what you find. Wait for
 CI (`gh pr checks --watch`) and fix failures. Make sure the CI workflow
