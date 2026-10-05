@@ -60,7 +60,14 @@ export const conversation = v.object({
   members: v.array(v.string()),
   muted: v.boolean(),
   name: v.union(v.null(), v.string()),
+  // Optional so results from PDSs that predate them still validate.
+  /** When the caller pinned it to the top of their inbox. */
+  pinnedAt: v.optional(v.number()),
+  /** Channels only: whether the caller's inbox lists it. */
+  showInInbox: v.optional(v.boolean()),
   spaceId: v.union(v.null(), v.string()),
+  /** Channels only: the space's name. */
+  spaceName: v.optional(v.string()),
   unreadCount: v.number(),
   updatedAt: v.number(),
 });
@@ -71,6 +78,8 @@ export const channel = v.object({
   conversationId: v.string(),
   name: v.string(),
   position: v.number(),
+  /** Whether the caller's inbox lists it (absent from older PDSs: yes). */
+  showInInbox: v.optional(v.boolean()),
   unreadCount: v.number(),
 });
 
@@ -167,6 +176,19 @@ export const messagesProtocol = definePluginProtocol({
       args: v.object({ conversationId: v.string(), muted: v.boolean() }),
       returns: v.null(),
     }),
+    /** Pins a conversation to the top of your inbox, or unpins it. */
+    setPinned: defineOperation({
+      args: v.object({ conversationId: v.string(), pinned: v.boolean() }),
+      returns: v.null(),
+    }),
+    /**
+     * Lists a channel in your inbox (the default) or leaves it out; it
+     * stays in its space either way. Channels only.
+     */
+    setShowInInbox: defineOperation({
+      args: v.object({ conversationId: v.string(), show: v.boolean() }),
+      returns: v.null(),
+    }),
     createSpace: defineOperation({
       args: v.object({ name: v.string() }),
       returns: v.object({ spaceId: v.string() }),
@@ -205,8 +227,13 @@ export const messagesProtocol = definePluginProtocol({
     }),
   },
   queries: {
+    /**
+     * Your conversations. With `channels`, it also lists the channels of
+     * your spaces that you haven't left out of it; without, it lists only
+     * direct messages and groups (as apps before the unified inbox expect).
+     */
     inbox: defineOperation({
-      args: v.object({}),
+      args: v.object({ channels: v.optional(v.boolean()) }),
       returns: v.array(conversation),
     }),
     conversation: defineOperation({

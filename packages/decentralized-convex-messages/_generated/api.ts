@@ -11,6 +11,7 @@
 import type * as conversations from "../conversations.js";
 import type * as dispatcher from "../dispatcher.js";
 import type * as history from "../history.js";
+import type * as inbox from "../inbox.js";
 import type * as index from "../index.js";
 import type * as metadata from "../metadata.js";
 import type * as model from "../model.js";
@@ -33,6 +34,7 @@ const fullApi: ApiFromModules<{
   conversations: typeof conversations;
   dispatcher: typeof dispatcher;
   history: typeof history;
+  inbox: typeof inbox;
   index: typeof index;
   metadata: typeof metadata;
   model: typeof model;

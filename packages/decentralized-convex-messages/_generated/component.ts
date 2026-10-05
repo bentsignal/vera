@@ -88,6 +88,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 args: { conversationId: string; muted: boolean };
                 type: "setMuted";
               }
+            | {
+                args: { conversationId: string; pinned: boolean };
+                type: "setPinned";
+              }
+            | {
+                args: { conversationId: string; show: boolean };
+                type: "setShowInInbox";
+              }
             | { args: { name: string }; type: "createSpace" }
             | { args: { name: string; spaceId: string }; type: "renameSpace" }
             | {
@@ -154,6 +162,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         | { routes?: Array<string>; type: "react"; value: null }
         | { routes?: Array<string>; type: "markRead"; value: null }
         | { routes?: Array<string>; type: "setMuted"; value: null }
+        | { routes?: Array<string>; type: "setPinned"; value: null }
+        | { routes?: Array<string>; type: "setShowInInbox"; value: null }
         | {
             routes?: Array<string>;
             type: "createSpace";
@@ -187,7 +197,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           };
           lastChanged: "0.1.0";
           operation:
-            | { args: {}; type: "inbox" }
+            | { args: { channels?: boolean }; type: "inbox" }
             | { args: { conversationId: string }; type: "conversation" }
             | {
                 args: {
@@ -241,7 +251,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               members: Array<string>;
               muted: boolean;
               name: null | string;
+              pinnedAt?: number;
+              showInInbox?: boolean;
               spaceId: null | string;
+              spaceName?: string;
               unreadCount: number;
               updatedAt: number;
             }>;
@@ -281,7 +294,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               members: Array<string>;
               muted: boolean;
               name: null | string;
+              pinnedAt?: number;
+              showInInbox?: boolean;
               spaceId: null | string;
+              spaceName?: string;
               unreadCount: number;
               updatedAt: number;
             };
@@ -338,6 +354,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 conversationId: string;
                 name: string;
                 position: number;
+                showInInbox?: boolean;
                 unreadCount: number;
               }>;
               members: Array<{ accountId: string; role: "owner" | "member" }>;
@@ -355,6 +372,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 conversationId: string;
                 name: string;
                 position: number;
+                showInInbox?: boolean;
                 unreadCount: number;
               }>;
               members: Array<{ accountId: string; role: "owner" | "member" }>;

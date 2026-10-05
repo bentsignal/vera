@@ -2,7 +2,7 @@ import { ConvexError } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import type { Conversation, Message, Space } from "./protocol.ts";
+import type { Conversation, Message } from "./protocol.ts";
 
 const ADDRESS_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const MAX_NAME_LENGTH = 80;
@@ -152,17 +152,25 @@ export async function upsertMember(
   ctx: MutationCtx,
   access: ConversationAccess,
   accountId: string,
-  patch: Partial<Pick<Doc<"members">, "lastReadAt" | "muted">>,
+  patch: Partial<
+    Pick<
+      Doc<"members">,
+      "hiddenFromInbox" | "lastReadAt" | "muted" | "pinnedAt"
+    >
+  >,
 ) {
   if (access.member !== null) {
+    // An undefined value removes the field (unpinned, back in the inbox).
     await ctx.db.patch(access.member._id, patch);
     return;
   }
   await ctx.db.insert("members", {
     accountId,
     conversationId: access.conversation.conversationId,
+    hiddenFromInbox: patch.hiddenFromInbox,
     lastReadAt: patch.lastReadAt ?? access.lastReadAt,
     muted: patch.muted ?? access.muted,
+    pinnedAt: patch.pinnedAt,
     role: "member",
   });
 }
@@ -232,8 +240,12 @@ export async function toConversation(
   access: ConversationAccess,
   accountId: string,
 ): Promise<Conversation> {
-  const { conversation } = access;
+  const { conversation, member } = access;
   const lastMessage = await latestMessage(ctx, conversation.conversationId);
+  const space =
+    conversation.spaceId === undefined
+      ? null
+      : await getSpace(ctx, conversation.spaceId);
   return {
     conversationId: conversation.conversationId,
     kind: conversation.kind,
@@ -241,7 +253,13 @@ export async function toConversation(
     members: await memberAddresses(ctx, conversation),
     muted: access.muted,
     name: conversation.name ?? null,
+    pinnedAt: member?.pinnedAt,
+    showInInbox:
+      conversation.kind === "channel"
+        ? member?.hiddenFromInbox !== true
+        : undefined,
     spaceId: conversation.spaceId ?? null,
+    spaceName: space?.name,
     unreadCount: await unreadCount(
       ctx,
       conversation.conversationId,
@@ -250,75 +268,4 @@ export async function toConversation(
     ),
     updatedAt: conversation.updatedAt,
   };
-}
-
-export async function toSpace(
-  ctx: QueryCtx,
-  space: Doc<"spaces">,
-  accountId: string,
-): Promise<Space | null> {
-  const self = await getSpaceMember(ctx, space.spaceId, accountId);
-  if (self === null) return null;
-  const members = await ctx.db
-    .query("spaceMembers")
-    .withIndex("by_space_account", (index) =>
-      index.eq("spaceId", space.spaceId),
-    )
-    .collect();
-  const conversations = await ctx.db
-    .query("conversations")
-    .withIndex("by_space", (index) => index.eq("spaceId", space.spaceId))
-    .collect();
-  const channels = await Promise.all(
-    conversations.map(async (conversation) => {
-      const member = await getMember(
-        ctx,
-        conversation.conversationId,
-        accountId,
-      );
-      return {
-        conversationId: conversation.conversationId,
-        name: conversation.name ?? "",
-        position: conversation.position ?? 0,
-        unreadCount: await unreadCount(
-          ctx,
-          conversation.conversationId,
-          accountId,
-          member?.lastReadAt ?? self._creationTime,
-        ),
-      };
-    }),
-  );
-  channels.sort(
-    (left, right) =>
-      left.position - right.position || left.name.localeCompare(right.name),
-  );
-  return {
-    channels,
-    members: members.map((member) => ({
-      accountId: member.accountId,
-      role: member.role,
-    })),
-    name: space.name,
-    role: self.role,
-    spaceId: space.spaceId,
-    unreadCount: channels.reduce(
-      (total, channel) => total + channel.unreadCount,
-      0,
-    ),
-  };
-}
-
-export async function requireSpaceRole(
-  ctx: QueryCtx,
-  spaceId: string,
-  accountId: string,
-  role: "member" | "owner",
-) {
-  const space = await getSpace(ctx, spaceId);
-  const member =
-    space === null ? null : await getSpaceMember(ctx, spaceId, accountId);
-  if (space === null || member === null) fail("SPACE_NOT_FOUND");
-  if (role === "owner" && member.role !== "owner") fail("SPACE_OWNER_REQUIRED");
-  return { member, space };
 }
