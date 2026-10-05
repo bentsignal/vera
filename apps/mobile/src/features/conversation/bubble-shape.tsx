@@ -1,14 +1,16 @@
 import Svg, { Path } from "react-native-svg";
 
 /** How far the tail hangs below the bubble. */
-export const TAIL_DROP = 6;
+export const TAIL_DROP = 7;
 /** Bubble corner radius, a touch rounder than a capsule's for one line. */
 export const BUBBLE_RADIUS = 20;
 
 /**
- * A rounded bubble with a tail hanging from its bottom edge, just inside the
- * bottom-right corner: the corner keeps its full curve, and the tail grows
- * out of the bottom like a small hook pointing toward the corner. One
+ * A rounded bubble with iMessage's tail at its bottom-right corner: the
+ * corner curves in to a waist, and the tail below it curls back out like a
+ * horn to a round tip, then sweeps up into the bottom edge. The tail's
+ * points were fitted to a trace of iMessage's, in points measured from the
+ * bubble's right and bottom edges, and don't scale with the bubble. One
  * continuous path, so there is no seam where the tail meets the bubble.
  * `width` and `height` are the bubble's own box; the tail drops `TAIL_DROP`
  * below it.
@@ -18,19 +20,24 @@ function tailedBubblePath(width: number, height: number) {
   const k = r * 0.45;
   const w = width;
   const h = height;
-  const d = TAIL_DROP;
-  // Where the bottom-right corner's curve meets the bottom edge.
-  const corner = w - r;
+  // The corner leaves the side 20 above the bottom, or lower on a short
+  // bubble, below where the top corner ends.
+  const cornerStart = Math.max(h - 20, r);
+  // Where the tail meets the bottom edge, short of the left corner.
+  const tailEnd = Math.max(w - 21.89, r);
   return [
     `M ${r} 0`,
     `L ${w - r} 0`,
     `C ${w - k} 0 ${w} ${k} ${w} ${r}`,
-    `L ${w} ${h - r}`,
-    `C ${w} ${h - k} ${w - k} ${h} ${corner} ${h}`,
-    // Down into the tip, which sits under the end of the corner's curve...
-    `C ${corner - 1} ${h + d * 0.4} ${corner + 1} ${h + d * 0.85} ${corner + 4} ${h + d}`,
-    // ...then a soft scoop back up into the bottom edge, toward the center.
-    `C ${corner - 4} ${h + d} ${corner - 10} ${h + d * 0.5} ${corner - 14} ${h}`,
+    `L ${w} ${cornerStart}`,
+    // The corner curves in to the tail's waist...
+    `C ${w} ${h - 7.65} ${w - 10.52} ${h - 4.3} ${w - 10.52} ${h - 0.07}`,
+    // ...then the tail curls back out toward the edge...
+    `C ${w - 10.52} ${h + 2.54} ${w - 9.51} ${h + 3.61} ${w - 8.42} ${h + 5.21}`,
+    // ...rounds off at the tip...
+    `A 1.03 1.03 0 0 1 ${w - 9.67} ${h + 6.73}`,
+    // ...and sweeps back up into the bottom edge.
+    `C ${w - 17.42} ${h + 3.49} ${Math.max(w - 19.39, tailEnd)} ${h} ${tailEnd} ${h}`,
     `L ${r} ${h}`,
     `C ${k} ${h} 0 ${h - k} 0 ${h - r}`,
     `L 0 ${r}`,

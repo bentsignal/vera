@@ -24,9 +24,7 @@ export function MessageStacked({
 }) {
   const body = visibleBody(message);
   return (
-    <View
-      className={cn("flex-row gap-3 px-4", startsGroup ? "pt-3" : "pt-0.5")}
-    >
+    <View className={cn("flex-row gap-3 px-4", startsGroup ? "pt-5" : "pt-1")}>
       <View style={{ width: AVATAR_COLUMN }}>
         {startsGroup && (
           <Avatar name={author.displayName} size="row" uri={author.avatarUrl} />
