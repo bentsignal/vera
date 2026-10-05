@@ -10,15 +10,15 @@ import { usePeopleSearch } from "~/features/compose/use-people-search";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useSpaceActions } from "~/features/messaging/spaces";
 
-/** Picks who to add, then creates the space named on the previous step. */
+/** Picks who to invite, then creates the space named on the previous step. */
 function NewSpacePeople({ name }: { name: string }) {
   const router = useRouter();
   const closeSheet = useCloseSheet();
   const { address: self } = useAccount();
-  const { addMembers, createSpace } = useSpaceActions();
+  const { createSpace, invite } = useSpaceActions();
   const [members, setMembers] = useState<string[]>([]);
   const search = usePeopleSearch({ selected: members });
-  const isPending = createSpace.isPending || addMembers.isPending;
+  const isPending = createSpace.isPending || invite.isPending;
 
   function toggle(address: string) {
     if (members.includes(address)) {
@@ -36,13 +36,13 @@ function NewSpacePeople({ name }: { name: string }) {
       return;
     }
     if (members.length > 0) {
-      // The space exists either way; people can be added again from it.
-      await addMembers
+      // The space exists either way; people can be invited again from it.
+      await invite
         .mutateAsync({ members, spaceId: created.spaceId })
         .catch(() =>
           Alert.alert(
-            "Couldn't Add People",
-            "The space was created. Add people from its Members list.",
+            "Couldn't Invite People",
+            "The space was created. Invite people from its Members list.",
           ),
         );
     }
@@ -69,7 +69,7 @@ function NewSpacePeople({ name }: { name: string }) {
           <PeoplePicker
             search={search}
             selected={members}
-            footer="Add people now, or later from the space."
+            footer="Invite people now, or later from the space. They join once they accept."
             onPress={toggle}
           />
         </FieldList>

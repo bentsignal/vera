@@ -90,7 +90,7 @@ function AppStack() {
       />
       <Stack.Screen
         name="new-space"
-        // Its own stack: the name, then the people to add.
+        // Its own stack: the name, then the people to invite.
         options={{ headerShown: false, presentation: "modal" }}
       />
       <Stack.Screen
@@ -108,7 +108,25 @@ function AppStack() {
           presentation: "formSheet",
           sheetAllowedDetents: [0.5, 1],
           sheetGrabberVisible: true,
-          title: "Add People",
+          title: "Invite People",
+        }}
+      />
+      <Stack.Screen
+        name="invite-link"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5, 1],
+          sheetGrabberVisible: true,
+          title: "New Invite Link",
+        }}
+      />
+      <Stack.Screen
+        name="join/[code]"
+        options={{
+          headerShown: false,
+          presentation: "formSheet",
+          sheetAllowedDetents: "fitToContents",
+          sheetGrabberVisible: true,
         }}
       />
     </Stack>

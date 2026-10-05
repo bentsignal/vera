@@ -4,6 +4,14 @@
     {
       "source": "/.well-known/:path*",
       "destination": "https://disciplined-hyena-211.convex.site/.well-known/:path*"
+    },
+    {
+      "source": "/join/:code",
+      "destination": "https://disciplined-hyena-211.convex.site/join/:code"
+    },
+    {
+      "source": "/dev/join/:code",
+      "destination": "https://disciplined-hyena-211.convex.site/dev/join/:code"
     }
   ],
   "redirects": [

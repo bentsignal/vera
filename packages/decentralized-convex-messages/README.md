@@ -29,6 +29,19 @@ the member row: `messages.setPinned` pins any conversation (`pinnedAt`), and
 in its space (`showInInbox`, on by default). Channels get a member row the
 first time one of these, or a read, is stored.
 
+People join spaces by accepting an invitation or opening an invite link.
+`messages.inviteToSpace` (any member) leaves a pending invitation that
+`messages.spaceInvites` lists for the invitee until they call
+`messages.acceptSpaceInvite` or `messages.declineSpaceInvite`; a space lists
+its pending invitees in `invited`. `messages.createSpaceInviteLink` (any
+member) returns a random code that lasts `expiresIn` milliseconds (at most a
+year), or forever without it. `messages.spaceInviteLinkPreview` shows any
+signed-in account where a code leads, and `messages.joinSpaceWithLink` joins
+through it. `messages.spaceInviteLinks` lists a space's live links (owners see
+all, members their own), and `messages.revokeSpaceInviteLink` turns one off
+(its maker or an owner). `messages.addSpaceMembers`, which adds people
+without asking, remains for apps from before invitations.
+
 Reactions follow the same author-home rule as messages: `messages.react`
 stores your reaction on your home PDS, and `messages.reactions` (given the
 message IDs on screen) gathers reactions from every member's PDS.

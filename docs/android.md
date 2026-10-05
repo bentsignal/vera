@@ -107,7 +107,9 @@ Other signing keys need both values added, on both deployments:
 - **Google Play App Signing** re-signs Play builds with Google's key. Copy its
   SHA-256 from Play Console → Test and release → App integrity, then add it
   to `PASSKEY_ANDROID_CERT_SHA256` and its `android:apk-key-hash:` form to
-  `PASSKEY_ORIGINS`.
+  `PASSKEY_ORIGINS`. Space invite links (`vera.chat/join/…`) use the same
+  `assetlinks.json`, so until then Play builds open them in the browser
+  instead of the app.
 - **Local debug builds** (`expo run:android`) sign with
   `~/.android/debug.keystore`, which does not exist yet. Rather than trusting
   that key, sign emulators in with the dev deep link:
@@ -150,7 +152,7 @@ the EAS key that `assetlinks.json` already lists.
 5. Add testers by email (up to 100). Internal testing has no review, and
    updates arrive through the Play Store.
 6. Add the Play App Signing fingerprint to the passkey variables (see
-   Passkeys).
+   Passkeys); passkeys and invite links both need it.
 
 Personal accounts created after 2023-11-13 must run a closed test with 12
 testers for 14 days before public release. That only matters for the store

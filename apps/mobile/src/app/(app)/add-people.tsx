@@ -12,11 +12,14 @@ import { useSpace, useSpaceActions } from "~/features/messaging/spaces";
 
 function AddPeople({ spaceId }: { spaceId: string }) {
   const router = useRouter();
-  const { addMembers } = useSpaceActions();
+  const { invite } = useSpaceActions();
   const { space } = useSpace(spaceId);
   const [members, setMembers] = useState<string[]>([]);
   const search = usePeopleSearch({
-    exclude: (space?.members ?? []).map((member) => member.accountId),
+    exclude: [
+      ...(space?.members ?? []).map((member) => member.accountId),
+      ...(space?.invited ?? []),
+    ],
     selected: members,
   });
 
@@ -29,12 +32,12 @@ function AddPeople({ spaceId }: { spaceId: string }) {
     search.clear();
   }
 
-  async function add() {
+  async function send() {
     try {
-      await addMembers.mutateAsync({ members, spaceId });
+      await invite.mutateAsync({ members, spaceId });
       router.dismiss();
     } catch {
-      Alert.alert("Couldn't Add People", "Try again in a moment.");
+      Alert.alert("Couldn't Invite People", "Try again in a moment.");
     }
   }
 
@@ -43,15 +46,20 @@ function AddPeople({ spaceId }: { spaceId: string }) {
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon={sheetIcons.done}
-          accessibilityLabel="Add to Space"
+          accessibilityLabel="Send Invites"
           variant="prominent"
-          disabled={members.length === 0 || addMembers.isPending}
-          onPress={() => void add()}
+          disabled={members.length === 0 || invite.isPending}
+          onPress={() => void send()}
         />
       </Stack.Toolbar>
       <NativeHost style={{ flex: 1 }}>
         <FieldList>
-          <PeoplePicker search={search} selected={members} onPress={toggle} />
+          <PeoplePicker
+            search={search}
+            selected={members}
+            footer="They join once they accept."
+            onPress={toggle}
+          />
         </FieldList>
       </NativeHost>
     </>

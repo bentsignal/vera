@@ -8,6 +8,7 @@ import { httpAction } from "./_generated/server";
 import { androidAssetLinks, appleAppSiteAssociation } from "./appAssociation";
 import { authComponent, createAuth } from "./auth";
 import app from "./convex.config";
+import { joinPage } from "./joinPage";
 import { requireEnvironment } from "./lib";
 
 const http = httpRouter();
@@ -32,6 +33,10 @@ http.route({
   method: "GET",
   path: "/.well-known/assetlinks.json",
 });
+
+// Space invite links, for when the app doesn't open them itself.
+http.route({ handler: joinPage, method: "GET", pathPrefix: "/join/" });
+http.route({ handler: joinPage, method: "GET", pathPrefix: "/dev/join/" });
 
 // vera.chat points at this deployment for passkeys; people visiting it
 // belong on the website.

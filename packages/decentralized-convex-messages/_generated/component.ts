@@ -103,6 +103,18 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 type: "addSpaceMembers";
               }
             | {
+                args: { members: Array<string>; spaceId: string };
+                type: "inviteToSpace";
+              }
+            | { args: { spaceId: string }; type: "acceptSpaceInvite" }
+            | { args: { spaceId: string }; type: "declineSpaceInvite" }
+            | {
+                args: { expiresIn?: number; spaceId: string };
+                type: "createSpaceInviteLink";
+              }
+            | { args: { code: string }; type: "revokeSpaceInviteLink" }
+            | { args: { code: string }; type: "joinSpaceWithLink" }
+            | {
                 args: { accountId: string; spaceId: string };
                 type: "removeSpaceMember";
               }
@@ -171,6 +183,25 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           }
         | { routes?: Array<string>; type: "renameSpace"; value: null }
         | { routes?: Array<string>; type: "addSpaceMembers"; value: null }
+        | { routes?: Array<string>; type: "inviteToSpace"; value: null }
+        | { routes?: Array<string>; type: "acceptSpaceInvite"; value: null }
+        | { routes?: Array<string>; type: "declineSpaceInvite"; value: null }
+        | {
+            routes?: Array<string>;
+            type: "createSpaceInviteLink";
+            value: {
+              code: string;
+              createdAt: number;
+              createdBy: string;
+              expiresAt: null | number;
+            };
+          }
+        | { routes?: Array<string>; type: "revokeSpaceInviteLink"; value: null }
+        | {
+            routes?: Array<string>;
+            type: "joinSpaceWithLink";
+            value: { spaceId: string };
+          }
         | { routes?: Array<string>; type: "removeSpaceMember"; value: null }
         | {
             routes?: Array<string>;
@@ -213,7 +244,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 type: "reactions";
               }
             | { args: {}; type: "spaces" }
-            | { args: { spaceId: string }; type: "space" };
+            | { args: { spaceId: string }; type: "space" }
+            | { args: {}; type: "spaceInvites" }
+            | { args: { spaceId: string }; type: "spaceInviteLinks" }
+            | { args: { code: string }; type: "spaceInviteLinkPreview" };
           version: string;
         },
         | {
@@ -357,6 +391,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 showInInbox?: boolean;
                 unreadCount: number;
               }>;
+              invited?: Array<string>;
               members: Array<{ accountId: string; role: "owner" | "member" }>;
               name: string;
               role: "owner" | "member";
@@ -375,11 +410,44 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 showInInbox?: boolean;
                 unreadCount: number;
               }>;
+              invited?: Array<string>;
               members: Array<{ accountId: string; role: "owner" | "member" }>;
               name: string;
               role: "owner" | "member";
               spaceId: string;
               unreadCount: number;
+            };
+          }
+        | {
+            routes?: Array<string>;
+            type: "spaceInvites";
+            value: Array<{
+              invitedAt: number;
+              invitedBy: string;
+              memberCount: number;
+              name: string;
+              spaceId: string;
+            }>;
+          }
+        | {
+            routes?: Array<string>;
+            type: "spaceInviteLinks";
+            value: Array<{
+              code: string;
+              createdAt: number;
+              createdBy: string;
+              expiresAt: null | number;
+            }>;
+          }
+        | {
+            routes?: Array<string>;
+            type: "spaceInviteLinkPreview";
+            value: null | {
+              expiresAt: null | number;
+              isMember: boolean;
+              memberCount: number;
+              name: string;
+              spaceId: string;
             };
           },
         Name

@@ -9,3 +9,15 @@ export function pdsResult<Result, Source>(
     ? data.result
     : undefined;
 }
+
+/**
+ * Like `pdsResult`, but `fallback` once the PDS has failed, for optional
+ * extras (such as from a PDS that predates them) that shouldn't hold up a
+ * screen.
+ */
+export function pdsResultOr<Result, Source, Fallback>(
+  data: PdsQueryData<Result, Source> | undefined,
+  fallback: Fallback,
+) {
+  return data?.status === "error" ? fallback : pdsResult(data);
+}

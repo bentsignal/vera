@@ -181,6 +181,31 @@ export async function seedSpace(
   return spaceId;
 }
 
+/** A bot's space that the account is invited to but hasn't joined. */
+export async function seedSpaceInvite(
+  ctx: ActionCtx,
+  me: Author,
+  bots: readonly Identity[],
+) {
+  const owner = bots.at(0);
+  if (owner === undefined) throw new Error("Missing bots");
+  const spaceId = stringField(
+    await asAccount(ctx, owner, {
+      args: { name: "Book Club" },
+      type: "createSpace",
+    }),
+    "spaceId",
+  );
+  await asAccount(ctx, owner, {
+    args: { members: bots.map((bot) => bot.accountId), spaceId },
+    type: "addSpaceMembers",
+  });
+  await asAccount(ctx, owner, {
+    args: { members: [me.address], spaceId },
+    type: "inviteToSpace",
+  });
+}
+
 /** Message IDs and timestamps from a `messages.list` page, oldest first. */
 function pageMessages(page: unknown) {
   const messages: unknown =

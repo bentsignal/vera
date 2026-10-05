@@ -1,7 +1,8 @@
 import { httpAction } from "./_generated/server";
 
 // iOS and Android only let the Vera app create passkeys for the relying party
-// domain once that domain lists the app in these two files.
+// domain, and open its invite links, once that domain lists the app in these
+// two files.
 
 function list(name: string) {
   return (process.env[name] ?? "")
@@ -19,12 +20,27 @@ function json(body: unknown) {
   });
 }
 
-/** `PASSKEY_APPLE_APP_IDS`: `<TEAM ID>.<bundle identifier>` entries. */
-export const appleAppSiteAssociation = httpAction(() =>
-  Promise.resolve(
-    json({ webcredentials: { apps: list("PASSKEY_APPLE_APP_IDS") } }),
-  ),
-);
+/**
+ * `PASSKEY_APPLE_APP_IDS`: `<TEAM ID>.<bundle identifier>` entries. Vera
+ * opens invite links at `/join/*`; Vera Dev (`….dev`) at `/dev/join/*`, so
+ * each app only opens links its own server made.
+ */
+export const appleAppSiteAssociation = httpAction(() => {
+  const apps = list("PASSKEY_APPLE_APP_IDS");
+  return Promise.resolve(
+    json({
+      applinks: {
+        details: apps.map((app) => ({
+          appIDs: [app],
+          components: [
+            { "/": app.endsWith(".dev") ? "/dev/join/*" : "/join/*" },
+          ],
+        })),
+      },
+      webcredentials: { apps },
+    }),
+  );
+});
 
 /**
  * `PASSKEY_ANDROID_PACKAGE` (comma-separated: Vera and Vera Dev) and

@@ -42,7 +42,7 @@ Mac has free memory. The queue only works if every agent goes through it.
 ```sh
 scripts/sim.sh up             # wait for a slot, then dev client + this worktree's simulator + Metro
 scripts/sim.sh signin         # dev sign-in as this worktree's test user (wt…)
-scripts/sim.sh seed           # bot DMs, a group, and a space
+scripts/sim.sh seed           # bot DMs, a group, a space, and a space invite
 scripts/sim.sh open /settings # go to any route; conversation/<id>, profile/<address>, ...
 scripts/sim.sh relaunch       # restart the app, e.g. to drop the keyboard or reset state
 scripts/sim.sh shot <name>    # screenshot to .cache/evidence/<name>.png

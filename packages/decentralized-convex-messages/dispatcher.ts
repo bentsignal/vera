@@ -6,6 +6,7 @@ import {
 import { mutation, query } from "./_generated/server.js";
 import * as conversations from "./conversations.ts";
 import * as inbox from "./inbox.ts";
+import * as invites from "./invites.ts";
 import { requireAccountId } from "./model.ts";
 import { messagesProtocol } from "./protocol.ts";
 import * as push from "./pushTokens.ts";
@@ -15,6 +16,8 @@ import * as spaces from "./spaces.ts";
 export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
   handlers: {
     mutations: {
+      acceptSpaceInvite: (ctx, { args, identity }) =>
+        invites.acceptSpaceInvite(ctx, requireAccountId(identity), args),
       addGroupMembers: (ctx, { args, identity }) =>
         conversations.addGroupMembers(ctx, requireAccountId(identity), args),
       addSpaceMembers: (ctx, { args, identity }) =>
@@ -25,8 +28,16 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         conversations.createGroup(ctx, requireAccountId(identity), args),
       createSpace: (ctx, { args, identity }) =>
         spaces.createSpace(ctx, requireAccountId(identity), args),
+      createSpaceInviteLink: (ctx, { args, identity }) =>
+        invites.createSpaceInviteLink(ctx, requireAccountId(identity), args),
+      declineSpaceInvite: (ctx, { args, identity }) =>
+        invites.declineSpaceInvite(ctx, requireAccountId(identity), args),
       deleteChannel: (ctx, { args, identity }) =>
         spaces.deleteChannel(ctx, requireAccountId(identity), args),
+      inviteToSpace: (ctx, { args, identity }) =>
+        invites.inviteToSpace(ctx, requireAccountId(identity), args),
+      joinSpaceWithLink: (ctx, { args, identity }) =>
+        invites.joinSpaceWithLink(ctx, requireAccountId(identity), args),
       leaveConversation: (ctx, { args, identity }) =>
         conversations.leaveConversation(ctx, requireAccountId(identity), args),
       markRead: (ctx, { args, identity }) =>
@@ -45,6 +56,8 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         conversations.renameGroup(ctx, requireAccountId(identity), args),
       renameSpace: (ctx, { args, identity }) =>
         spaces.renameSpace(ctx, requireAccountId(identity), args),
+      revokeSpaceInviteLink: (ctx, { args, identity }) =>
+        invites.revokeSpaceInviteLink(ctx, requireAccountId(identity), args),
       send: (ctx, { args, identity }) => {
         const self = requireAccountId(identity);
         const authorName = identity?.name?.trim() ?? self.split("@")[0] ?? self;
@@ -82,6 +95,16 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
       },
       space: (ctx, { args, identity }) =>
         spaces.space(ctx, requireAccountId(identity), args.spaceId),
+      spaceInviteLinkPreview: (ctx, { args, identity }) =>
+        invites.spaceInviteLinkPreview(
+          ctx,
+          requireAccountId(identity),
+          args.code,
+        ),
+      spaceInviteLinks: (ctx, { args, identity }) =>
+        invites.spaceInviteLinks(ctx, requireAccountId(identity), args.spaceId),
+      spaceInvites: (ctx, { identity }) =>
+        invites.spaceInvites(ctx, requireAccountId(identity)),
       spaces: (ctx, { identity }) =>
         spaces.spaces(ctx, requireAccountId(identity)),
     },

@@ -2,6 +2,7 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useCSSVariable } from "uniwind";
 
 import { useInbox } from "~/features/messaging/conversations";
+import { useSpaceInvites } from "~/features/messaging/spaces";
 import {
   blurNativeSearch,
   focusNativeSearch,
@@ -10,7 +11,8 @@ import {
 export default function TabsLayout() {
   const accent = useCSSVariable("--color-accent");
   const { conversations } = useInbox();
-  // Channel unreads count here too, so Spaces has no badge of its own.
+  // Channel unreads count here, so Spaces badges only invitations.
+  const invites = useSpaceInvites().invites.length;
   const unread = (conversations ?? []).filter(
     ({ unreadCount }) => unreadCount > 0,
   ).length;
@@ -32,6 +34,9 @@ export default function TabsLayout() {
           sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
           md="grid_view"
         />
+        {invites > 0 && (
+          <NativeTabs.Trigger.Badge>{String(invites)}</NativeTabs.Trigger.Badge>
+        )}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>

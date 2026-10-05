@@ -69,6 +69,23 @@ export default defineSchema({
   })
     .index("by_account", ["accountId"])
     .index("by_space_account", ["spaceId", "accountId"]),
+  // People invited to a space who haven't accepted or declined yet.
+  spaceInvites: defineTable({
+    accountId: v.string(),
+    invitedBy: v.string(),
+    spaceId: v.string(),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_space_account", ["spaceId", "accountId"]),
+  // Links into a space; `expiresAt` is absent on ones that never expire.
+  spaceInviteLinks: defineTable({
+    code: v.string(),
+    createdBy: v.string(),
+    expiresAt: v.optional(v.number()),
+    spaceId: v.string(),
+  })
+    .index("by_code", ["code"])
+    .index("by_space", ["spaceId"]),
   pushTokens: defineTable({
     accountId: v.string(),
     token: v.string(),
