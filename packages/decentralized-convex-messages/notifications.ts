@@ -19,6 +19,13 @@ import {
   memberAddresses,
 } from "./model.ts";
 
+/**
+ * Android: the app's high-importance `messages` channel (the default
+ * channel doesn't pop up), and high FCM priority, without which Android
+ * delays or drops pushes while the app is closed or the phone is idle.
+ */
+const ANDROID_DELIVERY = { channelId: "messages", priority: "high" } as const;
+
 /** Who to notify about a message, and what to show them. */
 export const targets = internalQuery({
   args: { messageId: v.string() },
@@ -131,6 +138,7 @@ export const send = internalAction({
           senderId: target.senderId,
           senderName,
         },
+        ...ANDROID_DELIVERY,
         // Lets the iOS Notification Service Extension rewrite it.
         mutableContent: true,
         sound: "default",
@@ -179,6 +187,7 @@ export const sendInvite = internalAction({
           spaceId,
           spaceName: target.spaceName,
         },
+        ...ANDROID_DELIVERY,
         sound: "default",
         title: target.spaceName,
         to: token,

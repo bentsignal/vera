@@ -75,22 +75,59 @@ function TopLine({
   );
 }
 
-export function ConversationRow({
+/**
+ * The row's look, with no touch handling: the unread dot, photo, title
+ * line, and preview. `ConversationRow` makes it a link; on iOS the Inbox
+ * hosts it inside a native SwiftUI row instead.
+ */
+export function ConversationRowContent({
   conversation,
   showAccount,
-  onMarkRead,
-  onTogglePin,
-  onLeave,
 }: {
   conversation: ConversationSummary;
   /** Names the account the conversation belongs to, when several show. */
   showAccount: boolean;
-  onMarkRead: () => void;
-  onTogglePin: () => void;
-  onLeave: () => void;
 }) {
-  const { account, id, kind, title, lastMessage, unreadCount } = conversation;
-  const pinned = conversation.pinnedAt !== null;
+  const { kind, title, lastMessage, unreadCount } = conversation;
+  return (
+    <View className="flex-1 flex-row items-center">
+      {/* iMessage's unread dot sits in a gutter left of the photo. */}
+      <View className="w-6 items-center">
+        {unreadCount > 0 && (
+          <View
+            accessibilityLabel={`${unreadCount} unread`}
+            className="bg-accent size-[10px] rounded-full"
+          />
+        )}
+      </View>
+      <Avatar
+        name={title}
+        size="list"
+        uri={conversation.avatarUrl}
+        glyph={kind === "channel" ? CHANNEL_GLYPH : undefined}
+      />
+      <View className="border-b-hairline border-separator ml-3 min-h-[78px] flex-1 justify-center self-stretch py-2.5 pr-4">
+        <TopLine conversation={conversation} showAccount={showAccount} />
+        <Text
+          numberOfLines={2}
+          className="text-subhead text-muted pt-0.5 leading-[20px]"
+        >
+          {lastMessage}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/** A tappable Inbox row that opens the conversation. */
+export function ConversationRow({
+  conversation,
+  showAccount,
+}: {
+  conversation: ConversationSummary;
+  showAccount: boolean;
+}) {
+  const { account, id, title } = conversation;
   return (
     <Link
       href={{
@@ -99,56 +136,12 @@ export function ConversationRow({
       }}
       asChild
     >
-      <Link.Trigger>
-        <Pressable className="active:bg-fill flex-row items-center">
-          {/* iMessage's unread dot sits in a gutter left of the photo. */}
-          <View className="w-6 items-center">
-            {unreadCount > 0 && (
-              <View
-                accessibilityLabel={`${unreadCount} unread`}
-                className="bg-accent size-[10px] rounded-full"
-              />
-            )}
-          </View>
-          <Avatar
-            name={title}
-            size="list"
-            uri={conversation.avatarUrl}
-            glyph={kind === "channel" ? CHANNEL_GLYPH : undefined}
-          />
-          <View className="border-b-hairline border-separator ml-3 min-h-[78px] flex-1 justify-center py-2.5 pr-4">
-            <TopLine conversation={conversation} showAccount={showAccount} />
-            <Text
-              numberOfLines={2}
-              className="text-subhead text-muted pt-0.5 leading-[20px]"
-            >
-              {lastMessage}
-            </Text>
-          </View>
-        </Pressable>
-      </Link.Trigger>
-      <Link.Preview />
-      <Link.Menu>
-        <Link.MenuAction
-          title={pinned ? "Unpin" : "Pin"}
-          icon={pinned ? "pin.slash" : "pin"}
-          onPress={onTogglePin}
+      <Pressable className="active:bg-fill flex-row">
+        <ConversationRowContent
+          conversation={conversation}
+          showAccount={showAccount}
         />
-        <Link.MenuAction
-          title="Mark as Read"
-          icon="envelope.open"
-          disabled={unreadCount === 0}
-          onPress={onMarkRead}
-        />
-        {kind === "group" && (
-          <Link.MenuAction
-            title="Leave Group"
-            icon="rectangle.portrait.and.arrow.right"
-            destructive
-            onPress={onLeave}
-          />
-        )}
-      </Link.Menu>
+      </Pressable>
     </Link>
   );
 }

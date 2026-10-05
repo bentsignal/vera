@@ -1,16 +1,13 @@
 import { Platform, Text, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import EditSquare from "@expo/material-symbols/edit_square.xml";
-import { pds } from "@vera/backend/pds";
 
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
-import { ConversationRow } from "~/features/inbox/conversation-row";
 import { filterInbox } from "~/features/inbox/filter";
 import { FilterToolbar } from "~/features/inbox/filter-toolbar";
-import { inboxSwipeActions, togglePin } from "~/features/inbox/swipe-actions";
-import { SwipeRow } from "~/features/inbox/swipe-row";
-import { useRunAs, useVisibleAccounts } from "~/features/messaging/account";
+import { InboxRow } from "~/features/inbox/inbox-row";
+import { useVisibleAccounts } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/conversations";
 import { usePreference } from "~/features/preferences/store";
 import { AccountToolbar } from "~/features/session/account-toolbar";
@@ -29,7 +26,6 @@ function Empty({ title, detail }: { title: string; detail: string }) {
 export default function InboxScreen() {
   const router = useRouter();
   const { conversations, isLoading } = useInbox();
-  const runAs = useRunAs();
   const showAccount = useVisibleAccounts().length > 1;
   const show = usePreference("inboxShow");
   const from = usePreference("inboxFrom");
@@ -71,28 +67,7 @@ export default function InboxScreen() {
         keyExtractor={(item) => item.key}
         ListEmptyComponent={empty()}
         renderItem={({ item }) => (
-          <SwipeRow {...inboxSwipeActions(runAs, item)}>
-            <ConversationRow
-              conversation={item}
-              showAccount={showAccount}
-              onMarkRead={() =>
-                void runAs(
-                  item.account,
-                  pds.messages.markRead({
-                    conversationId: item.id,
-                    readAt: Date.now(),
-                  }),
-                )
-              }
-              onTogglePin={() => togglePin(runAs, item)}
-              onLeave={() =>
-                void runAs(
-                  item.account,
-                  pds.messages.leaveConversation({ conversationId: item.id }),
-                )
-              }
-            />
-          </SwipeRow>
+          <InboxRow conversation={item} showAccount={showAccount} />
         )}
       />
     </>

@@ -1,8 +1,7 @@
-import type { ComponentProps, ReactNode } from "react";
-import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
+import type { ReactNode } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { useRef } from "react";
-import { Pressable, Text } from "react-native";
+import { Text, View } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   useAnimatedReaction,
@@ -12,176 +11,153 @@ import { scheduleOnRN } from "react-native-worklets";
 import * as Haptics from "expo-haptics";
 import { useCSSVariable } from "uniwind";
 
+import type { RowAction } from "./swipe-actions";
 import { SymbolIcon } from "~/components/symbol-icon";
-
-export interface SwipeAction {
-  key: string;
-  label: string;
-  icon: ComponentProps<typeof SymbolIcon>["name"];
-  /** The action's background, such as `bg-accent`. */
-  className: string;
-  onPress: () => void;
-}
+import { afterSwipe } from "./swipe-actions";
 
 type Side = "leading" | "trailing";
 
-const ACTION_WIDTH = 76;
-/** Dragging this far past the buttons runs the edge-most action on release. */
-const FULL_SWIPE = 120;
+/** How far a row slides before letting go runs its action. */
+const TRIGGER = 120;
+/** The space the icon keeps from the screen edge. */
+const ICON_INSET = 24;
 
-function fullSwipeHaptic() {
+const TONE = {
+  accent: "bg-accent",
+  destructive: "bg-destructive",
+  gray: "bg-[#8e8e93]",
+} as const;
+
+function triggerHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 }
 
 /**
- * One side's buttons. The edge-most action's color also fills the space a
- * long drag uncovers, and its icon follows the row's edge, as in Mail and
- * Messages. Crossing the full-swipe distance ticks a haptic.
+ * The color and icon a swipe uncovers. Past the trigger point the icon
+ * grows and a haptic ticks, so you know letting go will run it.
  */
-function Actions({
-  actions,
+function Reveal({
+  action,
   side,
   translation,
-  onFull,
-  close,
+  onArmed,
 }: {
-  actions: readonly SwipeAction[];
+  action: RowAction;
   side: Side;
   translation: SharedValue<number>;
-  /** Called as the drag crosses the full-swipe distance, either way. */
-  onFull: (full: boolean) => void;
-  close: () => void;
+  /** Called as the drag crosses the trigger point, either way. */
+  onArmed: (armed: boolean) => void;
 }) {
-  const width = ACTION_WIDTH * actions.length;
   const sign = side === "leading" ? 1 : -1;
   useAnimatedReaction(
-    () => translation.value * sign > width + FULL_SWIPE,
+    () => translation.value * sign > TRIGGER,
     (now, before) => {
       if (before === null || now === before) return;
-      scheduleOnRN(onFull, now);
-      if (now) scheduleOnRN(fullSwipeHaptic);
+      scheduleOnRN(onArmed, now);
+      if (now) scheduleOnRN(triggerHaptic);
     },
   );
-  const followEdge = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: sign * Math.max(0, translation.value * sign - width) },
-    ],
+  const icon = useAnimatedStyle(() => ({
+    opacity: Math.min(1, (translation.value * sign) / (TRIGGER * 0.6)),
+    transform: [{ scale: translation.value * sign > TRIGGER ? 1.2 : 1 }],
   }));
-  // The edge-most action sits at the screen edge: first on the leading
-  // side, last on the trailing side.
-  const ordered = side === "leading" ? actions : [...actions].reverse();
-  const edge = side === "leading" ? 0 : ordered.length - 1;
   return (
-    <Animated.View className="flex-row" style={{ width }}>
-      {ordered.map((action, index) => (
-        <Pressable
-          key={action.key}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          className={`items-center justify-center ${action.className}`}
-          style={{ width: ACTION_WIDTH, zIndex: index === edge ? 0 : 1 }}
-          onPress={() => {
-            close();
-            action.onPress();
-          }}
-        >
-          {index === edge && (
-            <Animated.View
-              className={`absolute inset-y-0 w-[1000px] ${action.className}`}
-              style={side === "leading" ? { left: 0 } : { right: 0 }}
-            />
-          )}
-          <Animated.View
-            className="items-center gap-1"
-            style={index === edge ? followEdge : undefined}
-          >
-            <SymbolIcon
-              name={action.icon}
-              size={20}
-              tintColorClassName="accent-white"
-            />
-            <Text className="text-caption font-medium text-white">
-              {action.label}
-            </Text>
-          </Animated.View>
-        </Pressable>
-      ))}
-    </Animated.View>
+    <View
+      pointerEvents="none"
+      className={`w-full justify-center ${TONE[action.tone]}`}
+      style={
+        side === "leading"
+          ? { paddingLeft: ICON_INSET }
+          : { paddingRight: ICON_INSET }
+      }
+    >
+      <Animated.View
+        className={`items-center gap-1 ${side === "trailing" ? "self-end" : "self-start"}`}
+        style={icon}
+      >
+        <SymbolIcon
+          name={action.icon}
+          size={22}
+          tintColorClassName="accent-white"
+        />
+        <Text className="text-caption font-medium text-white">
+          {action.label}
+        </Text>
+      </Animated.View>
+    </View>
   );
 }
 
 /**
- * A list row with swipe actions: swiping right shows `leading`, swiping
- * left shows `trailing`. Tap an action, or swipe all the way to run the
- * one at the edge. Each side takes any number of actions, so more (Mark as
- * Unread, Delete) slot in without changing the row.
+ * Android's swipe actions, as in Gmail: swipe a row right for `leading`'s
+ * first action or left for `trailing`'s, past the trigger point, and let
+ * go. The row always springs back; there are no buttons to tap. (iOS uses
+ * SwiftUI's own swipe actions; see `inbox-row.ios.tsx`.)
  */
 export function SwipeRow({
   leading = [],
   trailing = [],
   children,
 }: {
-  leading?: readonly SwipeAction[];
-  trailing?: readonly SwipeAction[];
+  leading?: readonly RowAction[];
+  trailing?: readonly RowAction[];
   children: ReactNode;
 }) {
-  // The side dragged past the full-swipe distance, if any.
-  const full = useRef<Side | null>(null);
-  const swipeable = useRef<SwipeableMethods>(null);
-  // Opaque, so the actions behind the row show only as it slides.
+  // The side dragged past the trigger point, if any.
+  const armed = useRef<Side | null>(null);
+  // Opaque, so the color behind the row shows only as it slides.
   const background = useCSSVariable("--color-background");
+  const [first] = leading;
+  const [last] = trailing;
   return (
     <ReanimatedSwipeable
-      ref={swipeable}
+      friction={1}
+      overshootLeft={first !== undefined}
+      overshootRight={last !== undefined}
+      // Never stays open: letting go either runs the action or snaps back.
+      leftThreshold={Number.MAX_SAFE_INTEGER}
+      rightThreshold={Number.MAX_SAFE_INTEGER}
       childrenContainerStyle={{
         backgroundColor:
           typeof background === "string" ? background : undefined,
       }}
-      friction={1.5}
-      overshootFriction={4}
-      leftThreshold={ACTION_WIDTH / 2}
-      rightThreshold={ACTION_WIDTH / 2}
       renderLeftActions={
-        leading.length === 0
+        first === undefined
           ? undefined
-          : (_progress, translation, methods) => (
-              <Actions
-                actions={leading}
+          : (_progress, translation) => (
+              <Reveal
+                action={first}
                 side="leading"
                 translation={translation}
-                onFull={(on) => {
-                  full.current = on ? "leading" : null;
+                onArmed={(on) => {
+                  armed.current = on ? "leading" : null;
                 }}
-                close={methods.close}
               />
             )
       }
       renderRightActions={
-        trailing.length === 0
+        last === undefined
           ? undefined
-          : (_progress, translation, methods) => (
-              <Actions
-                actions={trailing}
+          : (_progress, translation) => (
+              <Reveal
+                action={last}
                 side="trailing"
                 translation={translation}
-                onFull={(on) => {
-                  full.current = on ? "trailing" : null;
+                onArmed={(on) => {
+                  armed.current = on ? "trailing" : null;
                 }}
-                close={methods.close}
               />
             )
       }
-      onSwipeableWillOpen={() => {
-        // Whichever side was dragged past the full-swipe distance runs its
-        // edge-most action; the row then closes instead of staying open.
-        if (full.current === "leading") leading[0]?.onPress();
-        if (full.current === "trailing") trailing[0]?.onPress();
-      }}
-      onSwipeableOpen={() => {
-        if (full.current !== null) {
-          full.current = null;
-          swipeable.current?.close();
-        }
+      onSwipeableWillClose={() => {
+        const action =
+          armed.current === "leading"
+            ? first
+            : armed.current === "trailing"
+              ? last
+              : undefined;
+        armed.current = null;
+        if (action !== undefined) afterSwipe(action.onPress);
       }}
     >
       {children}
