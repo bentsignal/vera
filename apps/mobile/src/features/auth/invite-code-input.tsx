@@ -109,7 +109,14 @@ export function InviteCodeInput({
 }
 
 const styles = StyleSheet.create({
-  // Transparent text rather than a transparent view: iOS doesn't deliver
-  // touches to a nearly invisible view, which would break tap and paste.
-  field: { ...StyleSheet.absoluteFill, color: "transparent" },
+  // iOS doesn't deliver touches to an invisible view, which would break tap
+  // and paste, so there only the text is transparent. Android draws the text
+  // whatever its color, but does deliver touches to an invisible view.
+  field: {
+    ...StyleSheet.absoluteFill,
+    ...Platform.select({
+      android: { opacity: 0 },
+      default: { color: "transparent" },
+    }),
+  },
 });
