@@ -9,6 +9,7 @@ import { pds } from "@vera/backend/pds";
 
 import { env } from "~/env";
 import { useAccount } from "~/features/messaging/account";
+import { stringField } from "./presented";
 
 let activeConversationId: string | undefined;
 
@@ -27,25 +28,19 @@ export function useActiveConversation(conversationId: string) {
   });
 }
 
-function asString(value: unknown) {
-  return typeof value === "string" ? value : undefined;
-}
-
-function stringField(data: unknown, field: string) {
-  return typeof data === "object" && data !== null
-    ? asString(Reflect.get(data, field))
-    : undefined;
-}
-
 Notifications.setNotificationHandler({
   handleNotification: (notification) => {
     const conversationId = stringField(
       notification.request.content.data,
       "conversationId",
     );
-    const visible = conversationId !== activeConversationId;
+    // Space invitations have no conversation and always show.
+    const visible =
+      conversationId === undefined || conversationId !== activeConversationId;
     return Promise.resolve({
       shouldPlaySound: visible,
+      // A push's badge counts only its own account; `useAppBadge` sets the
+      // total across accounts while the app is open.
       shouldSetBadge: false,
       shouldShowBanner: visible,
       shouldShowList: true,
@@ -89,13 +84,21 @@ export function usePushRegistration() {
   }, [mutate]);
 }
 
-/** Opens the conversation when someone taps a message notification. */
+/**
+ * Opens the conversation when someone taps a message notification, and the
+ * invites when they tap a space invitation.
+ */
 export function useNotificationRouting() {
   const router = useRouter();
   const response = Notifications.useLastNotificationResponse();
   // eslint-disable-next-line no-restricted-syntax -- Responds to a notification tap delivered by the OS.
   useEffect(() => {
     const data = response?.notification.request.content.data;
+    if (stringField(data, "kind") === "spaceInvite") {
+      router.push("/spaces/invites");
+      void Notifications.clearLastNotificationResponseAsync();
+      return;
+    }
     const conversationId = stringField(data, "conversationId");
     if (conversationId === undefined) return;
     const messageId = stringField(data, "messageId");

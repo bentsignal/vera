@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as badges from "../badges.js";
 import type * as conversations from "../conversations.js";
+import type * as delivery from "../delivery.js";
 import type * as dispatcher from "../dispatcher.js";
 import type * as history from "../history.js";
 import type * as inbox from "../inbox.js";
@@ -33,7 +35,9 @@ import type {
 import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
+  badges: typeof badges;
   conversations: typeof conversations;
+  delivery: typeof delivery;
   dispatcher: typeof dispatcher;
   history: typeof history;
   inbox: typeof inbox;

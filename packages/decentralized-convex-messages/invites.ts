@@ -7,7 +7,14 @@ import type {
   SpaceInvite,
   SpaceInviteLink,
 } from "./protocol.ts";
-import { fail, getSpace, getSpaceMember, normalizeMembers } from "./model.ts";
+import { internal } from "./_generated/api.js";
+import {
+  fail,
+  getSpace,
+  getSpaceMember,
+  normalizeMembers,
+  pendingInvites,
+} from "./model.ts";
 import { MAX_INVITE_LINK_LIFETIME } from "./protocol.ts";
 import { requireSpaceRole } from "./spaces.ts";
 
@@ -69,6 +76,7 @@ export async function inviteToSpace(
   args: Args<"inviteToSpace">,
 ) {
   await requireSpaceRole(ctx, args.spaceId, self, "member");
+  const invited: string[] = [];
   for (const accountId of normalizeMembers(args.members, self)) {
     const isMember =
       (await getSpaceMember(ctx, args.spaceId, accountId)) !== null;
@@ -76,6 +84,14 @@ export async function inviteToSpace(
     if (isMember || isInvited) continue;
     await ctx.db.insert("spaceInvites", {
       accountId,
+      invitedBy: self,
+      spaceId: args.spaceId,
+    });
+    invited.push(accountId);
+  }
+  if (invited.length > 0) {
+    await ctx.scheduler.runAfter(0, internal.notifications.sendInvite, {
+      accountIds: invited,
       invitedBy: self,
       spaceId: args.spaceId,
     });
@@ -107,14 +123,8 @@ export async function declineSpaceInvite(
 }
 
 export async function spaceInvites(ctx: QueryCtx, self: string) {
-  const invites = await ctx.db
-    .query("spaceInvites")
-    .withIndex("by_account", (index) => index.eq("accountId", self))
-    .collect();
   const result: SpaceInvite[] = [];
-  for (const invite of invites) {
-    const space = await getSpace(ctx, invite.spaceId);
-    if (space === null) continue;
+  for (const { invite, space } of await pendingInvites(ctx, self)) {
     result.push({
       invitedAt: invite._creationTime,
       invitedBy: invite.invitedBy,

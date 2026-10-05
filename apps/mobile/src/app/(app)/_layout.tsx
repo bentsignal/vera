@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 
 import { AccountScope, useAccounts } from "~/features/messaging/account";
 import { useEnsureProfile } from "~/features/messaging/directory";
+import { useAppBadge } from "~/features/notifications/badge";
 import {
   useNotificationRouting,
   usePushRegistration,
@@ -20,6 +21,7 @@ function AccountUpkeep() {
 export default function AppLayout() {
   const accounts = useAccounts();
   useNotificationRouting();
+  useAppBadge();
   return (
     <>
       {accounts.map((account) => (

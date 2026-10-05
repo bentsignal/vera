@@ -8,7 +8,8 @@ import {
 import { ConvexHttpClient } from "convex/browser";
 
 import type { StoredAccount } from "./account-store";
-import { removeStoredAccount } from "./account-store";
+import { forgetAccountNotifications } from "~/features/notifications/presented";
+import { removeStoredAccount, storedAccounts } from "./account-store";
 import { createHomeAuthClient } from "./auth-client";
 import { createFederationAuthTokenFetcher, homeToken } from "./federation-auth";
 
@@ -66,6 +67,10 @@ export function closeAccountSession(session: AccountSession) {
   session.pds.disconnect(queryClient);
   void session.transport.close();
   queryClient.removeQueries({ queryKey: pdsSessionQueryKey(session.address) });
+  void forgetAccountNotifications(
+    session.address,
+    storedAccounts().length,
+  ).catch(() => null);
 }
 
 /**

@@ -93,6 +93,20 @@ export function getSpaceMember(
     .unique();
 }
 
+/** The account's invitations to spaces that still exist, with the space. */
+export async function pendingInvites(ctx: QueryCtx, accountId: string) {
+  const invites = await ctx.db
+    .query("spaceInvites")
+    .withIndex("by_account", (index) => index.eq("accountId", accountId))
+    .collect();
+  const pending = [];
+  for (const invite of invites) {
+    const space = await getSpace(ctx, invite.spaceId);
+    if (space !== null) pending.push({ invite, space });
+  }
+  return pending;
+}
+
 export interface ConversationAccess {
   readonly conversation: Doc<"conversations">;
   readonly lastReadAt: number;
@@ -233,6 +247,27 @@ export async function unreadCount(
     )
     .take(MAX_UNREAD + 1);
   return unread.filter((message) => message.authorId !== accountId).length;
+}
+
+/**
+ * Whether anyone else has written since `lastReadAt`. Cheaper than
+ * `unreadCount` when only "any unread" matters, as for the app icon badge.
+ */
+export async function hasUnread(
+  ctx: QueryCtx,
+  conversationId: string,
+  accountId: string,
+  lastReadAt: number,
+) {
+  const newer = ctx.db
+    .query("messages")
+    .withIndex("by_conversation_sent", (index) =>
+      index.eq("conversationId", conversationId).gt("sentAt", lastReadAt),
+    );
+  for await (const message of newer) {
+    if (message.authorId !== accountId) return true;
+  }
+  return false;
 }
 
 export async function toConversation(
