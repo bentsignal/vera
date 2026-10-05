@@ -28,9 +28,14 @@ export function usePeopleSearch({
   const lookupTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Remounting clears the native field.
   const [fieldKey, setFieldKey] = useState(0);
-  const known = [
-    ...new Set((conversations ?? []).flatMap((item) => item.memberIds)),
-  ].filter((address) => address !== self && !exclude.includes(address));
+  const excluded = new Set(exclude);
+  const picked = new Set(selected);
+  const knownSet = new Set(
+    (conversations ?? [])
+      .flatMap((item) => item.memberIds)
+      .filter((address) => address !== self && !excluded.has(address)),
+  );
+  const known = [...knownSet];
   const typed = toAddress(lookup);
   const profileOf = useProfiles([
     ...known,
@@ -55,11 +60,11 @@ export function usePeopleSearch({
   // Selected people added by address come first, then known people, in a
   // stable order so checking a row never moves it.
   const people = [
-    ...selected.filter((address) => !known.includes(address)),
+    ...selected.filter((address) => !knownSet.has(address)),
     ...known,
   ].filter(
     (address) =>
-      selected.includes(address) ||
+      picked.has(address) ||
       address.includes(needle) ||
       profileOf(address).displayName.toLowerCase().includes(needle),
   );
@@ -71,7 +76,7 @@ export function usePeopleSearch({
     newAddress:
       typed !== null &&
       typed !== self &&
-      !exclude.includes(typed) &&
+      !excluded.has(typed) &&
       !people.includes(typed)
         ? typed
         : null,
