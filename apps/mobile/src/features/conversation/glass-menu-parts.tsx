@@ -104,7 +104,7 @@ export function ReactionBar({
         style={{ paddingHorizontal: BAR_PADDING }}
       >
         {QUICK_REACTIONS.map((emoji) => {
-          const reaction = target.message.reactions.find(
+          const reaction = target.message.reactions?.find(
             (item) => item.emoji === emoji,
           );
           return (
