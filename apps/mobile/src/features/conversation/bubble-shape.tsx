@@ -55,13 +55,15 @@ export function TailedBubble({
   isOwn: boolean;
 }) {
   return (
+    // Sized by insets, not `width`/`height`: Svg rounds those down to whole
+    // points, which clipped the edge of bubbles with fractional widths.
     <Svg
       pointerEvents="none"
-      width={width}
-      height={height + TAIL_DROP}
       style={{
+        bottom: -TAIL_DROP,
         left: 0,
         position: "absolute",
+        right: 0,
         top: 0,
         transform: isOwn ? undefined : [{ scaleX: -1 }],
       }}
