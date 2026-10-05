@@ -1,6 +1,6 @@
 ---
 name: vera-feature
-description: The end-to-end workflow for building a Vera feature or fix in a T3 Code worktree, from choosing a backend through simulator verification, PR evidence, and waiting for Shawn's approval to merge. Use at the start of any feature, bug fix, or UI change in this repo, and whenever you need the simulator, an isolated Convex backend, screenshots or videos for a PR, or are about to open or merge a PR.
+description: The end-to-end workflow for building a Vera feature or fix in a T3 Code worktree, from choosing a backend through simulator verification, PR evidence, and waiting for Shawn's approval to merge. Use at the start of any feature, bug fix, or UI change in this repo, and whenever you need an isolated Convex backend, screenshots or videos for a PR, or are about to open or merge a PR. Simulator and emulator use also requires the vera-simulator skill.
 ---
 
 # Building a Vera change
@@ -19,7 +19,8 @@ ambiguous in a way that changes what you build, ask before building.
 Otherwise pick the sensible default and say so in the PR.
 
 For a change to an existing screen, bring the simulator up (step 4) and take
-the "before" screenshots now, before you edit anything.
+the "before" screenshots now, before you edit anything. Then `down` it while
+you build; `up` again when you're ready to verify.
 
 ## 2. Choose the backend
 
@@ -40,8 +41,9 @@ scripts/backend.sh status
 `isolate` creates the Convex dev deployment `dev/<branch>` (expires in 14
 days) with the dev settings, gives it its own account domain, publishes the
 `_pds` DNS record (Vercel DNS for vera.chat), and writes
-`apps/mobile/.env.local` so the app talks to it. Run `scripts/sim.sh up`
-after isolating so Metro picks up the new domain. Accounts and data there
+`apps/mobile/.env.local` so the app talks to it. A simulator started
+before isolating needs `scripts/sim.sh up` again so Metro picks up the new
+domain. Accounts and data there
 start empty: sign in and seed (below). Run Convex CLI commands from
 `services/backend` (`npx convex run`, `npx convex logs`, `npx convex data`).
 They target this worktree's deployment.
@@ -63,57 +65,15 @@ concern.
 
 ## 4. Verify in your simulator
 
-```sh
-scripts/sim.sh up             # dev client + this worktree's simulator + Metro
-scripts/sim.sh signin         # dev sign-in as this worktree's test user (wt…)
-scripts/sim.sh seed           # bot DMs, a group, and a space
-scripts/sim.sh open /settings # go to any route; conversation/<id>, profile/<address>, ...
-scripts/sim.sh relaunch       # restart the app, e.g. to drop the keyboard or reset state
-scripts/sim.sh status
-```
+**Load the `vera-simulator` skill first and follow its rules.** Every
+worktree shares Shawn's Mac, so devices start only through `scripts/sim.sh`
+and its queue, and `up` may make you wait your turn.
 
-Every command takes `--android` first for this worktree's Android emulator
-(`scripts/sim.sh --android up`, `scripts/sim.sh --android shot after`). Both
-platforms share the worktree's Metro. Check Android whenever a change touches
-layout, navigation, platform files (`.ios.tsx`/`.android.tsx`), or native
-config, and put Android screenshots in the PR next to iOS ones. The Android
-dev client is cached the same way (first build of a fingerprint ~10 minutes).
-In T3 Code, `device_open` takes the emulator serial `up` prints
-(`emulator-55xx`), with `platform: "android"`.
-
-- `up` reuses the cached dev client unless native code changed (the first
-  build of a fingerprint takes ~10 minutes; it's shared by every worktree).
-  Re-run `up` after changing native code, `app.config.ts`, or `.env.local`.
-  JavaScript edits hot-reload; `scripts/sim.sh reload` forces it.
-- Routes with parameters take them as a query string. Read the route file
-  under `apps/mobile/src/app` for the names, such as
-  `/settings/account?account=<address>&title=<name>`.
-- Seed once per account. Running it again reuses the bot DMs but adds
-  another group and space. For a clean slate, sign in as a new username.
-- `signin` takes a username (`scripts/sim.sh signin alice`) for a second
-  account. On the shared dev PDS keep to your worktree's `wt…` user so you
-  don't disturb anyone else's data.
-- Let Shawn watch: call the T3 `device_open` tool with the simulator UDID
-  that `up` prints. It returns the exact `agent-device` command and flags.
-  Run `agent-device open chat.vera.app.dev "${F[@]}"` once before other
-  agent-device commands (they fail with "Run open first" otherwise). It also
-  brings Vera back to the front if `device_open` left the home screen up.
-- agent-device refs (`@e12`) expire after every action: take a fresh
-  `snapshot -i` before each tap or fill. To clear a multiline field, select
-  all through the field's edit menu or hold delete (`longpress <delete key> 4000`);
-  `fill` may not clear it. Each action takes a few seconds, so timing-
-  sensitive behavior (debounces under a second) needs a code-level check
-  instead.
-  Use agent-device for taps, typing, scrolling, and gestures (`snapshot -i`,
-  `press @e3`, `fill`, `longpress`, `scroll`). In zsh, put the flags in an
-  array (`F=(--platform ios ...)` then `"$F[@]"`), because a flags string
-  isn't split. Use `scripts/sim.sh open` for navigation instead of typed URLs.
-- Don't use `xcrun simctl openurl` for app links: iOS asks "Open in Vera?"
-  every time. If one appears anyway, `agent-device alert accept`.
-- Exercise the actual change: the happy path, the empty and loading states,
-  errors you can trigger, and dark mode if colors changed
-  (`xcrun simctl ui <udid> appearance dark`). Check Metro's log
-  (`.cache/sim/metro.log`) for red boxes and warnings you introduced.
+Exercise the actual change: the happy path, the empty and loading states,
+errors you can trigger, and dark mode if colors changed. Check Android too
+whenever a change touches layout, navigation, platform files
+(`.ios.tsx`/`.android.tsx`), or native config, and put Android screenshots
+in the PR next to iOS ones.
 
 ## 4b. Put it on Shawn's phone
 
@@ -180,12 +140,9 @@ links to the MP4.
   there. Otherwise paste the `npx convex run` output.
 - Never commit evidence. `.cache/` is gitignored.
 
-When you have the evidence, shut the devices down: `scripts/sim.sh down`
-and `scripts/sim.sh --android down` (they delete the simulator or emulator,
-and Metro stops with the last one). Don't leave
-simulators running while you wait for CI or for Shawn; they eat his Mac's
-memory and CPU, and `scripts/sim.sh up` brings one back in about a minute
-with the cached build. Also close it in T3's Device panel (`device_close`).
+When you have the evidence, shut the devices down (`scripts/sim.sh down`,
+plus `--android` if you used it; see the `vera-simulator` skill). Never
+leave one running while you wait for CI or for Shawn.
 
 ## 6. Validate
 
@@ -246,14 +203,8 @@ anything he should look at closely. **Stop there.** Don't merge.
 
 ## Troubleshooting
 
-- **`sim.sh up` says Metro didn't start:** read `.cache/sim/metro.log`. A
-  port clash is resolved automatically. Kill only the PID in
-  `.cache/sim/state`, never by pattern (other worktrees run Metro too).
-- **The app shows the dev launcher instead of Vera:** `scripts/sim.sh relaunch`.
+- **Simulator problems:** see the `vera-simulator` skill's troubleshooting.
 - **`signin` fails:** the backend must have `DEV_TOOLS=true` (both the shared
   dev PDS and isolated ones do). Check `scripts/backend.sh status`.
 - **Discovery errors after `isolate`:** DNS can take a minute. Wait,
   `scripts/sim.sh relaunch`, and try again.
-- **The dev client build fails:** run the `xcodebuild` from
-  `apps/mobile/README.md` by hand to see the error. It is usually a missing
-  `pod install` after dependency changes; `up` runs prebuild with `--clean`.

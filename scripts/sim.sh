@@ -16,7 +16,12 @@
 #   relaunch         restart the app (clears in-memory state)
 #   eval "<js>"      evaluate JavaScript in the running app
 #   status           devices, port, Metro, and backend
+#   queue            the simulator queue: devices up on this Mac, who is waiting, and why
 #   down             delete this platform's device; stops Metro when no device is left
+#
+# `up` waits its turn in the simulator queue (scripts/simq.ts), which starts
+# a device only while the Mac has memory for it. Exit code 75 means still
+# queued: run `up` again to keep your place. VERA_SIMQ=off skips the queue.
 #
 # Each dev client (Vera Dev, the dev variant in app.config.ts, as a Debug
 # build with no notification extension) is built once per native fingerprint
@@ -64,9 +69,16 @@ save() {
     "$DEVICE" "$SERIAL" "$EMULATOR_PID" "$RECORD_PID" >"$STATE_DIR/$PLATFORM"
 }
 
+# The simulator queue, which needs nothing installed; see scripts/simq.ts.
+queue() {
+  [ "${VERA_SIMQ:-on}" = off ] && return 0
+  node --experimental-strip-types --no-warnings "$ROOT/scripts/simq.ts" "$@" --worktree "$ROOT"
+}
+
 require_up() {
   load
   if [ -z "$DEVICE" ]; then
+    cat "$STATE_DIR/$PLATFORM.reclaimed" >&2 2>/dev/null || true
     echo "no $PLATFORM device yet; run scripts/sim.sh$([ "$PLATFORM" = android ] && echo " --android") up" >&2
     exit 1
   fi
@@ -246,11 +258,14 @@ launch() {
 up() {
   load
   ensure_client
+  rm -f "$STATE_DIR/$PLATFORM.reclaimed"
+  queue acquire "$PLATFORM"
   "ensure_${PLATFORM}_device"
   install_client
   ensure_metro
   save
   launch
+  queue ready "$PLATFORM" --device "$DEVICE" --serial "$SERIAL" --metro-pid "$METRO_PID"
   [ "$PLATFORM" = ios ] && open -ga Simulator
   status
   echo "watch it in T3 Code: device_open with deviceId $([ "$PLATFORM" = ios ] && echo "$DEVICE" || echo "$SERIAL")"
@@ -335,12 +350,19 @@ down() {
   DEVICE="" SERIAL="" EMULATOR_PID="" RECORD_PID=""
   save
   rm -f "$STATE_DIR/$PLATFORM"
+  queue release "$PLATFORM" || true
   echo "$PLATFORM device stopped"
   release_metro
 }
 
 command="${1:-status}"
 shift || true
+# The state file's mtime is when this worktree last used its device; the
+# queue shuts down devices unused for a while when others are waiting.
+case "$command" in
+  up | down | status | queue) ;;
+  *) [ -f "$STATE_DIR/$PLATFORM" ] && touch "$STATE_DIR/$PLATFORM" ;;
+esac
 case "$command" in
   up) up ;;
   signin) require_up && open_path "/dev-sign-in?username=${1:-$(default_user)}" ;;
@@ -353,9 +375,10 @@ case "$command" in
   stop) stop ;;
   reload) require_up && app_eval "globalThis.veraDev.reload()" ;;
   status) status ;;
+  queue) queue status ;;
   down) down ;;
   *)
-    sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

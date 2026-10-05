@@ -155,7 +155,8 @@ Chat", Apple ID 6818656155):
   (`appStoreVersionLocalizations`), and the subtitle and privacy policy URL
   (`appInfoLocalizations`).
 - Screenshots for the 6.9" iPhone (and iPad, since `supportsTablet` is on).
-  Capture them in a simulator with production-like seeded data.
+  Capture them in a simulator with production-like seeded data (the
+  `vera-simulator` skill).
 - Category, age rating (`ageRatingDeclarations`), price (free), and
   availability.
 - App Privacy answers. The API can't set these, so use Codex in the web UI.
