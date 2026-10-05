@@ -46,8 +46,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     icon: dev ? "./assets/icons/vera-dev.icon" : "./assets/icons/vera.icon",
     bundleIdentifier: BUNDLE_ID,
     supportsTablet: true,
-    // Passkeys use the permanent relying party ID `vera.chat`.
-    associatedDomains: ["webcredentials:vera.chat"],
+    // Passkeys use the permanent relying party ID `vera.chat`, which also
+    // hosts space invite links (`/join/*`, Vera Dev's `/dev/join/*`).
+    associatedDomains: ["webcredentials:vera.chat", "applinks:vera.chat"],
     config: { usesNonExemptEncryption: false },
   },
   android: {
@@ -62,6 +63,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: "./assets/icons/vera-android-monochrome.png",
     },
     predictiveBackGestureEnabled: true,
+    // Space invite links open in the app (verified by vera.chat's
+    // assetlinks.json); Vera Dev claims only its own `/dev/join/` links.
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        category: ["BROWSABLE", "DEFAULT"],
+        data: [
+          {
+            host: "vera.chat",
+            pathPrefix: dev ? "/dev/join/" : "/join/",
+            scheme: "https",
+          },
+        ],
+      },
+    ],
     // Firebase project vera-c5690: Expo push reaches Android through FCM.
     // Public client identifiers only; the FCM V1 service account key lives
     // in EAS credentials, not here (see docs/android.md). Vera Dev is its
