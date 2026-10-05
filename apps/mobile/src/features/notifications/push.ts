@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
@@ -12,17 +12,19 @@ import { useAccount } from "~/features/messaging/account";
 
 let activeConversationId: string | undefined;
 
-/** Suppresses banners for the conversation currently on screen. */
+/**
+ * Marks the conversation as the one on screen, which suppresses its banners
+ * and lets a tap on its notification reuse the screen.
+ */
 export function useActiveConversation(conversationId: string) {
-  // eslint-disable-next-line no-restricted-syntax -- Mirrors the open screen into the notification handler, which runs outside React.
-  useEffect(() => {
+  useFocusEffect(() => {
     activeConversationId = conversationId;
     return () => {
       if (activeConversationId === conversationId) {
         activeConversationId = undefined;
       }
     };
-  }, [conversationId]);
+  });
 }
 
 function asString(value: unknown) {
@@ -100,14 +102,20 @@ export function useNotificationRouting() {
     // Open as the account the message was sent to, at the message itself
     // so an old notification stays useful.
     const account = stringField(data, "accountId");
-    router.push({
-      params: {
-        conversationId,
-        ...(account === undefined ? {} : { account }),
-        ...(messageId === undefined ? {} : { messageId }),
-      },
-      pathname: "/conversation/[conversationId]",
-    });
+    const params = {
+      ...(account === undefined ? {} : { account }),
+      ...(messageId === undefined ? {} : { messageId }),
+    };
+    if (conversationId === activeConversationId) {
+      // Already on screen: pushing would stack a second copy, so swiping
+      // back would land on the same conversation.
+      router.setParams(params);
+    } else {
+      router.push({
+        params: { conversationId, ...params },
+        pathname: "/conversation/[conversationId]",
+      });
+    }
     void Notifications.clearLastNotificationResponseAsync();
   }, [response, router]);
 }
