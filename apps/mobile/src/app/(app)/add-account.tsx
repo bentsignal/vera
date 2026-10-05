@@ -1,10 +1,12 @@
-import { useState } from "react";
+import type { TextInputRef } from "@expo/ui";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
 import { env } from "~/env";
+import { INVITE_CODE_LENGTH } from "~/features/auth/invite-code";
 import { newAccountSections } from "~/features/auth/new-account-sections";
 import { isValidUsername, normalizeUsername } from "~/features/auth/username";
 import { devSignIn } from "~/features/dev/dev-tools";
@@ -21,6 +23,7 @@ export default function AddAccountScreen() {
   const [username, setUsername] = useState("");
   const [devUsername, setDevUsername] = useState("");
   const [pending, setPending] = useState(false);
+  const usernameRef = useRef<TextInputRef>(null);
 
   async function run(attempt: () => Promise<string | null>, title: string) {
     const before = storedAccounts().length;
@@ -71,8 +74,10 @@ export default function AddAccountScreen() {
           </FieldGroup.Section>
         )}
         {newAccountSections({
+          inviteCode,
           onChangeInviteCode: setInviteCode,
           onChangeUsername: setUsername,
+          usernameRef,
         })}
         <FieldGroup.Section>
           <Button
@@ -81,14 +86,14 @@ export default function AddAccountScreen() {
             modifiers={linkButton}
             disabled={
               pending ||
-              inviteCode.trim().length === 0 ||
+              inviteCode.length !== INVITE_CODE_LENGTH ||
               !isValidUsername(normalizeUsername(username))
             }
             onPress={() =>
               void run(
                 () =>
                   createAccount(pendingSignIn, {
-                    inviteCode: inviteCode.trim(),
+                    inviteCode,
                     username: normalizeUsername(username),
                   }),
                 "Couldn't Create Account",
