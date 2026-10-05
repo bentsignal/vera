@@ -55,6 +55,8 @@ interface Zoom {
   rebase: SharedValue<boolean>;
   /** Whether the current drag is a swipe to close. */
   dismissing: SharedValue<boolean>;
+  /** Set once a swipe closes the photo, so a second swipe can't close twice. */
+  closed: SharedValue<boolean>;
   /** How far a swipe to close has dragged the photo. */
   dragX: SharedValue<number>;
   dragY: SharedValue<number>;
@@ -63,6 +65,7 @@ interface Zoom {
 function useZoom(size: Size | undefined) {
   const window = useWindowDimensions();
   return {
+    closed: useSharedValue(false),
     dragX: useSharedValue(0),
     dragY: useSharedValue(0),
     dismissing: useSharedValue(false),
@@ -176,6 +179,7 @@ function endDismiss(
 ) {
   "worklet";
   zoom.dismissing.set(false);
+  if (zoom.closed.get()) return;
   const closing =
     event.translationY > DISMISS_DISTANCE ||
     (event.velocityY > DISMISS_VELOCITY && event.translationY > 0);
@@ -183,6 +187,7 @@ function endDismiss(
     springBack(zoom);
     return;
   }
+  zoom.closed.set(true);
   // Carries on off the bottom of the screen while the screen closes.
   const leave = { duration: 220 };
   zoom.dragX.set(withTiming(event.translationX + event.velocityX * 0.2, leave));
@@ -288,8 +293,8 @@ export function PhotoViewer({
     Gesture.Simultaneous(pinchGesture(zoom), panGesture(zoom, onClose)),
   );
 
-  // An animated style drives one view, so the backdrop and the controls
-  // each get their own.
+  // Each style refers to `zoom` itself: Reanimated only updates a style for
+  // the shared values its own function captures, not a helper's.
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: 1 - dismissProgress(zoom),
   }));
