@@ -4,7 +4,7 @@ import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { useAccount, useAccounts, useVisibleAccounts } from "./account";
-import { pdsResult } from "./results";
+import { pdsResult, pdsResultOr } from "./results";
 
 /** Spaces across the visible accounts, each tagged with its account. */
 export function useSpaces() {
@@ -56,7 +56,8 @@ export function useSpaceInvites() {
     queries: accounts.map((session) =>
       pdsQuery({
         args: {},
-        options: { select: pdsResult },
+        // A PDS without invitations has none to show.
+        options: { select: (result) => pdsResultOr(result, []) },
         query: pds.messages.spaceInvites,
         session,
       }),
@@ -84,7 +85,7 @@ export function useSpaceInviteLinks(spaceId: string) {
   const { data } = useQuery(
     pdsQuery({
       args: { spaceId },
-      options: { select: pdsResult },
+      options: { select: (result) => pdsResultOr(result, []) },
       query: pds.messages.spaceInviteLinks,
       session: address,
     }),
@@ -102,7 +103,13 @@ export function useInviteLinkPreview(code: string) {
     queries: accounts.map((session) =>
       pdsQuery({
         args: { code },
-        options: { select: (result) => pdsResult(result)?.[0] },
+        options: {
+          // undefined while loading; null when this account can't open it.
+          select: (result) => {
+            const found = pdsResultOr(result, [null]);
+            return found === undefined ? undefined : (found[0] ?? null);
+          },
+        },
         query: pds.messages.spaceInviteLinkPreview,
         session,
       }),
