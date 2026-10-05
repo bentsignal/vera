@@ -74,7 +74,9 @@ function AppStack() {
         options={{
           animation: "fade",
           headerShown: false,
-          presentation: "fullScreenModal",
+          // Transparent so the conversation shows through as a photo is
+          // swiped away; the viewer draws its own black backdrop.
+          presentation: "transparentModal",
         }}
       />
       <Stack.Screen
