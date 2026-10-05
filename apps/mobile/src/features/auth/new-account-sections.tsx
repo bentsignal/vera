@@ -1,5 +1,5 @@
-import type { RefObject } from "react";
 import type { TextInputRef } from "@expo/ui";
+import type { RefObject } from "react";
 import { FieldGroup, RNHostView, Row, Text, TextInput } from "@expo/ui";
 
 import { env } from "~/env";

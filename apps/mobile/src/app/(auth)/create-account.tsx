@@ -1,8 +1,8 @@
+import type { TextInputRef } from "@expo/ui";
 import { useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { TextInputRef } from "@expo/ui";
 import { FieldGroup } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";

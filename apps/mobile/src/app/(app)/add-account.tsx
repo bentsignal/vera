@@ -1,7 +1,7 @@
+import type { TextInputRef } from "@expo/ui";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
-import type { TextInputRef } from "@expo/ui";
 import { Button, FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
