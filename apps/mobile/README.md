@@ -64,9 +64,11 @@ The phone holds one Vera Dev at a time:
   native fingerprint, cached in `~/Library/Caches/vera` for every worktree),
   starts the worktree's Metro, and prints an install link and an open link,
   each with a QR code PNG. The open link
-  (`vera-dev://expo-development-client/?url=http://<tailnet IP>:<port>`)
-  loads the worktree's JavaScript over Tailscale, so Shawn's phone reaches it
-  anywhere, and edits hot-reload. A worktree with an isolated backend serves
+  (`vera-dev://expo-development-client/?url=http://<Mac's Wi-Fi IP>:<port>`)
+  loads the worktree's JavaScript over the local network, so the phone has to
+  be on the same Wi-Fi as the Mac, and edits hot-reload. It's a plain IP, not
+  a tailnet address: iOS's App Transport Security blocks plain HTTP to
+  tailnet (100.x) addresses but allows local network ones. A worktree with an isolated backend serves
   that backend's domain, which starts with no accounts: sign in there with
   `vera-dev:///dev-sign-in?username=<name>`.
   Release testing uses it too, serving `main`.

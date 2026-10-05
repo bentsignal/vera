@@ -97,7 +97,8 @@ scripts/phone.sh down           # when he's done
     client, or when an internal build or an older dev client is in the Vera
     Dev slot;
   - an **open** link (`vera-dev://expo-development-client/?url=...`) that
-    points Vera Dev at this worktree's Metro over the tailnet.
+    points Vera Dev at this worktree's Metro over the Mac's Wi-Fi (the
+    phone must be on the same network).
 - Send Shawn the open link with its QR code embedded
   (`![open](/abs/path/.cache/sim/phone-ios-open.png)`, from `up`'s output),
   plus the install link and its QR code when he needs it. Say plainly

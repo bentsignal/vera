@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Vera Dev on Shawn's phone: the dev client for this worktree's native code,
-# loading JavaScript from this worktree's Metro over the tailnet (his Mac and
-# phones share one). JavaScript changes hot-reload with no build; a native
+# loading JavaScript from this worktree's Metro over the Mac's Wi-Fi (the
+# phone has to be on the same network). JavaScript changes hot-reload with no build; a native
 # build happens only when this fingerprint has no dev client yet.
 #
 #   scripts/phone.sh [--android] <command>     (iPhone without --android)
 #
 #   up       build the dev client if needed, start Metro, print the links
 #   link     print the links and QR codes again
-#   status   the dev client for this fingerprint, Metro, and the tailnet address
+#   status   the dev client for this fingerprint, Metro, and the Wi-Fi address
 #   down     stop serving the phone; Metro stops unless a simulator uses it
 #
 # Dev clients are EAS `development` builds (ad hoc, with the notification
@@ -43,13 +43,16 @@ fingerprint() {
     node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).hash))'
 }
 
-# The Mac's tailnet address. An IP, not the MagicDNS name: iOS's App
-# Transport Security leaves plain HTTP to IP addresses alone.
+# The Mac's address on the local network: the default route's interface,
+# else Wi-Fi. A plain private IP, because iOS's App Transport Security
+# allows plain HTTP to local network addresses (NSAllowsLocalNetworking) but
+# blocks it to tailnet (100.x) ones.
 address() {
-  local ip
-  ip="$(tailscale ip -4 2>/dev/null | head -1 || true)"
+  local iface ip
+  iface="$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
+  ip="$(ipconfig getifaddr "${iface:-en0}" 2>/dev/null || ipconfig getifaddr en0 2>/dev/null || true)"
   if [ -z "$ip" ]; then
-    echo "Tailscale is not running on this Mac; the phone cannot reach Metro" >&2
+    echo "this Mac has no local network address; connect it to the phone's Wi-Fi" >&2
     exit 1
   fi
   echo "$ip"
@@ -160,7 +163,7 @@ status() {
   load_metro
   echo "metro: ${PORT:-none} ($(metro_running && echo running || echo stopped))"
   echo "serving the phone: $([ -f "$STATE_DIR/phone-$PLATFORM" ] && echo yes || echo no)"
-  echo "tailnet address: $(address)"
+  echo "Wi-Fi address: $(address) (the phone must be on the same network)"
   "$ROOT/scripts/backend.sh" status
 }
 

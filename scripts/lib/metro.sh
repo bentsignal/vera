@@ -1,7 +1,7 @@
 # This worktree's Metro, shared by scripts/sim.sh (simulators) and
 # scripts/phone.sh (Shawn's phone). Metro listens on every interface and
 # answers with bundle URLs on whatever host the device used, so one Metro
-# serves 127.0.0.1 and the tailnet at once. Its state is $STATE_DIR/metro;
+# serves 127.0.0.1 and the Mac's Wi-Fi address at once. Its state is $STATE_DIR/metro;
 # each device using it keeps a file in $STATE_DIR (ios, android, phone-ios,
 # phone-android), and Metro stops when the last one goes.
 #

@@ -84,8 +84,8 @@ See [apps/mobile/README.md](apps/mobile/README.md#vera-dev).
 
 - **Day to day, Vera Dev is the dev client.** To let Shawn try a change on
   his phone, run `scripts/phone.sh up` (`--android` for his Android phone)
-  in your worktree. It serves the worktree's Metro over the tailnet and
-  prints an open link and a QR code: send both, with the QR PNG embedded.
+  in your worktree. It serves the worktree's Metro on the Mac's Wi-Fi
+  address (the phone must be on the same network) and prints an open link and a QR code: send both, with the QR PNG embedded.
   JavaScript changes then hot-reload on his phone with no build.
 - **Native builds only when native code changed.** `phone.sh up` builds a
   new dev client (about 15 minutes) only when the worktree's native
