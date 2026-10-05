@@ -27,7 +27,12 @@ function Media({ attachment }: { attachment: Attachment }) {
       accessibilityLabel={isVideo ? "Play video" : "View photo"}
       onPress={() =>
         router.push({
-          params: { kind: attachment.kind, url: attachment.url },
+          params: {
+            height: attachment.height,
+            kind: attachment.kind,
+            url: attachment.url,
+            width: attachment.width,
+          },
           pathname: "/media",
         })
       }
