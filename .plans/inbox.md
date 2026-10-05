@@ -38,12 +38,12 @@ everything you read and a Spaces tab for browsing and managing spaces.
 
 ## Stack (one PR each)
 
-1. [ ] Create flows: compose sheet (Chat | Group), New Space with toolbar
+1. [x] Create flows: compose sheet (Chat | Group), New Space with toolbar
        buttons. (#82)
-2. [ ] Backend: inbox with channels (that show in the Inbox) and their space
+2. [x] Backend: inbox with channels (that show in the Inbox) and their space
        name; per-account pin and Show in Inbox. (#83)
-3. [ ] Inbox tab: rename, merged list, pins, filter menu, Show in Inbox
-       toggles, Spaces tab without a badge.
+3. [x] Inbox tab: rename, merged list, pins, filter menu, Show in Inbox
+       toggles, Spaces tab without a badge. (#84)
 
 ## Later: invite links
 
