@@ -25,15 +25,13 @@ import { useCSSVariable } from "uniwind";
 import type { RowAction } from "./swipe-actions";
 import type { ConversationSummary } from "./types";
 import { useRunAs } from "~/features/messaging/account";
-import { ConversationRowContent } from "./conversation-row";
+import { ConversationRowContent, INBOX_ROW_HEIGHT } from "./conversation-row";
 import {
   afterSwipe,
   inboxMenuActions,
   inboxSwipeActions,
 } from "./swipe-actions";
 
-/** Every row is this tall, so each native row can be sized up front. */
-export const INBOX_ROW_HEIGHT = 84;
 /** Where the text starts (unread gutter, photo, gap): the separator's inset. */
 const TEXT_INSET = 24 + 46 + 12;
 

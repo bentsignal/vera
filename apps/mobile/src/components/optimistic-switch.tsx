@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Switch } from "@expo/ui";
 
 /**
- * A switch for a server setting: it shows the choice right away, then the
- * server's value takes over again once `onChange` settles, so a change made
- * elsewhere (a swipe in the Inbox, another device) shows here too.
+ * A switch for a server setting: it shows the choice right away and keeps
+ * showing it until the server's value changes, then follows the server
+ * again, so a change made elsewhere (a swipe in the Inbox, another device)
+ * shows here too. A failed save goes back to the server's value.
  */
 export function OptimisticSwitch({
   label,
@@ -15,16 +16,21 @@ export function OptimisticSwitch({
   value: boolean;
   onChange: (value: boolean) => Promise<unknown>;
 }) {
-  const [choice, setChoice] = useState<boolean | null>(null);
+  // The choice, and the server's value when it was made.
+  const [pending, setPending] = useState<{
+    choice: boolean;
+    from: boolean;
+  } | null>(null);
+  // The server has moved since the tap: it has the say again.
+  if (pending !== null && value !== pending.from) setPending(null);
+  const shown = pending === null ? value : pending.choice;
   return (
     <Switch
       label={label}
-      value={choice ?? value}
+      value={shown}
       onValueChange={(next) => {
-        setChoice(next);
-        void onChange(next)
-          .catch(() => null)
-          .finally(() => setChoice(null));
+        setPending({ choice: next, from: value });
+        onChange(next).catch(() => setPending(null));
       }}
     />
   );

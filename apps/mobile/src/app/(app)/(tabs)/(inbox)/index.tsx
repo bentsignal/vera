@@ -4,6 +4,7 @@ import EditSquare from "@expo/material-symbols/edit_square.xml";
 
 import { ScreenList } from "~/components/screen-list";
 import { TabTitle } from "~/components/tab-title";
+import { INBOX_ROW_HEIGHT } from "~/features/inbox/conversation-row";
 import { filterInbox } from "~/features/inbox/filter";
 import { FilterToolbar } from "~/features/inbox/filter-toolbar";
 import { InboxRow } from "~/features/inbox/inbox-row";
@@ -64,6 +65,7 @@ export default function InboxScreen() {
       <ScreenList
         ready={!isLoading}
         data={items}
+        estimatedItemSize={INBOX_ROW_HEIGHT}
         keyExtractor={(item) => item.key}
         ListEmptyComponent={empty()}
         renderItem={({ item }) => (

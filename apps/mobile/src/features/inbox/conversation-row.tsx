@@ -10,6 +10,13 @@ import { formatInboxTimestamp } from "~/lib/format";
 
 const CHANNEL_GLYPH = { android: "tag", ios: "number" } as const;
 
+/**
+ * Every Inbox row is this tall. One fixed height keeps the list's layout
+ * exact when rows reorder (pinning moves one to the top), and lets iOS
+ * size each native row up front.
+ */
+export const INBOX_ROW_HEIGHT = 84;
+
 /** The name, then a channel's space and the muted bell. */
 function Title({ conversation }: { conversation: ConversationSummary }) {
   return (
@@ -141,7 +148,10 @@ export function ConversationRow({
       }}
       asChild
     >
-      <Pressable className="active:bg-fill flex-row">
+      <Pressable
+        className="active:bg-fill flex-row"
+        style={{ height: INBOX_ROW_HEIGHT }}
+      >
         <ConversationRowContent
           conversation={conversation}
           showAccount={showAccount}
