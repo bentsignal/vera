@@ -218,6 +218,28 @@ without changing anything (it did for `chat.vera.app.dev`): check an App ID
 with `pnpm release asc GET '/v1/bundleIds?filter[identifier]=<id>&include=bundleIdCapabilities'`
 and add missing ones with `POST /v1/bundleIdCapabilities`.
 
+Push notifications on both apps use one APNs key, `VNH5HYJRA9`, kept in
+Expo. If a bundle ID has no push key, Expo rejects every push to it with
+`InvalidCredentials`. Vera Dev had none until 2026-10-05, so its pushes
+never arrived and only the app's own in-app updates showed. `eas
+credentials` asks for an Apple ID to attach an existing key; Expo's GraphQL
+API doesn't (the session secret is in `~/.expo/state.json`):
+
+```graphql
+mutation {
+  iosAppCredentials {
+    setPushKey(id: "<iosAppCredentials id>", pushKeyId: "<push key id>") {
+      id
+    }
+  }
+}
+```
+
+Find both ids with `app { byFullName(fullName: "@directedbyshawn/vera") {
+iosAppCredentials { id appleAppIdentifier { bundleIdentifier } pushKey { id
+keyIdentifier } } } }`. To check a token end to end, send it a push through
+`https://exp.host/--/api/v2/push/send` and read the receipt.
+
 Two things the key cannot do, done once in the web UI instead: creating the
 App Store Connect app record ("Vera Chat", Apple ID `6818656155`; "Vera" was
 taken) and enabling Communication Notifications on an App ID (Apple's API
