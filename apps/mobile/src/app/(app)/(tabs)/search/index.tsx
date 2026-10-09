@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 
@@ -11,6 +10,7 @@ import {
   nativeSearchBarRef,
 } from "~/features/search/native-search";
 import { useSearchResults } from "~/features/search/use-search";
+import { useSearchText } from "~/features/search/use-search-query";
 
 const ICONS = {
   channel: { android: "tag", ios: "number" },
@@ -50,7 +50,7 @@ function ResultRow({
 
 export default function SearchScreen() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const { query, onChangeText } = useSearchText();
   const results = useSearchResults(query);
 
   // Selecting the tab opens the search field over the keyboard. The frame
@@ -91,7 +91,7 @@ export default function SearchScreen() {
         hideWhenScrolling={false}
         obscureBackground={false}
         placement="automatic"
-        onChangeText={(event) => setQuery(event.nativeEvent.text)}
+        onChangeText={(event) => onChangeText(event.nativeEvent.text)}
       />
       <ScreenList
         data={results}

@@ -13,10 +13,11 @@ const UNCHECKED = "circle";
 export function CheckMark({
   checked,
 }: {
-  checked: boolean;
+  checked: boolean | undefined;
   onChange: () => void;
 }) {
   const accent = useCSSVariable("--color-accent");
+  if (checked === undefined) return null;
   return (
     <Icon
       name={checked ? CHECKED : UNCHECKED}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
@@ -16,6 +16,32 @@ import { AccountScope } from "~/features/messaging/account";
 
 const MODES = ["Chat", "Group"] as const;
 
+/** Next, to name the group, shown in Group mode. */
+function NextToolbar({
+  disabled,
+  hidden,
+  onPress,
+}: {
+  disabled: boolean;
+  hidden: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Button
+        hidden={hidden}
+        icon={sheetIcons.next}
+        accessibilityLabel="Next"
+        variant="prominent"
+        disabled={disabled}
+        onPress={onPress}
+      >
+        Next
+      </Stack.Toolbar.Button>
+    </Stack.Toolbar>
+  );
+}
+
 function NewMessage({
   from,
   onChangeFrom,
@@ -27,11 +53,12 @@ function NewMessage({
   const closeSheet = useCloseSheet();
   const [mode, setMode] = useState<(typeof MODES)[number]>("Chat");
   const [members, setMembers] = useState<string[]>([]);
-  const search = usePeopleSearch({ selected: members });
   const openDirect = useMutation(
     pdsMutation({ mutation: pds.messages.openDirect, session: from }),
   );
   const isGroup = mode === "Group";
+  // Chat lists everyone; Group lists the people picked on their own.
+  const search = usePeopleSearch({ selected: isGroup ? members : [] });
 
   // Opens the conversation with one person (an existing DM if there is one).
   async function message(address: string) {
@@ -60,7 +87,6 @@ function NewMessage({
       return;
     }
     setMembers([...members, address]);
-    search.clear();
   }
 
   return (
@@ -72,23 +98,21 @@ function NewMessage({
           onPress={closeSheet}
         />
       </Stack.Toolbar>
-      <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button
-          hidden={!isGroup}
-          icon={sheetIcons.next}
-          accessibilityLabel="Next"
-          variant="prominent"
+      {/* Android animates a hidden button back in by growing the header's
+          Compose host frame by frame, which janks; there the toolbar just
+          mounts with Group. iOS fades it in natively. */}
+      {(Platform.OS === "ios" || isGroup) && (
+        <NextToolbar
           disabled={members.length === 0}
+          hidden={!isGroup}
           onPress={() =>
             router.push({
               params: { account: from, members: members.join(",") },
               pathname: "/new-message/group",
             })
           }
-        >
-          Next
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
+        />
+      )}
       <NativeHost style={{ flex: 1 }}>
         <FieldList>
           <SegmentedSection values={MODES} value={mode} onChange={setMode} />
