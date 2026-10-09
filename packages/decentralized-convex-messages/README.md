@@ -38,8 +38,9 @@ member) returns a random code that lasts `expiresIn` milliseconds (at most a
 year), or forever without it. `messages.spaceInviteLinkPreview` shows any
 signed-in account where a code leads, and `messages.joinSpaceWithLink` joins
 through it. `messages.spaceInviteLinks` lists a space's live links (owners see
-all, members their own), and `messages.revokeSpaceInviteLink` turns one off
-(its maker or an owner). `messages.addSpaceMembers`, which adds people
+all, members their own). Its maker or an owner can change how long one
+lasts with `messages.setSpaceInviteLinkExpiry` (measured from when it was
+made) or delete it with `messages.revokeSpaceInviteLink`. `messages.addSpaceMembers`, which adds people
 without asking, remains for apps from before invitations.
 
 Reactions follow the same author-home rule as messages: `messages.react`

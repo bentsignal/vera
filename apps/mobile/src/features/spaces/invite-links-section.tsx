@@ -1,21 +1,26 @@
 import type { Space, SpaceInviteLink } from "@decentralized-convex/messages";
+import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { FieldGroup, ListItem, Text } from "@expo/ui";
 
-import { showActionSheet } from "~/components/action-sheet";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";
 import { useSpaceActions } from "~/features/messaging/spaces";
 import { secondaryTextStyle } from "~/lib/colors";
-import { canCopy, copyText } from "~/lib/native-extras";
-import { describeExpiry, inviteLinkUrl, shareInviteLink } from "./invite-links";
+import {
+  DEFAULT_EXPIRATION,
+  describeExpiry,
+  EXPIRATIONS,
+  inviteLinkUrl,
+} from "./invite-links";
 
 const LINK_ICON = { android: "link", ios: "link" } as const;
 
 /**
  * The space's live invite links (owners see everyone's, members their
- * own), each with share, copy, and turn off, under a row that makes one.
+ * own), under a row that makes one. Tapping a link opens it to copy,
+ * share, change how long it lasts, or delete it.
  */
 export function InviteLinksSection({
   links,
@@ -26,22 +31,29 @@ export function InviteLinksSection({
 }) {
   const router = useRouter();
   const { address: account } = useAccount();
-  const { revokeInviteLink } = useSpaceActions();
+  const { createInviteLink } = useSpaceActions();
   const profileOf = useProfiles(links.map((link) => link.createdBy));
 
-  function manage(code: string) {
-    const url = inviteLinkUrl(code);
-    showActionSheet([
-      { label: "Share Link", onPress: () => shareInviteLink(url) },
-      ...(canCopy
-        ? [{ label: "Copy Link", onPress: () => copyText(url) }]
-        : []),
+  function open(code: string) {
+    router.push({
+      params: { account, code, spaceId: space.spaceId },
+      pathname: "/invite-link",
+    });
+  }
+
+  /** Makes a link right away (it lasts a week until changed) and opens it. */
+  function create() {
+    const { ms } =
+      EXPIRATIONS.find((choice) => choice.value === DEFAULT_EXPIRATION) ??
+      EXPIRATIONS[0];
+    createInviteLink.mutate(
+      { expiresIn: ms, spaceId: space.spaceId },
       {
-        destructive: true,
-        label: "Turn Off Link",
-        onPress: () => revokeInviteLink.mutate({ code }),
+        onError: () =>
+          Alert.alert("Couldn't Create Link", "Try again in a moment."),
+        onSuccess: (link) => open(link.code),
       },
-    ]);
+    );
   }
 
   return (
@@ -54,12 +66,9 @@ export function InviteLinksSection({
             tintColorClassName="accent-accent"
           />
         }
-        onPress={() =>
-          router.push({
-            params: { account, spaceId: space.spaceId },
-            pathname: "/invite-link",
-          })
-        }
+        onPress={() => {
+          if (!createInviteLink.isPending) create();
+        }}
       >
         Create Invite Link
       </ListItem>
@@ -83,7 +92,7 @@ export function InviteLinksSection({
               ].join(" · ")}
             </Text>
           }
-          onPress={() => manage(link.code)}
+          onPress={() => open(link.code)}
         >
           {inviteLinkUrl(link.code).replace("https://", "")}
         </ListItem>

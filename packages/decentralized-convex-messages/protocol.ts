@@ -267,7 +267,19 @@ export const messagesProtocol = definePluginProtocol({
       }),
       returns: spaceInviteLink,
     }),
-    /** Turns a link off. Its maker or a space owner may. */
+    /**
+     * Changes how long a link lasts: `expiresIn` milliseconds from when it
+     * was made, or forever without it. Its maker or a space owner may. A
+     * lifetime that has already run out fails with `INVALID_EXPIRATION`.
+     */
+    setSpaceInviteLinkExpiry: defineOperation({
+      args: v.object({
+        code: v.string(),
+        expiresIn: v.optional(v.number()),
+      }),
+      returns: spaceInviteLink,
+    }),
+    /** Deletes a link. Its maker or a space owner may. */
     revokeSpaceInviteLink: defineOperation({
       args: v.object({ code: v.string() }),
       returns: v.null(),

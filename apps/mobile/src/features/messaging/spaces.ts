@@ -155,5 +155,8 @@ export function useSpaceActions() {
     revokeInviteLink: useMutation(
       pdsMutation({ mutation: pds.messages.revokeSpaceInviteLink, session }),
     ),
+    setInviteLinkExpiry: useMutation(
+      pdsMutation({ mutation: pds.messages.setSpaceInviteLinkExpiry, session }),
+    ),
   };
 }

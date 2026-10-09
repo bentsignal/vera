@@ -21,6 +21,23 @@ export type Expiration = (typeof EXPIRATIONS)[number]["value"];
 export const DEFAULT_EXPIRATION = "7d" satisfies Expiration;
 
 /**
+ * Which choice a link was set to: its lifetime from creation, matched to
+ * the nearest minute (the server stamps creation a moment after it reads
+ * the clock). Undefined for a lifetime that isn't one of the choices.
+ */
+export function expirationOf(link: {
+  createdAt: number;
+  expiresAt: number | null;
+}) {
+  if (link.expiresAt === null) return "never" satisfies Expiration;
+  const lifetime = link.expiresAt - link.createdAt;
+  return EXPIRATIONS.find(
+    (choice) =>
+      choice.ms !== undefined && Math.abs(choice.ms - lifetime) < MINUTE,
+  )?.value;
+}
+
+/**
  * The shareable link for an invite code. Vera opens `vera.chat/join/…`
  * and Vera Dev opens `vera.chat/dev/join/…` (see `+native-intent.ts`), so
  * a link always opens the app whose server made it.

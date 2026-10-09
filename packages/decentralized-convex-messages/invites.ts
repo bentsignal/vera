@@ -192,6 +192,36 @@ export async function createSpaceInviteLink(
   } satisfies SpaceInviteLink;
 }
 
+export async function setSpaceInviteLinkExpiry(
+  ctx: MutationCtx,
+  self: string,
+  args: Args<"setSpaceInviteLinkExpiry">,
+) {
+  const link = await getLink(ctx, args.code);
+  if (link === null || isExpired(link, Date.now()))
+    fail("SPACE_INVITE_LINK_NOT_FOUND");
+  await requireSpaceRole(
+    ctx,
+    link.spaceId,
+    self,
+    link.createdBy === self ? "member" : "owner",
+  );
+  const { expiresIn } = args;
+  if (
+    expiresIn !== undefined &&
+    !(expiresIn > 0 && expiresIn <= MAX_INVITE_LINK_LIFETIME)
+  ) {
+    fail("INVALID_EXPIRATION");
+  }
+  const expiresAt =
+    expiresIn === undefined ? undefined : link._creationTime + expiresIn;
+  if (expiresAt !== undefined && expiresAt <= Date.now()) {
+    fail("INVALID_EXPIRATION");
+  }
+  await ctx.db.patch(link._id, { expiresAt });
+  return toLink({ ...link, expiresAt });
+}
+
 export async function revokeSpaceInviteLink(
   ctx: MutationCtx,
   self: string,

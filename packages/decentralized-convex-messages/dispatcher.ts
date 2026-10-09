@@ -56,6 +56,8 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         conversations.renameGroup(ctx, requireAccountId(identity), args),
       renameSpace: (ctx, { args, identity }) =>
         spaces.renameSpace(ctx, requireAccountId(identity), args),
+      setSpaceInviteLinkExpiry: (ctx, { args, identity }) =>
+        invites.setSpaceInviteLinkExpiry(ctx, requireAccountId(identity), args),
       revokeSpaceInviteLink: (ctx, { args, identity }) =>
         invites.revokeSpaceInviteLink(ctx, requireAccountId(identity), args),
       send: (ctx, { args, identity }) => {

@@ -119,7 +119,7 @@ function AppStack() {
           presentation: "formSheet",
           sheetAllowedDetents: [0.5, 1],
           sheetGrabberVisible: true,
-          title: "New Invite Link",
+          title: "Invite Link",
         }}
       />
       <Stack.Screen
