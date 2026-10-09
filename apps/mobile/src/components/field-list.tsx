@@ -7,7 +7,8 @@ import { FieldGroup } from "@expo/ui";
  * components (each rendering exactly one section). On iOS it is
  * `FieldGroup`. On Android, `FieldGroup` wraps any child that isn't a
  * literal section in another section, so section components came out as
- * cards inside cards; `field-list.android.tsx` lists them as they are.
+ * cards inside cards (and a section component that renders nothing left
+ * an empty card); `field-list.android.tsx` lists them as they are.
  */
 export function FieldList({
   modifiers,

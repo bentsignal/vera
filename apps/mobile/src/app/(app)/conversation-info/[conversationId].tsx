@@ -2,9 +2,9 @@ import type { Conversation } from "@decentralized-convex/messages";
 import { Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { FieldGroup } from "@expo/ui";
 
 import type { AvatarGlyph } from "~/components/avatar";
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import {
   InboxSection,
@@ -38,14 +38,14 @@ function Details({
   return (
     <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
+        <FieldList>
           <ProfileCard {...card} />
           <InboxSection conversation={conversation} />
           {kind !== "direct" && <MembersSection members={members} />}
           {kind === "group" && (
             <LeaveSection conversationId={conversationId} name={card.name} />
           )}
-        </FieldGroup>
+        </FieldList>
       </NativeHost>
     </Animated.View>
   );

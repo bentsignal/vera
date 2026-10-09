@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { FieldGroup, ListItem, Text } from "@expo/ui";
+import { FieldGroup, Text } from "@expo/ui";
 
 import { showActionSheet } from "~/components/action-sheet";
+import { ListItem } from "~/components/list-item";
 import { useAccounts, useVisibleAccounts } from "~/features/messaging/account";
 import { secondaryTextStyle } from "~/lib/colors";
 

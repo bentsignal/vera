@@ -3,10 +3,11 @@ import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
-import { Button, FieldGroup, ListItem, Text } from "@expo/ui";
+import { Button, FieldGroup, Text } from "@expo/ui";
 import { pds } from "@vera/backend/pds";
 
 import { Avatar } from "~/components/avatar";
+import { ListItem } from "~/components/list-item";
 import { OptimisticSwitch } from "~/components/optimistic-switch";
 import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";

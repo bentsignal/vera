@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
-import { Button, FieldGroup, ListItem, Text } from "@expo/ui";
+import { Button, FieldGroup, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
+import { ListItem } from "~/components/list-item";
 import { SymbolIcon } from "~/components/symbol-icon";
 import {
   AccountScope,
@@ -10,7 +11,7 @@ import {
 } from "~/features/messaging/account";
 import { useMyProfile } from "~/features/messaging/directory";
 import { secondaryTextStyle } from "~/lib/colors";
-import { linkButton, nestedListItemColors } from "~/lib/ui-modifiers";
+import { linkButton } from "~/lib/ui-modifiers";
 
 function AccountRow() {
   const router = useRouter();
@@ -19,7 +20,6 @@ function AccountRow() {
   const displayName = profile?.displayName ?? username;
   return (
     <ListItem
-      colors={nestedListItemColors}
       leading={
         <Avatar name={displayName} size="md" uri={profile?.avatarUrl ?? null} />
       }

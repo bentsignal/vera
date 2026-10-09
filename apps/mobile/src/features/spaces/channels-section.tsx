@@ -1,8 +1,10 @@
 import type { Space } from "@decentralized-convex/messages";
 import { useRouter } from "expo-router";
-import { FieldGroup, ListItem, Text } from "@expo/ui";
+import { FieldGroup } from "@expo/ui";
 
+import { ListItem } from "~/components/list-item";
 import { SectionHeaderWithAdd } from "~/components/section-header";
+import { SectionTitle } from "~/components/section-title";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { UnreadBadge } from "~/components/unread-badge";
 import { useAccount } from "~/features/messaging/account";
@@ -24,7 +26,7 @@ export function ChannelsSection({ space }: { space: Space }) {
             }
           />
         ) : (
-          <Text>Text Channels</Text>
+          <SectionTitle>Text Channels</SectionTitle>
         )}
       </FieldGroup.SectionHeader>
       {space.channels.map((channel) => (
