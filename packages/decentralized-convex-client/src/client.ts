@@ -2,6 +2,7 @@ import type { DiscoveredPds } from "@decentralized-convex/address";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { accountDomain, discoverPds } from "@decentralized-convex/address";
 
+import type { PdsMutationOptions } from "./optimistic.ts";
 import type {
   AnyPdsMutationRequest,
   AnyPdsQueryRequest,
@@ -220,12 +221,19 @@ export class DecentralizedConvexClient {
     }).mutation(request);
   }
 
-  pdsMutation<Request extends AnyPdsMutationRequest>(request: Request) {
+  /**
+   * Runs a mutation on the home PDS. An `optimisticUpdate` changes the home
+   * PDS's query results right away, until the mutation's result arrives.
+   */
+  pdsMutation<Request extends AnyPdsMutationRequest>(
+    request: Request,
+    options?: PdsMutationOptions,
+  ) {
     const home = this.#requireHome();
     assertPdsSupportsRequest(home, request);
     return new PdsClient({
       connection: this.#getConnection(home.manifest.deploymentUrl),
-    }).mutation(request);
+    }).mutation(request, options);
   }
 
   async resolvePds(addressOrDomain: string) {

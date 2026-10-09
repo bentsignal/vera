@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import * as Crypto from "expo-crypto";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { listNames } from "@decentralized-convex/messages";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
@@ -15,7 +16,8 @@ import type { Message } from "~/features/conversation/types";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useAccount, useVisibleAccounts } from "./account";
 import { useMessageWindow } from "./message-window";
-import { useProfiles, useProfileState } from "./profiles";
+import * as optimistic from "./optimistic";
+import { useProfileState } from "./profiles";
 import { useReactions } from "./reactions";
 import { pdsResult } from "./results";
 
@@ -34,14 +36,30 @@ export function toMessage(
   } satisfies Message;
 }
 
+/**
+ * A group's title: its name, or else the other members' names, in address
+ * order like the PDS lists them (so it reads the same everywhere).
+ */
+export function groupTitle(
+  name: string | null,
+  members: readonly string[],
+  self: string,
+  displayName: (id: string) => string,
+) {
+  if (name !== null) return name;
+  const others = members.filter((member) => member !== self).sort();
+  return others.length === 0 ? "Group" : listNames(others.map(displayName));
+}
+
 function conversationTitle(
   conversation: Conversation,
   self: string,
   displayName: (id: string) => string,
 ) {
-  if (conversation.kind === "channel") return `#${conversation.name ?? ""}`;
-  if (conversation.kind === "group") return conversation.name ?? "Group";
-  const other = conversation.members.find((member) => member !== self);
+  const { kind, members, name } = conversation;
+  if (kind === "channel") return `#${name ?? ""}`;
+  if (kind === "group") return groupTitle(name, members, self, displayName);
+  const other = members.find((member) => member !== self);
   return displayName(other ?? self);
 }
 
@@ -65,7 +83,7 @@ function preview(
 function summarize(
   account: string,
   conversation: Conversation,
-  profileOf: ReturnType<typeof useProfiles>,
+  profileOf: ReturnType<typeof useProfileState>["profileOf"],
 ) {
   function displayName(address: string) {
     return profileOf(address).displayName;
@@ -153,16 +171,47 @@ export function useConversation(conversationId: string) {
       session: address,
     }),
   );
-  const profileOf = useProfiles(data?.members ?? []);
+  const profiles = useProfileState(data?.members ?? []);
+  const { profileOf } = profiles;
   function displayName(account: string) {
     return profileOf(account).displayName;
   }
+  // An unnamed group's title is its members' names: wait for them, rather
+  // than show usernames that then change.
+  const titled = data != null && !(data.kind === "group" && data.name === null);
   return {
     conversation: data ?? undefined,
     displayName,
     isLoading: data === undefined,
     profileOf,
-    title: data ? conversationTitle(data, address, displayName) : "",
+    title:
+      data != null && (titled || !profiles.isLoading)
+        ? conversationTitle(data, address, displayName)
+        : "",
+  };
+}
+
+/**
+ * Starting a group or a direct conversation as the scoped account. Both
+ * show up (and open) right away, before the PDS answers.
+ */
+export function useConversationActions() {
+  const { address: session } = useAccount();
+  return {
+    createGroup: useMutation(
+      pdsMutation({
+        mutation: pds.messages.createGroup,
+        optimisticUpdate: optimistic.createGroup(session),
+        session,
+      }),
+    ),
+    openDirect: useMutation(
+      pdsMutation({
+        mutation: pds.messages.openDirect,
+        optimisticUpdate: optimistic.openDirect(session),
+        session,
+      }),
+    ),
   };
 }
 

@@ -114,3 +114,88 @@ void test("binds protocols to canonical typed PDS calls", async () => {
   assert.deepEqual(live, [{ body: "live", id: "note-2" }]);
   assert.equal(calls.length, 4);
 });
+
+/** Convex's optimistic store for `pds:dispatchQuery`, keyed by args. */
+function fakeOptimisticStore() {
+  const results = new Map<string, { args: unknown; value: unknown }>();
+  return {
+    getAllQueries: () => [...results.values()],
+    getQuery: (_query: unknown, args: unknown) =>
+      results.get(JSON.stringify(args))?.value,
+    setQuery: (_query: unknown, args: unknown, value: unknown) => {
+      results.set(JSON.stringify(args), { args, value });
+    },
+  };
+}
+
+void test("adapts Convex optimistic updates to PDS requests", async () => {
+  const requests = definePdsApi(notes);
+  const mine = requests.notes.list({ owner: "shawn" });
+  const theirs = requests.notes.list({ owner: "maya" });
+  const store = fakeOptimisticStore();
+  store.setQuery(pdsFunctions.query, mine, {
+    routes: ["a.test"],
+    value: [{ body: "saved", id: "note-1" }],
+  });
+  store.setQuery(pdsFunctions.query, theirs, { routes: [], value: [] });
+
+  let applied: ((store: never) => void) | undefined;
+  const connection: PdsConnection = {
+    close: () => Promise.resolve(),
+    mutation: (_mutation, _args, options) => {
+      applied = options?.optimisticUpdate;
+      return Promise.resolve({ id: "note-2" });
+    },
+    query: () => Promise.reject(new Error("unused")),
+    subscribe: () => () => undefined,
+  };
+  const client = new PdsClient({ connection });
+  await client.mutation(requests.notes.create({ body: "draft" }), {
+    optimisticUpdate: (local) => {
+      const lists = local.getAllQueries(requests.notes.list);
+      assert.deepEqual(
+        lists.map(({ args }) => args.owner),
+        ["shawn", "maya"],
+      );
+      for (const { args, request, value } of lists) {
+        if (args.owner !== "shawn" || value === undefined) continue;
+        local.setQuery(request, [...value, { body: "draft", id: "note-2" }]);
+      }
+    },
+  });
+  assert.ok(applied);
+  // Convex calls the update with its own store.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- The fake implements the methods PDS updates use.
+  applied(store as never);
+  assert.deepEqual(store.getQuery(pdsFunctions.query, mine), {
+    routes: ["a.test"],
+    value: [
+      { body: "saved", id: "note-1" },
+      { body: "draft", id: "note-2" },
+    ],
+  });
+  assert.deepEqual(store.getQuery(pdsFunctions.query, theirs), {
+    routes: [],
+    value: [],
+  });
+});
+
+void test("keeps the last result while an optimistic update shows loading", () => {
+  const results: unknown[] = [];
+  const connection: PdsConnection = {
+    close: () => Promise.resolve(),
+    mutation: () => Promise.reject(new Error("unused")),
+    query: () => Promise.reject(new Error("unused")),
+    subscribe: (_query, _args, onResult) => {
+      onResult({ routes: [], value: [{ body: "one", id: "1" }] });
+      onResult(undefined);
+      return () => undefined;
+    },
+  };
+  new PdsClient({ connection }).watchQuery(
+    definePdsApi(notes).notes.list({ owner: "shawn" }),
+    (result) => results.push(result),
+    assert.fail,
+  );
+  assert.deepEqual(results, [[{ body: "one", id: "1" }]]);
+});

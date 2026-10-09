@@ -43,22 +43,18 @@ export function InvitesRow({ count }: { count: number }) {
 function PillButton({
   label,
   prominent = false,
-  disabled,
   onPress,
 }: {
   label: string;
   prominent?: boolean;
-  disabled: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
       className={cn(
         "h-9 flex-1 items-center justify-center rounded-full active:opacity-70",
         prominent ? "bg-accent" : "bg-fill",
-        disabled && "opacity-50",
       )}
       onPress={onPress}
     >
@@ -75,8 +71,9 @@ function PillButton({
 }
 
 /**
- * One space you're invited to, with Accept and Decline. Accepting opens the
- * space in place of the invites; declining the last one goes back.
+ * One space you're invited to, with Accept and Decline. Both answer right
+ * away: accepting opens the space in place of the invites; declining the
+ * last one goes back.
  */
 export function InviteRow({
   invite,
@@ -92,35 +89,27 @@ export function InviteRow({
   const router = useRouter();
   const inviter = useProfile(invite.invitedBy);
   const { acceptInvite, declineInvite } = useSpaceActions();
-  const isPending = acceptInvite.isPending || declineInvite.isPending;
   const { spaceId } = invite;
 
   function accept() {
-    acceptInvite.mutate(
-      { spaceId },
-      {
-        onError: () =>
-          Alert.alert("Couldn't Join Space", "Try again in a moment."),
-        onSuccess: () =>
-          router.replace({
-            params: { account: invite.account, name: invite.name, spaceId },
-            pathname: "/spaces/[spaceId]",
-          }),
-      },
-    );
+    void acceptInvite
+      .mutateAsync({ spaceId })
+      .catch(() =>
+        Alert.alert("Couldn't Join Space", "Try again in a moment."),
+      );
+    router.replace({
+      params: { account: invite.account, name: invite.name, spaceId },
+      pathname: "/spaces/[spaceId]",
+    });
   }
 
   function decline() {
-    declineInvite.mutate(
-      { spaceId },
-      {
-        onError: () =>
-          Alert.alert("Couldn't Decline Invite", "Try again in a moment."),
-        onSuccess: () => {
-          if (isLast) router.back();
-        },
-      },
-    );
+    void declineInvite
+      .mutateAsync({ spaceId })
+      .catch(() =>
+        Alert.alert("Couldn't Decline Invite", "Try again in a moment."),
+      );
+    if (isLast) router.back();
   }
 
   return (
@@ -147,13 +136,8 @@ export function InviteRow({
           </Text>
         </View>
         <View className="flex-row gap-2">
-          <PillButton label="Decline" disabled={isPending} onPress={decline} />
-          <PillButton
-            label="Accept"
-            prominent
-            disabled={isPending}
-            onPress={accept}
-          />
+          <PillButton label="Decline" onPress={decline} />
+          <PillButton label="Accept" prominent onPress={accept} />
         </View>
       </View>
     </View>

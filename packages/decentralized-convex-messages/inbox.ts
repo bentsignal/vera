@@ -53,34 +53,42 @@ export async function inboxAccess(
   self: string,
   channels: boolean,
 ) {
+  // Every conversation is read concurrently; reading them one at a time made
+  // a large inbox take a second, and every write to it waits for that.
   const memberships = await ctx.db
     .query("members")
     .withIndex("by_account", (index) => index.eq("accountId", self))
     .collect();
-  const found: ConversationAccess[] = [];
-  for (const membership of memberships) {
-    const access = await findAccess(ctx, membership.conversationId, self);
-    if (access === null || access.conversation.kind === "channel") continue;
-    found.push(access);
-  }
-  if (channels) {
-    const spaces = await ctx.db
-      .query("spaceMembers")
-      .withIndex("by_account", (index) => index.eq("accountId", self))
-      .collect();
-    for (const { spaceId } of spaces) {
-      const spaceChannels = await ctx.db
+  const direct = await Promise.all(
+    memberships.map((membership) =>
+      findAccess(ctx, membership.conversationId, self),
+    ),
+  );
+  const found = direct.filter(
+    (access): access is ConversationAccess =>
+      access !== null && access.conversation.kind !== "channel",
+  );
+  if (!channels) return found;
+  const spaces = await ctx.db
+    .query("spaceMembers")
+    .withIndex("by_account", (index) => index.eq("accountId", self))
+    .collect();
+  const spaceChannels = await Promise.all(
+    spaces.map(async ({ spaceId }) => {
+      const conversations = await ctx.db
         .query("conversations")
         .withIndex("by_space", (index) => index.eq("spaceId", spaceId))
         .collect();
-      for (const channel of spaceChannels) {
-        const access = await findAccess(ctx, channel.conversationId, self);
-        if (access === null || access.member?.hiddenFromInbox === true) {
-          continue;
-        }
-        found.push(access);
-      }
-    }
+      return Promise.all(
+        conversations.map((channel) =>
+          findAccess(ctx, channel.conversationId, self),
+        ),
+      );
+    }),
+  );
+  for (const access of spaceChannels.flat()) {
+    if (access === null || access.member?.hiddenFromInbox === true) continue;
+    found.push(access);
   }
   return found;
 }
@@ -91,9 +99,10 @@ export async function inbox(
   self: string,
   args: OperationArgs<Queries["inbox"]>,
 ) {
-  const conversations = [];
-  for (const access of await inboxAccess(ctx, self, args.channels === true)) {
-    conversations.push(await toConversation(ctx, access, self));
-  }
+  const conversations = await Promise.all(
+    (await inboxAccess(ctx, self, args.channels === true)).map((access) =>
+      toConversation(ctx, access, self),
+    ),
+  );
   return conversations.sort((left, right) => right.updatedAt - left.updatedAt);
 }

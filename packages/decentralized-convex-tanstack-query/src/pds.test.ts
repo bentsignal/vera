@@ -73,6 +73,37 @@ void test("produces native TanStack query and mutation options", async () => {
     body: "hello",
     id: "https://a.test",
   });
+  assert.equal(connections.get("https://a.test")?.optimisticUpdate, undefined);
+
+  // An optimistic update reaches the home connection with the mutation's args.
+  const seen: string[] = [];
+  await new MutationObserver(
+    queryClient,
+    pdsMutation({
+      mutation: createNote,
+      optimisticUpdate: (store, { body }) => {
+        seen.push(body);
+        store.setQuery(listNotes({ owner: "alice" }), [{ body, id: "draft" }]);
+      },
+    }),
+  ).mutate({ body: "draft" });
+  const set: unknown[] = [];
+  const store = {
+    getAllQueries: () => [],
+    getQuery: () => undefined,
+    setQuery: (_query: unknown, args: unknown, value: unknown) => {
+      set.push({ args, value });
+    },
+  };
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- The fake implements the methods PDS updates use.
+  connections.get("https://a.test")?.optimisticUpdate?.(store as never);
+  assert.deepEqual(seen, ["draft"]);
+  assert.deepEqual(set, [
+    {
+      args: listNotes({ owner: "alice" }),
+      value: { routes: [], value: [{ body: "draft", id: "draft" }] },
+    },
+  ]);
 
   unsubscribe();
   disconnect();

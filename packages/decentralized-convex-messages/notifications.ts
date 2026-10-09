@@ -18,6 +18,7 @@ import {
   getSpace,
   memberAddresses,
 } from "./model.ts";
+import { listNames } from "./naming.ts";
 
 /**
  * Android: the app's high-importance `messages` channel (the default
@@ -38,8 +39,9 @@ export const targets = internalQuery({
     const conversation = await getConversation(ctx, message.conversationId);
     if (conversation === null) return null;
 
+    const members = await memberAddresses(ctx, conversation);
     const recipients: { accountId: string; token: string }[] = [];
-    for (const accountId of await memberAddresses(ctx, conversation)) {
+    for (const accountId of members) {
       if (accountId === message.authorId) continue;
       const member = await getMember(
         ctx,
@@ -58,6 +60,12 @@ export const targets = internalQuery({
       conversationId: conversation.conversationId,
       conversationName: await conversationName(ctx, conversation),
       messageId: message.messageId,
+      // A group without a name is titled with the other members' names,
+      // which differ for each recipient.
+      unnamedGroupMembers:
+        conversation.kind === "group" && conversation.name === undefined
+          ? members
+          : null,
       kind: conversation.kind,
       recipients,
       senderId: message.authorId,
@@ -115,40 +123,50 @@ export const send = internalAction({
       messageId,
     });
     if (target === null || target.recipients.length === 0) return;
-    const [sender, badges] = await Promise.all([
-      senderProfile(target.senderId),
+    const [sender, badges, memberNames] = await Promise.all([
+      accountProfile(target.senderId),
       badgeCounts(ctx, target.recipients),
+      displayNames([...(target.unnamedGroupMembers ?? [])].sort()),
     ]);
     const senderName = sender?.displayName ?? target.senderName;
+    const { conversationName: name } = target;
+    /** An unnamed group's title leaves out whoever it's for. */
+    function conversationNameFor(accountId: string) {
+      const others = memberNames.filter(([member]) => member !== accountId);
+      return others.length === 0
+        ? name
+        : listNames(others.map(([, other]) => other));
+    }
 
     await deliver(
       ctx,
-      target.recipients.map(({ accountId, token }) => ({
-        ...badgeField(badges.get(accountId)),
-        body: target.body,
-        // A device signed into several accounts opens the message as
-        // the account it was sent to.
-        data: {
-          accountId,
-          conversationId: target.conversationId,
-          conversationName: target.conversationName,
-          kind: target.kind,
-          messageId: target.messageId,
-          senderAvatarUrl: sender?.avatarUrl ?? null,
-          senderId: target.senderId,
-          senderName,
-        },
-        ...ANDROID_DELIVERY,
-        // Lets the iOS Notification Service Extension rewrite it.
-        mutableContent: true,
-        sound: "default",
-        ...(target.conversationName === null
-          ? {}
-          : { subtitle: target.conversationName }),
-        threadId: target.conversationId,
-        title: senderName,
-        to: token,
-      })),
+      target.recipients.map(({ accountId, token }) => {
+        const conversationName = conversationNameFor(accountId);
+        return {
+          ...badgeField(badges.get(accountId)),
+          body: target.body,
+          // A device signed into several accounts opens the message as
+          // the account it was sent to.
+          data: {
+            accountId,
+            conversationId: target.conversationId,
+            conversationName,
+            kind: target.kind,
+            messageId: target.messageId,
+            senderAvatarUrl: sender?.avatarUrl ?? null,
+            senderId: target.senderId,
+            senderName,
+          },
+          ...ANDROID_DELIVERY,
+          // Lets the iOS Notification Service Extension rewrite it.
+          mutableContent: true,
+          sound: "default",
+          ...(conversationName === null ? {} : { subtitle: conversationName }),
+          threadId: target.conversationId,
+          title: senderName,
+          to: token,
+        };
+      }),
     );
   },
 });
@@ -171,7 +189,7 @@ export const sendInvite = internalAction({
     });
     if (target === null || target.recipients.length === 0) return;
     const [inviter, badges] = await Promise.all([
-      senderProfile(invitedBy),
+      accountProfile(invitedBy),
       badgeCounts(ctx, target.recipients),
     ]);
     const inviterName = inviter?.displayName ?? invitedBy.split("@")[0];
@@ -238,16 +256,30 @@ async function conversationName(
   return space === null ? channel : `${space.name} ${channel}`;
 }
 
+/** Each account's display name (its username without a profile), in order. */
+async function displayNames(accountIds: readonly string[]) {
+  const profiles = await Promise.all(accountIds.map(accountProfile));
+  return accountIds.map(
+    (accountId, index) =>
+      [
+        accountId,
+        profiles[index]?.displayName ??
+          accountId.slice(0, accountId.indexOf("@")),
+      ] as const,
+  );
+}
+
 /**
- * The sender's Accounts profile, for their current display name and photo.
- * Messages are stored on the author's home PDS, so the profile is on this
- * deployment, but a Convex Component cannot read a sibling Component. It
+ * An account's Accounts profile, for their current display name and photo.
+ * Messages are stored on the author's home PDS, so the sender's profile is
+ * on this deployment (other members' may not be, and come back null), but a
+ * Convex Component cannot read a sibling Component. It
  * asks this PDS's public root router instead, exactly as a client would
  * (`accounts.getProfile` needs no session). Messages requires `accounts`,
  * so the plugin is always installed. Any failure returns null and the
  * notification falls back to the name stored on the message.
  */
-async function senderProfile(accountId: string) {
+async function accountProfile(accountId: string) {
   try {
     const response = await fetch(`${env.CONVEX_CLOUD_URL}/api/query`, {
       body: JSON.stringify({
@@ -266,7 +298,7 @@ async function senderProfile(accountId: string) {
     if (!response.ok) return null;
     return parseProfile(await response.json());
   } catch (error) {
-    console.error("Sender profile lookup failed", error);
+    console.error("Profile lookup failed", error);
     return null;
   }
 }

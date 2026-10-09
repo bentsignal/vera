@@ -7,6 +7,11 @@ import type {
   PdsRequestResult,
   SerializedPdsRequest,
 } from "./api.ts";
+import type {
+  PdsConnectionMutationOptions,
+  PdsMutationOptions,
+} from "./optimistic.ts";
+import { pdsOptimisticLocalStore } from "./optimistic.ts";
 
 export { definePdsApi, pdsApiRequirements } from "./api.ts";
 export type {
@@ -62,6 +67,7 @@ export interface PdsConnection {
   mutation<Mutation extends RootMutation>(
     mutation: Mutation,
     args: SerializedPdsRequest,
+    options?: PdsConnectionMutationOptions,
   ): Promise<FunctionReturnType<Mutation>>;
   query<Query extends RootQuery>(
     query: Query,
@@ -70,7 +76,8 @@ export interface PdsConnection {
   subscribe<Query extends RootQuery>(
     query: Query,
     args: SerializedPdsRequest,
-    onResult: (result: FunctionReturnType<Query>) => void,
+    // Undefined when an optimistic update shows the query as loading.
+    onResult: (result: FunctionReturnType<Query> | undefined) => void,
     onError: (error: Error) => void,
   ): () => void;
 }
@@ -90,14 +97,28 @@ export class PdsClient {
     this.#query = options.query ?? pdsFunctions.query;
   }
 
+  /**
+   * Runs a mutation. Its `optimisticUpdate` changes this connection's query
+   * results right away, until the mutation's own result arrives.
+   */
   mutation<Request extends AnyPdsMutationRequest>(
     request: Request,
+    options: PdsMutationOptions = {},
   ): Promise<PdsRequestResult<Request>> {
+    const { optimisticUpdate } = options;
+    const query = this.#query;
     // The request's phantom result is defined by the same protocol that created its payload.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return this.#connection.mutation(this.#mutation, request) as Promise<
-      PdsRequestResult<Request>
-    >;
+    return this.#connection.mutation(
+      this.#mutation,
+      request,
+      optimisticUpdate === undefined
+        ? undefined
+        : {
+            optimisticUpdate: (store) =>
+              optimisticUpdate(pdsOptimisticLocalStore(store, query)),
+          },
+    ) as Promise<PdsRequestResult<Request>>;
   }
 
   async query<Request extends AnyPdsQueryRequest>(
@@ -137,6 +158,8 @@ export class PdsClient {
       this.#query,
       request,
       (result) => {
+        // An optimistic update set it loading; keep what was shown.
+        if (result === undefined) return;
         // The request's phantom result is defined by the same protocol that created its payload.
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
         const data = result.value as PdsRequestResult<Request>;

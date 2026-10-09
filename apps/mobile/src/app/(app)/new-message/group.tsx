@@ -1,44 +1,61 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
-import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { FieldGroup, ListItem, Text, TextInput } from "@expo/ui";
-import { pds } from "@vera/backend/pds";
 
 import { Avatar } from "~/components/avatar";
 import { NativeHost } from "~/components/native-host";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
 import { AccountScope, useAccount } from "~/features/messaging/account";
+import {
+  groupTitle,
+  useConversationActions,
+} from "~/features/messaging/conversations";
+import { newId } from "~/features/messaging/optimistic";
 import { useProfiles } from "~/features/messaging/profiles";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 
-/** Names the group picked on the previous step and creates it. */
+/**
+ * Names the group picked on the previous step (or leaves it unnamed, titled
+ * with its members), creates it, and opens it right away.
+ */
 function NewGroup({ members }: { members: string[] }) {
   const router = useRouter();
   const closeSheet = useCloseSheet();
   const { address: self } = useAccount();
   const profileOf = useProfiles(members);
   const [name, setName] = useState("");
-  const createGroup = useMutation(
-    pdsMutation({ mutation: pds.messages.createGroup, session: self }),
+  const { createGroup } = useConversationActions();
+  // The sheet closes as it creates; a second tap must not make another.
+  const created = useRef(false);
+  const unnamedTitle = groupTitle(
+    null,
+    members,
+    self,
+    (address) => profileOf(address).displayName,
   );
 
-  async function create() {
-    const created = await createGroup
-      .mutateAsync({ members, name: name.trim() })
-      .catch(() => null);
-    if (created === null) {
-      Alert.alert("Couldn't Create Group", "Try again in a moment.");
-      return;
-    }
+  function create() {
+    if (created.current) return;
+    created.current = true;
+    const conversationId = newId("group", self);
+    const groupName = name.trim();
+    void createGroup
+      .mutateAsync({
+        conversationId,
+        members,
+        ...(groupName === "" ? {} : { name: groupName }),
+      })
+      .catch(() =>
+        Alert.alert("Couldn't Create Group", "Try again in a moment."),
+      );
     closeSheet();
     router.push({
       params: {
         account: self,
-        conversationId: created.conversationId,
-        title: name.trim(),
+        conversationId,
+        title: groupName === "" ? unnamedTitle : groupName,
       },
       pathname: "/conversation/[conversationId]",
     });
@@ -51,14 +68,18 @@ function NewGroup({ members }: { members: string[] }) {
           icon={sheetIcons.done}
           accessibilityLabel="Create Group"
           variant="prominent"
-          disabled={name.trim().length === 0 || createGroup.isPending}
-          onPress={() => void create()}
+          onPress={create}
         />
       </Stack.Toolbar>
       <NativeHost style={{ flex: 1 }}>
         <FieldGroup>
           <FieldGroup.Section title="Group Name">
-            <TextInput autoFocus placeholder="Name" onChangeText={setName} />
+            {/* Optional: without one, the group shows its members' names. */}
+            <TextInput
+              autoFocus
+              placeholder={unnamedTitle}
+              onChangeText={setName}
+            />
           </FieldGroup.Section>
           <FieldGroup.Section title="Members">
             {members.map((address) => (

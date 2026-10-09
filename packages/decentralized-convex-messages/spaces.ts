@@ -9,12 +9,14 @@ import {
   getMember,
   getSpace,
   getSpaceMember,
+  isRetriedCreate,
   newId,
   normalizeAddress,
   normalizeMembers,
   normalizeName,
   unreadCount,
 } from "./model.ts";
+import { channelName } from "./naming.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
 type Args<Operation extends keyof Mutations> = OperationArgs<
@@ -22,9 +24,7 @@ type Args<Operation extends keyof Mutations> = OperationArgs<
 >;
 
 function normalizeChannelName(value: string) {
-  return normalizeName(
-    value.replace(/^#/, "").toLowerCase().replace(/\s+/g, "-"),
-  );
+  return normalizeName(channelName(value));
 }
 
 async function requireChannelOwner(
@@ -46,7 +46,12 @@ export async function createSpace(
   self: string,
   args: Args<"createSpace">,
 ) {
-  const spaceId = newId("space", self);
+  const spaceId = newId("space", self, args.spaceId);
+  const generalId = newId("channel", self, args.generalChannelId);
+  if (isRetriedCreate(await getSpace(ctx, spaceId), self, () => true)) {
+    return { spaceId };
+  }
+  if ((await getConversation(ctx, generalId)) !== null) fail("ID_TAKEN");
   await ctx.db.insert("spaces", {
     createdBy: self,
     name: normalizeName(args.name),
@@ -58,7 +63,7 @@ export async function createSpace(
     spaceId,
   });
   await ctx.db.insert("conversations", {
-    conversationId: newId("channel", self),
+    conversationId: generalId,
     createdBy: self,
     kind: "channel",
     name: "general",
@@ -125,11 +130,21 @@ export async function createChannel(
   args: Args<"createChannel">,
 ) {
   await requireSpaceRole(ctx, args.spaceId, self, "owner");
+  const conversationId = newId("channel", self, args.conversationId);
+  const existing = await getConversation(ctx, conversationId);
+  if (
+    isRetriedCreate(
+      existing,
+      self,
+      ({ kind, spaceId }) => kind === "channel" && spaceId === args.spaceId,
+    )
+  ) {
+    return { conversationId };
+  }
   const channels = await ctx.db
     .query("conversations")
     .withIndex("by_space", (index) => index.eq("spaceId", args.spaceId))
     .collect();
-  const conversationId = newId("channel", self);
   await ctx.db.insert("conversations", {
     conversationId,
     createdBy: self,
@@ -182,13 +197,15 @@ export async function spaces(ctx: QueryCtx, self: string) {
     .query("spaceMembers")
     .withIndex("by_account", (index) => index.eq("accountId", self))
     .collect();
-  const result = [];
-  for (const membership of memberships) {
-    const found = await getSpace(ctx, membership.spaceId);
-    const value = found === null ? null : await toSpace(ctx, found, self);
-    if (value !== null) result.push(value);
-  }
-  return result.sort((left, right) => left.name.localeCompare(right.name));
+  const found = await Promise.all(
+    memberships.map(async ({ spaceId }) => {
+      const space = await getSpace(ctx, spaceId);
+      return space === null ? null : toSpace(ctx, space, self);
+    }),
+  );
+  return found
+    .filter((space) => space !== null)
+    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 export async function space(ctx: QueryCtx, self: string, spaceId: string) {
@@ -203,22 +220,24 @@ export async function toSpace(
 ): Promise<Space | null> {
   const self = await getSpaceMember(ctx, space.spaceId, accountId);
   if (self === null) return null;
-  const members = await ctx.db
-    .query("spaceMembers")
-    .withIndex("by_space_account", (index) =>
-      index.eq("spaceId", space.spaceId),
-    )
-    .collect();
-  const invites = await ctx.db
-    .query("spaceInvites")
-    .withIndex("by_space_account", (index) =>
-      index.eq("spaceId", space.spaceId),
-    )
-    .collect();
-  const conversations = await ctx.db
-    .query("conversations")
-    .withIndex("by_space", (index) => index.eq("spaceId", space.spaceId))
-    .collect();
+  const [members, invites, conversations] = await Promise.all([
+    ctx.db
+      .query("spaceMembers")
+      .withIndex("by_space_account", (index) =>
+        index.eq("spaceId", space.spaceId),
+      )
+      .collect(),
+    ctx.db
+      .query("spaceInvites")
+      .withIndex("by_space_account", (index) =>
+        index.eq("spaceId", space.spaceId),
+      )
+      .collect(),
+    ctx.db
+      .query("conversations")
+      .withIndex("by_space", (index) => index.eq("spaceId", space.spaceId))
+      .collect(),
+  ]);
   const channels = await Promise.all(
     conversations.map(async (conversation) => {
       const member = await getMember(

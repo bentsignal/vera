@@ -19,12 +19,14 @@ import type * as invites from "../invites.js";
 import type * as links from "../links.js";
 import type * as metadata from "../metadata.js";
 import type * as model from "../model.js";
+import type * as naming from "../naming.js";
 import type * as notifications from "../notifications.js";
 import type * as paging from "../paging.js";
 import type * as previews from "../previews.js";
 import type * as protocol from "../protocol.js";
 import type * as pushTokens from "../pushTokens.js";
 import type * as reactions from "../reactions.js";
+import type * as shapes from "../shapes.js";
 import type * as spaces from "../spaces.js";
 
 import type {
@@ -46,12 +48,14 @@ const fullApi: ApiFromModules<{
   links: typeof links;
   metadata: typeof metadata;
   model: typeof model;
+  naming: typeof naming;
   notifications: typeof notifications;
   paging: typeof paging;
   previews: typeof previews;
   protocol: typeof protocol;
   pushTokens: typeof pushTokens;
   reactions: typeof reactions;
+  shapes: typeof shapes;
   spaces: typeof spaces;
 }> = anyApi as any;
 

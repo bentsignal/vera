@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { Alert, Platform } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
-import { pdsMutation } from "@decentralized-convex/tanstack-query";
-import { pds } from "@vera/backend/pds";
+import { directConversationId } from "@decentralized-convex/messages";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
@@ -13,6 +11,7 @@ import { PeoplePicker } from "~/features/compose/people-picker";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
 import { usePeopleSearch } from "~/features/compose/use-people-search";
 import { AccountScope } from "~/features/messaging/account";
+import { useConversationActions } from "~/features/messaging/conversations";
 
 const MODES = ["Chat", "Group"] as const;
 
@@ -53,28 +52,24 @@ function NewMessage({
   const closeSheet = useCloseSheet();
   const [mode, setMode] = useState<(typeof MODES)[number]>("Chat");
   const [members, setMembers] = useState<string[]>([]);
-  const openDirect = useMutation(
-    pdsMutation({ mutation: pds.messages.openDirect, session: from }),
-  );
+  const { openDirect } = useConversationActions();
   const isGroup = mode === "Group";
   // Chat lists everyone; Group lists the people picked on their own.
   const search = usePeopleSearch({ selected: isGroup ? members : [] });
 
-  // Opens the conversation with one person (an existing DM if there is one).
-  async function message(address: string) {
-    if (openDirect.isPending) return;
-    const opened = await openDirect
+  // Opens the conversation with one person (an existing DM if there is
+  // one) right away: its ID comes from the two addresses.
+  function message(address: string) {
+    void openDirect
       .mutateAsync({ accountId: address })
-      .catch(() => null);
-    if (opened === null) {
-      Alert.alert("Couldn't Start Conversation", "Try again in a moment.");
-      return;
-    }
+      .catch(() =>
+        Alert.alert("Couldn't Start Conversation", "Try again in a moment."),
+      );
     closeSheet();
     router.push({
       params: {
         account: from,
-        conversationId: opened.conversationId,
+        conversationId: directConversationId(from, address.toLowerCase()),
         title: search.profileOf(address).displayName,
       },
       pathname: "/conversation/[conversationId]",

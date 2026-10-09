@@ -1,14 +1,13 @@
 import { Alert } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
-import { pdsMutation } from "@decentralized-convex/tanstack-query";
+import { directConversationId } from "@decentralized-convex/messages";
 import { Button, FieldGroup, Text } from "@expo/ui";
-import { pds } from "@vera/backend/pds";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { AccountScope, useAccount } from "~/features/messaging/account";
+import { useConversationActions } from "~/features/messaging/conversations";
 import { useProfile } from "~/features/messaging/profiles";
 import { ProfileCard } from "~/features/profile/profile-card";
 import { fillWidth, plainRow, prominentButton } from "~/lib/ui-modifiers";
@@ -17,20 +16,21 @@ import { fillWidth, plainRow, prominentButton } from "~/lib/ui-modifiers";
 function MessageButton({ address, name }: { address: string; name: string }) {
   const router = useRouter();
   const { address: account } = useAccount();
-  const openDirect = useMutation(
-    pdsMutation({ mutation: pds.messages.openDirect, session: account }),
-  );
+  const { openDirect } = useConversationActions();
 
-  async function message() {
-    const opened = await openDirect
+  // Opens right away: the conversation's ID comes from the two addresses.
+  function message() {
+    void openDirect
       .mutateAsync({ accountId: address })
-      .catch(() => null);
-    if (opened === null) {
-      Alert.alert("Couldn't Open Conversation", "Try again in a moment.");
-      return;
-    }
+      .catch(() =>
+        Alert.alert("Couldn't Open Conversation", "Try again in a moment."),
+      );
     router.push({
-      params: { account, conversationId: opened.conversationId, title: name },
+      params: {
+        account,
+        conversationId: directConversationId(account, address.toLowerCase()),
+        title: name,
+      },
       pathname: "/conversation/[conversationId]",
     });
   }
@@ -39,9 +39,8 @@ function MessageButton({ address, name }: { address: string; name: string }) {
     <FieldGroup.Section>
       <Button
         variant="filled"
-        disabled={openDirect.isPending}
         modifiers={[...prominentButton, ...plainRow]}
-        onPress={() => void message()}
+        onPress={message}
       >
         <Text
           modifiers={fillWidth}

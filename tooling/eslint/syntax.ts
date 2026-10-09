@@ -91,6 +91,17 @@ const strictReactSyntaxSelectors = [
       "useLoaderData must include a `select` option so the component only re-renders when the selected slice changes.",
   },
   {
+    selector: "JSXAttribute[name.name='disabled'] Identifier[name='isPending']",
+    message:
+      "Don't disable a control while its mutation is in flight. Respond right away: give the mutation an `optimisticUpdate` (see `pdsMutation`), then close or navigate immediately. See AGENTS.md → Optimistic updates.",
+  },
+  {
+    selector:
+      "AwaitExpression > CallExpression[callee.property.name='mutateAsync']",
+    message:
+      "Don't wait for the server before responding to a user action. Start the mutation with an `optimisticUpdate` (see `pdsMutation`), handle failure with `.catch`, and close or navigate immediately. See AGENTS.md → Optimistic updates.",
+  },
+  {
     selector: "CallExpression[callee.name='useContext']",
     message:
       "useContext does not support fine-grained selection and causes re-renders on every context change. Use a Rostra store with a selector instead. Use the rostra skill for more information.",

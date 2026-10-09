@@ -4,6 +4,7 @@ import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { useAccount, useAccounts, useVisibleAccounts } from "./account";
+import * as optimistic from "./optimistic";
 import { pdsResult, pdsResultOr } from "./results";
 
 /** Spaces across the visible accounts, each tagged with its account. */
@@ -125,32 +126,64 @@ export function useInviteLinkPreview(code: string) {
   };
 }
 
+/**
+ * Space actions as the scoped account. Creating, joining, inviting, and
+ * leaving show their result right away, before the PDS answers.
+ */
 export function useSpaceActions() {
   const { address: session } = useAccount();
   return {
     acceptInvite: useMutation(
-      pdsMutation({ mutation: pds.messages.acceptSpaceInvite, session }),
+      pdsMutation({
+        mutation: pds.messages.acceptSpaceInvite,
+        optimisticUpdate: optimistic.joinSpace,
+        session,
+      }),
     ),
     createChannel: useMutation(
-      pdsMutation({ mutation: pds.messages.createChannel, session }),
+      pdsMutation({
+        mutation: pds.messages.createChannel,
+        optimisticUpdate: optimistic.createChannel(session),
+        session,
+      }),
     ),
     createInviteLink: useMutation(
       pdsMutation({ mutation: pds.messages.createSpaceInviteLink, session }),
     ),
     createSpace: useMutation(
-      pdsMutation({ mutation: pds.messages.createSpace, session }),
+      pdsMutation({
+        mutation: pds.messages.createSpace,
+        optimisticUpdate: optimistic.createSpace(session),
+        session,
+      }),
     ),
     declineInvite: useMutation(
-      pdsMutation({ mutation: pds.messages.declineSpaceInvite, session }),
+      pdsMutation({
+        mutation: pds.messages.declineSpaceInvite,
+        optimisticUpdate: optimistic.declineInvite,
+        session,
+      }),
     ),
     invite: useMutation(
-      pdsMutation({ mutation: pds.messages.inviteToSpace, session }),
+      pdsMutation({
+        mutation: pds.messages.inviteToSpace,
+        optimisticUpdate: optimistic.inviteToSpace,
+        session,
+      }),
     ),
     joinWithLink: useMutation(
-      pdsMutation({ mutation: pds.messages.joinSpaceWithLink, session }),
+      pdsMutation({
+        mutation: pds.messages.joinSpaceWithLink,
+        optimisticUpdate: optimistic.joinSpaceWithLink,
+        session,
+      }),
     ),
     removeMember: useMutation(
-      pdsMutation({ mutation: pds.messages.removeSpaceMember, session }),
+      pdsMutation({
+        mutation: pds.messages.removeSpaceMember,
+        optimisticUpdate: optimistic.removeSpaceMember(session),
+        session,
+      }),
     ),
     revokeInviteLink: useMutation(
       pdsMutation({ mutation: pds.messages.revokeSpaceInviteLink, session }),
