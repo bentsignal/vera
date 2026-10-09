@@ -32,13 +32,14 @@ function AddPeople({ spaceId }: { spaceId: string }) {
     search.clear();
   }
 
-  async function send() {
-    try {
-      await invite.mutateAsync({ members, spaceId });
-      router.dismiss();
-    } catch {
-      Alert.alert("Couldn't Invite People", "Try again in a moment.");
-    }
+  /** Invites them, shown as invited right away. */
+  function send() {
+    void invite
+      .mutateAsync({ members, spaceId })
+      .catch(() =>
+        Alert.alert("Couldn't Invite People", "Try again in a moment."),
+      );
+    router.dismiss();
   }
 
   return (
@@ -48,8 +49,8 @@ function AddPeople({ spaceId }: { spaceId: string }) {
           icon={sheetIcons.done}
           accessibilityLabel="Send Invites"
           variant="prominent"
-          disabled={members.length === 0 || invite.isPending}
-          onPress={() => void send()}
+          disabled={members.length === 0}
+          onPress={send}
         />
       </Stack.Toolbar>
       <NativeHost style={{ flex: 1 }}>

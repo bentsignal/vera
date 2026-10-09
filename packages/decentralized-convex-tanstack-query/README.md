@@ -129,6 +129,47 @@ queryClient.removeQueries({
 });
 ```
 
+## Optimistic updates
+
+A mutation can show its effect before the PDS answers. `optimisticUpdate`
+changes the home PDS's query results, and so every `pdsQuery` showing them,
+the moment the mutation starts. The change stays until the mutation's own
+result reaches the client, and rolls back if it fails. It is Convex's
+optimistic update, addressed by PDS requests:
+
+```ts
+const createNote = useMutation(
+  pdsMutation({
+    mutation: pds.notes.create,
+    optimisticUpdate: (store, { body, id }) => {
+      for (const { args, request, value } of store.getAllQueries(
+        pds.notes.list,
+      )) {
+        if (value === undefined || args.owner !== me) continue;
+        store.setQuery(request, [...value, { body, id }]);
+      }
+    },
+  }),
+);
+
+createNote.mutate({ body, id: crypto.randomUUID() });
+closeSheet(); // no waiting
+```
+
+- `getQuery(request)` and `setQuery(request, value)` read and replace one
+  query's result; `getAllQueries(builder)` lists every loaded query of an
+  operation with its args and exact `request`. Setting `undefined` shows a
+  query that hasn't loaded as still loading, rather than as an answer.
+- The update runs again whenever new results arrive, so it must depend only
+  on the store and its arguments. It may set queries nothing watches yet,
+  such as the detail of something just created; a screen opened next shows
+  them at once.
+- Let the client choose IDs for new things (passing them to the mutation)
+  so the app can open them before the PDS answers.
+- `mutateAsync` still resolves only once the result has reached every live
+  query, so handle failures with `.catch` and don't await it before
+  responding to the user.
+
 `PdsQueryClient` updates TanStack's cache from live Convex subscriptions. The
 core client owns home-first routing, PDS discovery, connection reuse, and
 author-home mutations; the TanStack adapter only bridges those results into the

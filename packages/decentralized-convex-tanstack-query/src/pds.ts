@@ -2,6 +2,7 @@ import type {
   AnyPdsMutationRequest,
   AnyPdsQueryRequest,
   DefaultCombinedPdsResult,
+  PdsOptimisticLocalStore,
   PdsQueryData,
   PdsQueryExecutionOptions,
   PdsRequest,
@@ -225,6 +226,15 @@ export interface PdsMutationConfig<
   Context = unknown,
 > {
   readonly mutation: (args: Args) => Request;
+  /**
+   * Shows the mutation's effect right away: changes the home PDS's query
+   * results (and so every `pdsQuery` showing them) until the mutation's own
+   * result arrives, and rolls back if it fails.
+   */
+  readonly optimisticUpdate?: (
+    store: PdsOptimisticLocalStore,
+    args: Args,
+  ) => void;
   readonly options?: Omit<
     UseMutationOptions<PdsRequestResult<Request>, Error, Args, Context>,
     "mutationFn"
@@ -237,10 +247,20 @@ export function pdsMutation<
   Args,
   Request extends PdsRequest<unknown, "mutation">,
   Context = unknown,
->({ mutation, options, session }: PdsMutationConfig<Args, Request, Context>) {
+>({
+  mutation,
+  optimisticUpdate,
+  options,
+  session,
+}: PdsMutationConfig<Args, Request, Context>) {
   return mutationOptions<PdsRequestResult<Request>, Error, Args, Context>({
     ...options,
     mutationFn: (args: Args, { client }) =>
-      connectedPdsClient(client, session).mutate(mutation(args)),
+      connectedPdsClient(client, session).mutate(
+        mutation(args),
+        optimisticUpdate === undefined
+          ? undefined
+          : { optimisticUpdate: (store) => optimisticUpdate(store, args) },
+      ),
   });
 }

@@ -2,6 +2,7 @@ import type {
   FederationConnection,
   FederationMutationReference,
   FederationQueryReference,
+  PdsConnectionMutationOptions,
   PdsRequest,
 } from "@decentralized-convex/client";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
@@ -57,6 +58,8 @@ export function memoryTransport(home: string) {
 export class MemoryConnection implements FederationConnection {
   readonly #publishers = new Set<(body: string) => void>();
   readonly #url;
+  /** The last mutation's optimistic update, for tests to apply. */
+  optimisticUpdate: PdsConnectionMutationOptions["optimisticUpdate"];
 
   constructor(url: string) {
     this.#url = url;
@@ -69,7 +72,9 @@ export class MemoryConnection implements FederationConnection {
   mutation<Mutation extends FederationMutationReference>(
     _mutation: Mutation,
     args: FunctionArgs<Mutation>,
+    options?: PdsConnectionMutationOptions,
   ): Promise<FunctionReturnType<Mutation>> {
+    this.optimisticUpdate = options?.optimisticUpdate;
     const body = operationArgs(args).body;
     const result = { body, id: this.#url };
     // The fake connection cannot derive a concrete result from an arbitrary reference.

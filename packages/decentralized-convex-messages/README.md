@@ -29,6 +29,16 @@ the member row: `messages.setPinned` pins any conversation (`pinnedAt`), and
 in its space (`showInInbox`, on by default). Channels get a member row the
 first time one of these, or a read, is stored.
 
+`messages.createGroup` takes an optional `name`; apps title a group without
+one with its other members' names (`listNames`, in address order), and its
+pushes do the same for each recipient. `createGroup`, `createSpace` (for the
+space and its #general), and `createChannel` accept IDs the app made with
+`createdId(kind, creator, uuid)`, so an app can show and open the new thing
+before the PDS answers. The PDS checks that such an ID names the creator's
+home domain; a retry with the same ID returns what exists, and any other
+reuse fails with `ID_TAKEN`. Direct conversation IDs are
+`directConversationId(a, b)`, so apps can open one right away too.
+
 People join spaces by accepting an invitation or opening an invite link.
 `messages.inviteToSpace` (any member) leaves a pending invitation that
 `messages.spaceInvites` lists for the invitee until they call
@@ -56,7 +66,7 @@ communication notifications:
 | Field            | Value                                                                                                                                        |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `title`          | Sender's display name                                                                                                                        |
-| `subtitle`       | Group name, or `Space #channel`; omitted for direct messages                                                                                 |
+| `subtitle`       | Group name (an unnamed group's other members), or `Space #channel`; omitted for direct messages                                              |
 | `body`           | Message preview (or "Sent a photo" and similar)                                                                                              |
 | `mutableContent` | `true`, so the app's Notification Service Extension can run                                                                                  |
 | `threadId`       | Conversation ID                                                                                                                              |

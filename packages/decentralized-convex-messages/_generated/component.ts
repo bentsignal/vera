@@ -40,7 +40,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           operation:
             | { args: { accountId: string }; type: "openDirect" }
             | {
-                args: { members: Array<string>; name: string };
+                args: {
+                  conversationId?: string;
+                  members: Array<string>;
+                  name?: string;
+                };
                 type: "createGroup";
               }
             | {
@@ -96,7 +100,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 args: { conversationId: string; show: boolean };
                 type: "setShowInInbox";
               }
-            | { args: { name: string }; type: "createSpace" }
+            | {
+                args: {
+                  generalChannelId?: string;
+                  name: string;
+                  spaceId?: string;
+                };
+                type: "createSpace";
+              }
             | { args: { name: string; spaceId: string }; type: "renameSpace" }
             | {
                 args: { members: Array<string>; spaceId: string };
@@ -122,7 +133,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 args: { accountId: string; spaceId: string };
                 type: "removeSpaceMember";
               }
-            | { args: { name: string; spaceId: string }; type: "createChannel" }
+            | {
+                args: {
+                  conversationId?: string;
+                  name: string;
+                  spaceId: string;
+                };
+                type: "createChannel";
+              }
             | {
                 args: { conversationId: string; name: string };
                 type: "renameChannel";

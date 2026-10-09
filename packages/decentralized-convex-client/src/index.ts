@@ -32,6 +32,14 @@ export {
   PdsClient,
 } from "./pds.ts";
 export { FederatedQueryObserver } from "./observer.ts";
+export { pdsOptimisticLocalStore } from "./optimistic.ts";
+export type {
+  PdsConnectionMutationOptions,
+  PdsMutationOptions,
+  PdsOptimisticLocalStore,
+  PdsOptimisticQuery,
+  PdsOptimisticUpdate,
+} from "./optimistic.ts";
 export { FederatedPdsQueryObserver } from "./pds-observer.ts";
 export { mapPdsQueryData, pdsQueryDataFromSnapshot } from "./query-data.ts";
 export type {

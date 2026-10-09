@@ -2,6 +2,8 @@ export { decentralizedConvexPackage } from "../metadata.ts";
 export { mapPdsQueryData } from "@decentralized-convex/client";
 export type {
   SuccessfulPdsQueryData,
+  PdsOptimisticLocalStore,
+  PdsOptimisticQuery,
   PdsQueryData,
   PdsQueryFederation,
 } from "@decentralized-convex/client";

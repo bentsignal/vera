@@ -1,6 +1,13 @@
 export { decentralizedConvexPackage } from "./metadata.ts";
 export { previewedUrl, withoutPreviewedUrl } from "./links.ts";
 export {
+  channelName,
+  createdId,
+  directConversationId,
+  listNames,
+} from "./naming.ts";
+export type { CreatedKind } from "./naming.ts";
+export {
   attachment,
   channel,
   conversation,

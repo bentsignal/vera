@@ -2,7 +2,9 @@ import { ConvexError } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import type { CreatedKind } from "./naming.ts";
 import type { Conversation, Message } from "./protocol.ts";
+import { createdId, isCreatedId } from "./naming.ts";
 
 const ADDRESS_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const MAX_NAME_LENGTH = 80;
@@ -41,14 +43,39 @@ export function normalizeName(value: string) {
   return name;
 }
 
-/** New group, space, and channel IDs name the creator's home domain. */
-export function newId(kind: string, accountId: string) {
-  const domain = accountId.slice(accountId.lastIndexOf("@") + 1);
-  return `${kind}:${domain}:${crypto.randomUUID()}`;
+/**
+ * The ID for a new group, space, or channel: the one the app proposed, or a
+ * fresh one. A proposed ID must name the creator's home domain, like the
+ * ones made here.
+ */
+export function newId(kind: CreatedKind, accountId: string, proposed?: string) {
+  if (proposed === undefined) {
+    return createdId(kind, accountId, crypto.randomUUID());
+  }
+  if (!isCreatedId(proposed, kind, accountId)) fail("INVALID_ID");
+  return proposed;
 }
 
-export function directConversationId(left: string, right: string) {
-  return `direct:${[left, right].sort().join(":")}`;
+/**
+ * Whether a create with this ID already happened: true when it's the same
+ * creator retrying (`isSame` checks it's the same kind of thing), so the
+ * create returns what exists. Any other use of the ID fails.
+ */
+export function isRetriedCreate<Existing extends { createdBy: string }>(
+  existing: Existing | null,
+  self: string,
+  isSame: (existing: Existing) => boolean,
+) {
+  if (existing === null) return false;
+  if (existing.createdBy !== self || !isSame(existing)) fail("ID_TAKEN");
+  return true;
+}
+
+/** Normalizes an optional name; blank means none. */
+export function optionalName(value: string | undefined) {
+  return value === undefined || value.trim().length === 0
+    ? undefined
+    : normalizeName(value);
 }
 
 export function getConversation(ctx: QueryCtx, conversationId: string) {
@@ -124,9 +151,11 @@ export async function findAccess(
   conversationId: string,
   accountId: string,
 ): Promise<ConversationAccess | null> {
-  const conversation = await getConversation(ctx, conversationId);
+  const [conversation, member] = await Promise.all([
+    getConversation(ctx, conversationId),
+    getMember(ctx, conversationId, accountId),
+  ]);
   if (conversation === null) return null;
-  const member = await getMember(ctx, conversationId, accountId);
   if (conversation.kind !== "channel") {
     return member === null
       ? null
@@ -276,16 +305,20 @@ export async function toConversation(
   accountId: string,
 ): Promise<Conversation> {
   const { conversation, member } = access;
-  const lastMessage = await latestMessage(ctx, conversation.conversationId);
-  const space =
+  // Concurrent reads: an inbox converts every conversation it lists.
+  const [lastMessage, space, members, unread] = await Promise.all([
+    latestMessage(ctx, conversation.conversationId),
     conversation.spaceId === undefined
       ? null
-      : await getSpace(ctx, conversation.spaceId);
+      : getSpace(ctx, conversation.spaceId),
+    memberAddresses(ctx, conversation),
+    unreadCount(ctx, conversation.conversationId, accountId, access.lastReadAt),
+  ]);
   return {
     conversationId: conversation.conversationId,
     kind: conversation.kind,
     lastMessage: lastMessage === null ? null : toMessage(lastMessage),
-    members: await memberAddresses(ctx, conversation),
+    members,
     muted: access.muted,
     name: conversation.name ?? null,
     pinnedAt: member?.pinnedAt,
@@ -295,12 +328,7 @@ export async function toConversation(
         : undefined,
     spaceId: conversation.spaceId ?? null,
     spaceName: space?.name,
-    unreadCount: await unreadCount(
-      ctx,
-      conversation.conversationId,
-      accountId,
-      access.lastReadAt,
-    ),
+    unreadCount: unread,
     updatedAt: conversation.updatedAt,
   };
 }

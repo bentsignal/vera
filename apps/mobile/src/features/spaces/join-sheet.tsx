@@ -77,18 +77,17 @@ function JoinCard({
     );
   }
 
+  /** Joins and opens the space right away. */
   function join() {
-    joinWithLink.mutate(
-      { code },
-      {
-        onError: () =>
-          Alert.alert(
-            "Couldn't Join Space",
-            "The link may have just expired. Try again or ask for a new one.",
-          ),
-        onSuccess: open,
-      },
-    );
+    void joinWithLink
+      .mutateAsync({ code })
+      .catch(() =>
+        Alert.alert(
+          "Couldn't Join Space",
+          "The link may have just expired. Try again or ask for a new one.",
+        ),
+      );
+    open();
   }
 
   return (
@@ -128,11 +127,7 @@ function JoinCard({
         {preview.isMember ? (
           <ProminentButton label="Open Space" onPress={open} />
         ) : (
-          <ProminentButton
-            label="Join Space"
-            disabled={joinWithLink.isPending}
-            onPress={join}
-          />
+          <ProminentButton label="Join Space" onPress={join} />
         )}
         <ProminentButton
           label="Not Now"

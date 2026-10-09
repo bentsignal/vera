@@ -3,6 +3,7 @@ import type {
   AnyPdsQueryRequest,
   DecentralizedConvexClient,
   DefaultCombinedPdsResult,
+  PdsMutationOptions,
   PdsQueryData,
   PdsQueryExecutionOptions,
   PdsRequestResult,
@@ -170,8 +171,9 @@ export class PdsQueryClient {
 
   async mutate<Request extends AnyPdsMutationRequest>(
     request: Request,
+    options?: PdsMutationOptions,
   ): Promise<PdsRequestResult<Request>> {
-    return this.#client.pdsMutation(request);
+    return this.#client.pdsMutation(request, options);
   }
 
   #startQuery(queryClient: QueryClient, query: Query) {

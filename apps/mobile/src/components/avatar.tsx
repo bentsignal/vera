@@ -25,9 +25,10 @@ const SIZES = {
 export type AvatarGlyph = SymbolViewProps["name"];
 
 function initials(name: string) {
+  // Words only, so a group titled "Maya, Leo & Priya" reads "ML".
   return name
-    .trim()
-    .split(/\s+/)
+    .split(/[\s,&]+/)
+    .filter((part) => part !== "")
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");

@@ -5,20 +5,22 @@ import type { MessagePage } from "./paging.ts";
 import type { Attachment, messagesProtocol } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
 import {
-  directConversationId,
   fail,
   findAccess,
   getConversation,
+  isRetriedCreate,
   memberAddresses,
   newId,
   normalizeAddress,
   normalizeMembers,
   normalizeName,
+  optionalName,
   requireAccess,
   toConversation,
   toMessage,
   upsertMember,
 } from "./model.ts";
+import { directConversationId } from "./naming.ts";
 import { around, newerThan, olderThan } from "./paging.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
@@ -78,12 +80,17 @@ export async function createGroup(
   if (members.length === 0 || members.length >= MAX_GROUP_MEMBERS) {
     fail("INVALID_GROUP_MEMBERS");
   }
-  const conversationId = newId("group", self);
+  const conversationId = newId("group", self, args.conversationId);
+  const existing = await getConversation(ctx, conversationId);
+  if (isRetriedCreate(existing, self, ({ kind }) => kind === "group")) {
+    return { conversationId };
+  }
   await ctx.db.insert("conversations", {
     conversationId,
     createdBy: self,
     kind: "group",
-    name: normalizeName(args.name),
+    // Groups without a name are titled with their members' names.
+    name: optionalName(args.name),
     updatedAt: Date.now(),
   });
   await insertMembers(ctx, conversationId, [self, ...members], self);

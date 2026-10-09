@@ -1,6 +1,7 @@
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { ConvexClient } from "convex/browser";
 
+import type { PdsConnectionMutationOptions } from "./optimistic.ts";
 import type { PdsConnection } from "./pds.ts";
 import type {
   FederationAuthTokenFetcher,
@@ -28,8 +29,9 @@ class ConvexFederationConnection implements FederationConnection {
   mutation<Mutation extends FederationMutationReference>(
     mutation: Mutation,
     args: FunctionArgs<Mutation>,
+    options?: PdsConnectionMutationOptions,
   ): Promise<FunctionReturnType<Mutation>> {
-    return this.#client.mutation(mutation, args);
+    return this.#client.mutation(mutation, args, options);
   }
 
   query<Query extends FederationQueryReference>(
