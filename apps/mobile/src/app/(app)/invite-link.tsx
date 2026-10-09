@@ -1,12 +1,13 @@
 import type { SpaceInviteLink } from "@decentralized-convex/messages";
 import { useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, FieldGroup, Row, Spacer, Text } from "@expo/ui";
 
 import type { Expiration } from "~/features/spaces/invite-links";
 import { ChoiceMenu } from "~/components/choice-menu";
 import { NativeHost } from "~/components/native-host";
+import { SelectableText } from "~/components/selectable-text";
 import { AccountScope } from "~/features/messaging/account";
 import {
   useSpaceActions,
@@ -96,7 +97,16 @@ function InviteLink({ code, spaceId }: { code: string; spaceId: string }) {
     <NativeHost style={{ flex: 1 }}>
       <FieldGroup>
         <FieldGroup.Section title="Invite Link">
-          <Text>{url.replace("https://", "")}</Text>
+          <SelectableText>{url}</SelectableText>
+          {/* iOS can only copy a text whole, so the code gets its own row;
+              on Android any part of the link can be selected. */}
+          {Platform.OS === "ios" && (
+            <Row alignment="center" modifiers={fillRow}>
+              <Text>Code</Text>
+              <Spacer flexible />
+              <SelectableText>{code}</SelectableText>
+            </Row>
+          )}
           {canCopy && (
             <Button
               label={copied ? "Copied" : "Copy Link"}
@@ -106,6 +116,8 @@ function InviteLink({ code, spaceId }: { code: string; spaceId: string }) {
                 copyText(url);
                 selectionTick();
                 setCopied(true);
+                // Back to "Copy Link" so it can be copied again.
+                setTimeout(() => setCopied(false), 2000);
               }}
             />
           )}
