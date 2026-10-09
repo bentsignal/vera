@@ -11,6 +11,20 @@ import {
 
 export const unstable_settings = { anchor: "(tabs)" };
 
+/**
+ * A sheet whose action (Create, Add) is a toolbar button. iOS shows it as a
+ * half-height sheet; Android's sheet has no header, so the button would be
+ * missing, and there it's a full modal with a header instead.
+ */
+const TOOLBAR_SHEET =
+  Platform.OS === "ios"
+    ? ({
+        presentation: "formSheet",
+        sheetAllowedDetents: [0.5, 1],
+        sheetGrabberVisible: true,
+      } as const)
+    : ({ presentation: "modal" } as const);
+
 /** Keeps one signed-in account's profile and notifications set up. */
 function AccountUpkeep() {
   useEnsureProfile();
@@ -97,21 +111,11 @@ function AppStack() {
       />
       <Stack.Screen
         name="new-channel"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
-          title: "New Channel",
-        }}
+        options={{ ...TOOLBAR_SHEET, title: "New Channel" }}
       />
       <Stack.Screen
         name="add-people"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.5, 1],
-          sheetGrabberVisible: true,
-          title: "Invite People",
-        }}
+        options={{ ...TOOLBAR_SHEET, title: "Invite People" }}
       />
       <Stack.Screen
         name="invite-link"
