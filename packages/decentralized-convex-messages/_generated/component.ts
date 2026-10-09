@@ -112,6 +112,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 args: { expiresIn?: number; spaceId: string };
                 type: "createSpaceInviteLink";
               }
+            | {
+                args: { code: string; expiresIn?: number };
+                type: "setSpaceInviteLinkExpiry";
+              }
             | { args: { code: string }; type: "revokeSpaceInviteLink" }
             | { args: { code: string }; type: "joinSpaceWithLink" }
             | {
@@ -189,6 +193,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         | {
             routes?: Array<string>;
             type: "createSpaceInviteLink";
+            value: {
+              code: string;
+              createdAt: number;
+              createdBy: string;
+              expiresAt: null | number;
+            };
+          }
+        | {
+            routes?: Array<string>;
+            type: "setSpaceInviteLinkExpiry";
             value: {
               code: string;
               createdAt: number;
