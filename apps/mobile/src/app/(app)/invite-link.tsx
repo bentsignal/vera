@@ -1,6 +1,6 @@
 import type { SpaceInviteLink } from "@decentralized-convex/messages";
 import { useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, FieldGroup, Row, Spacer, Text } from "@expo/ui";
 
@@ -98,15 +98,6 @@ function InviteLink({ code, spaceId }: { code: string; spaceId: string }) {
       <FieldGroup>
         <FieldGroup.Section title="Invite Link">
           <SelectableText>{url}</SelectableText>
-          {/* iOS can only copy a text whole, so the code gets its own row;
-              on Android any part of the link can be selected. */}
-          {Platform.OS === "ios" && (
-            <Row alignment="center" modifiers={fillRow}>
-              <Text>Code</Text>
-              <Spacer flexible />
-              <SelectableText>{code}</SelectableText>
-            </Row>
-          )}
           {canCopy && (
             <Button
               label={copied ? "Copied" : "Copy Link"}
@@ -144,10 +135,23 @@ function InviteLink({ code, spaceId }: { code: string; spaceId: string }) {
             label="Delete Invite Link"
             variant="text"
             modifiers={destructive}
-            onPress={() => {
-              revokeInviteLink.mutate({ code });
-              router.back();
-            }}
+            onPress={() =>
+              Alert.alert(
+                "Delete Invite Link?",
+                "Anyone who has it won't be able to join with it.",
+                [
+                  { style: "cancel", text: "Cancel" },
+                  {
+                    onPress: () => {
+                      revokeInviteLink.mutate({ code });
+                      router.back();
+                    },
+                    style: "destructive",
+                    text: "Delete",
+                  },
+                ],
+              )
+            }
           />
         </FieldGroup.Section>
       </FieldGroup>

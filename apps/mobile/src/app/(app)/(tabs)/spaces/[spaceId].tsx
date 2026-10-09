@@ -48,7 +48,8 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
       {
         onPress: () => {
           removeMember.mutate({ accountId: address, spaceId });
-          router.back();
+          // Back to the Spaces list, wherever the space was opened from.
+          router.dismissTo("/spaces");
         },
         style: "destructive",
         text: "Leave",

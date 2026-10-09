@@ -62,14 +62,19 @@ function JoinCard({
 
   function open() {
     router.dismiss();
-    router.push({
-      params: {
-        account: preview.account,
-        name: preview.name,
-        spaceId: preview.spaceId,
+    // On top of the Spaces list, so going back (or leaving the space)
+    // lands there rather than on whatever tab was open before.
+    router.push(
+      {
+        params: {
+          account: preview.account,
+          name: preview.name,
+          spaceId: preview.spaceId,
+        },
+        pathname: "/spaces/[spaceId]",
       },
-      pathname: "/spaces/[spaceId]",
-    });
+      { withAnchor: true },
+    );
   }
 
   function join() {
@@ -147,7 +152,7 @@ function InvalidCard() {
         Invite Invalid
       </Text>
       <Text className="text-body text-muted text-center">
-        This invite has expired or been turned off. Ask for a new link.
+        This invite has expired or been deleted.
       </Text>
       <View className="mt-6 w-full">
         <ProminentButton label="Close" onPress={() => router.dismiss()} />
