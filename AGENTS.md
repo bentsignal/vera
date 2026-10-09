@@ -121,6 +121,24 @@ banned except with an `eslint-disable-next-line` comment saying why nothing
 else works. CI also exports the iOS bundle and labels PRs that change native
 code ("📱 Native Change"), since those need a store build to ship.
 
+Two more rules, also enforced by lint:
+
+- **User actions respond instantly.** A tap shows its result right away,
+  never after a server round trip. Give the mutation an `optimisticUpdate`
+  (`pdsMutation`) that changes the query results it affects, then close the
+  sheet or navigate immediately. When the app opens something new, it makes
+  the ID itself (`createdId`, `directConversationId`) and passes it along.
+  Don't `await mutateAsync` before responding or disable a control while
+  `isPending`. Report a failure with `.catch(() => Alert.alert(...))`; the
+  update rolls back on its own. Use a ref, not `isPending`, to stop a double
+  submit. The only exception is a result only the server can produce (an
+  invite link's code); say so in a comment.
+- **Search is debounced and never flickers.** Every search goes through
+  `useSearchText` and `useSearchQuery`
+  (`apps/mobile/src/features/search/use-search-query.ts`): the query waits
+  for typing to pause, and the previous results stay up until the next ones
+  arrive.
+
 ## Decentralized Convex release invariant
 
 All official `@decentralized-convex/*` packages and the wire protocol use one
