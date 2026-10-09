@@ -17,24 +17,6 @@ export function toAddress(input: string) {
   return ADDRESS_PATTERN.test(address) ? address : null;
 }
 
-/** Whether an address belongs to a Vera account, once known. */
-export function useAccountExists(address: string | null) {
-  const { address: session } = useAccount();
-  const { data } = useQuery(
-    pdsQuery({
-      args: { accountId: address ?? "" },
-      options: {
-        enabled: address !== null,
-        select: (result) =>
-          pdsResult(result)?.some((profile) => profile !== null),
-      },
-      query: pds.accounts.getProfile,
-      session,
-    }),
-  );
-  return address === null ? undefined : data;
-}
-
 export function useMyProfile() {
   const { address } = useAccount();
   const { data } = useQuery(

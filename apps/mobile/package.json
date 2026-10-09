@@ -12,6 +12,7 @@
     "format:fix": "prettier --write . --ignore-path ../../.gitignore --ignore-path .gitignore",
     "ios": "expo run:ios",
     "lint": "eslint --flag unstable_native_nodejs_ts_config",
+    "test": "node --experimental-strip-types --test 'src/**/*.test.ts'",
     "typecheck": "uniwind generate-artifacts --css ./src/global.css --dts ./src/uniwind-types.d.ts && tsgo --noEmit"
   },
   "dependencies": {

@@ -29,7 +29,6 @@ function AddPeople({ spaceId }: { spaceId: string }) {
       return;
     }
     setMembers([...members, address]);
-    search.clear();
   }
 
   async function send() {

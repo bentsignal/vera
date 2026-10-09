@@ -5,8 +5,10 @@ export function CheckMark({
   checked,
   onChange,
 }: {
-  checked: boolean;
+  /** undefined draws nothing, for a row that can't be picked. */
+  checked: boolean | undefined;
   onChange: () => void;
 }) {
+  if (checked === undefined) return null;
   return <Checkbox value={checked} onValueChange={onChange} />;
 }

@@ -2,6 +2,7 @@ import { useAccounts } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/conversations";
 import { useDisplayNames } from "~/features/messaging/profiles";
 import { useSpaces } from "~/features/messaging/spaces";
+import { normalizeSearch } from "./debounce";
 
 function matches(needle: string, ...values: readonly string[]) {
   return values.some((value) => value.toLowerCase().includes(needle));
@@ -10,6 +11,7 @@ function matches(needle: string, ...values: readonly string[]) {
 /**
  * Conversations, spaces, channels, and people that match a query, across
  * the visible accounts. Each result opens as the account it came from.
+ * Pass the debounced query from `useSearchText`.
  */
 export function useSearchResults(query: string) {
   const mine = new Set(useAccounts().map((account) => account.address));
@@ -27,7 +29,7 @@ export function useSearchResults(query: string) {
       .reverse(),
   );
   const displayName = useDisplayNames([...people.keys()]);
-  const needle = query.trim().toLowerCase();
+  const needle = normalizeSearch(query);
   if (needle.length === 0) return [];
 
   return [

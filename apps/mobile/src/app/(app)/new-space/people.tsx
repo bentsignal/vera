@@ -26,7 +26,6 @@ function NewSpacePeople({ name }: { name: string }) {
       return;
     }
     setMembers([...members, address]);
-    search.clear();
   }
 
   async function create() {

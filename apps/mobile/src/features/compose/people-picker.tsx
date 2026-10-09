@@ -1,8 +1,10 @@
+import type { TextInputRef } from "@expo/ui";
+import { useRef } from "react";
+import { Platform } from "react-native";
 import { FieldGroup, ListItem, Text, TextInput } from "@expo/ui";
 
 import type { PeopleSearch } from "./use-people-search";
 import { Avatar } from "~/components/avatar";
-import { useAccountExists } from "~/features/messaging/directory";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 import { CheckMark } from "./check-mark";
@@ -26,7 +28,10 @@ function PersonRow({
       leading={<Avatar name={displayName} size="sm" uri={avatarUrl} />}
       supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
       trailing={
-        checked === undefined ? undefined : (
+        // Compose reads a row's trailing slot only when the row mounts.
+        // Android keeps an empty one on rows without a mark, so switching to
+        // picking shows the marks without remounting every row.
+        checked === undefined && Platform.OS !== "android" ? undefined : (
           <CheckMark checked={checked} onChange={() => onPress(address)} />
         )
       }
@@ -37,40 +42,14 @@ function PersonRow({
   );
 }
 
-/** The account the search text names, or "No users found". */
-function NewAddressSection({
-  address,
-  search,
-  checked,
-  onPress,
-}: {
-  address: string;
-  search: PeopleSearch;
-  checked?: boolean;
-  onPress: (address: string) => void;
-}) {
-  const exists = useAccountExists(address);
-  if (exists === undefined) return null;
-  return (
-    <FieldGroup.Section>
-      {exists ? (
-        <PersonRow
-          address={address}
-          search={search}
-          checked={checked}
-          onPress={onPress}
-        />
-      ) : (
-        <Text textStyle={secondaryTextStyle}>No users found</Text>
-      )}
-    </FieldGroup.Section>
-  );
-}
-
 /**
- * A search field over a list of people. With `selected`, rows show check
- * circles for picking several; without it, tapping a row picks that person.
- * Render inside a `FieldGroup`.
+ * A search field, the people already picked, then the search results. With
+ * `selected`, rows show check marks for picking several; without it,
+ * tapping a row picks that person. Render inside a `FieldList`.
+ *
+ * Picking clears the field in place rather than remounting it: a remounted
+ * field drops the keyboard and comes back, which flickers. Sections only
+ * come and go below the field, for the same reason.
  */
 export function PeoplePicker({
   search,
@@ -84,18 +63,31 @@ export function PeoplePicker({
   footer?: string;
   onPress: (address: string) => void;
 }) {
-  const picked = new Set(selected);
+  const field = useRef<TextInputRef>(null);
+  const picking = selected !== undefined;
+  const results = [
+    ...(search.newAddress === null ? [] : [search.newAddress]),
+    ...search.people,
+  ];
+
+  function pick(address: string) {
+    onPress(address);
+    if (!picking) return;
+    field.current?.clear();
+    search.clear();
+  }
+
   return (
     <>
-      <FieldGroup.Section>
+      <FieldGroup.Section key="search">
         <TextInput
-          key={search.fieldKey}
+          ref={field}
           autoFocus
           placeholder="Search username or address"
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
-          onChangeText={search.setQuery}
+          onChangeText={search.onChangeText}
         />
         {footer !== undefined && (
           <FieldGroup.SectionFooter>
@@ -103,25 +95,34 @@ export function PeoplePicker({
           </FieldGroup.SectionFooter>
         )}
       </FieldGroup.Section>
-      {search.newAddress !== null && (
-        <NewAddressSection
-          address={search.newAddress}
-          search={search}
-          checked={selected === undefined ? undefined : false}
-          onPress={onPress}
-        />
-      )}
-      {search.people.length > 0 && (
-        <FieldGroup.Section>
-          {search.people.map((address) => (
+      {picking && selected.length > 0 && (
+        <FieldGroup.Section key="selected">
+          {selected.map((address) => (
             <PersonRow
-              key={address}
+              key={`selected:${address}`}
               address={address}
               search={search}
-              checked={selected === undefined ? undefined : picked.has(address)}
+              checked
               onPress={onPress}
             />
           ))}
+        </FieldGroup.Section>
+      )}
+      {(results.length > 0 || search.noResults) && (
+        <FieldGroup.Section key="results">
+          {search.noResults ? (
+            <Text textStyle={secondaryTextStyle}>No users found</Text>
+          ) : (
+            results.map((address) => (
+              <PersonRow
+                key={address}
+                address={address}
+                search={search}
+                checked={picking ? false : undefined}
+                onPress={pick}
+              />
+            ))
+          )}
         </FieldGroup.Section>
       )}
     </>
