@@ -1,8 +1,9 @@
 import type { Space } from "@decentralized-convex/messages";
 import { useRouter } from "expo-router";
-import { FieldGroup, ListItem, Text } from "@expo/ui";
+import { FieldGroup, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
+import { ListItem } from "~/components/list-item";
 import { SectionHeaderWithAdd } from "~/components/section-header";
 import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";

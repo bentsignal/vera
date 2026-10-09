@@ -1,5 +1,6 @@
-import { Button, Icon, Row, Spacer, Text } from "@expo/ui";
+import { Button, Icon, Row, Spacer } from "@expo/ui";
 
+import { SectionTitle } from "~/components/section-title";
 import { fillRow, linkButton } from "~/lib/ui-modifiers";
 
 const PLUS = Icon.select({
@@ -21,9 +22,9 @@ export function SectionHeaderWithAdd({
 }) {
   return (
     <Row alignment="center" modifiers={fillRow}>
-      <Text>{title}</Text>
+      <SectionTitle>{title}</SectionTitle>
       <Spacer flexible />
-      <Button modifiers={linkButton} onPress={onAdd}>
+      <Button variant="text" modifiers={linkButton} onPress={onAdd}>
         <Icon name={PLUS} size={16} />
       </Button>
     </Row>

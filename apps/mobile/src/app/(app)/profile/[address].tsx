@@ -6,6 +6,7 @@ import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { Button, FieldGroup, Text } from "@expo/ui";
 import { pds } from "@vera/backend/pds";
 
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useProfile } from "~/features/messaging/profiles";
@@ -62,7 +63,7 @@ function Profile({ address }: { address: string }) {
   return (
     <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
+        <FieldList>
           <ProfileCard
             name={profile.displayName}
             subtitle={address}
@@ -80,7 +81,7 @@ function Profile({ address }: { address: string }) {
           {address !== account && (
             <MessageButton address={address} name={profile.displayName} />
           )}
-        </FieldGroup>
+        </FieldList>
       </NativeHost>
     </Animated.View>
   );

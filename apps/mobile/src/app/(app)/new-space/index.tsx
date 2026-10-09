@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import { FieldGroup, Text, TextInput } from "@expo/ui";
 
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { FromSection, useFromAccount } from "~/features/compose/from-section";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
@@ -38,7 +39,7 @@ export default function NewSpaceScreen() {
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
       <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
+        <FieldList>
           <FromSection from={from} onChange={setFrom} />
           <FieldGroup.Section title="Name">
             <TextInput
@@ -50,7 +51,7 @@ export default function NewSpaceScreen() {
               <Text>Spaces start with a #general channel.</Text>
             </FieldGroup.SectionFooter>
           </FieldGroup.Section>
-        </FieldGroup>
+        </FieldList>
       </NativeHost>
     </>
   );

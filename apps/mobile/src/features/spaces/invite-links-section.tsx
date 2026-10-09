@@ -1,8 +1,9 @@
 import type { Space, SpaceInviteLink } from "@decentralized-convex/messages";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { FieldGroup, ListItem, Text } from "@expo/ui";
+import { FieldGroup, Text } from "@expo/ui";
 
+import { ListItem } from "~/components/list-item";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";

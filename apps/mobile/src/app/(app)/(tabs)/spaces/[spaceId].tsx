@@ -3,6 +3,7 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Button, FieldGroup } from "@expo/ui";
 
+import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import {
@@ -63,7 +64,7 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
       {/* Fades in once loaded instead of popping in. */}
       <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
         <NativeHost style={{ flex: 1 }}>
-          <FieldGroup>
+          <FieldList>
             <ChannelsSection space={space} />
             <InboxSection space={space} />
             <MembersSection space={space} />
@@ -78,7 +79,7 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
                 />
               </FieldGroup.Section>
             )}
-          </FieldGroup>
+          </FieldList>
         </NativeHost>
       </Animated.View>
     </>
