@@ -68,7 +68,8 @@ build_ios() {
   (
     cd "$MOBILE"
     if [ -d "$RELEASE_XCODE" ]; then export DEVELOPER_DIR="$RELEASE_XCODE"; fi
-    PATH="/opt/homebrew/bin:$PATH" eas build -p ios --profile development --local \
+    # CocoaPods comes from rbenv, which only login shells set up.
+    PATH="/opt/homebrew/bin:$HOME/.rbenv/shims:$PATH" eas build -p ios --profile development --local \
       --non-interactive --output "$1" </dev/null
   )
 }

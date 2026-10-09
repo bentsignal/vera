@@ -429,7 +429,9 @@ function build(profile: string | undefined, flags: string[]) {
         cwd: MOBILE,
         env: {
           ...apple,
-          PATH: `/opt/homebrew/bin:${process.env.PATH ?? ""}`,
+          // fastlane from Homebrew; CocoaPods from rbenv, which only
+          // login shells set up.
+          PATH: `/opt/homebrew/bin:${homedir()}/.rbenv/shims:${process.env.PATH ?? ""}`,
           DEVELOPER_DIR: RELEASE_XCODE,
         },
       },
