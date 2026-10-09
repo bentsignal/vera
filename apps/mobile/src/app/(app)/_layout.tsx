@@ -18,12 +18,12 @@ export const unstable_settings = { anchor: "(tabs)" };
  */
 const TOOLBAR_SHEET =
   Platform.OS === "ios"
-    ? ({
-        presentation: "formSheet",
+    ? {
+        presentation: "formSheet" as const,
         sheetAllowedDetents: [0.5, 1],
         sheetGrabberVisible: true,
-      } as const)
-    : ({ presentation: "modal" } as const);
+      }
+    : { presentation: "modal" as const };
 
 /** Keeps one signed-in account's profile and notifications set up. */
 function AccountUpkeep() {
