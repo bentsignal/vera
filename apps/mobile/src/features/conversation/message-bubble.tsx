@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 import type { Message } from "./types";
@@ -35,15 +35,19 @@ function Body({
   const shaped = tail && size !== undefined && typeof color === "string";
   return (
     <View
+      // Android doesn't round a background that appears on a view that
+      // already exists (a bubble that loses its tail when a message lands
+      // below it turned square), so it gets a fresh view when it switches
+      // between the tail shape and the plain rounded background. iOS keeps
+      // the same view, so the tail animates away.
+      key={Platform.OS === "android" ? String(shaped) : undefined}
       onLayout={(event) => {
         const { height, width } = event.nativeEvent.layout;
         if (tail) setSize({ height, width });
       }}
       className="px-3.5 py-2"
       style={{
-        // Always set, transparent while the shape draws the bubble: Android
-        // didn't round a background added later, so a bubble that lost its
-        // tail when a message came in below turned square.
+        // Transparent while the tail shape draws the bubble.
         backgroundColor:
           shaped || typeof color !== "string" ? "transparent" : color,
         borderCurve: "continuous",
