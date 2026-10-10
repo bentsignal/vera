@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams } from "expo-router";
-import { FieldGroup, Text, TextInput } from "@expo/ui";
+import { FieldGroup, Text } from "@expo/ui";
 
 import { showActionSheet } from "~/components/action-sheet";
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { TextInput } from "~/components/text-input";
 import { DeveloperSection } from "~/features/dev/developer-section";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { AccountSection } from "~/features/settings/account-section";

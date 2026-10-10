@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { FieldGroup, ListItem, Text, TextInput } from "@expo/ui";
+import { FieldGroup, ListItem, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
 import { NativeHost } from "~/components/native-host";
+import { TextInput } from "~/components/text-input";
 import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
 import { useGroupMembers } from "~/features/compose/group-members";
 import { RemoveButton } from "~/features/compose/remove-button";

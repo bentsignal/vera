@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { FieldGroup, TextInput } from "@expo/ui";
+import { FieldGroup } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
+import { TextInput } from "~/components/text-input";
 import { sheetIcons } from "~/features/compose/sheet";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { newId } from "~/features/messaging/optimistic";

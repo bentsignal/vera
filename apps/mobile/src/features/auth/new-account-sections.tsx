@@ -1,7 +1,8 @@
 import type { TextInputRef } from "@expo/ui";
 import type { RefObject } from "react";
-import { FieldGroup, RNHostView, Row, Text, TextInput } from "@expo/ui";
+import { FieldGroup, RNHostView, Row, Text } from "@expo/ui";
 
+import { TextInput } from "~/components/text-input";
 import { env } from "~/env";
 import { nativeColors } from "~/lib/colors";
 import { fillRow, growInRow } from "~/lib/ui-modifiers";

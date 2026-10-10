@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Stack, useRouter } from "expo-router";
-import { FieldGroup, Text, TextInput } from "@expo/ui";
+import { FieldGroup, Text } from "@expo/ui";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { TextInput } from "~/components/text-input";
 import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
 import { FromSection, useFromAccount } from "~/features/compose/from-section";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";

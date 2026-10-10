@@ -1,10 +1,11 @@
 import type { TextInputRef } from "@expo/ui";
 import { useRef } from "react";
 import { Platform } from "react-native";
-import { FieldGroup, ListItem, Text, TextInput } from "@expo/ui";
+import { FieldGroup, ListItem, Text } from "@expo/ui";
 
 import type { PeopleSearch } from "./use-people-search";
 import { Avatar } from "~/components/avatar";
+import { TextInput } from "~/components/text-input";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 import { CheckMark } from "./check-mark";
