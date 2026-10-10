@@ -78,6 +78,39 @@ function PickedSection({
   );
 }
 
+/** The people to pick from, or "No users found" when a search found none. */
+function ResultsSection({
+  results,
+  search,
+  checked,
+  onPress,
+}: {
+  results: readonly string[];
+  search: PeopleSearch;
+  /** Whether a row shows checked; undefined for plain tappable rows. */
+  checked?: (address: string) => boolean;
+  onPress: (address: string) => void;
+}) {
+  if (!KEEP_SECTIONS && results.length === 0 && !search.noResults) return null;
+  return (
+    <FieldGroup.Section modifiers={sectionGap}>
+      {search.noResults ? (
+        <Text textStyle={secondaryTextStyle}>No users found</Text>
+      ) : (
+        results.map((address) => (
+          <PersonRow
+            key={address}
+            address={address}
+            search={search}
+            checked={checked?.(address)}
+            onPress={onPress}
+          />
+        ))
+      )}
+    </FieldGroup.Section>
+  );
+}
+
 /**
  * A search field, then people to pick. With `selected`, rows show check
  * marks for picking several: without a search the people already picked
@@ -149,23 +182,13 @@ export function PeoplePicker({
             onPress={onPress}
           />
         )}
-        {(KEEP_SECTIONS || results.length > 0 || search.noResults) && (
-          <FieldGroup.Section key="results" modifiers={sectionGap}>
-            {search.noResults ? (
-              <Text textStyle={secondaryTextStyle}>No users found</Text>
-            ) : (
-              results.map((address) => (
-                <PersonRow
-                  key={address}
-                  address={address}
-                  search={search}
-                  checked={picking ? picked.has(address) : undefined}
-                  onPress={pick}
-                />
-              ))
-            )}
-          </FieldGroup.Section>
-        )}
+        <ResultsSection
+          key="results"
+          results={results}
+          search={search}
+          checked={picking ? (address) => picked.has(address) : undefined}
+          onPress={pick}
+        />
       </PeopleSections>
     </>
   );
