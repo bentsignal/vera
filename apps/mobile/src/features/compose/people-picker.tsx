@@ -8,8 +8,17 @@ import { Avatar } from "~/components/avatar";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 import { CheckMark } from "./check-mark";
-import { sectionGap, showsPickedSection } from "./people-layout";
+import { sectionGap } from "./people-layout";
 import { PeopleSections } from "./people-sections";
+
+/**
+ * Android keeps both sections mounted and changes only their rows: Compose
+ * crashes ("The specified child already has a parent") when a whole section
+ * holding React Native views (the avatars) is removed and another inserted,
+ * as when a search starts and the picked people hide. An empty section
+ * draws nothing.
+ */
+const KEEP_SECTIONS = Platform.OS === "android";
 
 function PersonRow({
   address,
@@ -95,6 +104,8 @@ export function PeoplePicker({
 }) {
   const field = useRef<TextInputRef>(null);
   const picking = selected !== undefined;
+  // The people picked show while there's no search.
+  const showsPicked = picking && !search.searching && selected.length > 0;
   const picked = new Set(selected);
   const results = [
     ...(search.newAddress === null ? [] : [search.newAddress]),
@@ -130,17 +141,15 @@ export function PeoplePicker({
         )}
       </FieldGroup.Section>
       <PeopleSections key="people">
-        {picking &&
-          !search.searching &&
-          showsPickedSection(selected.length) && (
-            <PickedSection
-              key="selected"
-              selected={selected}
-              search={search}
-              onPress={onPress}
-            />
-          )}
-        {(results.length > 0 || search.noResults) && (
+        {picking && (KEEP_SECTIONS || showsPicked) && (
+          <PickedSection
+            key="selected"
+            selected={showsPicked ? selected : []}
+            search={search}
+            onPress={onPress}
+          />
+        )}
+        {(KEEP_SECTIONS || results.length > 0 || search.noResults) && (
           <FieldGroup.Section key="results" modifiers={sectionGap}>
             {search.noResults ? (
               <Text textStyle={secondaryTextStyle}>No users found</Text>
