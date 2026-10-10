@@ -8,11 +8,8 @@ import { Avatar } from "~/components/avatar";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 import { CheckMark } from "./check-mark";
-import {
-  PeopleSections,
-  sectionGap,
-  showsPickedSection,
-} from "./people-sections";
+import { sectionGap, showsPickedSection } from "./people-layout";
+import { PeopleSections } from "./people-sections";
 
 function PersonRow({
   address,
