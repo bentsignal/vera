@@ -1,8 +1,10 @@
 /**
- * How long typing must pause before a search runs. Long enough to skip the
- * letters in between, short enough to feel live.
+ * How long typing must pause before a search runs. Long enough that a
+ * steady typist's letters in between never show results of their own (at
+ * 250 ms, typing a little slowly settled on nearly every letter, so rows
+ * came and went as each partial query matched), short enough to feel live.
  */
-export const SEARCH_DELAY_MS = 250;
+export const SEARCH_DELAY_MS = 400;
 
 /** Search text as matched: trimmed and lowercased. */
 export function normalizeSearch(text: string) {
@@ -40,19 +42,27 @@ export function createDebouncer({
   return { cancel, push };
 }
 
+/** A search's results, with the query they answer. */
+export interface SearchAnswer<Data> {
+  readonly data: Data | undefined;
+  readonly query: string;
+}
+
 /**
- * Which query's results to show. A query whose results are still loading
- * keeps the last settled query on screen, so results never blank out or
- * flash "no results" in between.
+ * Which answer a search shows. While the newest query's results load, the
+ * last settled answer stays up whole, its query with its own data, so
+ * results never blank out, flash "no results", or pair one query's matches
+ * with another's lookup. The shown answer then changes once, when the new
+ * one has arrived.
  */
-export function shownQuery({
-  query,
+export function shownAnswer<Data>({
+  current,
   settled,
   isLoading,
 }: {
-  query: string;
-  settled: string;
+  current: SearchAnswer<Data>;
+  settled: SearchAnswer<Data>;
   isLoading: boolean;
 }) {
-  return isLoading ? settled : query;
+  return isLoading ? settled : current;
 }

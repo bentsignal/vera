@@ -4,18 +4,8 @@ import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-import { env } from "~/env";
 import { useAccount, useAccounts } from "./account";
 import { pdsResult } from "./results";
-
-const ADDRESS_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
-
-/** Accepts `maya` or `maya@vera.chat` and returns a full address. */
-export function toAddress(input: string) {
-  const value = input.trim().toLowerCase().replace(/^@/, "");
-  const address = value.includes("@") ? value : `${value}@${env.veraDomain}`;
-  return ADDRESS_PATTERN.test(address) ? address : null;
-}
 
 export function useMyProfile() {
   const { address } = useAccount();
