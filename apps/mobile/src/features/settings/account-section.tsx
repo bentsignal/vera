@@ -20,8 +20,8 @@ export function AccountSection() {
         { style: "cancel", text: "Cancel" },
         {
           onPress: () => {
+            signOutAccount(session);
             router.back();
-            void signOutAccount(session);
           },
           style: "destructive",
           text: "Sign Out",

@@ -32,6 +32,12 @@ Every account creates a passkey at sign-up, and passkeys are the only way to
 sign in. Later, web and other clients will sign in by scanning a code with the
 phone.
 
+Sign-in is one tap (decided 2026-10-10). The welcome screen's Sign In button
+asks the system for any passkey saved for `vera.chat` (a discoverable
+credential), with no username or server field, because Vera's server is the
+only one for now. Signing in to a self-hosted server, which needs a way to
+name it, comes later.
+
 Sign-up requires an invite code. Codes are stored in Convex, are multi-use, and
 stay valid until deactivated. Shawn asks the agent to create a code, sends it to
 friends, and later asks the agent to deactivate it. The repo skill

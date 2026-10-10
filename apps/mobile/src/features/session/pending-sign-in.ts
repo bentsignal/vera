@@ -32,7 +32,7 @@ export async function finishPendingSignIn({ authClient, home }: PendingSignIn) {
   const address = data?.user.email.toLowerCase();
   if (address === undefined) {
     await clearPending();
-    return "Couldn't sign in. Try again.";
+    return "Try again.";
   }
   if (storedAccounts().some((account) => account.address === address)) {
     // Don't leave a second session for an account that's already here.
