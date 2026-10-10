@@ -8,6 +8,11 @@ import { Avatar } from "~/components/avatar";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 import { CheckMark } from "./check-mark";
+import {
+  PeopleSections,
+  sectionGap,
+  showsPickedSection,
+} from "./people-sections";
 
 function PersonRow({
   address,
@@ -42,9 +47,37 @@ function PersonRow({
   );
 }
 
+/** The people already picked, checked, shown while there's no search. */
+function PickedSection({
+  selected,
+  search,
+  onPress,
+}: {
+  selected: readonly string[];
+  search: PeopleSearch;
+  onPress: (address: string) => void;
+}) {
+  return (
+    <FieldGroup.Section modifiers={selected.length > 0 ? sectionGap : []}>
+      {selected.map((address) => (
+        <PersonRow
+          key={`selected:${address}`}
+          address={address}
+          search={search}
+          checked
+          onPress={onPress}
+        />
+      ))}
+    </FieldGroup.Section>
+  );
+}
+
 /**
- * A search field, the people already picked, then the search results. With
- * `selected`, rows show check marks for picking several; without it,
+ * A search field, then people to pick. With `selected`, rows show check
+ * marks for picking several: without a search the people already picked
+ * come first, in their own section, then everyone else; a search shows
+ * only its matches, checked if they're picked, so the results stay right
+ * under the field rather than below the picked list. Without `selected`,
  * tapping a row picks that person. Render inside a `FieldList`.
  *
  * Picking clears the field in place rather than remounting it: a remounted
@@ -65,14 +98,18 @@ export function PeoplePicker({
 }) {
   const field = useRef<TextInputRef>(null);
   const picking = selected !== undefined;
+  const picked = new Set(selected);
   const results = [
     ...(search.newAddress === null ? [] : [search.newAddress]),
     ...search.people,
   ];
 
   function pick(address: string) {
+    const adding = picking && !picked.has(address);
     onPress(address);
-    if (!picking) return;
+    // Adding someone ends that search, as in Messages. Unchecking someone
+    // leaves it, to pick another match.
+    if (!adding) return;
     field.current?.clear();
     search.clear();
   }
@@ -95,36 +132,35 @@ export function PeoplePicker({
           </FieldGroup.SectionFooter>
         )}
       </FieldGroup.Section>
-      {picking && selected.length > 0 && (
-        <FieldGroup.Section key="selected">
-          {selected.map((address) => (
-            <PersonRow
-              key={`selected:${address}`}
-              address={address}
+      <PeopleSections key="people">
+        {picking &&
+          !search.searching &&
+          showsPickedSection(selected.length) && (
+            <PickedSection
+              key="selected"
+              selected={selected}
               search={search}
-              checked
               onPress={onPress}
             />
-          ))}
-        </FieldGroup.Section>
-      )}
-      {(results.length > 0 || search.noResults) && (
-        <FieldGroup.Section key="results">
-          {search.noResults ? (
-            <Text textStyle={secondaryTextStyle}>No users found</Text>
-          ) : (
-            results.map((address) => (
-              <PersonRow
-                key={address}
-                address={address}
-                search={search}
-                checked={picking ? false : undefined}
-                onPress={pick}
-              />
-            ))
           )}
-        </FieldGroup.Section>
-      )}
+        {(results.length > 0 || search.noResults) && (
+          <FieldGroup.Section key="results" modifiers={sectionGap}>
+            {search.noResults ? (
+              <Text textStyle={secondaryTextStyle}>No users found</Text>
+            ) : (
+              results.map((address) => (
+                <PersonRow
+                  key={address}
+                  address={address}
+                  search={search}
+                  checked={picking ? picked.has(address) : undefined}
+                  onPress={pick}
+                />
+              ))
+            )}
+          </FieldGroup.Section>
+        )}
+      </PeopleSections>
     </>
   );
 }

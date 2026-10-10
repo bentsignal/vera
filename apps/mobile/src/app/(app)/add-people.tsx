@@ -4,14 +4,18 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
 import { PeoplePicker } from "~/features/compose/people-picker";
 import { sheetIcons } from "~/features/compose/sheet";
+import { SheetKeyboardLock } from "~/features/compose/sheet-keyboard";
 import { usePeopleSearch } from "~/features/compose/use-people-search";
 import { AccountScope } from "~/features/messaging/account";
 import { useSpace, useSpaceActions } from "~/features/messaging/spaces";
+import { dismissKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 function AddPeople({ spaceId }: { spaceId: string }) {
   const router = useRouter();
+  const dragDismiss = useDismissKeyboardOnDrag();
   const { invite } = useSpaceActions();
   const { space } = useSpace(spaceId);
   const [members, setMembers] = useState<string[]>([]);
@@ -43,6 +47,7 @@ function AddPeople({ spaceId }: { spaceId: string }) {
 
   return (
     <>
+      <SheetKeyboardLock />
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon={sheetIcons.done}
@@ -52,8 +57,8 @@ function AddPeople({ spaceId }: { spaceId: string }) {
           onPress={send}
         />
       </Stack.Toolbar>
-      <NativeHost style={{ flex: 1 }}>
-        <FieldList>
+      <NativeHost style={{ flex: 1 }} {...dragDismiss}>
+        <FieldList modifiers={dismissKeyboardOnScroll}>
           <PeoplePicker
             search={search}
             selected={members}

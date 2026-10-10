@@ -4,16 +4,19 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
 import { PeoplePicker } from "~/features/compose/people-picker";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
 import { usePeopleSearch } from "~/features/compose/use-people-search";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { newId } from "~/features/messaging/optimistic";
 import { useSpaceActions } from "~/features/messaging/spaces";
+import { dismissKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 /** Picks who to invite, then creates the space named on the previous step. */
 function NewSpacePeople({ name }: { name: string }) {
   const router = useRouter();
+  const dragDismiss = useDismissKeyboardOnDrag();
   const closeSheet = useCloseSheet();
   const { address: self } = useAccount();
   const { createSpace, invite } = useSpaceActions();
@@ -73,8 +76,8 @@ function NewSpacePeople({ name }: { name: string }) {
           onPress={create}
         />
       </Stack.Toolbar>
-      <NativeHost style={{ flex: 1 }}>
-        <FieldList>
+      <NativeHost style={{ flex: 1 }} {...dragDismiss}>
+        <FieldList modifiers={dismissKeyboardOnScroll}>
           <PeoplePicker
             search={search}
             selected={members}

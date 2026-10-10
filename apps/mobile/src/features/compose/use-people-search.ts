@@ -56,9 +56,9 @@ function useNamedAccount({
  * People to message or add: everyone from the account's conversations who
  * matches the search, plus the account the search names, once it is known
  * to exist. Results follow the debounced search and keep showing the last
- * answer while the next one loads. `selected` people are left out of the
- * results (the picker lists them on their own); `exclude` people never
- * appear.
+ * answer while the next one loads. Without a search, `selected` people are
+ * left out of the results (the picker lists them on their own); with one,
+ * the ones who match are among the results. `exclude` people never appear.
  */
 export function usePeopleSearch({
   selected = [],
@@ -77,37 +77,39 @@ export function usePeopleSearch({
       .flatMap((item) => item.memberIds)
       .filter((address) => address !== self && !excluded.has(address)),
   );
-  const listed = new Set([...known, ...excluded]);
+  // Picked people can come from a lookup rather than a conversation; a
+  // search finds them too.
+  const candidates = new Set([...known, ...selected]);
+  const listed = new Set([...candidates, ...excluded]);
 
   const lookup = useNamedAccount({ listed, query: text.query, self });
   // The query whose results are on screen.
   const needle = normalizeSearch(lookup.query);
-  const exists = lookup.address !== null;
-  const newAddress =
-    lookup.address !== null && !picked.has(lookup.address)
-      ? lookup.address
-      : null;
+  const searching = needle !== "";
+  const newAddress = lookup.address;
   const profileOf = useProfiles([
-    ...known,
-    ...selected,
+    ...candidates,
     ...(newAddress === null ? [] : [newAddress]),
   ]);
-  const people = [...known].filter(
-    (address) =>
-      !picked.has(address) &&
-      (address.includes(needle) ||
-        profileOf(address).displayName.toLowerCase().includes(needle)),
-  );
+  const people = searching
+    ? [...candidates].filter(
+        (address) =>
+          address.includes(needle) ||
+          profileOf(address).displayName.toLowerCase().includes(needle),
+      )
+    : [...known].filter((address) => !picked.has(address));
 
   return {
     clear: text.clear,
     /** The account the search names, when it exists and isn't listed. */
     newAddress,
     /** Nobody matches a non-empty search. */
-    noResults: needle !== "" && people.length === 0 && !exists,
+    noResults: searching && people.length === 0 && newAddress === null,
     onChangeText: text.onChangeText,
     people,
     profileOf,
+    /** A search is showing: picked people appear only if they match it. */
+    searching,
   };
 }
 
