@@ -8,7 +8,13 @@ import type { HomeAuthClient } from "./auth-client";
 import type { PendingSignIn } from "./pending-sign-in";
 import { finishPendingSignIn } from "./pending-sign-in";
 
-const SIGN_UP_ERRORS = new Map([
+/**
+ * Messages for the alert body, by server or passkey error code. The alert's
+ * title says what failed, so these say why, never the same words.
+ */
+const ERRORS = new Map([
+  ["NoCredentials", "There's no Vera passkey on this device."],
+  ["PASSKEY_NOT_FOUND", "Vera doesn't recognize that passkey."],
   ["INVALID_SIGN_UP_REQUEST", "Enter an invite code and a username."],
   [
     "INVALID_USERNAME",
@@ -23,11 +29,15 @@ const SIGN_UP_ERRORS = new Map([
 ]);
 
 /** A message for the person, or null when they cancelled the passkey sheet. */
-function describe(error: unknown, fallback: string) {
+function describe(error: unknown) {
+  const fallback = "Try again.";
   if (typeof error !== "object" || error === null) return fallback;
-  if ("error" in error && error.error === "UserCancelled") return null;
+  if ("error" in error && typeof error.error === "string") {
+    if (error.error === "UserCancelled") return null;
+    return ERRORS.get(error.error) ?? fallback;
+  }
   if ("code" in error && typeof error.code === "string") {
-    return SIGN_UP_ERRORS.get(error.code) ?? fallback;
+    return ERRORS.get(error.code) ?? fallback;
   }
   return fallback;
 }
@@ -68,13 +78,14 @@ export async function createAccount(
     });
     return await finishPendingSignIn(pending);
   } catch (error) {
-    return describe(error, "Couldn't create your account. Try again.");
+    return describe(error);
   }
 }
 
 /**
- * Signs in with any passkey saved for Vera. Returns an error message, or
- * null when cancelled or successful.
+ * Signs in with any passkey saved for Vera: no username, so the system
+ * lists the device's discoverable credentials. Returns an error message,
+ * or null when cancelled or successful.
  */
 export async function signIn(pending: PendingSignIn) {
   const { authClient } = pending;
@@ -90,6 +101,6 @@ export async function signIn(pending: PendingSignIn) {
     });
     return await finishPendingSignIn(pending);
   } catch (error) {
-    return describe(error, "Couldn't sign in. Try again.");
+    return describe(error);
   }
 }

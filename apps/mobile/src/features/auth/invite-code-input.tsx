@@ -93,14 +93,21 @@ export function InviteCodeInput({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         autoCapitalize="characters"
+        // No suggestions or AutoFill here or in the username field after
+        // it, so iOS never shows the bar above the keyboard on one and
+        // hides it on the other, which moved the Continue button.
         autoComplete="off"
+        textContentType="none"
         autoCorrect={false}
         spellCheck={false}
         // Android's password keyboard is the one without suggestions.
         keyboardType={
           Platform.OS === "android" ? "visible-password" : "ascii-capable"
         }
-        caretHidden
+        // iOS gets a transparent caret instead of `caretHidden`: it anchors
+        // the long-press Paste menu to the caret, and a hidden one left
+        // the menu nowhere to show.
+        caretHidden={Platform.OS === "android"}
         selectionColor="transparent"
         style={styles.field}
       />

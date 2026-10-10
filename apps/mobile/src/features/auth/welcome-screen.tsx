@@ -6,6 +6,8 @@ import Close from "@expo/material-symbols/close.xml";
 import { withUniwind } from "uniwind";
 
 import { ProminentButton } from "~/components/prominent-button";
+import { signIn } from "~/features/session/passkeys";
+import { usePendingSignIn } from "~/features/session/pending-sign-in";
 import appIcon from "../../../assets/images/icon.png";
 import { useAuthFlow } from "./auth-flow";
 
@@ -14,7 +16,8 @@ const StyledImage = withUniwind(Image);
 
 export function WelcomeScreen() {
   const router = useRouter();
-  const { adding, createAccountHref, signInHref } = useAuthFlow();
+  const pendingSignIn = usePendingSignIn();
+  const { adding, attempt, createAccountHref, pending } = useAuthFlow();
   return (
     // In Add Account's modal, the sheet color, so it reads as a sheet.
     <StyledSafeAreaView
@@ -39,12 +42,18 @@ export function WelcomeScreen() {
       <View className="gap-4">
         <ProminentButton
           label="Create Account"
-          onPress={() => router.push(createAccountHref)}
+          onPress={() => {
+            if (!pending) router.push(createAccountHref);
+          }}
         />
+        {/* One tap: the system offers the Vera passkeys saved on this device. */}
         <ProminentButton
           label="Sign In"
           variant="secondary"
-          onPress={() => router.push(signInHref)}
+          loading={pending}
+          onPress={() =>
+            void attempt("Couldn't Sign In", () => signIn(pendingSignIn))
+          }
         />
       </View>
     </StyledSafeAreaView>

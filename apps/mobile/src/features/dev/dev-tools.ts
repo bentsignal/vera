@@ -14,7 +14,7 @@ export async function devSignIn(pending: PendingSignIn, username: string) {
     body: { username: username.trim().toLowerCase() },
     method: "POST",
   });
-  if (error !== null) return "Dev sign-in failed.";
+  if (error !== null) return "The dev PDS refused it.";
   return finishPendingSignIn(pending);
 }
 

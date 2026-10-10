@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { FieldGroup, Text } from "@expo/ui";
 
@@ -6,7 +7,11 @@ import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { TextInput } from "~/components/text-input";
 import { DeveloperSection } from "~/features/dev/developer-section";
-import { AccountScope, useAccount } from "~/features/messaging/account";
+import {
+  AccountScope,
+  useAccount,
+  useAccounts,
+} from "~/features/messaging/account";
 import { AccountSection } from "~/features/settings/account-section";
 import { ProfileSection } from "~/features/settings/profile-section";
 import { useProfileEditor } from "~/features/settings/use-profile-editor";
@@ -68,8 +73,14 @@ export default function AccountSettingsScreen() {
     account: string;
     title?: string;
   }>();
+  const accounts = useAccounts();
+  // Signing out drops the account before this screen closes; it keeps
+  // showing the account it opened with until it's gone.
+  const [opened] = useState(() =>
+    accounts.find((session) => session.address === account),
+  );
   return (
-    <AccountScope address={account}>
+    <AccountScope address={account} signedOut={opened}>
       <Stack.Screen options={{ headerLargeTitleEnabled: false }} />
       <Stack.Title>{title ?? ""}</Stack.Title>
       <AccountSettings />

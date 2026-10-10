@@ -5,6 +5,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FieldGroup } from "@expo/ui";
 
+import { useFormBackground } from "~/components/form-background";
 import { NativeHost } from "~/components/native-host";
 import { ProminentButton } from "~/components/prominent-button";
 import { createAccount } from "~/features/session/passkeys";
@@ -16,30 +17,20 @@ import { isValidUsername, normalizeUsername } from "./username";
 
 export function CreateAccountScreen() {
   const insets = useSafeAreaInsets();
+  const background = useFormBackground();
   const pendingSignIn = usePendingSignIn();
-  const { attempt } = useAuthFlow();
+  const { attempt, pending } = useAuthFlow();
   const [inviteCode, setInviteCode] = useState("");
   const [username, setUsername] = useState("");
-  const [pending, setPending] = useState(false);
   const usernameRef = useRef<TextInputRef>(null);
   const canSubmit =
-    !pending &&
     inviteCode.length === INVITE_CODE_LENGTH &&
     isValidUsername(normalizeUsername(username));
 
-  async function submit() {
-    setPending(true);
-    await attempt("Couldn't Create Account", () =>
-      createAccount(pendingSignIn, {
-        inviteCode,
-        username: normalizeUsername(username),
-      }),
-    );
-    setPending(false);
-  }
-
   return (
-    <View className="bg-background-grouped flex-1">
+    // The form's color behind the button too, so the screen is one color
+    // (see `useFormScreenOptions` for the header).
+    <View className="flex-1" style={{ backgroundColor: background }}>
       <NativeHost style={{ flex: 1 }}>
         <FieldGroup>
           {newAccountSections({
@@ -52,13 +43,21 @@ export function CreateAccountScreen() {
       </NativeHost>
       <KeyboardStickyView offset={{ opened: insets.bottom }}>
         <View
-          className="gap-2 px-6 pt-3"
+          className="px-6 pt-3"
           style={{ paddingBottom: insets.bottom + 8 }}
         >
           <ProminentButton
-            label="Create Passkey"
+            label="Continue"
             disabled={!canSubmit}
-            onPress={() => void submit()}
+            loading={pending}
+            onPress={() =>
+              void attempt("Couldn't Create Account", () =>
+                createAccount(pendingSignIn, {
+                  inviteCode,
+                  username: normalizeUsername(username),
+                }),
+              )
+            }
           />
         </View>
       </KeyboardStickyView>

@@ -16,7 +16,9 @@ import { InviteCodeInput } from "./invite-code-input";
  * shows just the first section, which hid the username field.
  *
  * A complete invite code moves the cursor on to the username field, which
- * `usernameRef` points at.
+ * `usernameRef` points at. The username field has no AutoFill type: a
+ * username type made iOS show its passwords bar there but not over the
+ * invite code, and the keyboard changed height between the two.
  */
 export function newAccountSections({
   inviteCode,
@@ -51,7 +53,6 @@ export function newAccountSections({
             placeholder="username"
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="username-new"
             onChangeText={onChangeUsername}
           />
           <Text

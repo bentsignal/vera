@@ -5,21 +5,32 @@ import { createContext, use } from "react";
 import type { AccountSession } from "~/features/session/account-session";
 import { useSession } from "~/features/session/session-provider";
 
-const ScopeContext = createContext<string | undefined>(undefined);
+interface Scope {
+  readonly address: string | undefined;
+  readonly signedOut: AccountSession | undefined;
+}
+
+const ScopeContext = createContext<Scope | undefined>(undefined);
 
 /**
  * Makes everything below act as one signed-in account, such as a
  * conversation opened from that account's inbox. Unknown or missing
  * addresses fall back to the first account.
+ *
+ * `signedOut` is the session to keep acting as once `address` signs out,
+ * so a screen that signs out of its account still shows that account
+ * while it closes, instead of another one.
  */
 export function AccountScope({
   address,
+  signedOut,
   children,
 }: {
   address: string | undefined;
+  signedOut?: AccountSession;
   children: ReactNode;
 }) {
-  return <ScopeContext value={address}>{children}</ScopeContext>;
+  return <ScopeContext value={{ address, signedOut }}>{children}</ScopeContext>;
 }
 
 /** Every signed-in account. */
@@ -63,9 +74,11 @@ function describe(session: AccountSession | undefined) {
  * the first signed-in account.
  */
 export function useAccount() {
-  const scoped = use(ScopeContext);
+  const scope = use(ScopeContext);
   const { accounts } = useSession();
   return describe(
-    accounts.find((account) => account.address === scoped) ?? accounts[0],
+    accounts.find((account) => account.address === scope?.address) ??
+      scope?.signedOut ??
+      accounts[0],
   );
 }

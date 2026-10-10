@@ -3,6 +3,8 @@ import { DevSettings } from "react-native";
 import { router } from "expo-router";
 
 import { env } from "~/env";
+import { storedAccounts } from "~/features/session/account-store";
+import { devSignInPath } from "./dev-sign-in-path";
 
 function isAppPath(path: string): path is Href & string {
   return path.startsWith("/");
@@ -19,7 +21,8 @@ export function installDevAutomation() {
     veraDev: {
       open(path: string) {
         if (!path.startsWith("/")) throw new Error(`Not an app path: ${path}`);
-        if (isAppPath(path)) router.push(path);
+        const target = devSignInPath(path, storedAccounts().length > 0);
+        if (isAppPath(target)) router.push(target);
       },
       reload() {
         DevSettings.reload();
