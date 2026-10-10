@@ -43,7 +43,9 @@ Notifications.setNotificationHandler({
       // total across accounts while the app is open.
       shouldSetBadge: false,
       shouldShowBanner: visible,
-      shouldShowList: true,
+      // Not in the notification list either: on Android that list is the
+      // shade, whose icons show at the top of the screen while you read.
+      shouldShowList: visible,
     });
   },
 });
