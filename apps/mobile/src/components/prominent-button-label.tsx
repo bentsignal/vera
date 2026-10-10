@@ -1,6 +1,6 @@
 import { Text } from "@expo/ui";
 import { ProgressView, ZStack } from "@expo/ui/swift-ui";
-import { opacity, tint } from "@expo/ui/swift-ui/modifiers";
+import { controlSize, opacity, tint } from "@expo/ui/swift-ui/modifiers";
 
 import { fillWidth } from "~/lib/ui-modifiers";
 import { LABEL_STYLE } from "./prominent-button-style";
@@ -31,9 +31,13 @@ export function ProminentButtonLabel({
       <Text modifiers={[...fillWidth, opacity(0)]} textStyle={LABEL_STYLE}>
         {label}
       </Text>
-      {/* White like a filled button's label; elsewhere, the system gray. */}
+      {/* Small: a large button would make it large, and taller than the
+          label. White like a filled button's label; elsewhere, gray. */}
       <ProgressView
-        modifiers={variant === "filled" ? [tint("white")] : undefined}
+        modifiers={[
+          controlSize("small"),
+          ...(variant === "filled" ? [tint("white")] : []),
+        ]}
       />
     </ZStack>
   );

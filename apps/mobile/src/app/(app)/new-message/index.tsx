@@ -134,8 +134,10 @@ export default function NewMessageScreen() {
   const { from, setFrom } = useFromAccount();
   const [, setMembers] = useGroupMembers();
   return (
-    // Changing accounts starts the message over.
-    <AccountScope key={from} address={from}>
+    // Switching accounts swaps the people listed but keeps the screen, so
+    // the search field keeps focus and the keyboard stays put. The people
+    // picked don't carry over.
+    <AccountScope address={from}>
       <NewMessage
         from={from}
         onChangeFrom={(address) => {
