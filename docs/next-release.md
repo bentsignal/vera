@@ -144,3 +144,18 @@ sign-in must still work.
 In the release report, list each step above and whether it's done: the
 backend deploy, the Vercel deploy, the TestFlight link check, and the Play
 setup with the signing key added (or still waiting on his account).
+
+## From the release test: deactivate the session invite code
+
+Made 2026-10-10 on the dev PDS (`perceptive-magpie-29`) so Shawn could
+create test accounts during the release test: code `9AEP-SC77`, label
+"release test session 2026-10-10 (deactivate after testing)". It isn't on
+production. Deactivate it once Shawn says testing is done, before the
+release report, and tell him:
+
+```sh
+cd services/backend   # on the shared dev deployment
+npx convex run invites:deactivate '{"code":"9AEP-SC77"}'
+```
+
+**Verify:** `npx convex run invites:list` shows it with `active: false`.
