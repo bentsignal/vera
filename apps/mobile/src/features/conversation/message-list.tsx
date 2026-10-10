@@ -86,10 +86,15 @@ function arrivedAfter(row: MessageRow, openedAt: number) {
 }
 
 function RowContent({ row, self, layout, profileOf, showAuthors }: RowProps) {
-  if (row.type === "day") return <DaySeparator date={row.date} />;
-  if (row.type === "time") return <TimeHeader date={row.date} />;
+  const stacked = layout === "stacked";
+  if (row.type === "day") {
+    return <DaySeparator date={row.date} stacked={stacked} />;
+  }
+  if (row.type === "time") {
+    return <TimeHeader date={row.date} stacked={stacked} />;
+  }
   const { message } = row;
-  if (layout === "stacked") {
+  if (stacked) {
     return (
       <MessageStacked
         message={message}

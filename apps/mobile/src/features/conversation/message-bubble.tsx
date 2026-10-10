@@ -39,11 +39,13 @@ function Body({
         const { height, width } = event.nativeEvent.layout;
         if (tail) setSize({ height, width });
       }}
-      className={cn(
-        "px-3.5 py-2",
-        !shaped && (isOwn ? "bg-bubble-outgoing" : "bg-bubble-incoming"),
-      )}
+      className="px-3.5 py-2"
       style={{
+        // Always set, transparent while the shape draws the bubble: Android
+        // didn't round a background added later, so a bubble that lost its
+        // tail when a message came in below turned square.
+        backgroundColor:
+          shaped || typeof color !== "string" ? "transparent" : color,
         borderCurve: "continuous",
         borderRadius: BUBBLE_RADIUS,
         // Room for the tail hanging below, so nothing under it overlaps.
