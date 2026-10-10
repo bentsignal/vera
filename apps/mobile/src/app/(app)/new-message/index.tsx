@@ -6,12 +6,15 @@ import { directConversationId } from "@decentralized-convex/messages";
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { SegmentedSection } from "~/components/segmented-section";
+import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
 import { FromSection, useFromAccount } from "~/features/compose/from-section";
+import { useGroupMembers } from "~/features/compose/group-members";
 import { PeoplePicker } from "~/features/compose/people-picker";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
 import { usePeopleSearch } from "~/features/compose/use-people-search";
 import { AccountScope } from "~/features/messaging/account";
 import { useConversationActions } from "~/features/messaging/conversations";
+import { dismissKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 const MODES = ["Chat", "Group"] as const;
 
@@ -51,7 +54,9 @@ function NewMessage({
   const router = useRouter();
   const closeSheet = useCloseSheet();
   const [mode, setMode] = useState<(typeof MODES)[number]>("Chat");
-  const [members, setMembers] = useState<string[]>([]);
+  // Shared with the name step, which can remove people again.
+  const [members, setMembers] = useGroupMembers();
+  const dragDismiss = useDismissKeyboardOnDrag();
   const { openDirect } = useConversationActions();
   const isGroup = mode === "Group";
   // Chat lists everyone; Group lists the people picked on their own.
@@ -102,14 +107,14 @@ function NewMessage({
           hidden={!isGroup}
           onPress={() =>
             router.push({
-              params: { account: from, members: members.join(",") },
+              params: { account: from },
               pathname: "/new-message/group",
             })
           }
         />
       )}
-      <NativeHost style={{ flex: 1 }}>
-        <FieldList>
+      <NativeHost style={{ flex: 1 }} {...dragDismiss}>
+        <FieldList modifiers={dismissKeyboardOnScroll}>
           <SegmentedSection values={MODES} value={mode} onChange={setMode} />
           <FromSection from={from} onChange={onChangeFrom} />
           <PeoplePicker
@@ -127,10 +132,17 @@ function NewMessage({
 
 export default function NewMessageScreen() {
   const { from, setFrom } = useFromAccount();
+  const [, setMembers] = useGroupMembers();
   return (
     // Changing accounts starts the message over.
     <AccountScope key={from} address={from}>
-      <NewMessage from={from} onChangeFrom={setFrom} />
+      <NewMessage
+        from={from}
+        onChangeFrom={(address) => {
+          setMembers([]);
+          setFrom(address);
+        }}
+      />
     </AccountScope>
   );
 }

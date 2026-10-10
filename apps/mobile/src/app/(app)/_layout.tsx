@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { Stack } from "expo-router";
 
+import { dismissKeyboardOnSheetSwipe } from "~/features/compose/sheet";
 import { AccountScope, useAccounts } from "~/features/messaging/account";
 import { useEnsureProfile } from "~/features/messaging/directory";
 import { useAppBadge } from "~/features/notifications/badge";
@@ -99,6 +100,7 @@ function AppStack() {
         name="new-message"
         // Its own stack: Group continues to a name step.
         options={{ headerShown: false, presentation: "modal" }}
+        listeners={dismissKeyboardOnSheetSwipe}
       />
       <Stack.Screen
         name="add-account"
@@ -108,6 +110,7 @@ function AppStack() {
         name="new-space"
         // Its own stack: the name, then the people to invite.
         options={{ headerShown: false, presentation: "modal" }}
+        listeners={dismissKeyboardOnSheetSwipe}
       />
       <Stack.Screen
         name="new-channel"
@@ -116,6 +119,7 @@ function AppStack() {
       <Stack.Screen
         name="add-people"
         options={{ ...TOOLBAR_SHEET, title: "Invite People" }}
+        listeners={dismissKeyboardOnSheetSwipe}
       />
       <Stack.Screen
         name="invite-link"

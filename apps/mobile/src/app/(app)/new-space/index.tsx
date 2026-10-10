@@ -4,11 +4,14 @@ import { FieldGroup, Text, TextInput } from "@expo/ui";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
 import { FromSection, useFromAccount } from "~/features/compose/from-section";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
+import { dismissKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 export default function NewSpaceScreen() {
   const router = useRouter();
+  const dragDismiss = useDismissKeyboardOnDrag();
   const closeSheet = useCloseSheet();
   const { from, setFrom } = useFromAccount();
   const [name, setName] = useState("");
@@ -38,8 +41,8 @@ export default function NewSpaceScreen() {
           Next
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
-      <NativeHost style={{ flex: 1 }}>
-        <FieldList>
+      <NativeHost style={{ flex: 1 }} {...dragDismiss}>
+        <FieldList modifiers={dismissKeyboardOnScroll}>
           <FromSection from={from} onChange={setFrom} />
           <FieldGroup.Section title="Name">
             <TextInput

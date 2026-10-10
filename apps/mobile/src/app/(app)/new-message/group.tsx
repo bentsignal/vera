@@ -5,6 +5,9 @@ import { FieldGroup, ListItem, Text, TextInput } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
 import { NativeHost } from "~/components/native-host";
+import { useDismissKeyboardOnDrag } from "~/features/compose/dismiss-keyboard-on-drag";
+import { useGroupMembers } from "~/features/compose/group-members";
+import { RemoveButton } from "~/features/compose/remove-button";
 import { sheetIcons, useCloseSheet } from "~/features/compose/sheet";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import {
@@ -14,14 +17,54 @@ import {
 import { newId } from "~/features/messaging/optimistic";
 import { useProfiles } from "~/features/messaging/profiles";
 import { secondaryTextStyle } from "~/lib/colors";
-import { nestedListItemColors } from "~/lib/ui-modifiers";
+import {
+  dismissKeyboardOnScroll,
+  nestedListItemColors,
+} from "~/lib/ui-modifiers";
+
+/** A member of the group being made, with a button to remove them. */
+function MemberRow({
+  address,
+  profile,
+  onRemove,
+}: {
+  address: string;
+  profile: { avatarUrl?: string | null; displayName: string };
+  onRemove: () => void;
+}) {
+  const { avatarUrl, displayName } = profile;
+  return (
+    <ListItem
+      colors={nestedListItemColors}
+      leading={<Avatar name={displayName} size="sm" uri={avatarUrl} />}
+      supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
+      trailing={
+        <RemoveButton
+          label={`Remove ${displayName}`}
+          onPress={() =>
+            Alert.alert(`Remove ${displayName}?`, undefined, [
+              { style: "cancel", text: "Cancel" },
+              { onPress: onRemove, style: "destructive", text: "Remove" },
+            ])
+          }
+        />
+      }
+    >
+      {displayName}
+    </ListItem>
+  );
+}
 
 /**
  * Names the group picked on the previous step (or leaves it unnamed, titled
- * with its members), creates it, and opens it right away.
+ * with its members), creates it, and opens it right away. Members can be
+ * removed here too; removing the last one goes back to the picker, since a
+ * group needs someone in it.
  */
-function NewGroup({ members }: { members: string[] }) {
+function NewGroup() {
   const router = useRouter();
+  const [members, setMembers] = useGroupMembers();
+  const dragDismiss = useDismissKeyboardOnDrag();
   const closeSheet = useCloseSheet();
   const { address: self } = useAccount();
   const profileOf = useProfiles(members);
@@ -35,6 +78,12 @@ function NewGroup({ members }: { members: string[] }) {
     self,
     (address) => profileOf(address).displayName,
   );
+
+  function remove(address: string) {
+    const rest = members.filter((member) => member !== address);
+    setMembers(rest);
+    if (rest.length === 0) router.back();
+  }
 
   function create() {
     if (created.current) return;
@@ -71,8 +120,8 @@ function NewGroup({ members }: { members: string[] }) {
           onPress={create}
         />
       </Stack.Toolbar>
-      <NativeHost style={{ flex: 1 }}>
-        <FieldGroup>
+      <NativeHost style={{ flex: 1 }} {...dragDismiss}>
+        <FieldGroup modifiers={dismissKeyboardOnScroll}>
           <FieldGroup.Section title="Group Name">
             {/* Optional: without one, the group shows its members' names. */}
             <TextInput
@@ -83,22 +132,12 @@ function NewGroup({ members }: { members: string[] }) {
           </FieldGroup.Section>
           <FieldGroup.Section title="Members">
             {members.map((address) => (
-              <ListItem
+              <MemberRow
                 key={address}
-                colors={nestedListItemColors}
-                leading={
-                  <Avatar
-                    name={profileOf(address).displayName}
-                    size="sm"
-                    uri={profileOf(address).avatarUrl}
-                  />
-                }
-                supportingText={
-                  <Text textStyle={secondaryTextStyle}>{address}</Text>
-                }
-              >
-                {profileOf(address).displayName}
-              </ListItem>
+                address={address}
+                profile={profileOf(address)}
+                onRemove={() => remove(address)}
+              />
             ))}
           </FieldGroup.Section>
         </FieldGroup>
@@ -108,17 +147,13 @@ function NewGroup({ members }: { members: string[] }) {
 }
 
 export default function NewGroupScreen() {
-  const { account, members } = useLocalSearchParams<{
+  const { account } = useLocalSearchParams<{
     /** The account the group comes from. */
     account?: string;
-    /** Comma-separated addresses picked on the first step. */
-    members?: string;
   }>();
   return (
     <AccountScope address={account}>
-      <NewGroup
-        members={(members ?? "").split(",").filter((item) => item !== "")}
-      />
+      <NewGroup />
     </AccountScope>
   );
 }
