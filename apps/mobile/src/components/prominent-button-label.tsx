@@ -31,11 +31,12 @@ export function ProminentButtonLabel({
       <Text modifiers={[...fillWidth, opacity(0)]} textStyle={LABEL_STYLE}>
         {label}
       </Text>
-      {/* Small: a large button would make it large, and taller than the
-          label. White like a filled button's label; elsewhere, gray. */}
+      {/* Regular, about the label's capital height: a large button would
+          make it large, taller than the label. White like a filled
+          button's label; elsewhere, gray. */}
       <ProgressView
         modifiers={[
-          controlSize("small"),
+          controlSize("regular"),
           ...(variant === "filled" ? [tint("white")] : []),
         ]}
       />
