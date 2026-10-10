@@ -1,21 +1,22 @@
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
+import { env } from "~/env";
 import { useAccount } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/conversations";
-import { toAddress } from "~/features/messaging/directory";
 import { useProfiles } from "~/features/messaging/profiles";
 import { pdsResultOr } from "~/features/messaging/results";
-import { normalizeSearch } from "~/features/search/debounce";
 import {
   useSearchQuery,
   useSearchText,
 } from "~/features/search/use-search-query";
+import { searchedAddress, searchPeople } from "./people-match";
 
 /**
- * The account a search names, such as `maya` or `maya@vera.chat`, when it
- * isn't `listed` already and exists. `query` is the search whose answer is
- * showing; it stays on the last one while the next is looked up.
+ * The account a search names, such as `maya`, `maya@ve`, or
+ * `maya@vera.chat`, when it isn't `listed` already and exists. `query` is
+ * the search whose answer is showing; it stays on the last one while the
+ * next is looked up, and `address` always answers that same query.
  */
 function useNamedAccount({
   listed,
@@ -27,7 +28,7 @@ function useNamedAccount({
   self: string;
 }) {
   function lookupOf(text: string) {
-    const address = toAddress(text);
+    const address = searchedAddress(text, env.veraDomain);
     return address === null || address === self || listed.has(address)
       ? null
       : address;
@@ -83,28 +84,28 @@ export function usePeopleSearch({
   const listed = new Set([...candidates, ...excluded]);
 
   const lookup = useNamedAccount({ listed, query: text.query, self });
-  // The query whose results are on screen.
-  const needle = normalizeSearch(lookup.query);
-  const searching = needle !== "";
   const newAddress = lookup.address;
   const profileOf = useProfiles([
     ...candidates,
     ...(newAddress === null ? [] : [newAddress]),
   ]);
-  const people = searching
-    ? [...candidates].filter(
-        (address) =>
-          address.includes(needle) ||
-          profileOf(address).displayName.toLowerCase().includes(needle),
-      )
-    : [...known].filter((address) => !picked.has(address));
+  // Matches and the lookup both follow the query whose answer is showing,
+  // so a search's rows change once, when its lookup settles.
+  const { people, noResults, searching } = searchPeople({
+    candidates: [...candidates],
+    displayNameOf: (address) => profileOf(address).displayName,
+    found: newAddress,
+    known: [...known],
+    picked,
+    query: lookup.query,
+  });
 
   return {
     clear: text.clear,
     /** The account the search names, when it exists and isn't listed. */
     newAddress,
     /** Nobody matches a non-empty search. */
-    noResults: searching && people.length === 0 && newAddress === null,
+    noResults,
     onChangeText: text.onChangeText,
     people,
     profileOf,

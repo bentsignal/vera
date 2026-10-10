@@ -5,7 +5,7 @@ import {
   createDebouncer,
   normalizeSearch,
   SEARCH_DELAY_MS,
-  shownQuery,
+  shownAnswer,
 } from "./debounce.ts";
 
 function debounced() {
@@ -46,15 +46,11 @@ void test("cancel drops pending text", (t) => {
   assert.deepEqual(settled, []);
 });
 
-void test("keeps the settled query on screen while the next loads", () => {
-  assert.equal(
-    shownQuery({ isLoading: true, query: "mayb", settled: "may" }),
-    "may",
-  );
-  assert.equal(
-    shownQuery({ isLoading: false, query: "mayb", settled: "may" }),
-    "mayb",
-  );
+void test("keeps the settled answer, query and data together, while the next loads", () => {
+  const settled = { data: true, query: "maya" };
+  const current = { data: undefined, query: "mayb" };
+  assert.equal(shownAnswer({ current, isLoading: true, settled }), settled);
+  assert.equal(shownAnswer({ current, isLoading: false, settled }), current);
 });
 
 void test("matches text trimmed and lowercased", () => {
