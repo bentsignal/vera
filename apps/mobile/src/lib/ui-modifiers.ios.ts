@@ -21,6 +21,12 @@ export const prominentButton = [
   controlSize("large"),
 ];
 export const largeButton = [buttonBorderShape("capsule"), controlSize("large")];
+/** A screen's second action, beside a `prominentButton`. */
+export const secondaryButton = [
+  buttonStyle("glass"),
+  buttonBorderShape("capsule"),
+  controlSize("large"),
+];
 export const circleButton = [
   buttonStyle("glass"),
   buttonBorderShape("circle"),

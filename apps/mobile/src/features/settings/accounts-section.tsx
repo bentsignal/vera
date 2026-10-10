@@ -1,8 +1,9 @@
 import { useRouter } from "expo-router";
-import { Button, FieldGroup, Text } from "@expo/ui";
+import { FieldGroup, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
 import { ListItem } from "~/components/list-item";
+import { SectionHeaderWithAdd } from "~/components/section-header";
 import { SymbolIcon } from "~/components/symbol-icon";
 import {
   AccountScope,
@@ -11,7 +12,6 @@ import {
 } from "~/features/messaging/account";
 import { useMyProfile } from "~/features/messaging/directory";
 import { secondaryTextStyle } from "~/lib/colors";
-import { linkButton } from "~/lib/ui-modifiers";
 
 function AccountRow() {
   const router = useRouter();
@@ -44,23 +44,26 @@ function AccountRow() {
   );
 }
 
-/** Every signed-in account, like the accounts list in a mail app. */
+/**
+ * Every signed-in account, like the accounts list in a mail app. The plus
+ * in the header adds one, on the right where a thumb reaches it.
+ */
 export function AccountsSection() {
   const router = useRouter();
   const accounts = useAccounts();
   return (
-    <FieldGroup.Section title="Accounts">
+    <FieldGroup.Section>
+      <FieldGroup.SectionHeader>
+        <SectionHeaderWithAdd
+          title="Accounts"
+          onAdd={() => router.push("/add-account")}
+        />
+      </FieldGroup.SectionHeader>
       {accounts.map((account) => (
         <AccountScope key={account.address} address={account.address}>
           <AccountRow />
         </AccountScope>
       ))}
-      <Button
-        label="Add Account"
-        variant="text"
-        modifiers={linkButton}
-        onPress={() => router.push("/add-account")}
-      />
     </FieldGroup.Section>
   );
 }

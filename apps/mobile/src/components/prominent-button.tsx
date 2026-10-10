@@ -1,9 +1,23 @@
 import { Button, Text } from "@expo/ui";
 
 import { NativeHost } from "~/components/native-host";
-import { fillWidth, linkButton, prominentButton } from "~/lib/ui-modifiers";
+import {
+  fillWidth,
+  linkButton,
+  prominentButton,
+  secondaryButton,
+} from "~/lib/ui-modifiers";
 
-/** A full-width, large native button for a screen's primary action. */
+const MODIFIERS = {
+  filled: prominentButton,
+  secondary: secondaryButton,
+  text: linkButton,
+};
+
+/**
+ * A full-width, large native button: `filled` for a screen's primary
+ * action, `secondary` for the one beside it, `text` for a quiet link.
+ */
 export function ProminentButton({
   label,
   onPress,
@@ -13,15 +27,15 @@ export function ProminentButton({
   label: string;
   onPress: () => void;
   disabled?: boolean;
-  variant?: "filled" | "text";
+  variant?: "filled" | "secondary" | "text";
 }) {
   return (
     <NativeHost matchContents={{ vertical: true }}>
       <Button
-        variant={variant}
+        variant={variant === "secondary" ? "outlined" : variant}
         onPress={onPress}
         disabled={disabled}
-        modifiers={variant === "filled" ? prominentButton : linkButton}
+        modifiers={MODIFIERS[variant]}
       >
         <Text
           modifiers={fillWidth}

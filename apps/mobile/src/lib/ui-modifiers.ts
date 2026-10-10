@@ -14,6 +14,7 @@ export const fillRow = [] satisfies ModifierConfig[];
 export const growInRow = [] satisfies ModifierConfig[];
 export const prominentButton = [] satisfies ModifierConfig[];
 export const largeButton = [] satisfies ModifierConfig[];
+export const secondaryButton = [] satisfies ModifierConfig[];
 export const circleButton = [] satisfies ModifierConfig[];
 export const circleProminentButton = [] satisfies ModifierConfig[];
 export const linkButton = [] satisfies ModifierConfig[];

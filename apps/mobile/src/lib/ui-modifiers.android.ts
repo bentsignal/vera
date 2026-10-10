@@ -17,3 +17,5 @@ export function choiceButton(_label: string, _selected: boolean) {
 }
 
 export const nestedListItemColors = { containerColor: "transparent" };
+/** A screen's second action; Android draws it as an outlined button. */
+export const secondaryButton = [fillMaxWidth()];

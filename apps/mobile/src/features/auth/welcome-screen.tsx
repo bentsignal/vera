@@ -16,7 +16,10 @@ export function WelcomeScreen() {
   const router = useRouter();
   const { adding, createAccountHref, signInHref } = useAuthFlow();
   return (
-    <StyledSafeAreaView className="bg-background flex-1 px-6 pb-2">
+    // In Add Account's modal, the sheet color, so it reads as a sheet.
+    <StyledSafeAreaView
+      className={`flex-1 px-6 pb-6 ${adding ? "bg-background-elevated" : "bg-background"}`}
+    >
       {adding && (
         <Stack.Toolbar placement="left">
           <Stack.Toolbar.Button
@@ -33,14 +36,14 @@ export function WelcomeScreen() {
           Private messaging for you and your friends, on servers you can trust.
         </Text>
       </View>
-      <View className="gap-3">
+      <View className="gap-4">
         <ProminentButton
           label="Create Account"
           onPress={() => router.push(createAccountHref)}
         />
         <ProminentButton
           label="Sign In"
-          variant="text"
+          variant="secondary"
           onPress={() => router.push(signInHref)}
         />
       </View>
