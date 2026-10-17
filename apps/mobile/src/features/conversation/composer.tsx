@@ -13,6 +13,7 @@ import { withUniwind } from "uniwind";
 
 import type { MentionCandidate } from "./mention-text";
 import type { ReplyingTo } from "./reply-bar";
+import type { EditSession } from "./use-editing";
 import type {
   AttachmentSource,
   StagedFile,
@@ -24,9 +25,9 @@ import { cn } from "~/lib/cn";
 import { PASTE_IMAGES_NATIVE_ID, usePastedImages } from "~/lib/paste-images";
 import { AttachMenu } from "./attach-menu";
 import { readDraft, saveDraftText } from "./drafts";
+import { FieldTop } from "./field-top";
 import { MentionPicker } from "./mention-picker";
-import { ReplyBar } from "./reply-bar";
-import { StagedAttachments } from "./staged-attachments";
+import { canSendNow } from "./use-editing";
 import { useMentions } from "./use-mentions";
 
 const StyledTextInput = withUniwind(TextInput);
@@ -78,9 +79,12 @@ export function useComposerBottomInset() {
 
 function SendButton({
   visible,
+  saves,
   onPress,
 }: {
   visible: boolean;
+  /** It saves an edit rather than sending. */
+  saves: boolean;
   onPress: () => void;
 }) {
   // Always mounted, so it never pops in below the field or resizes.
@@ -98,13 +102,17 @@ function SendButton({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Send"
+        accessibilityLabel={saves ? "Save" : "Send"}
         onPress={onPress}
         className="bg-accent items-center justify-center rounded-full active:opacity-80"
         style={{ height: SEND, width: SEND }}
       >
         <SymbolIcon
-          name={{ android: "arrow_upward", ios: "arrow.up" }}
+          name={
+            saves
+              ? { android: "check", ios: "checkmark" }
+              : { android: "arrow_upward", ios: "arrow.up" }
+          }
           size={15}
           weight="bold"
           tintColorClassName="accent-on-accent"
@@ -132,7 +140,8 @@ function useSides() {
 
 /**
  * The text being typed and who it @mentions, emptied by `sent`, and kept as
- * a draft on this device (see `drafts.ts`).
+ * a draft on this device (see `drafts.ts`). A new `draftKey` (an edit's,
+ * or back from one) shows that draft instead.
  */
 function useDraft(
   draftKey: string,
@@ -141,6 +150,11 @@ function useDraft(
   mentionable: readonly MentionCandidate[] | undefined,
 ) {
   const [draft, setDraft] = useState(() => readDraft(draftKey).text);
+  const [shownKey, setShownKey] = useState(draftKey);
+  if (shownKey !== draftKey) {
+    setShownKey(draftKey);
+    setDraft(readDraft(draftKey).text);
+  }
   const mention = useMentions(draft, mentionable, draftKey, input);
   /** When the field was last emptied by sending, until something is typed. */
   const sentAt = useRef<number | null>(null);
@@ -184,6 +198,11 @@ function useDraft(
       sentAt.current = Date.now();
       return mentions;
     },
+    /**
+     * Who the saved edit mentions. The field then goes back to the draft
+     * (a new `draftKey`), so it isn't emptied.
+     */
+    saved: (text: string) => mention.take(text),
   };
 }
 
@@ -254,6 +273,7 @@ export function Composer({
   bottomInset,
   replyingTo,
   onCancelReply,
+  edit,
   placeholder = "Message",
 }: {
   ref?: Ref<ComposerHandle>;
@@ -277,6 +297,11 @@ export function Composer({
   /** Set while the next message is a reply. */
   replyingTo?: ReplyingTo;
   onCancelReply?: () => void;
+  /**
+   * Editing a message of yours (see `useEditing`): while it's `editing`,
+   * the field shows its text instead of the draft, with no attachments.
+   */
+  edit?: EditSession;
   placeholder?: string;
 }) {
   const input = useRef<TextInput>(null);
@@ -286,18 +311,22 @@ export function Composer({
   usePastedImages((images) => {
     if (input.current?.isFocused() === true) onPaste(images);
   });
-  const { draft, change, mention, pick, sent } = useDraft(
-    draftKey,
+  const editing = edit?.editing;
+  const { draft, change, mention, pick, sent, saved } = useDraft(
+    editing === undefined || edit === undefined ? draftKey : edit.editDraftKey,
     input,
     onChangeText,
     mentionable,
   );
-  const canSend = draft.trim().length > 0 || staged.length > 0;
+  const canSend = canSendNow(draft, staged, editing);
+  const saves = editing !== undefined;
+  const hint = staged.length > 0 || saves ? "Add a message" : placeholder;
 
   function send() {
     if (!canSend) return;
     const text = draft.trim();
-    onSend(text, sent(text));
+    if (editing === undefined) onSend(text, sent(text));
+    else edit?.save(text, saved(text));
   }
 
   return (
@@ -310,18 +339,19 @@ export function Composer({
         />
       )}
       <Bar bottomInset={bottomInset} onHeight={onHeight}>
-        <AttachMenu onPick={onPick} />
+        {/* An edit changes only the text. */}
+        {editing === undefined && <AttachMenu onPick={onPick} />}
         <GlassSurface
           className="flex-1 justify-center rounded-[20px]"
           style={{ minHeight: CONTROL }}
         >
-          {replyingTo !== undefined && (
-            <ReplyBar
-              replyingTo={replyingTo}
-              onCancel={() => onCancelReply?.()}
-            />
-          )}
-          <StagedAttachments files={staged} onRemove={onRemoveStaged} />
+          <FieldTop
+            edit={edit}
+            replyingTo={replyingTo}
+            onCancelReply={() => onCancelReply?.()}
+            staged={staged}
+            onRemoveStaged={onRemoveStaged}
+          />
           <StyledTextInput
             ref={input}
             nativeID={PASTE_IMAGES_NATIVE_ID}
@@ -329,7 +359,7 @@ export function Composer({
             value={draft}
             onChangeText={change}
             onSelectionChange={mention.onSelectionChange}
-            placeholder={staged.length > 0 ? "Add a message" : placeholder}
+            placeholder={hint}
             accessibilityLabel="Message"
             // A message field never needs AutoFill suggestions.
             autoComplete="off"
@@ -340,7 +370,7 @@ export function Composer({
             placeholderTextColorClassName="accent-muted"
             cursorColorClassName="accent-accent"
           />
-          <SendButton visible={canSend} onPress={send} />
+          <SendButton visible={canSend} saves={saves} onPress={send} />
         </GlassSurface>
       </Bar>
     </View>

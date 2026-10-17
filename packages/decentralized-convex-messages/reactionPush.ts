@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 
+import type { QueryCtx } from "./_generated/server.js";
 import { internal } from "./_generated/api.js";
 import { internalAction, internalQuery } from "./_generated/server.js";
 import { alertsOf } from "./alerts.ts";
@@ -19,6 +20,23 @@ import { wantsPush } from "./settings.ts";
  * the reaction is gone, the author reacted themselves, or they muted the
  * conversation or turned reaction pushes off.
  */
+/**
+ * The message reacted to, unless it's the reactor's own or was deleted
+ * since.
+ */
+async function othersMessage(
+  ctx: QueryCtx,
+  messageId: string,
+  reactorId: string,
+) {
+  const message = await ctx.db
+    .query("messages")
+    .withIndex("by_message", (index) => index.eq("messageId", messageId))
+    .unique();
+  if (message === null || message.deletedAt !== undefined) return null;
+  return message.authorId === reactorId ? null : message;
+}
+
 export const reactionTargets = internalQuery({
   args: { emoji: v.string(), messageId: v.string(), reactorId: v.string() },
   handler: async (ctx, { emoji, messageId, reactorId }) => {
@@ -29,11 +47,8 @@ export const reactionTargets = internalQuery({
       )
       .collect();
     if (!reaction.some((row) => row.emoji === emoji)) return null;
-    const message = await ctx.db
-      .query("messages")
-      .withIndex("by_message", (index) => index.eq("messageId", messageId))
-      .unique();
-    if (message === null || message.authorId === reactorId) return null;
+    const message = await othersMessage(ctx, messageId, reactorId);
+    if (message === null) return null;
     const conversation = await getConversation(ctx, message.conversationId);
     if (conversation === null) return null;
     const author = message.authorId;

@@ -99,12 +99,18 @@ export type InboxKind = Infer<typeof inboxKind>;
 
 /**
  * What a reply shows of the message it answers: its author, text, and
- * first attachment, as they were when the reply was sent.
+ * first attachment, as they were when the reply was sent, or since it
+ * was edited. Once that message is deleted, the quote is `deleted`, with
+ * no text or attachment.
  */
 export const quote = v.object({
   attachment: v.optional(attachment),
   authorId: v.string(),
   body: v.string(),
+  /** The message it answers was deleted (absent from older PDSs). */
+  deleted: v.optional(v.boolean()),
+  /** The message it answers (absent from replies older than edits). */
+  messageId: v.optional(v.string()),
 });
 
 export type Quote = Infer<typeof quote>;
@@ -115,6 +121,14 @@ export const message = v.object({
   authorName: v.string(),
   body: v.string(),
   conversationId: v.string(),
+  /**
+   * When its author deleted it. Only a thread's original with replies
+   * stays, to keep its thread, and then without text, attachments, link
+   * previews, or mentions; any other deleted message is gone.
+   */
+  deletedAt: v.optional(v.number()),
+  /** When its author last changed its text (see `editMessage`). */
+  editedAt: v.optional(v.number()),
   /** The first link's preview, for apps from before `linkPreviews`. */
   linkPreview: v.union(v.null(), linkPreview),
   /**

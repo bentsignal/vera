@@ -19,6 +19,7 @@ import { usePieceLift } from "./grow";
 import { LinkCardView } from "./link-preview-card";
 import { LinkedText } from "./linked-text";
 import { MenuTargetView } from "./message-actions";
+import { DeletedBubble, EditedLabel } from "./message-changes";
 import { linkPart, partCount } from "./message-parts";
 import { InteractiveMessage } from "./message-reactions";
 import { NotSent, SendingFade } from "./message-status";
@@ -100,6 +101,8 @@ function Content({
   const cards = linkCardsOf(message);
   // Its parts top to bottom: the attachments, then the text.
   const textPlace = message.attachments.length;
+  // Only a thread's original stays deleted, never a quoted reply.
+  if (message.deleted === true) return <DeletedBubble />;
   return (
     <SendingFade status={message.status}>
       {/* 4pt between a message's parts, the same as between bubbles. */}
@@ -261,6 +264,7 @@ function BubbleColumn({
           quoted={card !== undefined}
         />
       </InteractiveMessage>
+      <EditedLabel message={message} isOwn={isOwn} />
       <NotSent message={message} />
       {card !== undefined && (
         <View style={replyIndent(isOwn)}>

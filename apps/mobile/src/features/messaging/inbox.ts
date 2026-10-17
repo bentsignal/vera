@@ -16,6 +16,7 @@ import { pdsResult } from "./results";
 
 /** A message's text, or what it sent instead ("Photo", "3 attachments"). */
 export function messageSummary(message: PdsMessage) {
+  if (message.deletedAt !== undefined) return "This message was deleted";
   if (message.body.length > 0) return message.body;
   const count = message.attachments.length;
   const kind = message.attachments[0]?.kind ?? "file";
@@ -33,7 +34,9 @@ export function preview(
   if (message === null) return "No messages yet";
   const prefix =
     message.authorId === self ? "You: " : shared ? `${name}: ` : "";
-  if (message.body.length > 0) return `${prefix}${message.body}`;
+  if (message.body.length > 0 && message.deletedAt === undefined) {
+    return `${prefix}${message.body}`;
+  }
   return `${prefix || `${name}: `}${messageSummary(message)}`;
 }
 

@@ -19,7 +19,7 @@ type Args<Operation extends keyof Operations> = OperationArgs<
 >;
 
 /** How much of the answered message's text a reply keeps in its quote. */
-const QUOTE_LENGTH = 300;
+export const QUOTE_LENGTH = 300;
 
 export function messageById(ctx: QueryCtx, messageId: string) {
   return ctx.db
@@ -57,10 +57,19 @@ export function threadMembers(ctx: QueryCtx, threadId: string) {
 }
 
 function quoteOf(answered: Doc<"messages">): Quote {
+  if (answered.deletedAt !== undefined) {
+    return {
+      authorId: answered.authorId,
+      body: "",
+      deleted: true,
+      messageId: answered.messageId,
+    };
+  }
   return {
     attachment: answered.attachments[0],
     authorId: answered.authorId,
     body: answered.body.slice(0, QUOTE_LENGTH),
+    messageId: answered.messageId,
   };
 }
 

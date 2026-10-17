@@ -96,6 +96,25 @@ channels, and spaces report the level as `alerts`; `muted` (and
 `setMuted`/`setSpaceMuted`) remain for older apps and mean `none`. Direct
 messages are `all` or `none`.
 
+Editing and deleting: `messages.editMessage` changes the text of the
+caller's own message, and who it mentions (as `send` takes them); its
+attachments stay, and it comes back with `editedAt`. Its link cards are
+redone when its links change, and anyone it newly mentions finds it in
+their activity, without a push. `messages.deleteMessage` deletes the
+caller's own message for everyone, with the reactions and mentions stored
+with it. A thread's original that has replies stays as a placeholder
+(`deletedAt`, with no text, attachments, link previews, or mentions), so
+its thread can still be opened, and goes once its last reply is deleted;
+any other deleted message is gone. Deleting a reply takes it out of its
+thread's count. Either operation fails with `NOT_MESSAGE_AUTHOR` on anyone
+else's message. Replies stored on the author's PDS that quote the message
+follow it: their quote takes the new text, or is marked `deleted` with
+its text and attachment removed. Quotes name the message they're of
+(`quote.messageId`); ones from before that are matched by author and
+text. Replies stored on other PDSs keep their quote until federation
+carries changes there. Inbox previews, unread counts, and activity skip
+deleted placeholders.
+
 Reactions follow the same author-home rule as messages: `messages.react`
 stores your reaction on your home PDS, and `messages.reactions` (given the
 message IDs on screen) gathers reactions from every member's PDS.

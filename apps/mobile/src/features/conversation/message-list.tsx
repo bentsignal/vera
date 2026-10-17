@@ -18,7 +18,7 @@ import type { MessageRow, ThreadHead } from "./build-rows";
 import type { Latest } from "./list-position";
 import type { ToggleReaction, ViewReactions } from "./message-actions";
 import type { ProfileOf } from "./message-row";
-import type { MemberNotice, Message } from "./types";
+import type { MemberNotice, Message, MessageEdits } from "./types";
 import type { MessageLayout } from "~/features/preferences/store";
 import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
@@ -289,6 +289,8 @@ type MessageListProps = Omit<
   onOpenThread?: (message: Message) => void;
   /** The menu's Reply; absent in a thread. */
   onReply?: (message: Message) => void;
+  /** The menu's Edit and Delete, on your own messages (`useEditing`). */
+  editing?: MessageEdits;
 };
 
 /**
@@ -303,6 +305,7 @@ export function MessageList({
   onViewReactions,
   onOpenThread,
   onReply,
+  editing,
   ...props
 }: MessageListProps) {
   const listRef = useRef<FlatList<MessageRow>>(null);
@@ -329,6 +332,7 @@ export function MessageList({
       onViewReactions={onViewReactions}
       onOpenThread={onOpenThread}
       onReply={onReply}
+      editing={editing}
       // The menu is a modal, which takes the keyboard down on iOS and
       // reports it again on Android; the list stays still through both.
       menuKeyboard={keyboard}

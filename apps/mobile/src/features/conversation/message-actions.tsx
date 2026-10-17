@@ -15,10 +15,12 @@ import type {
   TargetAlign,
 } from "./glass-message-menu";
 import type { LiftMode } from "./row-touch";
-import type { Message, MessageAttachment } from "./types";
+import type { Message, MessageAttachment, MessageEdits } from "./types";
 import type { ReactionPart } from "~/features/messaging/reactions";
+import { useAccount } from "~/features/messaging/account";
 import { impact } from "~/lib/native-extras";
 import { GlassMessageMenu } from "./glass-message-menu";
+import { handlersFor } from "./menu-actions";
 import { MenuPressContext, reportTouch, usePartTarget } from "./row-touch";
 
 /** Adds or takes back your reaction on a part of a message. */
@@ -94,6 +96,7 @@ export function MessageActionsProvider({
   onViewReactions,
   onOpenThread,
   onReply,
+  editing,
   menuKeyboard,
   children,
 }: {
@@ -103,6 +106,8 @@ export function MessageActionsProvider({
   onOpenThread?: (message: Message) => void;
   /** The menu's Reply; absent in a thread. */
   onReply?: (message: Message) => void;
+  /** The menu's Edit and Delete, on your own messages. */
+  editing?: MessageEdits;
   /** What the keyboard does around the menu (see `useMenuKeyboard`). */
   menuKeyboard?: {
     onOpen: () => void;
@@ -111,6 +116,7 @@ export function MessageActionsProvider({
   };
   children: ReactNode;
 }) {
+  const { address } = useAccount();
   const [target, setTarget] = useState<MenuTarget | null>(null);
   return (
     <MessageActionsContext
@@ -142,9 +148,11 @@ export function MessageActionsProvider({
           onViewReactions={(emoji) =>
             onViewReactions(target.message.id, target.part, emoji)
           }
-          onReply={
-            onReply === undefined ? undefined : () => onReply(target.message)
-          }
+          handlers={handlersFor(target.message, {
+            editing,
+            onReply,
+            self: address,
+          })}
           onClosing={menuKeyboard?.onClosing}
           onClosed={(backToChat) => {
             setTarget(null);
@@ -282,8 +290,12 @@ export function useMenuTarget({
   const part = use(ReactionPartContext);
   const { open } = useMessageActions();
   const squeeze = useSqueeze();
-  // A message still sending (or that failed) has no menu yet.
-  const holdable = target !== null && target.message.status === undefined;
+  // A message still sending (or that failed) has no menu yet, and a
+  // deleted one has none.
+  const holdable =
+    target !== null &&
+    target.message.status === undefined &&
+    target.message.deleted !== true;
   function liftPart() {
     if (target === null) return;
     lift(open, measured, {

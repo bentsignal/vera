@@ -6,6 +6,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import type { ComposerHandle } from "./composer";
 import type { MentionCandidate } from "./mention-text";
 import type { ReplyingTo } from "./reply-bar";
+import type { EditSession } from "./use-editing";
 import type {
   AttachmentSource,
   StagedFile,
@@ -41,6 +42,7 @@ export function FloatingComposer({
   onSend,
   replyingTo,
   onCancelReply,
+  edit,
   placeholder,
 }: {
   ref?: Ref<ComposerHandle>;
@@ -54,6 +56,8 @@ export function FloatingComposer({
   /** Set while the next message is a reply (see `Composer`). */
   replyingTo?: ReplyingTo;
   onCancelReply?: () => void;
+  /** Editing a message of yours (see `Composer`). */
+  edit?: EditSession;
   placeholder?: string;
 }) {
   const bottomInset = useComposerBottomInset();
@@ -126,6 +130,7 @@ export function FloatingComposer({
         onHeight={onHeight}
         replyingTo={replyingTo}
         onCancelReply={onCancelReply}
+        edit={edit}
         placeholder={placeholder}
         onChangeText={links.onChangeText}
         onPick={(source) => void pick(source)}

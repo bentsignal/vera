@@ -63,7 +63,9 @@ export function MessageRowTarget({
   const { openThread } = useMessageActions();
   const row = useId();
   // A message still sending (or that failed) has no menu or thread yet.
-  const holdable = message.status === undefined;
+  // A deleted one has its thread, but no menu.
+  const sent = message.status === undefined;
+  const holdable = sent && message.deleted !== true;
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDelay(DOUBLE_TAP_MS)
@@ -79,7 +81,7 @@ export function MessageRowTarget({
     // A hold opens the menu instead.
     .maxDuration(LONG_PRESS_MS)
     .maxDistance(TAP_SLOP)
-    .enabled(openThread !== undefined && holdable)
+    .enabled(openThread !== undefined && sent)
     .runOnJS(true)
     .onBegin(rowGestureBegan)
     .onEnd((_, success) => {

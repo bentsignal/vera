@@ -277,6 +277,8 @@ export function toMessage(message: Doc<"messages">): Message {
     authorName: message.authorName,
     body: message.body,
     conversationId: message.conversationId,
+    deletedAt: message.deletedAt,
+    editedAt: message.editedAt,
     linkPreview: message.linkPreview ?? null,
     linkPreviews: message.linkPreviews,
     mentions: message.mentions,

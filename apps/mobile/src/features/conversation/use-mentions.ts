@@ -38,6 +38,12 @@ export function useMentions(
   const [mentions, setPicked] = useState<readonly Mention[]>(
     () => readDraft(draftKey).mentions,
   );
+  // Another draft shown in the field (an edit's, or back from one).
+  const [shownKey, setShownKey] = useState(draftKey);
+  if (shownKey !== draftKey) {
+    setShownKey(draftKey);
+    setPicked(readDraft(draftKey).mentions);
+  }
   function setMentions(next: readonly Mention[]) {
     setPicked(next);
     saveDraftMentions(draftKey, next);

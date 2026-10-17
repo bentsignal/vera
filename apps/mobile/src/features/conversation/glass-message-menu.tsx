@@ -19,6 +19,7 @@ import { requireOptionalNativeModule } from "expo";
 import { BlurView } from "expo-blur";
 import { useUniwind } from "uniwind";
 
+import type { MessageHandlers } from "./menu-actions";
 import type { MenuLayout, Rect } from "./menu-layout";
 import type { Message, MessageAttachment } from "./types";
 import type { ReactionPart } from "~/features/messaging/reactions";
@@ -204,7 +205,7 @@ export function GlassMessageMenu({
   target,
   onReact,
   onViewReactions,
-  onReply,
+  handlers,
   onClosing,
   onClosed,
 }: {
@@ -212,8 +213,8 @@ export function GlassMessageMenu({
   onReact: (emoji: string) => void;
   /** Opens the sheet of who reacted with what, on one emoji if given. */
   onViewReactions: (emoji?: string) => void;
-  /** The Reply action, in a conversation (not a thread). */
-  onReply?: () => void;
+  /** Reply in a conversation (not a thread); Edit and Delete on yours. */
+  handlers: MessageHandlers;
   /** The overlay starts playing back into place. */
   onClosing?: () => void;
   /**
@@ -229,7 +230,7 @@ export function GlassMessageMenu({
   const reactorsMax = screen.width - EDGE * 2;
   const actions = showReactors
     ? []
-    : menuActions(target, { close, onReply, onViewReactions });
+    : menuActions(target, { ...handlers, close, onViewReactions });
   const layout = menuLayout({
     align: target.align,
     bar: { height: BAR_HEIGHT, width: BAR_WIDTH },

@@ -11,6 +11,7 @@ import { Emoji } from "~/components/emoji";
 import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { QUICK_REACTIONS } from "~/features/messaging/reactions";
+import { cn } from "~/lib/cn";
 import { targetReactions } from "./menu-actions";
 import { TITLE_LINE_HEIGHT, TITLE_LINES } from "./menu-title";
 
@@ -151,6 +152,8 @@ export interface MenuAction {
   readonly label: string;
   readonly icon: SymbolViewProps["name"];
   readonly onPress: () => void;
+  /** It deletes something: in red. */
+  readonly destructive?: boolean;
 }
 
 export function ActionMenu({
@@ -202,11 +205,24 @@ export function ActionMenu({
               className="active:bg-fill mx-1.5 flex-row items-center justify-between rounded-[18px] px-3.5"
               style={{ height: ROW_HEIGHT }}
             >
-              <Text className="text-body text-foreground">{action.label}</Text>
+              <Text
+                className={cn(
+                  "text-body",
+                  action.destructive === true
+                    ? "text-destructive"
+                    : "text-foreground",
+                )}
+              >
+                {action.label}
+              </Text>
               <SymbolIcon
                 name={action.icon}
                 size={17}
-                tintColorClassName="accent-foreground"
+                tintColorClassName={
+                  action.destructive === true
+                    ? "accent-destructive"
+                    : "accent-foreground"
+                }
               />
             </Pressable>
           ))}

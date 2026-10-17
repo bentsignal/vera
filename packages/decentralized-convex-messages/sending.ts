@@ -1,27 +1,25 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
 import type { MutationCtx } from "./_generated/server.js";
-import type { Attachment, messagesProtocol } from "./protocol.ts";
+import type { messagesProtocol } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
 import { cardsForMessage, GIVE_UP_AFTER_MS } from "./linkCache.ts";
 import { previewedUrls } from "./links.ts";
 import { recordMentions, validMentions } from "./mentions.ts";
 import { fail, requireAccess, toMessage, upsertMember } from "./model.ts";
 import { startFetches } from "./previews.ts";
-import { MAX_ATTACHMENTS } from "./protocol.ts";
 import { addReply, replyTo } from "./threads.ts";
+import { validateMessage } from "./validation.ts";
 
 // Sending a message, or a reply in a thread, and who it @mentions.
 
 type Args = OperationArgs<(typeof messagesProtocol)["mutations"]["send"]>;
 
-const MAX_BODY_LENGTH = 4_000;
-
 /**
  * A new message's link cards: they start out from what was prefetched while
  * the message was typed, and the rest fill in as their fetches finish.
  */
-async function startLinkCards(
+export async function startLinkCards(
   ctx: MutationCtx,
   messageId: string,
   body: string,
@@ -116,24 +114,4 @@ function replyFields(reply: Awaited<ReturnType<typeof replyTo>> | undefined) {
     threadId: reply.threadId,
     threadOnly: reply.threadOnly,
   };
-}
-
-function validateMessage(body: string, attachments: readonly Attachment[]) {
-  if (body.length === 0 && attachments.length === 0) fail("EMPTY_MESSAGE");
-  if (body.length > MAX_BODY_LENGTH) fail("INVALID_MESSAGE_BODY");
-  if (attachments.length > MAX_ATTACHMENTS) fail("TOO_MANY_ATTACHMENTS");
-  const urls = attachments.flatMap((attachment) =>
-    attachment.thumbnailUrl === undefined
-      ? [attachment.url]
-      : [attachment.url, attachment.thumbnailUrl],
-  );
-  if (!urls.every(isHttpsUrl)) fail("INVALID_ATTACHMENT");
-}
-
-function isHttpsUrl(value: string) {
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
 }

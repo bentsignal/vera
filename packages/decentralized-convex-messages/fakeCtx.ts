@@ -15,6 +15,10 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_conversation: ["conversationId"],
     by_space: ["spaceId"],
   },
+  linkPreviewWaits: {
+    by_message: ["messageId"],
+    by_url: ["url"],
+  },
   memberEvents: { by_conversation_at: ["conversationId", "at"] },
   members: {
     by_account: ["accountId"],
@@ -35,6 +39,7 @@ const INDEXES: Record<string, Record<string, string[]>> = {
   reactions: {
     by_author_reacted: ["messageAuthorId", "reactedAt"],
     by_message: ["messageId"],
+    by_message_account: ["messageId", "accountId"],
   },
   spaceInvites: {
     by_account: ["accountId"],

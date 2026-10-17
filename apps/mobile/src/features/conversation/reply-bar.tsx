@@ -12,14 +12,18 @@ export interface ReplyingTo {
 }
 
 /**
- * "Replying to Maya" and the message, at the top of the field, with a
- * button to send a plain message instead.
+ * A line about what the field is doing, at its top: what it's about, the
+ * message it's about, and a button to stop.
  */
-export function ReplyBar({
-  replyingTo,
+function FieldBar({
+  title,
+  text,
+  cancelLabel,
   onCancel,
 }: {
-  replyingTo: ReplyingTo;
+  title: string;
+  text: string;
+  cancelLabel: string;
   onCancel: () => void;
 }) {
   return (
@@ -30,15 +34,15 @@ export function ReplyBar({
     >
       <View className="border-accent flex-1 border-l-2 pl-2">
         <Text numberOfLines={1} className="text-caption text-accent">
-          Replying to {replyingTo.name}
+          {title}
         </Text>
         <Text numberOfLines={1} className="text-footnote text-muted">
-          {replyingTo.text}
+          {text}
         </Text>
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Cancel Reply"
+        accessibilityLabel={cancelLabel}
         hitSlop={8}
         onPress={onCancel}
         className="active:opacity-60"
@@ -50,5 +54,55 @@ export function ReplyBar({
         />
       </Pressable>
     </Animated.View>
+  );
+}
+
+/**
+ * "Replying to Maya" and the message, at the top of the field, with a
+ * button to send a plain message instead.
+ */
+export function ReplyBar({
+  replyingTo,
+  onCancel,
+}: {
+  replyingTo: ReplyingTo;
+  onCancel: () => void;
+}) {
+  return (
+    <FieldBar
+      title={`Replying to ${replyingTo.name}`}
+      text={replyingTo.text}
+      cancelLabel="Cancel Reply"
+      onCancel={onCancel}
+    />
+  );
+}
+
+/** A message of yours the field is editing. */
+export interface Editing {
+  /** Its text as sent, or what it sent instead. */
+  readonly text: string;
+  /** It has attachments, so its text can be edited away. */
+  readonly canEmpty: boolean;
+}
+
+/**
+ * "Editing Message" and the message as it was, at the top of the field,
+ * with a button to leave it as it was.
+ */
+export function EditBar({
+  editing,
+  onCancel,
+}: {
+  editing: Editing;
+  onCancel: () => void;
+}) {
+  return (
+    <FieldBar
+      title="Editing Message"
+      text={editing.text}
+      cancelLabel="Cancel Editing"
+      onCancel={onCancel}
+    />
   );
 }

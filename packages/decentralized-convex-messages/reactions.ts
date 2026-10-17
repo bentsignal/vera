@@ -46,6 +46,20 @@ function requireValidReaction({ attachment, emoji, link }: Args<"react">) {
   }
 }
 
+/**
+ * The message reacted to, when it's stored here: messages live on their
+ * author's home PDS, and one stored here names its author, whose
+ * activity lists the reaction. A deleted one takes no reactions.
+ */
+async function storedMessage(ctx: QueryCtx, messageId: string) {
+  const message = await ctx.db
+    .query("messages")
+    .withIndex("by_message", (index) => index.eq("messageId", messageId))
+    .unique();
+  if (message?.deletedAt !== undefined) fail("MESSAGE_NOT_FOUND");
+  return message;
+}
+
 export async function react(
   ctx: MutationCtx,
   self: string,
@@ -72,12 +86,7 @@ export async function react(
   }
   if (existing !== undefined) return null;
   if (mine.length >= MAX_REACTIONS_PER_ACCOUNT) fail("TOO_MANY_REACTIONS");
-  // Messages live on their author's home PDS; one stored here names its
-  // author, whose activity lists the reaction.
-  const message = await ctx.db
-    .query("messages")
-    .withIndex("by_message", (index) => index.eq("messageId", args.messageId))
-    .unique();
+  const message = await storedMessage(ctx, args.messageId);
   await ctx.db.insert("reactions", {
     accountId: self,
     attachment: args.attachment,

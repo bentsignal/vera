@@ -62,6 +62,9 @@ export default defineSchema({
     authorName: v.string(),
     body: v.string(),
     conversationId: v.string(),
+    // A deleted thread original kept for its replies (see `message`).
+    deletedAt: v.optional(v.number()),
+    editedAt: v.optional(v.number()),
     linkPreview: v.optional(linkPreview),
     linkPreviews: v.optional(v.array(linkCard)),
     mentions: v.optional(v.array(mention)),

@@ -26,11 +26,19 @@ export function toMessage(
     attachments,
     authorId: message.authorId,
     body: message.body.length > 0 ? message.body : undefined,
+    deleted: message.deletedAt === undefined ? undefined : true,
+    editedAt:
+      message.editedAt === undefined ? undefined : new Date(message.editedAt),
     id: message.messageId,
     linkPreview: message.linkPreview ?? undefined,
     linkPreviews: message.linkPreviews,
     mentions: message.mentions,
-    reactions,
+    // A deleted message's reactions went with it (others' PDSs may still
+    // have some).
+    reactions:
+      message.deletedAt === undefined || reactions === undefined
+        ? reactions
+        : [],
     quote: message.quote,
     sentAt: new Date(message.sentAt),
     threadId: message.threadId,

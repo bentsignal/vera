@@ -25,6 +25,7 @@ void test("from older apps, only a thread's first reply shows in the conversatio
     attachment: undefined,
     authorId: ME,
     body: "root from me@vera.chat",
+    messageId: "root",
   });
 
   const shown = await olderThan(ctx, { conversationId: GROUP }, undefined);
@@ -84,6 +85,7 @@ void test("a reply to a reply goes to the original's thread, quoting the reply",
     attachment: undefined,
     authorId: MAYA,
     body: "first from maya@vera.chat",
+    messageId: "first",
   });
 });
 

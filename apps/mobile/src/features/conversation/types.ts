@@ -47,6 +47,13 @@ export interface Message {
   linkPreviews?: readonly LinkCard[];
   /** Who it @mentions, by the name written after each `@`. */
   mentions?: readonly Mention[];
+  /** When its author last changed its text. */
+  editedAt?: Date;
+  /**
+   * Its author deleted it. Only a thread's original with replies shows,
+   * as a placeholder over its thread's count.
+   */
+  deleted?: boolean;
   /** Undefined until the message's reactions have loaded. */
   reactions: readonly ReactionSummary[] | undefined;
   /** Set until the server confirms a message this device sent. */
@@ -63,6 +70,12 @@ export interface Message {
    * in the thread itself, which counts its replies above them.
    */
   thread?: ThreadInfo;
+}
+
+/** Editing and deleting your own messages (see `useEditing`). */
+export interface MessageEdits {
+  readonly edit: (message: Message) => void;
+  readonly delete: (message: Message) => void;
 }
 
 /**

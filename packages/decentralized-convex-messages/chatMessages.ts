@@ -5,15 +5,22 @@ import type { QueryCtx } from "./_generated/server.js";
 
 const MAX_UNREAD = 99;
 
-/** The newest message the conversation shows (not one kept in a thread). */
-export function latestMessage(ctx: QueryCtx, conversationId: string) {
-  return ctx.db
+/** Deleted originals kept for their threads that an inbox looks past. */
+const MAX_DELETED_SKIPPED = 10;
+
+/**
+ * The newest message the conversation shows (not one kept in a thread,
+ * nor a deleted original kept for its thread).
+ */
+export async function latestMessage(ctx: QueryCtx, conversationId: string) {
+  const newest = await ctx.db
     .query("messages")
     .withIndex("by_chat_sent", (index) =>
       index.eq("conversationId", conversationId).eq("threadOnly", undefined),
     )
     .order("desc")
-    .first();
+    .take(MAX_DELETED_SKIPPED + 1);
+  return newest.find((message) => message.deletedAt === undefined) ?? null;
 }
 
 export async function unreadCount(
@@ -31,5 +38,8 @@ export async function unreadCount(
         .gt("sentAt", lastReadAt),
     )
     .take(MAX_UNREAD + 1);
-  return unread.filter((message) => message.authorId !== accountId).length;
+  return unread.filter(
+    (message) =>
+      message.authorId !== accountId && message.deletedAt === undefined,
+  ).length;
 }

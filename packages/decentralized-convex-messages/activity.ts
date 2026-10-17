@@ -56,7 +56,11 @@ async function othersNewest(
   const theirs = new Array<Doc<"messages">>();
   let scanned = 0;
   for await (const message of newer) {
-    if (message.authorId !== scope.self && counts(message)) {
+    if (
+      message.authorId !== scope.self &&
+      message.deletedAt === undefined &&
+      counts(message)
+    ) {
       theirs.push(message);
     }
     scanned += 1;

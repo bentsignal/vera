@@ -8,6 +8,7 @@ import { AttachmentView } from "./attachment-view";
 import { LinkCardView } from "./link-preview-card";
 import { LinkedText } from "./linked-text";
 import { MenuTargetView } from "./message-actions";
+import { DeletedText, EditedSuffix } from "./message-changes";
 import { linkPart, partCount } from "./message-parts";
 import { linkCardsOf, visibleBody } from "./message-text";
 import { Placed, Reactable } from "./reaction-parts";
@@ -24,13 +25,16 @@ export function StackedParts({ message }: { message: Message }) {
   const body = visibleBody(message);
   const cards = linkCardsOf(message);
   const cardsPlace = message.attachments.length + 1;
+  const edited = message.editedAt !== undefined;
   const text = body !== undefined && (
     <LinkedText
       text={body}
       mentions={message.mentions}
       className="text-body text-foreground"
+      suffix={edited ? <EditedSuffix /> : undefined}
     />
   );
+  if (message.deleted === true) return <DeletedText />;
   return (
     <View className="items-start gap-1">
       {body !== undefined && (
@@ -63,6 +67,8 @@ export function StackedParts({ message }: { message: Message }) {
           <LinkCardView card={card} />
         </Reactable>
       ))}
+      {/* Edited away to its attachments, with no text to follow. */}
+      {edited && body === undefined && <EditedSuffix />}
     </View>
   );
 }

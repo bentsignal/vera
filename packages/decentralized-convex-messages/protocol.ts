@@ -76,6 +76,31 @@ export const messagesProtocol = definePluginProtocol({
       }),
       returns: message,
     }),
+    /**
+     * Changes the text of your own message, and who it @mentions (as in
+     * `send`); its attachments stay. It comes back with `editedAt`.
+     * Fails with `NOT_MESSAGE_AUTHOR` for anyone else's message.
+     */
+    editMessage: defineOperation({
+      args: v.object({
+        body: v.string(),
+        conversationId: v.string(),
+        mentions: v.optional(v.array(mention)),
+        messageId: v.string(),
+      }),
+      returns: message,
+    }),
+    /**
+     * Deletes your own message for everyone, with its reactions. A
+     * thread's original with replies stays as `deletedAt`, emptied, so
+     * its thread can still be opened; any other message is gone. Replies
+     * quoting it come back with `quote.deleted`. Fails with
+     * `NOT_MESSAGE_AUTHOR` for anyone else's message.
+     */
+    deleteMessage: defineOperation({
+      args: v.object({ conversationId: v.string(), messageId: v.string() }),
+      returns: v.null(),
+    }),
     /** Marks a thread read up to `readAt`, which sees its activity too. */
     markThreadRead: defineOperation({
       args: v.object({

@@ -8,7 +8,11 @@ import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { OutgoingDraft, OutgoingMessage } from "./outbox";
-import type { ReplyTarget, ThreadInfo } from "~/features/conversation/types";
+import type {
+  Message,
+  ReplyTarget,
+  ThreadInfo,
+} from "~/features/conversation/types";
 import { useAccount } from "./account";
 import { useMessageWindow } from "./message-window";
 import { sendOutgoing, useOutbox } from "./outbox";
@@ -164,6 +168,17 @@ function replyCountOf(
   return threadOf(threadId)?.replyCount ?? 0;
 }
 
+/**
+ * Whether a message shows: a deleted one only as a thread's original
+ * with replies, which keeps its place over its thread's count.
+ */
+function isShown(message: Message) {
+  if (message.deleted !== true) return true;
+  return (
+    message.threadId === undefined && (message.thread?.replyCount ?? 0) > 0
+  );
+}
+
 /** The newest message's time, when it's the newest there is. */
 function newestSentAt(view: ReturnType<typeof useMessageWindow>) {
   return view.hasNewer ? undefined : view.messages.at(-1)?.sentAt;
@@ -236,7 +251,8 @@ export function useMessages(
     messages: [
       ...view.messages
         .filter((message) => settled.shownIds.has(message.messageId))
-        .map((message) => shownMessage(message, how(message))),
+        .map((message) => shownMessage(message, how(message)))
+        .filter(isShown),
       ...unconfirmed,
     ],
     /** A thread's original, once loaded; undefined if it doesn't exist. */

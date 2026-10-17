@@ -7,6 +7,7 @@ import { mutation, query } from "./_generated/server.js";
 import * as activity from "./activity.ts";
 import * as alerts from "./alerts.ts";
 import * as conversations from "./conversations.ts";
+import * as editing from "./editing.ts";
 import * as inbox from "./inbox.ts";
 import * as invites from "./invites.ts";
 import { cachedCards } from "./linkCache.ts";
@@ -41,6 +42,15 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         invites.createSpaceInviteLink(ctx, requireAccountId(identity), args),
       declineSpaceInvite: (ctx, { args, identity }) =>
         invites.declineSpaceInvite(ctx, requireAccountId(identity), args),
+      deleteMessage: (ctx, { args, identity }) =>
+        editing.deleteMessage(ctx, requireAccountId(identity), args),
+      editMessage: (ctx, { args, identity }) =>
+        editing.editMessage(
+          ctx,
+          requireAccountId(identity),
+          args,
+          sending.startLinkCards,
+        ),
       deleteChannel: (ctx, { args, identity }) =>
         spaces.deleteChannel(ctx, requireAccountId(identity), args),
       inviteToSpace: (ctx, { args, identity }) =>

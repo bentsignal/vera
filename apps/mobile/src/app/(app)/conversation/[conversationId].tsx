@@ -14,6 +14,7 @@ import {
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
 import { MessageList } from "~/features/conversation/message-list";
+import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
 import { useReplies } from "~/features/conversation/use-replies";
 import { useDevConversation } from "~/features/dev/dev-conversation";
@@ -66,6 +67,18 @@ function listReady(
   );
 }
 
+/** Opens the conversation's info, titled `title` until it loads. */
+function useOpenInfo(conversationId: string) {
+  const router = useRouter();
+  const { address } = useAccount();
+  return (title: string) => {
+    router.push({
+      params: { account: address, conversationId, title },
+      pathname: "/conversation-info/[conversationId]",
+    });
+  };
+}
+
 function MissingConversation({ heading }: { heading: string }) {
   return (
     <View className="bg-background flex-1 items-center justify-center">
@@ -87,7 +100,7 @@ function Conversation({
   anchorId?: string;
   initialTitle?: string;
 }) {
-  const router = useRouter();
+  const openInfo = useOpenInfo(conversationId);
   const composerBottomInset = useComposerBottomInset();
   const { address } = useAccount();
   const devTools = useDevTools();
@@ -114,6 +127,7 @@ function Conversation({
     profileOf,
     title: heading,
   });
+  const editing = useEditing({ composer, conversationId });
   if (!isLoading && conversation === undefined) {
     return (
       <MissingConversation
@@ -148,6 +162,7 @@ function Conversation({
               onToggleReaction={messages.toggleReaction}
               onOpenThread={replies.openThread}
               onReply={replies.reply}
+              editing={editing}
               onViewReactions={viewReactions}
             />
           )}
@@ -157,12 +172,7 @@ function Conversation({
         kind={loaded.kind}
         avatarUrl={header.avatarUrl}
         affiliated={header.affiliated}
-        onOpenInfo={() =>
-          router.push({
-            params: { account: address, conversationId, title: heading },
-            pathname: "/conversation-info/[conversationId]",
-          })
-        }
+        onOpenInfo={() => openInfo(heading)}
       />
       <FloatingComposer
         ref={composer}
@@ -171,6 +181,7 @@ function Conversation({
         onHeight={setComposerHeight}
         replyingTo={replies.replyingTo}
         onCancelReply={replies.cancel}
+        edit={editing}
         onSend={(draft) => {
           messages.sendMessage(draft, replies.replyTo);
           replies.cancel();
