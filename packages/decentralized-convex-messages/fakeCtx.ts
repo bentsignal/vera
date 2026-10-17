@@ -53,6 +53,10 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_conversation_reply: ["conversationId", "lastReplyAt"],
     by_thread: ["threadId"],
   },
+  typing: {
+    by_account_conversation: ["accountId", "conversationId"],
+    by_conversation: ["conversationId", "typedAt"],
+  },
 };
 
 /** A row's field, or a nested one (`quote.authorId`). */

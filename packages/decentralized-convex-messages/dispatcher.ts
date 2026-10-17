@@ -21,6 +21,7 @@ import * as sightings from "./sightings.ts";
 import * as spaces from "./spaces.ts";
 import * as threadLists from "./threadLists.ts";
 import * as threads from "./threads.ts";
+import * as typing from "./typing.ts";
 
 export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
   handlers: {
@@ -96,6 +97,8 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
         alerts.setSpaceAlerts(ctx, requireAccountId(identity), args),
       setSpaceMuted: (ctx, { args, identity }) =>
         alerts.setSpaceMuted(ctx, requireAccountId(identity), args),
+      setTyping: (ctx, { args, identity }) =>
+        typing.setTyping(ctx, requireAccountId(identity), args),
       setThreadFollowed: (ctx, { args, identity }) =>
         threads.setThreadFollowed(ctx, requireAccountId(identity), args),
       setPinned: (ctx, { args, identity }) =>
@@ -165,6 +168,14 @@ export const { dispatchMutation, dispatchQuery } = defineComponentDispatchers({
           args,
         );
         return routedQueryResult(found.summaries, found.routes);
+      },
+      typing: async (ctx, { args, identity }) => {
+        const found = await typing.typing(
+          ctx,
+          requireAccountId(identity),
+          args,
+        );
+        return routedQueryResult(found.typists, found.routes);
       },
       spaceInviteLinkPreview: (ctx, { args, identity }) =>
         invites.spaceInviteLinkPreview(

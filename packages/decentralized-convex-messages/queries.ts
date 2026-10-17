@@ -16,6 +16,7 @@ import {
   threadPage,
   threadState,
   threadSummary,
+  typist,
 } from "./shapes.ts";
 import { threadListQueries } from "./threadOperations.ts";
 
@@ -86,6 +87,18 @@ export const queries = {
       messageIds: v.array(v.string()),
     }),
     returns: v.array(reaction),
+  }),
+  /**
+   * Who else is typing in a conversation, or with `threadId`, in that
+   * thread, gathered from every member's PDS (each stores its own
+   * accounts' typing).
+   */
+  typing: defineOperation({
+    args: v.object({
+      conversationId: v.string(),
+      threadId: v.optional(v.string()),
+    }),
+    returns: v.array(typist),
   }),
   /**
    * A thread: its original message and one page of replies, oldest

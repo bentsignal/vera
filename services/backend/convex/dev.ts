@@ -86,8 +86,9 @@ export const longThreadMiddle = action({
 });
 
 /**
- * Bots in a conversation answer the caller's latest message after a beat.
- * In a group or channel, the first @mentions the caller.
+ * Bots in a conversation answer the caller's latest message after a beat,
+ * typing for a moment first (the second starts while the first still
+ * types). In a group or channel, the first @mentions the caller.
  */
 export const replyToMe = action({
   // With `threadId`, the bots answer in that thread.
@@ -116,8 +117,15 @@ export const replyToMe = action({
           username: bot.username,
         });
       }
+      const typesAt = 400 + index * 900;
+      await ctx.scheduler.runAfter(typesAt, internal.dev.type, {
+        conversationId,
+        threadId,
+        typing: true,
+        username: bot.username,
+      });
       await ctx.scheduler.runAfter(
-        1500 + index * 2000 + (seed % 1500),
+        typesAt + 2500 + ((seed + index * 500) % 1500),
         internal.dev.say,
         {
           body: pick(REPLIES, seed + index * 31),
@@ -135,6 +143,60 @@ export const replyToMe = action({
 });
 
 const BOT_REACTIONS = ["❤️", "👍", "😂", "🔥", "😮"];
+
+/** A bot starts (or keeps up) typing, or stops. */
+export const type = internalAction({
+  args: {
+    conversationId: v.string(),
+    threadId: v.optional(v.string()),
+    typing: v.boolean(),
+    username: v.string(),
+  },
+  handler: async (ctx, { conversationId, threadId, typing, username }) => {
+    requireDevTools();
+    const bot = BOTS.find((candidate) => candidate.username === username);
+    if (bot === undefined) return;
+    await asAccount(ctx, botIdentity(bot), {
+      args: { conversationId, threadId, typing },
+      type: "setTyping",
+    });
+  },
+});
+
+/**
+ * Every bot in a conversation (or `count` of them) types for `seconds`,
+ * one after another, then stops, for trying typing indicators by hand:
+ * `npx convex run dev:typingCrowd '{"conversationId":"..."}'`.
+ */
+export const typingCrowd = internalAction({
+  args: {
+    conversationId: v.string(),
+    count: v.optional(v.number()),
+    seconds: v.optional(v.number()),
+    threadId: v.optional(v.string()),
+  },
+  handler: async (ctx, { conversationId, count, seconds = 8, threadId }) => {
+    requireDevTools();
+    const bots = BOTS.slice(0, count ?? BOTS.length);
+    for (const [index, bot] of bots.entries()) {
+      const start = index * 700;
+      // Typing times out unless it's kept up, as an app does while typing.
+      for (let at = start; at < seconds * 1000; at += 3000) {
+        await ctx.scheduler.runAfter(at, internal.dev.type, {
+          conversationId,
+          threadId,
+          typing: true,
+          username: bot.username,
+        });
+      }
+      await ctx.scheduler.runAfter(
+        seconds * 1000 + index * 700,
+        internal.dev.type,
+        { conversationId, threadId, typing: false, username: bot.username },
+      );
+    }
+  },
+});
 
 /** A bot reacts to the caller's newest message, read when it runs. */
 export const react = internalAction({

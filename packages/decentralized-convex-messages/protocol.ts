@@ -123,6 +123,22 @@ export const messagesProtocol = definePluginProtocol({
       returns: v.null(),
     }),
     /**
+     * Says you're typing in a conversation, or with `threadId`, a reply in
+     * that thread (`typing: true`), or that you've stopped. Apps say so
+     * again every `TYPING_REFRESH` while the text keeps changing, and you
+     * stop showing as typing `TYPING_TIMEOUT` after the last time. Sending
+     * a message there stops it too, in the same write, so readers never
+     * see the message and the typing at once.
+     */
+    setTyping: defineOperation({
+      args: v.object({
+        conversationId: v.string(),
+        threadId: v.optional(v.string()),
+        typing: v.boolean(),
+      }),
+      returns: v.null(),
+    }),
+    /**
      * Records that activity items came into view (see `activity`). Each
      * stays for `ACTIVITY_SEEN_LIFETIME` after it's seen, then goes, until
      * something newer happens in it.

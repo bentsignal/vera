@@ -100,6 +100,18 @@ Reactions follow the same author-home rule as messages: `messages.react`
 stores your reaction on your home PDS, and `messages.reactions` (given the
 message IDs on screen) gathers reactions from every member's PDS.
 
+Typing follows the same rule: `messages.setTyping` stores that you're
+typing in a conversation (or with `threadId`, a reply in that thread) on
+your home PDS, and `messages.typing` gathers who else is from every
+member's PDS. Apps call it as the text changes, at most every
+`TYPING_REFRESH`, and someone stops showing `TYPING_TIMEOUT` after the
+last time, or at once with `typing: false`. `send` ends its author's
+typing in the same write that stores the message, so a reader gets the
+message and the stop together. Each typist comes with `expiresIn`, how
+long they have left as the PDS answered, which apps count down from when
+the answer arrived, so no device's clock has to agree with a PDS's; and
+with `typedAt`, on the same clock as the `sentAt` of that PDS's messages.
+
 Activity: `messages.activity` lists what happened while the caller was
 away, newest first: messages others sent (one item per conversation, with
 the newest, a count, and the authors) and others' reactions to the caller's

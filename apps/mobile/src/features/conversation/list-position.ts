@@ -108,7 +108,12 @@ export function useLatest(
       state.current.seen = { composer, newest };
       if (seen === undefined) return;
       const grew = newest !== seen.newest || composer !== seen.composer;
-      if (grew && state.current.pinned) scrollToNewest();
+      if (!grew || !state.current.pinned) return;
+      scrollToNewest();
+      // Android's scroll anchor moves the list after this, holding the
+      // newest message still while the space under it opens (behind the
+      // composer, which is solid there), so it follows a frame later too.
+      if (Platform.OS === "android") requestAnimationFrame(scrollToNewest);
     },
   };
 }
@@ -167,11 +172,13 @@ export function usePlacement({
   anchorIndex,
   onReady,
   onLoadNewer,
+  onLoadOlder,
 }: {
   listRef: RefObject<FlatList<MessageRow> | null>;
   anchorIndex: number;
   onReady: () => void;
   onLoadNewer: () => void;
+  onLoadOlder: () => void;
 }) {
   const state = useRef<PlacementState>({
     missed: false,
@@ -183,7 +190,14 @@ export function usePlacement({
     onReady();
   }
   return {
-    isPlaced: () => state.current.placed,
+    /** Pages in older messages, once placed. */
+    loadOlder: () => {
+      if (state.current.placed) onLoadOlder();
+    },
+    /** Pages in newer messages, once placed. */
+    loadNewer: () => {
+      if (state.current.placed) onLoadNewer();
+    },
     /** The list has laid out its content. */
     onLaidOut: () => {
       if (state.current.started) return;

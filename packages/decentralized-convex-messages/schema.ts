@@ -158,6 +158,18 @@ export default defineSchema({
     .index("by_message", ["messageId"])
     .index("by_message_account", ["messageId", "accountId"])
     .index("by_author_reacted", ["messageAuthorId", "reactedAt"]),
+  // Who among this PDS's accounts is typing, one row per account and
+  // conversation, left behind once it times out (see `TYPING_TIMEOUT`).
+  typing: defineTable({
+    accountId: v.string(),
+    conversationId: v.string(),
+    startedAt: v.number(),
+    // Typing a reply in this thread rather than in the conversation.
+    threadId: v.optional(v.string()),
+    typedAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId", "typedAt"])
+    .index("by_account_conversation", ["accountId", "conversationId"]),
   // Each time an account saw an activity item (`key`) on screen, through
   // the newest activity in it then. Only the newest sighting older than a
   // day matters, so older ones are deleted.

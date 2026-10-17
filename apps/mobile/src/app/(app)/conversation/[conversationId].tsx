@@ -22,6 +22,7 @@ import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useMemberNotices } from "~/features/messaging/member-events";
 import { useMarkRead, useMessages } from "~/features/messaging/messages";
+import { useTypingReporter, useTypists } from "~/features/messaging/typing";
 import { useActiveConversation } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 
@@ -66,6 +67,17 @@ function listReady(
   );
 }
 
+/** Opens the conversation's info screen. */
+function useOpenInfo(conversationId: string, title: string) {
+  const router = useRouter();
+  const { address } = useAccount();
+  return () =>
+    router.push({
+      params: { account: address, conversationId, title },
+      pathname: "/conversation-info/[conversationId]",
+    });
+}
+
 function MissingConversation({ heading }: { heading: string }) {
   return (
     <View className="bg-background flex-1 items-center justify-center">
@@ -87,7 +99,6 @@ function Conversation({
   anchorId?: string;
   initialTitle?: string;
 }) {
-  const router = useRouter();
   const composerBottomInset = useComposerBottomInset();
   const { address } = useAccount();
   const devTools = useDevTools();
@@ -97,6 +108,8 @@ function Conversation({
   const layout = useMessageLayout(conversation?.kind);
   const messages = useMessages(conversationId, { anchor: anchorId });
   const notices = useMemberNotices(conversationId, conversation, messages);
+  const typists = useTypists(conversationId, { messages: messages.messages });
+  const reportTyping = useTypingReporter(conversationId);
   const composer = useRef<ComposerHandle>(null);
   // Undefined until the composer is laid out: the list leaves room for it
   // under the newest message, so it waits rather than shift once it knows.
@@ -108,6 +121,7 @@ function Conversation({
 
   const header = headerFor(loaded, address, initialTitle);
   const heading = header.title;
+  const openInfo = useOpenInfo(conversationId, heading);
   const replies = useReplies({
     composer,
     conversationId,
@@ -145,6 +159,7 @@ function Conversation({
               bottomInset={composerBottomInset}
               topInset={CONVERSATION_HEADER_HEIGHT}
               composerHeight={composerHeight}
+              typists={typists}
               onToggleReaction={messages.toggleReaction}
               onOpenThread={replies.openThread}
               onReply={replies.reply}
@@ -157,18 +172,14 @@ function Conversation({
         kind={loaded.kind}
         avatarUrl={header.avatarUrl}
         affiliated={header.affiliated}
-        onOpenInfo={() =>
-          router.push({
-            params: { account: address, conversationId, title: heading },
-            pathname: "/conversation-info/[conversationId]",
-          })
-        }
+        onOpenInfo={openInfo}
       />
       <FloatingComposer
         ref={composer}
         draftId={conversationId}
         mentionable={mentionableIn(conversation, address, profileOf)}
         onHeight={setComposerHeight}
+        onChangeText={reportTyping}
         replyingTo={replies.replyingTo}
         onCancelReply={replies.cancel}
         onSend={(draft) => {

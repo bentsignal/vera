@@ -39,6 +39,7 @@ export function FloatingComposer({
   mentionable,
   onHeight,
   onSend,
+  onChangeText,
   replyingTo,
   onCancelReply,
   placeholder,
@@ -51,6 +52,8 @@ export function FloatingComposer({
   /** The bar's height, without the people to mention listed over it. */
   onHeight: (height: number) => void;
   onSend: (draft: OutgoingDraft) => void;
+  /** Every change to the text (see `Composer`), to report typing. */
+  onChangeText?: (text: string, sent: boolean) => void;
   /** Set while the next message is a reply (see `Composer`). */
   replyingTo?: ReplyingTo;
   onCancelReply?: () => void;
@@ -127,7 +130,10 @@ export function FloatingComposer({
         replyingTo={replyingTo}
         onCancelReply={onCancelReply}
         placeholder={placeholder}
-        onChangeText={links.onChangeText}
+        onChangeText={(text, sent) => {
+          links.onChangeText(text);
+          onChangeText?.(text, sent);
+        }}
         onPick={(source) => void pick(source)}
         onPaste={paste}
         onRemoveStaged={(id) => {

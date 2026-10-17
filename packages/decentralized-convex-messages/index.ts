@@ -57,6 +57,9 @@ export {
   threadPage,
   threadState,
   threadSummary,
+  TYPING_REFRESH,
+  TYPING_TIMEOUT,
+  typist,
 } from "./protocol.ts";
 export type {
   ActivityConversation,
@@ -82,4 +85,5 @@ export type {
   ThreadListing,
   ThreadState,
   ThreadSummary,
+  Typist,
 } from "./protocol.ts";

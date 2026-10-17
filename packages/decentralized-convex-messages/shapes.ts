@@ -379,6 +379,31 @@ export const threadState = v.object({
 
 export type ThreadState = Infer<typeof threadState>;
 
+/**
+ * How long someone shows as typing after their app last said so. Apps say
+ * so again every `TYPING_REFRESH` while the text keeps changing.
+ */
+export const TYPING_TIMEOUT = 6_000;
+/** How often an app repeats `setTyping` while its text keeps changing. */
+export const TYPING_REFRESH = 3_000;
+
+/**
+ * Someone typing in a conversation (or a thread of it). `expiresIn` is
+ * how long they still show as typing, from when the PDS answered: apps
+ * count it down from when the answer arrived, so their clock never has to
+ * agree with the PDS's. `typedAt` is the PDS's time, to compare with the
+ * `sentAt` of messages stored on the same PDS.
+ */
+export const typist = v.object({
+  accountId: v.string(),
+  expiresIn: v.number(),
+  /** When this bout of typing began, so apps keep typists in order. */
+  startedAt: v.number(),
+  typedAt: v.number(),
+});
+
+export type Typist = Infer<typeof typist>;
+
 /** At most this many messages per `reactions` query. */
 export const MAX_REACTION_MESSAGES = 100;
 

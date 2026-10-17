@@ -26,6 +26,7 @@ import {
   useMarkThreadRead,
   useThreadState,
 } from "~/features/messaging/threads";
+import { useTypingReporter, useTypists } from "~/features/messaging/typing";
 import { useActiveThread } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 
@@ -116,6 +117,11 @@ function Thread({
   const layout = useMessageLayout(conversation?.kind);
   const thread = useMessages(conversationId, { threadId });
   const state = useThreadState(conversationId, threadId);
+  const typists = useTypists(conversationId, {
+    messages: thread.messages,
+    threadId,
+  });
+  const reportTyping = useTypingReporter(conversationId, threadId);
   const [composerHeight, setComposerHeight] = useState<number>();
   const list = useRef<MessageListHandle>(null);
   useMarkThreadRead(conversationId, threadId, thread.newestSentAt);
@@ -164,6 +170,7 @@ function Thread({
             bottomInset={composerBottomInset}
             topInset={THREAD_HEADER_HEIGHT}
             composerHeight={shown.composerHeight}
+            typists={typists}
             onToggleReaction={thread.toggleReaction}
             onViewReactions={viewReactions}
           />
@@ -182,6 +189,7 @@ function Thread({
           placeholder="Reply"
           mentionable={mentionableIn(conversation, address, profileOf)}
           onHeight={setComposerHeight}
+          onChangeText={reportTyping}
           onSend={(draft) => {
             thread.sendMessage(draft);
             list.current?.scrollToLatest();

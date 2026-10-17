@@ -8,6 +8,8 @@ const profile = { avatarUrl: null, displayName: "Maya" };
 function profileOf() {
   return profile;
 }
+/** Nobody typing, the same array each time. */
+const NOBODY = Object.freeze<string[]>([]);
 
 export function Conversation({ messages }: { messages: readonly Message[] }) {
   return (
@@ -24,6 +26,7 @@ export function Conversation({ messages }: { messages: readonly Message[] }) {
       bottomInset={0}
       topInset={0}
       composerHeight={56}
+      typists={NOBODY}
       onToggleReaction={() => undefined}
       onViewReactions={() => undefined}
     />

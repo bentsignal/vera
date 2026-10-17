@@ -10,6 +10,7 @@ import { fail, requireAccess, toMessage, upsertMember } from "./model.ts";
 import { startFetches } from "./previews.ts";
 import { MAX_ATTACHMENTS } from "./protocol.ts";
 import { addReply, replyTo } from "./threads.ts";
+import { stopTyping } from "./typing.ts";
 
 // Sending a message, or a reply in a thread, and who it @mentions.
 
@@ -78,6 +79,8 @@ export async function send(
     ...replyFields(reply),
   };
   await ctx.db.insert("messages", message);
+  // In the same write as the message, so no reader sees both at once.
+  await stopTyping(ctx, self, args.conversationId);
   await recordMentions(ctx, message);
   if (reply !== undefined) {
     await addReply(ctx, { ...reply, authorId: self, sentAt });

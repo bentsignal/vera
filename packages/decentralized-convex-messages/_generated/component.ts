@@ -107,6 +107,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 type: "react";
               }
             | {
+                args: {
+                  conversationId: string;
+                  threadId?: string;
+                  typing: boolean;
+                };
+                type: "setTyping";
+              }
+            | {
                 args: { items: Array<{ key: string; through: number }> };
                 type: "markActivitySeen";
               }
@@ -300,6 +308,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         | { routes?: Array<string>; type: "setThreadFollowed"; value: null }
         | { routes?: Array<string>; type: "prefetchLinkPreviews"; value: null }
         | { routes?: Array<string>; type: "react"; value: null }
+        | { routes?: Array<string>; type: "setTyping"; value: null }
         | { routes?: Array<string>; type: "markActivitySeen"; value: null }
         | { routes?: Array<string>; type: "markRead"; value: null }
         | { routes?: Array<string>; type: "setMuted"; value: null }
@@ -399,6 +408,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             | {
                 args: { conversationId: string; messageIds: Array<string> };
                 type: "reactions";
+              }
+            | {
+                args: { conversationId: string; threadId?: string };
+                type: "typing";
               }
             | {
                 args: {
@@ -1204,6 +1217,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               link?: number;
               messageId: string;
               reactedAt: number;
+            }>;
+          }
+        | {
+            routes?: Array<string>;
+            type: "typing";
+            value: Array<{
+              accountId: string;
+              expiresIn: number;
+              startedAt: number;
+              typedAt: number;
             }>;
           }
         | {

@@ -1,10 +1,9 @@
 import type { Ref, RefObject } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { useImperativeHandle, useRef, useState } from "react";
-import { FlatList, Pressable, View } from "react-native";
+import { FlatList, View } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import Animated, {
-  useAnimatedReaction,
   useAnimatedRef,
   useAnimatedStyle,
   useDerivedValue,
@@ -20,92 +19,17 @@ import type { ToggleReaction, ViewReactions } from "./message-actions";
 import type { ProfileOf } from "./message-row";
 import type { MemberNotice, Message } from "./types";
 import type { MessageLayout } from "~/features/preferences/store";
-import { GlassSurface } from "~/components/glass-surface";
-import { SymbolIcon } from "~/components/symbol-icon";
-import { cn } from "~/lib/cn";
 import { useBlankSpace } from "./blank-space";
 import { arrivedAfter, newestFirst } from "./build-rows";
 import { GrowthProvider } from "./grow";
+import { JumpToLatest } from "./jump-to-latest";
 import { ANCHOR, useLatest, usePlacement } from "./list-position";
 import { useMenuKeyboard } from "./menu-keyboard";
 import { MessageActionsProvider } from "./message-actions";
 import { Row } from "./message-row";
 import { RevealTimes } from "./reveal";
-
-/** The jump button's size. */
-const JUMP_SIZE = 40;
-
-function JumpChevron() {
-  return (
-    <SymbolIcon
-      name={{ android: "keyboard_arrow_down", ios: "chevron.down" }}
-      size={17}
-      weight="semibold"
-      tintColorClassName="accent-foreground"
-    />
-  );
-}
-
-/**
- * Back down to the newest message, once you've scrolled away from it. On
- * iOS a Liquid Glass circle that materializes and dissolves like the
- * system's own controls (glass can't fade, see `GlassSurface`); a plain
- * raised circle on Android.
- */
-function JumpToLatest({
-  visible,
-  bottom,
-  onPress,
-}: {
-  visible: SharedValue<boolean>;
-  /** Distance from the bottom edge, above the floating composer. */
-  bottom: number;
-  onPress: () => void;
-}) {
-  const [shown, setShown] = useState(false);
-  useAnimatedReaction(
-    () => visible.value,
-    (now, before) => {
-      if (now !== before) scheduleOnRN(setShown, now);
-    },
-  );
-  const chevron = useAnimatedStyle(() => ({
-    opacity: withTiming(visible.value ? 1 : 0, { duration: 160 }),
-    transform: [
-      { scale: withTiming(visible.value ? 1 : 0.6, { duration: 200 }) },
-    ],
-  }));
-  return (
-    <View
-      pointerEvents={shown ? "box-none" : "none"}
-      className="absolute right-4"
-      style={{ bottom }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Jump to latest"
-        accessibilityElementsHidden={!shown}
-        onPress={onPress}
-        hitSlop={6}
-      >
-        <GlassSurface
-          isInteractive
-          shown={shown}
-          className="items-center justify-center rounded-full"
-          androidClassName={cn(
-            "bg-background-elevated border-hairline border-separator shadow-sm",
-            !shown && "opacity-0",
-          )}
-          style={{ height: JUMP_SIZE, width: JUMP_SIZE }}
-        >
-          <Animated.View style={chevron}>
-            <JumpChevron />
-          </Animated.View>
-        </GlassSurface>
-      </Pressable>
-    </View>
-  );
-}
+import { BelowNewest } from "./typing-indicator";
+import { belowNewestHeight } from "./typing-space";
 
 /** What the conversation screen can ask of its list. */
 export interface MessageListHandle {
@@ -133,6 +57,8 @@ interface RowsProps {
   topInset: number;
   /** Height of the composer floating over the bottom of the list. */
   composerHeight: number;
+  /** Who else is typing here, in the order they started. */
+  typists: readonly string[];
   latest: Latest;
   /** Freezes keyboard handling (see useMenuKeyboard). */
   freeze: SharedValue<boolean>;
@@ -173,13 +99,23 @@ function Rows({
   bottomInset,
   topInset,
   composerHeight,
+  typists,
   latest,
   freeze,
   onReady,
   shown,
 }: RowsProps) {
   const safeArea = useSafeAreaInsets();
+  const top = safeArea.top + topInset;
   const rows = newestFirst(messages, layout, thread, notices);
+  const below = {
+    composerHeight,
+    layout,
+    newestKey: rows[0]?.key,
+    profileOf,
+    showFaces: showAuthors,
+    typists,
+  };
   const blank = useBlankSpace(thread !== undefined);
   // Only messages that arrive while open animate in, not loaded pages.
   const [openedAt] = useState(Date.now);
@@ -189,6 +125,7 @@ function Rows({
     anchorIndex,
     listRef,
     onLoadNewer,
+    onLoadOlder,
     onReady,
   });
   return (
@@ -236,20 +173,16 @@ function Rows({
       // Inverted: the list's end is the oldest message, at the top. Older
       // ones load three screens early, so a fast scroll rarely reaches
       // the top before they're there.
-      onEndReached={() => {
-        if (placement.isPlaced()) onLoadOlder();
-      }}
+      onEndReached={placement.loadOlder}
       onEndReachedThreshold={3}
-      onStartReached={() => {
-        if (placement.isPlaced()) onLoadNewer();
-      }}
+      onStartReached={placement.loadNewer}
       onStartReachedThreshold={3}
       onScroll={(event) => latest.onScroll(event.nativeEvent.contentOffset.y)}
       {...latest.scrollHandlers}
       scrollEventThrottle={16}
       onContentSizeChange={(_, height) => {
         blank.onContentHeight(height);
-        latest.onContentChange(rows[0]?.key, composerHeight);
+        latest.onContentChange(below.newestKey, belowNewestHeight(below));
         placement.onLaidOut();
       }}
       onScrollToIndexFailed={placement.onMissed}
@@ -259,18 +192,13 @@ function Rows({
       // A thread starts at the top, under its original (see
       // `useBlankSpace`).
       onLayout={(event) => blank.onListHeight(event.nativeEvent.layout.height)}
-      // Room under the newest message for the composer floating over it,
-      // which grows as you type, and above the oldest for the header: the
-      // messages scroll under both. Inverted, the list's header is at the
-      // bottom of the screen and its footer at the top.
-      ListHeaderComponent={<View style={{ height: composerHeight + 8 }} />}
-      ListFooterComponent={
-        <View style={{ height: safeArea.top + topInset + 8 }} />
-      }
-      scrollIndicatorInsets={{
-        bottom: safeArea.top + topInset,
-        top: composerHeight,
-      }}
+      // Room under the newest message (see `BelowNewest`) and above the
+      // oldest for the header: the messages scroll under both. Inverted,
+      // the list's header is at the bottom of the screen and its footer at
+      // the top.
+      ListHeaderComponent={<BelowNewest {...below} />}
+      ListFooterComponent={<View style={{ height: top + 8 }} />}
+      scrollIndicatorInsets={{ bottom: top, top: composerHeight }}
       style={{ flex: 1 }}
     />
   );
