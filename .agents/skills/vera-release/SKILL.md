@@ -246,7 +246,7 @@ After `ota production`:
     -H "accept: multipart/mixed" | grep -oE '"id":"[^"]+"' | head -1
   ```
 
-- On a device, Settings → About shows the running update's ID once the app
+- On a device, More → About shows the running update's ID once the app
   restarts into it as it opens (on a slow connection, at the open after).
   Without a signed-in Vera account,
   open the Play build twice on an Android device or emulator connected to

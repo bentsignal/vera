@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { FieldGroup, Text } from "@expo/ui";
+import { FieldGroup } from "@expo/ui";
 
 import { showActionSheet } from "~/components/action-sheet";
 import { FieldList } from "~/components/field-list";
@@ -55,9 +55,6 @@ function AccountSettings() {
               autoComplete="name"
               onChangeText={profile.changeName}
             />
-            <FieldGroup.SectionFooter>
-              <Text>Shown to people you message instead of your address.</Text>
-            </FieldGroup.SectionFooter>
           </FieldGroup.Section>
           <DeveloperSection />
           <AccountSection />

@@ -43,7 +43,7 @@ Mac has free memory. The queue only works if every agent goes through it.
 scripts/sim.sh up             # wait for a slot, then dev client + this worktree's simulator + Metro
 scripts/sim.sh signin         # dev sign-in as this worktree's test user (wt…)
 scripts/sim.sh seed           # bot DMs, a group, a space, and a space invite
-scripts/sim.sh open /settings # go to any route; conversation/<id>, profile/<address>, ...
+scripts/sim.sh open /more     # go to any route; conversation/<id>, profile/<address>, ...
 scripts/sim.sh relaunch       # restart the app, e.g. to drop the keyboard or reset state
 scripts/sim.sh shot <name>    # screenshot to .cache/evidence/<name>.png
 scripts/sim.sh record <name>  # start a video; `scripts/sim.sh stop` ends it
@@ -68,7 +68,7 @@ takes the emulator serial `up` prints (`emulator-55xx`), with
   `scripts/sim.sh reload` forces it.
 - Routes with parameters take them as a query string. Read the route file
   under `apps/mobile/src/app` for the names, such as
-  `/settings/account?account=<address>&title=<name>`.
+  `/more/account?account=<address>&title=<name>`.
 - Seed once per account. Running it again reuses the bot DMs but adds
   another group and space. For a clean slate, sign in as a new username.
 - `signin` takes a username (`scripts/sim.sh signin alice`) for a second

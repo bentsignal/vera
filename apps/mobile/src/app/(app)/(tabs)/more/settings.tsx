@@ -1,31 +1,28 @@
+import { Stack } from "expo-router";
+
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
-import { TabTitle } from "~/components/tab-title";
-import { AboutSection } from "~/features/settings/about-section";
-import { AccountsSection } from "~/features/settings/accounts-section";
 import {
   DisplaySection,
   ExperimentalSection,
 } from "~/features/settings/display-section";
-import { NotificationsSection } from "~/features/settings/notifications-section";
 import {
   AppIconSection,
   ThemesSection,
 } from "~/features/settings/themes-section";
 
+/** How the app looks on this device: appearance, message style, colors. */
 export default function SettingsScreen() {
   return (
     <>
-      <TabTitle title="Settings" />
+      <Stack.Screen options={{ headerLargeTitleEnabled: false }} />
+      <Stack.Title>Settings</Stack.Title>
       <NativeHost style={{ flex: 1 }}>
         <FieldList>
-          <AccountsSection />
-          <NotificationsSection />
           <DisplaySection />
           <ThemesSection />
           <AppIconSection />
           <ExperimentalSection />
-          <AboutSection />
         </FieldList>
       </NativeHost>
     </>

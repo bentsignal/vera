@@ -35,9 +35,6 @@ export function WelcomeScreen() {
       <View className="flex-1 items-center justify-center gap-4">
         <StyledImage source={appIcon} className="size-24 rounded-[22px]" />
         <Text className="text-large-title text-foreground font-bold">Vera</Text>
-        <Text className="text-body text-muted text-center">
-          Private messaging for you and your friends, on servers you can trust.
-        </Text>
       </View>
       <View className="gap-4">
         <ProminentButton

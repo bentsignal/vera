@@ -114,7 +114,7 @@ in the message:
   were production APKs; Play builds start at 5.
 - `mobile/ota/<channel>/<yyyymmddThhmmss>` (UTC): an update, with its EAS
   update group and, per platform, the runtime and the update ID the app
-  shows in Settings → About (`ios-update:`, `android-update:`).
+  shows in More → About (`ios-update:`, `android-update:`).
 - `backend/deploy/<yyyymmddThhmmss>`: a production Convex deploy
   (`pnpm release backend production`).
 

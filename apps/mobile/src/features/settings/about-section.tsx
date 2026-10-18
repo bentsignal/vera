@@ -53,7 +53,7 @@ export function AboutSection() {
       ? Updates.createdAt
       : null;
   return (
-    <FieldGroup.Section title="About">
+    <FieldGroup.Section>
       <Detail label="Version" value={appVersion()} />
       <Detail label="Channel" value={channel()} />
       <Detail label="Update" value={runningUpdate()} />

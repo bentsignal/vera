@@ -291,7 +291,8 @@ with `development: true`) and send to that token through the Expo push API.
 
 - `src/app`: routes. `(auth)` holds welcome, create account, and sign in;
   `(app)/(tabs)` holds Home (the Inbox and Spaces pages), Activity,
-  Settings, and Search, each with its own native stack; conversations and
+  More (your accounts, Settings, Notifications, and About), and Search, each
+  with its own native stack; conversations and
   the new-message sheet sit above the tabs.
 - `src/features/settings/notification-settings.ts`: which pushes you get,
   set the same on every signed-in account's server.
@@ -348,6 +349,6 @@ with `development: true`) and send to that token through the Expo push API.
 - `assets/icons`: the app icon, a top-down aloe vera made as a Liquid Glass
   Icon Composer document, and the flat Android and fallback images rendered
   from it, plus one alternate icon per color theme that people pick in
-  Settings > App Icon (iOS), separately from the color theme. The splash
+  More > Settings > App Icon (iOS), separately from the color theme. The splash
   screen has no logo, only the app's background color. See
   `assets/icons/README.md`.

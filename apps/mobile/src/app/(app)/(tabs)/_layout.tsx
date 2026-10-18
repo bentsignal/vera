@@ -47,9 +47,12 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Badge>{String(activity)}</NativeTabs.Trigger.Badge>
       )}
     </NativeTabs.Trigger>,
-    <NativeTabs.Trigger key="settings" name="settings">
-      <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
-      <NativeTabs.Trigger.Icon sf="gear" md="settings" />
+    <NativeTabs.Trigger key="more" name="more">
+      <NativeTabs.Trigger.Label>More</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger.Icon
+        sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
+        md="grid_view"
+      />
     </NativeTabs.Trigger>,
   ];
   return (

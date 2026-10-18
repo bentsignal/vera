@@ -6,7 +6,7 @@ import { storedAccounts } from "~/features/session/account-store";
 
 /**
  * The welcome and create-account screens run in two places: signed out,
- * and as a modal from Settings' "Add Account". Signed out, a new account
+ * and as a modal from More's "Add Account". Signed out, a new account
  * swaps the whole app in; adding one closes the modal.
  */
 export function useAuthFlow() {
@@ -32,7 +32,7 @@ export function useAuthFlow() {
     const before = storedAccounts().length;
     const error = await run();
     if (storedAccounts().length > before) {
-      if (adding) router.dismissTo("/settings");
+      if (adding) router.dismissTo("/more");
       return;
     }
     running.current = false;

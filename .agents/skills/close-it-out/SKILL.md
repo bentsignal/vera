@@ -37,7 +37,7 @@ device in T3's Device panel (`device_close`).
 
 If this worktree has an isolated backend and Shawn signed in to it on his
 phone, ask him to sign out of that throwaway account in Vera Dev first
-(Settings > Accounts > the account > Sign Out), and wait for him.
+(More > the account > Sign Out), and wait for him.
 
 ```sh
 gh pr merge <number> --merge --delete-branch

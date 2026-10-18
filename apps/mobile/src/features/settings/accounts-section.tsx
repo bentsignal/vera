@@ -39,7 +39,7 @@ function AccountRow() {
       onPress={() =>
         router.push({
           params: { account: address, title: displayName },
-          pathname: "/settings/account",
+          pathname: "/more/account",
         })
       }
     >

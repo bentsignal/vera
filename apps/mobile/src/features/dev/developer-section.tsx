@@ -6,7 +6,7 @@ import { Button, FieldGroup, Text } from "@expo/ui";
 import { useAccount } from "~/features/messaging/account";
 import { useDevTools } from "./dev-tools";
 
-/** Settings section for the dev PDS. Hidden in preview and store builds. */
+/** Account screen section for the dev PDS. Hidden in preview and store builds. */
 export function DeveloperSection() {
   const devTools = useDevTools();
   const router = useRouter();

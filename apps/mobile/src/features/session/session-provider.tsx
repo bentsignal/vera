@@ -41,7 +41,7 @@ export function useSession() {
 /**
  * Finds the home PDS of every signed-in account (and of this build, for new
  * sign-ins), then provides each account's live session to everything below.
- * An account whose home PDS can't be found sits out (Settings lists it)
+ * An account whose home PDS can't be found sits out (More lists it)
  * rather than taking the other accounts down with it.
  */
 export function SessionProvider({
