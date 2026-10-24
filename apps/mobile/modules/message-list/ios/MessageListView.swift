@@ -15,7 +15,7 @@ import UIKit
 //   firehose, rows go in without animation and the reader's place is kept.
 
 final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionViewDelegate,
-  UICollectionViewDataSourcePrefetching, UIGestureRecognizerDelegate {
+  UICollectionViewDataSourcePrefetching, UIGestureRecognizerDelegate, VeraComposerMountObserver {
   let onEvent = EventDispatcher()
 
   private let listLayout = ListLayout()
@@ -44,6 +44,14 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private var alignTop = false
   /// When JavaScript's insets go in (Insets.swift).
   private var insetsGate = InsetsGate()
+  private var reactInsets = UIEdgeInsets.zero
+  private var insetsChanged = false
+  private var composerBinding: ComposerLayout.Binding?
+  private var composerLayout = ComposerLayout()
+  private var composerClose = ComposerClose()
+  private var canceledComposerClose = false
+  private(set) var composerSurface = -1
+  var composerOwner: String? { composerLayout.binding?.owner }
   /// The insets the list is laid out with.
   private var insets: UIEdgeInsets { insetsGate.applied }
   /// Bumped with every `rows` prop, so a measurement knows whose it is.
@@ -56,7 +64,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private var measuring = false
   private var measureAgain = false
   private var applyOrder = RowApplyOrder()
-  private var deferredMeasurement: (result: MeasureQueue.Output, version: Int, generation: Int)?
+  private var deferredMeasurement: (result: MeasureQueue.Output, version: Int, generation: Int, authority: ComposerLayout.Authority?)?
   private var detached = false
   private var wasAttached = false
   private var requestedWidth: CGFloat = 0
@@ -108,6 +116,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
+    ComposerMounts.register(list: self)
+    lifter.onRestored = { [weak self] in self?.composerRestored() }
     clipsToBounds = true
     collectionView.backgroundColor = .clear
     collectionView.transform = CGAffineTransform(scaleX: 1, y: -1)
@@ -164,6 +174,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
+    composerSurface = VeraComposerSurfaceForView(self)
+    ComposerMounts.lifetimeChanged()
     if window != nil {
       let returning = detached
       detached = false
@@ -173,9 +185,13 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       detached = true
       cancelLatest()
       applyOrder.detached()
+      composerLayout.detach()
+      composerClose.cancel()
+      canceledComposerClose = false
       deferredMeasurement = nil
       pendingLanding = false
       lifter.land(into: nil)
+      lifter.finishLandings()
     }
   }
 
@@ -242,12 +258,66 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       keyboardOverlap = overlap
       setNeedsLayout()
     }
-    insetsGate.received(next)
+    reactInsets = next
+    insetsChanged = true
+  }
+
+  func setComposer(_ json: JSON?) {
+    composerBinding = ComposerLayout.Binding(json: json)
+  }
+
+  @objc func composerSurfaceDidMount(_ surface: Int, transaction: Int) {
+    ComposerMounts.seal(surface: surface, transaction: transaction)
+  }
+
+  /// Both list and host adapters reach here after the WHOLE surface mounts.
+  func composerDidMount(host: MessageListComposerView?, surface: Int, transaction: Int) {
+    guard !detached, window != nil, let binding = composerLayout.binding else { return }
+    let sample: ComposerLayout.Sample?
+    if let host, host.window === window {
+      sample = host.mountedSample
+    } else { sample = nil }
+    let changed = composerLayout.seal(sample)
+    validateComposerClose()
+    if canceledComposerClose { applyLift() }
+    Perf.composer("seal owner=\(binding.owner) release=\(binding.release) host=\(sample?.sequence ?? -1) height=\(sample?.height ?? -1) generation=\(composerLayout.generation) legacy=\(composerLayout.legacy) surface=\(surface) transaction=\(transaction)")
+    if let deferred = deferredMeasurement, !measuring {
+      complete(deferred.result, version: deferred.version, generation: deferred.generation, authority: deferred.authority)
+    } else if changed, !measuring {
+      measure()
+    }
+    applyOrdinaryComposer()
+    if keyboardThawed, !keyboardFrozen, !applyOrder.held {
+      keyboardHeight = currentKeyboardHeight
+      applyNewInsets(eased: true)
+      keyboardThawed = false
+    }
+  }
+
+  private func composerRestored() {
+    // Restoration carries no geometry from the old lift. New owner, lift,
+    // detach and result-generation guards are re-evaluated below.
+    guard !detached, window != nil, !lifter.isLanding, liftRequest == nil else { return }
+    if let deferred = deferredMeasurement, !measuring {
+      complete(deferred.result, version: deferred.version, generation: deferred.generation, authority: deferred.authority)
+    }
+    applyOrdinaryComposer()
+  }
+
+  private func applyOrdinaryComposer() {
+    let blocked = keyboardFrozen || applyOrder.held || pendingLanding
+      || liftRequest != nil || lifter.rowId != nil || lifter.isLanding
+    guard let target = composerLayout.ordinary(current: insets, react: reactInsets, blocked: blocked) else { return }
+    insetsGate.composerApplied(target)
+    applyNewInsets(eased: keyboardThawed)
+    keyboardThawed = false
+    Perf.composer("ordinary owner=\(composerLayout.binding?.owner ?? "") release=\(composerLayout.appliedRelease) bottom=\(target.bottom) generation=\(composerLayout.generation)")
   }
 
   func setKeyboardFrozen(_ frozen: Bool) {
     guard frozen != keyboardFrozen else { return }
     keyboardFrozen = frozen
+    if frozen, composerClose.cancel() { canceledComposerClose = true }
     if frozen, latestScrollRunning {
       collectionView.setContentOffset(collectionView.contentOffset, animated: false)
       latestScrollRunning = false
@@ -283,7 +353,11 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   func setLift(_ json: JSON?) {
     let request = LiftRequest(json)
     guard request != liftRequest else { return }
-    if request != nil { cancelLatest() }
+    if request != nil {
+      cancelLatest()
+      composerClose.cancel()
+      canceledComposerClose = false
+    }
     liftRequest = request
     liftChanged = true
   }
@@ -291,6 +365,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   /// Lifts the held part into the menu, or plays it back into place.
   private func applyLift() {
     if let request = liftRequest, let window {
+      composerClose.cancel()
+      canceledComposerClose = false
       pendingLanding = false
       guard let cell = cell(for: request.rowId) as? MessageCell else { return }
       lifter.lift(request, cell: cell, in: window)
@@ -298,15 +374,37 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       // Landing captures a destination once. While its paired layout is
       // held, keep the actual borrowed views up; start only after that
       // final layout, rather than landing at a position about to move.
-      if applyOrder.held {
+      let canceled = canceledComposerClose
+      canceledComposerClose = false
+      if !canceled, composerClose.permission == nil, composerLayout.pending {
+        composerClose.begin(composerLayout.capture(inset: insets, fallback: reactInsets),
+                            applied: composerLayout.appliedRelease, work: applyOrder.generation)
+      }
+      if !canceled, composerClose.permission != nil, composerLayout.pending {
+        pendingLanding = true
+        applyOrder.hold()
+        if let deferred = deferredMeasurement, !measuring {
+          complete(deferred.result, version: deferred.version, generation: deferred.generation, authority: deferred.authority)
+        } else if !measuring { measure() }
+        return
+      }
+      if !canceled, composerLayout.binding == nil, applyOrder.held {
         pendingLanding = true
         return
       }
+      composerClose.cancel()
       pendingLanding = false
       lifter.land(into: cell(for: rowId) as? MessageCell)
     }
     // Lifter captures the press's presentation scale before resetting it.
     shrink.reset()
+  }
+
+  private func validateComposerClose() {
+    if composerClose.permission != nil, !composerClose.current(in: composerLayout) {
+      composerClose.cancel()
+      canceledComposerClose = true
+    }
   }
 
   func setInitialRowId(_ id: String?) {
@@ -330,7 +428,21 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       backgroundColor = .clear
       rowsChanged = true
     }
-    switch insetsGate.batchEnded(rowsChanged: rowsChanged, placed: placed, frozen: keyboardFrozen, rowsVersion: rowsVersion, holdingRows: applyOrder.held) {
+    let wasBound = composerLayout.binding != nil
+    let composerWork = composerLayout.configure(composerBinding, inset: reactInsets)
+    validateComposerClose()
+    if composerLayout.binding != nil {
+      // Ignore stale scalar bottom writes while the native coordinator owns
+      // it. Every batch must seal before initial/synchronous apply too.
+      insetsChanged = false
+      insetsGate.composerApplied(insets)
+    } else if insetsChanged || wasBound {
+      insetsGate.received(reactInsets)
+      insetsChanged = false
+    }
+    switch composerLayout.binding == nil
+      ? insetsGate.batchEnded(rowsChanged: rowsChanged || composerWork, placed: placed, frozen: keyboardFrozen, rowsVersion: rowsVersion, holdingRows: applyOrder.held)
+      : .none {
     case .none:
       break
     case let .now(_, eased):
@@ -341,17 +453,17 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       break
     }
     if keyboardFrozen, insetsGate.carriesInsets(forRows: rowsVersion) { applyOrder.hold() }
-    if rowsChanged {
+    if rowsChanged || composerWork {
       rowsChanged = false
       measure()
     } else if applyOrder.held, !keyboardFrozen {
       if let deferred = deferredMeasurement, applyOrder.accepts(deferred.generation), !measuring {
-        complete(deferred.result, version: deferred.version, generation: deferred.generation)
+        complete(deferred.result, version: deferred.version, generation: deferred.generation, authority: deferred.authority)
       } else if !measuring {
         measure()
       }
     }
-    if liftChanged {
+    if liftChanged || canceledComposerClose {
       liftChanged = false
       applyLift()
     }
@@ -384,9 +496,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     // bottom inset, `keyboardOverlap`): the list adds the rest, which is
     // how far the composer rises. Before iOS 17 the guide stops at the safe
     // area when the keyboard is down.
-    let keyboard = currentKeyboardHeight
     // While the menu's modal has the keyboard down, nothing moves.
-    if keyboardFrozen || applyOrder.held { return }
+    if keyboardFrozen || applyOrder.held || composerLayout.binding != nil && !composerLayout.sealed { return }
+    let keyboard = currentKeyboardHeight
     let keyboardChanged = abs(keyboard - keyboardHeight) > 0.5
     if keyboardChanged {
       keyboardHeight = keyboard
@@ -468,20 +580,21 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     measureAgain = false
     let input = MeasureQueue.Input(rows: rowsToMeasure(), theme: state.theme, width: width, customHeights: customHeights)
     let version = rowsVersion
+    let authority = composerLayout.capture(inset: insets, fallback: reactInsets)
     if !placed {
       // The first rows: measured right away, so the list never shows empty.
       let interval = Perf.begin("measure now", "\(input.rows.count) rows")
       let result = measurer.measureNow(input)
       Perf.end(interval)
-      finish(result, version: version, generation: generation)
+      finish(result, version: version, generation: generation, authority: authority)
       return
     }
     measurer.measure(input) { [weak self] result in
-      self?.finish(result, version: version, generation: generation)
+      self?.finish(result, version: version, generation: generation, authority: authority)
     }
   }
 
-  private func finish(_ result: MeasureQueue.Output, version: Int, generation: Int) {
+  private func finish(_ result: MeasureQueue.Output, version: Int, generation: Int, authority: ComposerLayout.Authority?) {
     measuring = false
     guard !detached else { return }
     guard applyOrder.accepts(generation), version == rowsVersion,
@@ -489,23 +602,39 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       measure()
       return
     }
-    complete(result, version: version, generation: generation)
+    complete(result, version: version, generation: generation, authority: authority)
     if measureAgain || result.width != bounds.width { measure() }
   }
 
-  private func complete(_ result: MeasureQueue.Output, version: Int, generation: Int) {
+  private func complete(_ result: MeasureQueue.Output, version: Int, generation: Int, authority: ComposerLayout.Authority?) {
     guard applyOrder.accepts(generation), version == rowsVersion,
           result.width == bounds.width, result.themeVersion == state.theme.version else {
       if !measuring { measure() }
       return
     }
-    if keyboardFrozen, applyOrder.held || insetsGate.carriesInsets(forRows: version) {
+    if let authority {
+      guard composerLayout.accepts(authority) else {
+        deferredMeasurement = nil
+        if !measuring { measure() }
+        return
+      }
+    } else if composerLayout.binding != nil {
+      deferredMeasurement = nil
+      if !measuring { measure() }
+      return
+    }
+    let composerPair = authority.map { $0.release > composerLayout.appliedRelease } ?? false
+    let composerBlocked = authority.map { !composerLayout.canApply($0) } ?? false
+    let frozenCloseFlush = keyboardFrozen && pendingLanding && liftRequest == nil && composerPair
+      && authority.map { composerClose.permits($0, work: generation, layout: composerLayout) } == true
+    if composerBlocked || (authority != nil && (lifter.isLanding || composerPair && liftRequest != nil))
+      || keyboardFrozen && !frozenCloseFlush && (composerPair || applyOrder.held || insetsGate.carriesInsets(forRows: version)) {
       applyOrder.hold()
-      deferredMeasurement = (result, version, generation)
+      deferredMeasurement = (result, version, generation, authority)
       return
     }
     let wasHeld = applyOrder.held
-    if wasHeld {
+    if wasHeld, !frozenCloseFlush {
       // Keep the old on-screen offset until apply captures it. Its one
       // move then includes the current keyboard and the paired inset.
       keyboardHeight = currentKeyboardHeight
@@ -514,7 +643,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     if result.width != measuredWidth { drawnTheme = -1 }
     measuredWidth = result.width
     let interval = Perf.begin("apply", "\(result.rows.count) rows")
-    apply(result.rows, result.layouts, themeVersion: result.themeVersion, version: version)
+    apply(result.rows, result.layouts, themeVersion: result.themeVersion, version: version, authority: authority, frozenCloseFlush: frozenCloseFlush)
+    if let authority { composerLayout.applied(authority) }
     Perf.end(interval)
     if wasHeld, applyOrder.accepts(generation) {
       applyOrder.applied()
@@ -523,7 +653,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     }
   }
 
-  private func apply(_ newRows: [Row], _ newLayouts: [RowLayout], themeVersion: Int, version: Int) {
+  private func apply(_ newRows: [Row], _ newLayouts: [RowLayout], themeVersion: Int, version: Int, authority: ComposerLayout.Authority?, frozenCloseFlush: Bool) {
     let started = CACurrentMediaTime()
     defer { Slow.check("apply \(newRows.count) rows", since: started) }
     let latestGeneration = latestIntent.generation
@@ -538,7 +668,15 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     }
     // Insets that came with these rows go in with them, below.
     // (`take` applies them to `insets` already.)
-    let nextInsets = insetsGate.take(forRows: version, frozen: keyboardFrozen)
+    let nextInsets: UIEdgeInsets?
+    if let authority {
+      let ordinaryHeld = authority.release <= composerLayout.appliedRelease
+        && (liftRequest != nil || lifter.rowId != nil && !pendingLanding)
+      let target = keyboardFrozen && !frozenCloseFlush || ordinaryHeld ? insets : composerLayout.target(for: authority, current: insets, top: reactInsets.top)
+      nextInsets = target != insets ? target : nil
+      insetsGate.composerApplied(target)
+      Perf.composer("apply owner=\(authority.owner) release=\(authority.release) host=\(composerLayout.sample?.sequence ?? -1) bottom=\(target.bottom) generation=\(authority.generation) rows=\(version) close=\(frozenCloseFlush) keyboard=\(keyboardHeight)")
+    } else { nextInsets = insetsGate.take(forRows: version, frozen: keyboardFrozen) }
     guard placed, !rows.isEmpty else {
       drawnTheme = themeVersion
       rows = newRows
@@ -546,6 +684,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       listLayout.update(ids: newRows.map(\.id), heights: newLayouts.map(\.height))
       collectionView.reloadData()
       if !newRows.isEmpty { place() }
+      else if authority != nil { applyInsets(keepDistance: true) }
       return
     }
 

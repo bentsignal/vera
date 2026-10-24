@@ -1,3 +1,4 @@
+import Foundation
 import os
 
 // Signposts for profiling the list in any build, release included: open
@@ -38,5 +39,16 @@ enum Perf {
 
   static func end(_ interval: Interval) {
     signposter.endInterval(interval.name, interval.state)
+  }
+
+  /// Explicit local DEV opt-in. Geometry/identities only, never editor text.
+  static func composer(_ detail: @autoclosure () -> String) {
+    #if DEBUG
+    guard UserDefaults.standard.bool(forKey: "VeraComposerLayoutTrace")
+      || ProcessInfo.processInfo.environment["VERA_COMPOSER_LAYOUT_TRACE"] == "1" else { return }
+    let text = detail()
+    NSLog("[MessageListComposer] %@", text)
+    event("composer layout", text)
+    #endif
   }
 }

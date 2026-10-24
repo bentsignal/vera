@@ -12,6 +12,7 @@ public class MessageListModule: Module {
   static let features = ["lift", "customRows", "benchFling"]
 
   public func definition() -> ModuleDefinition {
+    let composerReady = ComposerMounts.prepare(context: appContext)
     Name("MessageList")
 
     Constant("support") { () -> [String: Any] in
@@ -19,7 +20,7 @@ public class MessageListModule: Module {
         "contractVersion": Self.contractVersion,
         "rowKinds": Self.rowKinds,
         "blockTypes": Self.blockTypes,
-        "features": Self.features,
+        "features": Self.features + (composerReady ? ["composerLayout"] : []),
       ]
     }
 
@@ -37,6 +38,9 @@ public class MessageListModule: Module {
       }
       Prop("insets") { (view: MessageListView, insets: [String: Any]?) in
         view.setInsets(insets)
+      }
+      Prop("composer") { (view: MessageListView, composer: [String: Any]?) in
+        view.setComposer(composer)
       }
       Prop("keyboard") { (view: MessageListView, keyboard: Bool?) in
         view.setKeyboard(keyboard ?? true)
@@ -75,6 +79,17 @@ public class MessageListModule: Module {
       AsyncFunction("benchFling") { (view: MessageListView, speed: Double, ms: Double, promise: Promise) in
         view.benchFling(speed: speed, ms: ms) { result in promise.resolve(result) }
       }.runOnQueue(.main)
+    }
+
+    View(MessageListComposerView.self) {
+      ViewName("MessageListComposer")
+      Prop("owner") { (view: MessageListComposerView, owner: String?) in
+        view.owner = owner ?? ""
+      }
+      Prop("sequence") { (view: MessageListComposerView, sequence: Double?) in
+        let value = sequence ?? 0
+        view.sequence = value.isFinite && value >= 0 && value.rounded() == value && value < Double(Int.max) ? Int(value) : -1
+      }
     }
 
     // A custom row's React content, as a child of the list (CustomRows.swift).
