@@ -163,6 +163,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   groupAlerts?: "all" | "mentions" | "none";
                   groups?: boolean;
                   invites?: boolean;
+                  keywords?: Array<string>;
                   reactions?: boolean;
                   replies?: boolean;
                   threadReplies?: boolean;
@@ -1116,6 +1117,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 groupAlerts?: "all" | "mentions" | "none";
                 groups: boolean;
                 invites: boolean;
+                keywords?: Array<string>;
                 reactions: boolean;
                 replies?: boolean;
                 threadReplies?: boolean;
@@ -2651,6 +2653,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               groupAlerts?: "all" | "mentions" | "none";
               groups: boolean;
               invites: boolean;
+              keywords?: Array<string>;
               reactions: boolean;
               replies?: boolean;
               threadReplies?: boolean;

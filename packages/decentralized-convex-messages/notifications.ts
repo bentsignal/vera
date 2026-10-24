@@ -9,8 +9,8 @@ import {
 } from "./_generated/server.js";
 import { badgeCount } from "./badges.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
-import { listeners, nameListeners } from "./listeners.ts";
-import { saysName } from "./mentions.ts";
+import { listeners, wordListeners } from "./listeners.ts";
+import { saysWord } from "./mentions.ts";
 import { getConversation, getSpace, memberAddresses } from "./model.ts";
 import { listNames } from "./naming.ts";
 import { inboxKind } from "./protocol.ts";
@@ -49,7 +49,7 @@ export const targets = internalQuery({
       return found;
     }
     const heard = await listeners(ctx, message, conversation, members);
-    const named = await nameListeners(
+    const words = await wordListeners(
       ctx,
       message,
       conversation,
@@ -59,9 +59,9 @@ export const targets = internalQuery({
     return {
       body: previewText(message),
       // Who hears of it only if it says their name, which `send` checks.
-      nameRecipients: await devices(named),
-      recipients: await devices(heard),
-      text: named.length === 0 ? "" : message.body,
+      nameRecipients: await devices(words.name),
+      recipients: await devices([...heard, ...words.keyword]),
+      text: words.name.length === 0 ? "" : message.body,
       conversationId: conversation.conversationId,
       conversationName: await conversationName(ctx, conversation),
       messageId: message.messageId,
@@ -93,7 +93,7 @@ async function namedIn<Device extends { accountId: string }>(
   const named = new Set(
     accountIds.filter((_, index) => {
       const name = profiles[index]?.displayName;
-      return name !== undefined && saysName(text, name);
+      return name !== undefined && saysWord(text, name);
     }),
   );
   return devices.filter(({ accountId }) => named.has(accountId));

@@ -7,6 +7,8 @@ import type {
   messagesProtocol,
   NotificationSettings,
 } from "./protocol.ts";
+import { fail } from "./model.ts";
+import { MAX_KEYWORD_LENGTH, MAX_KEYWORDS } from "./protocol.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
 type Args<Operation extends keyof Mutations> = OperationArgs<
@@ -46,13 +48,16 @@ function isOn(value: boolean | undefined) {
 
 /**
  * An account's push settings; everything is on until turned off, except
- * pushes for messages that say their name.
+ * pushes for messages that say their name or a keyword.
  */
 export async function notificationSettings(
   ctx: QueryCtx,
   accountId: string,
 ): Promise<
-  NotificationSettings & Record<"channelAlerts" | "groupAlerts", AlertLevel>
+  NotificationSettings &
+    Record<"channelAlerts" | "groupAlerts", AlertLevel> & {
+      keywords: string[];
+    }
 > {
   const row: Partial<Doc<"notificationSettings">> =
     (await settingsRow(ctx, accountId)) ?? {};
@@ -66,6 +71,7 @@ export async function notificationSettings(
     groupAlerts,
     groups: groupAlerts !== "none",
     invites: isOn(row.invites),
+    keywords: row.keywords ?? [],
     reactions: isOn(row.reactions),
     replies: isOn(row.replies),
     threadReplies: isOn(row.threadReplies),
@@ -88,13 +94,32 @@ function defaultPatch(
   return null;
 }
 
+/**
+ * Keywords as stored: trimmed, spaced singly, and each once whatever its
+ * case (the first one written wins).
+ */
+function cleanKeywords(keywords: readonly string[]) {
+  const kept = new Map<string, string>();
+  for (const written of keywords) {
+    const keyword = written.trim().replaceAll(/\s+/g, " ");
+    if (keyword.length === 0) continue;
+    if (keyword.length > MAX_KEYWORD_LENGTH) fail("KEYWORD_TOO_LONG");
+    const key = keyword.toLowerCase();
+    if (!kept.has(key)) kept.set(key, keyword);
+  }
+  if (kept.size > MAX_KEYWORDS) fail("TOO_MANY_KEYWORDS");
+  return [...kept.values()];
+}
+
 export async function setNotificationSettings(
   ctx: MutationCtx,
   self: string,
   args: Args<"setNotificationSettings">,
 ) {
-  const { channelAlerts, channels, groupAlerts, groups, ...kinds } = args;
+  const { channelAlerts, channels, groupAlerts, groups, keywords, ...kinds } =
+    args;
   const patch: Partial<Doc<"notificationSettings">> = { ...kinds };
+  if (keywords !== undefined) patch.keywords = cleanKeywords(keywords);
   const group = defaultPatch(groupAlerts, groups);
   if (group !== null) {
     patch.groupAlerts = group.level;

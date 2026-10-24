@@ -1,5 +1,5 @@
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { FieldGroup, Text } from "@expo/ui";
 
 import type {
@@ -7,16 +7,18 @@ import type {
   NotificationKind,
 } from "~/features/settings/notification-settings";
 import { FieldList } from "~/components/field-list";
+import { ListItem } from "~/components/list-item";
 import { NativeHost } from "~/components/native-host";
 import { OptimisticChoice } from "~/components/optimistic-choice";
 import { OptimisticSwitch } from "~/components/optimistic-switch";
+import { SymbolIcon } from "~/components/symbol-icon";
 import { ALERT_CHOICES } from "~/features/messaging/alerts";
 import { useNotificationSettings } from "~/features/settings/notification-settings";
+import { secondaryTextStyle } from "~/lib/colors";
 
 const KINDS = [
   { kind: "directMessages", label: "Direct Messages" },
   { kind: "replies", label: "Replies to Your Messages" },
-  { kind: "yourName", label: "Messages With Your Name" },
   { kind: "threadReplies", label: "Thread Updates" },
   { kind: "reactions", label: "Reactions" },
   { kind: "invites", label: "Space Invites" },
@@ -32,10 +34,12 @@ const DEFAULTS = [
 }[];
 
 /**
- * Which kinds of notifications you get, or none at all, and what groups
- * and channels alert you about unless they say otherwise.
+ * Which kinds of notifications you get, or none at all, the words that
+ * alert you (your name, your keywords), and what groups and channels
+ * alert you about unless they say otherwise.
  */
 export default function NotificationSettingsScreen() {
+  const router = useRouter();
   const { settings, set, setDefault } = useNotificationSettings();
   return (
     <>
@@ -70,12 +74,7 @@ export default function NotificationSettingsScreen() {
               </FieldGroup.Section>
               {settings.enabled && (
                 <FieldGroup.Section title="Notify Me About">
-                  {KINDS.filter(
-                    // Servers from before it leave your name out, and
-                    // can't send those.
-                    ({ kind }) =>
-                      kind !== "yourName" || settings.yourName !== undefined,
-                  ).map(({ kind, label }) => (
+                  {KINDS.map(({ kind, label }) => (
                     <OptimisticSwitch
                       key={kind}
                       label={label}
@@ -85,6 +84,39 @@ export default function NotificationSettingsScreen() {
                       onChange={(on) => set(kind, on)}
                     />
                   ))}
+                </FieldGroup.Section>
+              )}
+              {/* Servers from before these leave keywords out. */}
+              {settings.enabled && settings.keywords !== undefined && (
+                <FieldGroup.Section title="Messages That Say">
+                  <OptimisticSwitch
+                    label="Your Name"
+                    value={settings.yourName ?? false}
+                    onChange={(on) => set("yourName", on)}
+                  />
+                  <ListItem
+                    trailing={
+                      <SymbolIcon
+                        name={{
+                          android: "chevron_right",
+                          ios: "chevron.right",
+                        }}
+                        size={14}
+                        weight="semibold"
+                        tintColorClassName="accent-subtle"
+                      />
+                    }
+                    supportingText={
+                      settings.keywords.length === 0 ? undefined : (
+                        <Text textStyle={secondaryTextStyle}>
+                          {settings.keywords.join(", ")}
+                        </Text>
+                      )
+                    }
+                    onPress={() => router.push("/more/keywords")}
+                  >
+                    Keywords
+                  </ListItem>
                 </FieldGroup.Section>
               )}
               <FieldGroup.Section title="Groups and Channels">

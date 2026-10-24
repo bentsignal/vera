@@ -3,6 +3,7 @@ import type { QueryCtx } from "./_generated/server.js";
 import type { AlertLevel } from "./protocol.ts";
 import type { AccountSettings } from "./settings.ts";
 import { alerts, alertsFor } from "./alerts.ts";
+import { saysWord } from "./mentions.ts";
 import { findAccess } from "./model.ts";
 import { notificationSettings } from "./settings.ts";
 import { threadMember, threadMembers } from "./threads.ts";
@@ -178,31 +179,43 @@ export async function listeners(
 }
 
 /**
- * The members who'd hear of a message only if it says their display name:
- * they turned those pushes on, it doesn't reach them already (`heard`),
- * and it would as an @mention. The caller checks their names, which live
- * in Accounts (see `accountProfile`).
+ * The members who'd hear of a message only because of the words it says:
+ * it doesn't reach them already (`heard`), it would as an @mention, and
+ * it says one of their keywords (`keyword`) or they want to hear of their
+ * name (`name`). The caller checks names, which live in Accounts (see
+ * `accountProfile`).
  */
-export async function nameListeners(
+export async function wordListeners(
   ctx: QueryCtx,
   message: Doc<"messages">,
   conversation: Doc<"conversations">,
   members: readonly string[],
   heard: readonly Listener[],
 ) {
-  if (message.body.length === 0) return [];
+  const none = { keyword: [], name: [] };
+  if (message.body.length === 0) return none;
   const reached = new Set(heard.map(({ accountId }) => accountId));
-  const wanting = new Set<string>();
+  const keyword = new Set<string>();
+  const name = new Set<string>();
   for (const accountId of members) {
     if (accountId === message.authorId || reached.has(accountId)) continue;
     const settings = await notificationSettings(ctx, accountId);
-    if (settings.enabled && settings.yourName) wanting.add(accountId);
+    if (!settings.enabled) continue;
+    if (settings.keywords.some((word) => saysWord(message.body, word))) {
+      keyword.add(accountId);
+    } else if (settings.yourName) {
+      name.add(accountId);
+    }
   }
-  if (wanting.size === 0) return [];
+  const wanting = [...keyword, ...name];
+  if (wanting.length === 0) return none;
   const asMentioned = {
     ...message,
-    mentions: [...wanting].map((accountId) => ({ accountId, name: "" })),
+    mentions: wanting.map((accountId) => ({ accountId, name: "" })),
   };
-  const named = await listeners(ctx, asMentioned, conversation, [...wanting]);
-  return named.filter(({ accountId }) => wanting.has(accountId));
+  const found = await listeners(ctx, asMentioned, conversation, wanting);
+  return {
+    keyword: found.filter(({ accountId }) => keyword.has(accountId)),
+    name: found.filter(({ accountId }) => name.has(accountId)),
+  };
 }

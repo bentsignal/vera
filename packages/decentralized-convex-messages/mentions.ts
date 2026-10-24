@@ -16,11 +16,11 @@ function isWritten(name: string, body: string) {
 }
 
 /**
- * Whether a message's text says a display name: the whole name, in any
- * case, not inside a longer word ("Maya" isn't in "Mayan").
+ * Whether a message's text says a display name or keyword: all of it, in
+ * any case, not inside a longer word ("Maya" isn't in "Mayan").
  */
-export function saysName(text: string, name: string) {
-  const wanted = name.trim();
+export function saysWord(text: string, word: string) {
+  const wanted = word.trim();
   if (wanted.length === 0) return false;
   const escaped = wanted.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   return new RegExp(

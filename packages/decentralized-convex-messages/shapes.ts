@@ -480,6 +480,11 @@ export const notificationSettings = v.object({
   groupAlerts: v.optional(alertLevel),
   groups: v.boolean(),
   invites: v.boolean(),
+  /**
+   * Words that make a message alert the caller as an @mention would, when
+   * it says one (absent from older PDSs).
+   */
+  keywords: v.optional(v.array(v.string())),
   reactions: v.boolean(),
   // Optional so results from PDSs that predate threads still validate.
   /** Replies to the caller's own messages. */
@@ -504,8 +509,14 @@ export const notificationSettingsChange = v.object({
   groupAlerts: v.optional(alertLevel),
   groups: v.optional(v.boolean()),
   invites: v.optional(v.boolean()),
+  /** The whole list, replacing the one before. */
+  keywords: v.optional(v.array(v.string())),
   reactions: v.optional(v.boolean()),
   replies: v.optional(v.boolean()),
   threadReplies: v.optional(v.boolean()),
   yourName: v.optional(v.boolean()),
 });
+
+/** At most this many keywords, each at most `MAX_KEYWORD_LENGTH` long. */
+export const MAX_KEYWORDS = 50;
+export const MAX_KEYWORD_LENGTH = 50;

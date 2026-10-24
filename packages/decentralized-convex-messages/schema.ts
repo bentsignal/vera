@@ -261,6 +261,8 @@ export default defineSchema({
     groupAlerts: v.optional(alertLevel),
     groups: v.optional(v.boolean()),
     invites: v.optional(v.boolean()),
+    // Words that alert the account when a message says one.
+    keywords: v.optional(v.array(v.string())),
     reactions: v.optional(v.boolean()),
     replies: v.optional(v.boolean()),
     threadReplies: v.optional(v.boolean()),

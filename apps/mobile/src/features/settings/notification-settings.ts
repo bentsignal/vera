@@ -72,6 +72,9 @@ export function useNotificationSettings() {
     settings: settings ?? (answered ? null : undefined),
     /** Turns one kind on or off for every account, showing it right away. */
     set: (kind: NotificationKind, on: boolean) => save({ [kind]: on }),
+    /** Replaces the words that alert you, showing them right away. */
+    setKeywords: (keywords: readonly string[]) =>
+      save({ keywords: [...keywords] }),
     /** Sets what groups or channels alert about unless they say otherwise. */
     setDefault: (kind: AlertDefault, level: AlertLevel) => {
       // Older apps read the switch, so it changes with the level.
