@@ -38,8 +38,10 @@ messages keep Hide Alerts (everything or nothing).
 ## Your name and keywords
 
 Settings > Notifications > Messages That Say has a Your Name switch (off
-until turned on) and a Keywords screen, a list you add words to and swipe
-away (a remove button on Android). A message in a group or channel that
+until turned on) and a Keywords screen: a field that stays focused, so
+you can type a word and press return, then the next, and the list below
+it, each row with its delete control showing (iOS's editing list, swipe
+too; a remove button on Android). A message in a group or channel that
 says your display name, with the switch on, or one of your keywords
 counts as @mentioning you: whole words, any case ("Maya" matches "maya!"
 but not "Mayans"; "deploy" doesn't match "deployed"). So it follows the

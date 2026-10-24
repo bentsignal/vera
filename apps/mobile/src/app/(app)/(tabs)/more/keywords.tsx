@@ -1,6 +1,6 @@
 import type { TextInputRef } from "@expo/ui";
 import { useRef } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Stack } from "expo-router";
 import {
@@ -12,6 +12,7 @@ import { FieldGroup } from "@expo/ui";
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { TextInput } from "~/components/text-input";
+import { KEYWORDS_LIST_MODIFIERS } from "~/features/settings/keywords-list";
 import { KeywordsSection } from "~/features/settings/keywords-section";
 import { useNotificationSettings } from "~/features/settings/notification-settings";
 
@@ -33,6 +34,8 @@ export default function KeywordsScreen() {
   function add(text: string) {
     const keyword = text.trim().replaceAll(/\s+/g, " ");
     input.current?.clear();
+    // iOS ends editing on return; the keyboard stays up for the next one.
+    input.current?.focus();
     if (keyword.length === 0) return;
     const key = keyword.toLowerCase();
     if (keywords.some((existing) => existing.toLowerCase() === key)) return;
@@ -53,7 +56,7 @@ export default function KeywordsScreen() {
       {settings != null && (
         <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
           <NativeHost style={{ flex: 1 }}>
-            <FieldList>
+            <FieldList modifiers={KEYWORDS_LIST_MODIFIERS}>
               <FieldGroup.Section>
                 <TextInput
                   ref={input}
@@ -61,7 +64,9 @@ export default function KeywordsScreen() {
                   autoCorrect={false}
                   maxLength={MAX_KEYWORD_LENGTH}
                   placeholder="Add Keyword"
-                  returnKeyType="done"
+                  // Android's Done hides the keyboard before `add` runs;
+                  // Go does nothing of its own.
+                  returnKeyType={Platform.OS === "android" ? "go" : "done"}
                   onSubmitEditing={add}
                 />
               </FieldGroup.Section>
