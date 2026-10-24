@@ -2634,3 +2634,32 @@ blank flags during entry fade remain, not an all-pass motion claim.
 Raw geometry, identity coordinates, fault markers and contact are in
 `.cache/round2/ios-bubbles-short-ui-boundary-*`. The UI marker clock,
 JS delivery clock and video timestamps remain separate.
+
+**Fresh round2 iPhone delivered, October24 at17:01 EDT.**
+`scripts/phone.sh up` built and signed the ad hoc Vera Dev client from
+`aed11de6`, native fingerprint
+`7c5f4bd7089c4413a8dc8ff21decbc172e171e85`, under the heavy lock.
+The arm64 bundle ID is chat.vera.app.dev, team39K6A9FP99, and both registered
+iPhone UDIDs are in its unexpired profile. Deep strict codesign verification
+passes. Hosted page, manifest and IPA return200; hosted/local size matches
+75,144,702 bytes, SHA256
+d0052ab99281b5edf10fa18761cc572b288881e7e3bd41a930d4def09957e17e.
+Initial Python network verification failed because its default CA store
+was missing the issuer; using the Mac's trusted /etc/ssl/cert.pem succeeds,
+without disabling certificate validation. Raw report is
+`.cache/round2/phone-ios-round2-verification.json`.
+
+Install page:
+https://vera-evidence.b-cdn.net/dev-client/ios/7c5f4bd7089c4413a8dc8ff21decbc172e171e85-575d166d3f15/index.html
+
+The exact phone.sh block, sign-in/preservation/rollback/switch facts and
+13-item test script were sent immediately to the parent orchestrator.
+Normal Metro8492 remains up. This replaces Vera Dev only and keeps its
+sign-in/data when installed over it; production Vera is untouched. Main's
+client comes from phone.sh main. Android remains independently blocked on
+actual #165 dismissal, with diagnostic APK/logging next. No merge, release,
+store upload or data pass is approved or performed.
+
+Android diagnostic combined build succeeded with fingerprint
+`8c59c0782ba264289f174c1e99c0e2bb76d1789a`; heavy lock released before
+queueing emulator startup. No gesture behavior changed in this APK.
