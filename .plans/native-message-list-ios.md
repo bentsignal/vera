@@ -162,6 +162,36 @@ not link or run an app. Lint, typecheck, tests and React Doctor against
 compile, motion recordings, antialiasing cost and release-like cold-open
 profile; none of those is claimed here. No phone client was built.
 
+## Media taps (approved by Shawn, 2026-10-24)
+
+A photo or video opens on the first tap's release: alone, a carousel's
+card, or a deck's front card. It has its own tap recognizer, as reactions
+do (`TapRoute.swift`), so it no longer waits about 0.35 s for a double
+tap to fail. That wait measured 351.7 ms from finger lift to press in one
+Debug trace. A double tap on media no longer opens the menu, as the React
+Native list's photos behaved; a long hold still does, with the real
+content lifted. Text keeps its single tap (after the double-tap wait), its
+double tap and its hold. Reactions and taps that stop a scroll are
+unchanged. Android makes the same change on its side. Each tap's release
+must still land on what it was routed to (`TapRoute`), so a text tap or
+double tap that slides onto a photo or a chip does nothing, rather than
+that part's press or menu. Native emits every valid media release. The
+shared viewer route guard owns duplicate opens; there is no native timer
+or suppression window.
+
+Validation: 194/194 native host checks pass, including the tap routing
+and release boundary cases. All 20 Swift module files pass the arm64 iOS
+simulator typecheck against the real installed SDK and dependencies. This
+does not link or run a client. Repository lint, typecheck, tests and React
+Doctor against `origin/t3/native-message-list` pass, then format:fix runs.
+
+Still pending in integration's combined client:
+
+- finger up to press, measured again;
+- photo, video and per-item media opening;
+- a long hold opening the menu with no gallery;
+- deck and carousel gestures.
+
 ## Checks
 
 - Earlier phone-polish checkpoint: `Tests/run.sh`, 94 checks. 61 of them are new, for the reaction toggle
