@@ -11,6 +11,8 @@
 # the same 18 as before:
 #   react-front-media  your 👍 on a three-photo message's first photo (the
 #                      deck's front card at rest, a carousel's first item)
+#   react-front-media-remove
+#                      the same 👍 taken off again
 #   composer-send      five lines typed into the real composer, then its
 #                      Send pressed: the send shrink, through the draft and
 #                      send pipeline, not `conversation.send`. Needs
@@ -19,6 +21,8 @@
 #                      --session), such as a one-line wrapper script.
 #                      agent-device reads the screen as it taps, which can
 #                      stall the app for a moment: look at the video too.
+# Their setup and actions are logged to <run>/<label>.actions.log; a step
+# that fails fails the case, recorded or not.
 # Typing to the first arrival is `typing-reply`. Whether a row fades in
 # is a look at the frames: the analyzer follows positions, not opacity.
 #
@@ -71,9 +75,39 @@ fi
 say() { convex dev:say "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"body\":\"$2\"}"; }
 # A photo for `dev:say`, in one of a deck's shapes.
 photo() { echo "{\"kind\":\"image\",\"mimeType\":\"image/jpeg\",\"name\":\"$1.jpg\",\"size\":400000,\"url\":\"https://picsum.photos/seed/vera-motion-$1/$2/$3\",\"width\":$2,\"height\":$3}"; }
-say_photos() {
-  convex dev:say "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"body\":\"$2\",\"attachments\":[$(photo tall 1200 1600),$(photo wide 1600 1200),$(photo square 1080 1080)]}"
+# The named-only cases' setup and actions are logged, with their exit
+# status, to $RUN/<label>.actions.log (ACTIONS), and any that fails fails the
+# case: a recording never counts when what it records didn't happen.
+ACTIONS=/dev/null
+logged() {
+  # Not `status`: zsh's is read-only.
+  local out step_exit
+  out=$("$@" 2>&1); step_exit=$?
+  print -r -- "\$ ${(j: :)${(q)@}}" >>$ACTIONS
+  [[ -n $out ]] && print -r -- "$out" >>$ACTIONS
+  print -r -- "exit $step_exit" >>$ACTIONS
+  return $step_exit
 }
+convex_run() { (cd services/backend && npx convex run "$@"); }
+# Runs `expression` in the app, which must come to "done".
+js_done() {
+  local out
+  out=$(js "$1" | tr -d '"')
+  print -r -- "js $1" >>$ACTIONS
+  print -r -- "-> $out" >>$ACTIONS
+  [[ $out == done ]]
+}
+say_photos() {
+  logged convex_run dev:say "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"body\":\"$2\",\"attachments\":[$(photo tall 1200 1600),$(photo wide 1600 1200),$(photo square 1080 1080)]}"
+}
+# Your 👍 on or off the target's first photo (attachment 0; its part 0, since
+# the message has a body).
+toggle_front_media() {
+  js_done '(veraDev.conversation().react(veraDev.motionTarget, "\u{1F44D}", 0), "done")'
+}
+COMPOSER_TEXT=$'Line one\nLine two\nLine three\nLine four\nLine five'
+COMPOSER_TEXT_JS='Line one\nLine two\nLine three\nLine four\nLine five'
+
 typing() { convex dev:type "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"typing\":$2}"; }
 
 ready() {
@@ -114,8 +148,16 @@ scenario_first_reply() {
   sleep 3
 }
 scenario_send() { js 'veraDev.conversation().send("On my way")' >/dev/null; sleep 3; }
-scenario_react_front_media() { js 'veraDev.conversation().react(veraDev.motionTarget, "\u{1F44D}", 0)' >/dev/null; sleep 3; }
-scenario_composer_send() { ${=MOTION_AD} press 'label="Send"' >/dev/null 2>&1; sleep 3; }
+scenario_react_front_media() {
+  toggle_front_media || return 1
+  sleep 3
+}
+# Pressing the real Send, then checking the message really went out.
+scenario_composer_send() {
+  logged ${=MOTION_AD} press 'label="Send"' || return 1
+  sleep 3
+  js_done "(veraDev.conversation().messages().some((m) => m.body === \"$COMPOSER_TEXT_JS\") ? \"done\" : \"not sent\")"
+}
 scenario_edit() { js 'veraDev.conversation().edit(veraDev.motionMine, "Running ten minutes late, sorry")' >/dev/null; sleep 3; }
 scenario_delete() { js 'veraDev.conversation().remove(veraDev.motionMine)' >/dev/null; sleep 3; }
 scenario_firehose() {
@@ -138,6 +180,7 @@ SCENARIOS=(
 # Run only when named (see the top).
 NAMED_ONLY=(
   "react-front-media:scenario_react_front_media:media-target:"
+  "react-front-media-remove:scenario_react_front_media:media-target-reacted:"
   "composer-send:scenario_composer_send:composer:"
 )
 for entry in $NAMED_ONLY; do
@@ -168,6 +211,8 @@ for layout in bubbles stacked; do
       continue
     fi
     setup "$label"
+    ACTIONS=/dev/null
+    case $needs in media-target*|composer) ACTIONS="$RUN/$label.actions.log" ;; esac
     case $needs in
       target|target-reacted)
         say maya "Motion target $label"; sleep 3
@@ -181,27 +226,41 @@ for layout in bubbles stacked; do
         js "veraDev.conversation().send(\"Mine $label\")" >/dev/null; sleep 3
         js "veraDev.motionMine = \"Mine $label\"" >/dev/null
         ;;
-      media-target)
-        say_photos maya "Motion photos $label"; sleep 4
-        js "veraDev.motionTarget = \"Motion photos $label\"" >/dev/null
+      media-target|media-target-reacted)
+        if ! say_photos maya "Motion photos $label" ||
+          ! { sleep 4; js_done "(veraDev.motionTarget = \"Motion photos $label\", veraDev.conversation().idOf(veraDev.motionTarget), \"done\")"; } ||
+          { [[ $needs == media-target-reacted ]] && ! { toggle_front_media && sleep 3; }; }; then
+          summary+=("FAIL $label (setup failed: $ACTIONS)")
+          failed=1
+          continue
+        fi
         ;;
       composer)
         if [[ -z ${MOTION_AD:-} ]]; then
           summary+=("SKIP $label (set MOTION_AD to run agent-device on this device)")
           continue
         fi
-        ${=MOTION_AD} fill 'label="Message"' $'Line one\nLine two\nLine three\nLine four\nLine five' >/dev/null 2>&1
+        if ! logged ${=MOTION_AD} fill 'label="Message"' $COMPOSER_TEXT; then
+          summary+=("FAIL $label (filling the composer failed: $ACTIONS)")
+          failed=1
+          continue
+        fi
         sleep 2
         ;;
     esac
     sim record "motion-$label"; sleep 0.5
     $fn
+    acted=$?
     sim stop
     mv ".cache/evidence/motion-$label.mp4" "$RUN/$label.mp4" 2>/dev/null
     errors=$(tail -n +$((L0 + 1)) .cache/sim/metro.log | grep -cE "ERROR|Uncaught")
     result=$(node --experimental-strip-types scripts/motion/analyze.ts "$RUN/$label.mp4" ${=analyzer_flags})
     flagged=$?
-    if (( flagged != 0 || errors > 0 )); then
+    if (( acted != 0 )); then
+      # What was recorded isn't what the case is about: never a pass.
+      failed=1
+      summary+=("FAIL $label (the action failed: $ACTIONS)")
+    elif (( flagged != 0 || errors > 0 )); then
       failed=1
       summary+=("FAIL $label (errors in Metro's log: $errors)")
       summary+=("${(f)result}")

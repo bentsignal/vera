@@ -78,7 +78,8 @@ two run only when named:
 
 ```sh
 # Your 👍 on a three-photo message's first photo (the deck's front card at
-# rest; a carousel's first item in stacked).
+# rest; a carousel's first item in stacked), then a run that takes it off.
+# (`react-front-media` names both; `react-front-media-remove` just the second.)
 scripts/motion/check.sh react-front-media
 
 # The real composer: five lines typed into the field, then Send pressed.
@@ -87,7 +88,12 @@ scripts/motion/check.sh react-front-media
 MOTION_AD=.cache/round2/ad-ios scripts/motion/check.sh composer-send
 ```
 
-Without `MOTION_AD`, `composer-send` is skipped, not failed. agent-device
+Each setup step and action of these cases is logged with its exit status to
+`.cache/motion/<run>/<label>.actions.log`. A step that fails fails the case,
+so a recording never counts when what it records didn't happen.
+`composer-send` also checks that the five-line message was sent. A filter
+is a substring, so `react` runs these two along with `react-add` and
+`react-remove`. Without `MOTION_AD`, `composer-send` is skipped, not failed. agent-device
 reads the screen as it taps, which can stall the app for a moment, so look at
 the recording as well as the flags. Typing to the first arrival is
 `typing-reply` (`--android` for Android). Whether the new row fades in is

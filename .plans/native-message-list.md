@@ -1964,9 +1964,11 @@ Contract changes are agreed by all three before anyone builds them.
 | 12  | Reaction height changes: Android jerks and moves twice; iOS doesn't move at all. One smooth move on both.                                                    | iOS, Android                              |
 | 13  | Android arrivals don't rise and fade in (the first reply after typing just appears).                                                                         | Android                                   |
 
-Status, 2026-10-24 16:00: the iOS thread's run failed at the provider
-handoff ("Insufficient context allowance"), so iOS hasn't started; this
-was reported to the orchestrator. Android is running.
+Status: both native sources are now integrated (`c6e04b39`: iOS
+`ffa83e47`, Android `b7a37cdf`). None of the 13 items is checked at
+runtime yet, and the combined builds and QA are still ahead. (Earlier,
+at 16:00, the iOS thread's first run had failed at the provider handoff,
+and was restarted in its new thread.)
 
 ### Items 1 and 2: review of the shared side (`5920a109`), and its tests
 
@@ -2030,9 +2032,15 @@ Source findings only; nothing here is checked on a device.
   with `scripts/sim.sh eval "JSON.stringify(globalThis.veraDev.photoTiming.report())"`,
   and clear it with `.reset()`. The marks are JavaScript-thread times (upper
   bounds). The native owner's `Perf.swift` signposts cover touch to press,
-  including the double-tap wait.
-- **Motion:** `scripts/motion/check.sh` adds `react-front-media` and
-  `composer-send`, which run only when named, so a full run stays the same 18. `composer-send` drives the real composer through agent-device
+  including the double-tap wait. Compare each clock's spans separately, and
+  match native and JavaScript records by order, row and index. Never
+  subtract one clock's timestamps from the other's.
+- **Motion:** `scripts/motion/check.sh` adds `react-front-media`,
+  `react-front-media-remove` and `composer-send`, which run only when
+  named, so a full run stays the same 18. Their setup and actions are
+  logged to `<run>/<label>.actions.log` with exit statuses, and a failed
+  step fails the case (batch 4). `composer-send` also checks that the
+  message was sent. The device selectors are untried. `composer-send` drives the real composer through agent-device
   (`MOTION_AD`). Typing to the first arrival is `typing-reply`, and its fade
   needs a frame review. The dev screen's toggle now reacts on the first
   photo with an exact-part key (Android's inherited hunk, corrected).
