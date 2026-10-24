@@ -15,6 +15,22 @@ import androidx.recyclerview.widget.RecyclerView
 class ListLayoutManager(context: Context) : LinearLayoutManager(context, RecyclerView.VERTICAL, true) {
   var alignTop = false
 
+  internal data class ScrollAnchor(val id: Long, val bottom: Int)
+
+  /** Keep the visible row's screen position while a smooth target changes. */
+  internal fun captureScrollAnchor(recycler: RecyclerView): ScrollAnchor? {
+    val view = findViewByPosition(findFirstVisibleItemPosition()) ?: return null
+    val margin = (view.layoutParams as RecyclerView.LayoutParams).bottomMargin
+    return ScrollAnchor(recycler.getChildViewHolder(view).itemId, getDecoratedBottom(view) + margin)
+  }
+
+  internal fun restoreScrollAnchor(recycler: RecyclerView, anchor: ScrollAnchor) {
+    val adapter = recycler.adapter ?: return
+    val position = (0 until adapter.itemCount).firstOrNull { adapter.getItemId(it) == anchor.id } ?: return
+    // Reverse layout's offset is measured from its NEW padded bottom.
+    scrollToPositionWithOffset(position, recycler.height - recycler.paddingBottom - anchor.bottom)
+  }
+
   /** The empty space above the rows that alignTop lifted them through, or 0. */
   private var lifted = 0
 

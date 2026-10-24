@@ -1,5 +1,7 @@
 package chat.vera.messagelist
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
@@ -64,6 +66,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   @Volatile private var workerRows: List<Row> = emptyList()
   private var pendingRows: ReadableArray? = null
   private var rowsChanged = false
+  private var rowsVersion = 0L
+  private val latestScroll = LatestScroll()
 
   private var behavior = Behavior.DEFAULT
   /** `insets.top` and `insets.bottom`, and when they apply (see `InsetHold`). */
@@ -128,6 +132,10 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     env.onDeckChanged = { cell -> cell.deckChanged() }
 
     recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+      override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+        if (newState == RecyclerView.SCROLL_STATE_DRAGGING) latestScroll.cancel()
+      }
+
       override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
         scrolledPx += abs(dy)
         timed({ "onScrolled" }) {
@@ -174,19 +182,33 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   fun setKeyboardFrozen(frozen: Boolean) {
     if (frozen == keyboardFrozen) return
     keyboardFrozen = frozen
+    latestScroll.freeze(frozen)
+    val easing = keyboardEase
+    keyboardEase = null
+    easing?.cancel()
     if (frozen) {
-      keyboardEase?.cancel()
+      if (latestScroll.active) recycler.stopScroll()
       return
     }
     // Following again: ease to where the keyboard is now, if it moved meanwhile.
     val target = keyboardLift(ViewCompat.getRootWindowInsets(this))
-    if (target == keyboard) return
+    if (target == keyboard) {
+      retargetLatest()
+      return
+    }
     keyboardEase = ValueAnimator.ofInt(keyboard, target).apply {
       duration = KEYBOARD_EASE_MS
       interpolator = EASE
       addUpdateListener { setKeyboardLift(it.animatedValue as Int) }
-      start()
+      addListener(object : AnimatorListenerAdapter() {
+        override fun onAnimationEnd(animation: Animator) {
+          if (keyboardEase !== animation) return
+          keyboardEase = null
+          retargetLatest()
+        }
+      })
     }
+    keyboardEase?.start()
   }
 
   fun setAlignTop(alignTop: Boolean) {
@@ -224,6 +246,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     lift = request
     if (request == null) lifter.land()
     else {
+      latestScroll.cancel()
       recycler.stopScroll()
       val position = rows.rows.indexOfFirst { it.id == request.rowId }
       val holder = recycler.findViewHolderForAdapterPosition(position) as? RowHolder ?: return
@@ -250,18 +273,19 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     // the message arrives) applies with them, in the same layout pass, so
     // the rows above make one move. Until then the list keeps the old inset.
     val array = pendingRows
+    val version = ++rowsVersion
     work.execute {
       val next = decodeRows(array)
       val before = workerRows
       workerRows = next
       val diff = if (before.isEmpty()) null else DiffUtil.calculateDiff(RowsDiff(before, next), false)
-      main.post { timed({ "apply ${next.size} rows" }) { apply(next, diff, inset) } }
+      main.post { timed({ "apply ${next.size} rows" }) { apply(next, diff, inset, version) } }
     }
   }
 
   // MARK: Applying rows
 
-  private fun apply(next: List<Row>, diff: DiffUtil.DiffResult?, padding: Inset? = null) {
+  private fun apply(next: List<Row>, diff: DiffUtil.DiffResult?, padding: Inset? = null, version: Long = rowsVersion) {
     // A newer inset than the one these rows came with has applied already.
     val inset = insets.withRows(padding)
     val before = rows.rows
@@ -274,10 +298,18 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
       if (next.isNotEmpty()) {
         if (width == 0 || height == 0) placeWhenSized = true else placeInitially(next)
       }
+      if (latestScroll.follows(version)) retargetLatest()
       return
     }
     // Measured before the composer's inset changes.
-    val wasAtBottom = distanceFromLatest()?.let { it <= units.pxf(behavior.nearLatestPoints) } == true
+    val distance = distanceFromLatest()
+    val following = latestScroll.tracks(version)
+    // A smooth request can be within nearLatestPoints while still moving.
+    // It must finish smoothly, rather than snapping its last few points.
+    val away = following && (distance == null || distance > 1f)
+    val anchor = if (away) manager.captureScrollAnchor(recycler) else null
+    if (following) recycler.stopScroll()
+    val wasAtBottom = !away && distance?.let { it <= units.pxf(behavior.nearLatestPoints) } == true
     val changes = rowChanges(before, next, wasAtBottom)
     countArrivals(changes.bottomArrivals)
     // A firehose or a big change: everything takes its place at once.
@@ -288,13 +320,15 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     // The composer's change lands in this same layout pass as the rows.
     inset?.let { setPaddingOnly(it) }
     rows.apply(next, diff)
-    if (wasAtBottom && changes.newestInserted) manager.scrollToPositionWithOffset(0, 0)
+    if (anchor != null) manager.restoreScrollAnchor(recycler, anchor)
+    else if (wasAtBottom && changes.newestInserted) manager.scrollToPositionWithOffset(0, 0)
     // In this pass, while the animator knows what's new (see `layoutNow`).
     layoutNow()
     animator.inserted = emptySet()
     animator.rising = emptySet()
     animator.handoff = null
     animator.animate = true
+    if (following) retargetLatest()
     recycler.post { report(0) }
   }
 
@@ -381,6 +415,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     if (recycler.paddingTop == top && recycler.paddingBottom == bottom) return
     recycler.setPadding(0, top, 0, bottom)
     layoutNow()
+    retargetLatest()
   }
 
   /** Sets the insets without laying out: the rows' apply that follows lays out once, with both. */
@@ -400,7 +435,9 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   /** The keyboard moved: followed unless it's frozen. */
   private fun followKeyboard(lift: Int) {
     if (keyboardFrozen) return
-    keyboardEase?.cancel()
+    val easing = keyboardEase
+    keyboardEase = null
+    easing?.cancel()
     setKeyboardLift(lift)
   }
 
@@ -417,6 +454,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     if (recycler.paddingTop == top && recycler.paddingBottom == bottom) return
     recycler.setPadding(0, top, 0, bottom)
     layoutNow()
+    if (!imeAnimating && keyboardEase?.isRunning != true) retargetLatest()
   }
 
   /** Follows the keyboard frame by frame as it opens, closes, or is dragged down. */
@@ -471,6 +509,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   override fun onDetachedFromWindow() {
+    latestScroll.cancel()
+    recycler.stopScroll()
     lifter.finish()
     super.onDetachedFromWindow()
     revealAnimator?.cancel()
@@ -673,6 +713,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
    * list's benchmark (Reanimated's `scrollTo` in a frame callback) does.
    */
   fun benchFling(speed: Double, ms: Double, promise: expo.modules.kotlin.Promise) {
+    latestScroll.cancel()
     bench?.let { android.view.Choreographer.getInstance().removeFrameCallback(it) }
     recycler.stopScroll()
     val pxPerMs = units.pxf(speed.toFloat()) / 1000.0
@@ -717,15 +758,27 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   // MARK: Scrolling from JavaScript
 
   fun scrollToLatest(animated: Boolean) {
-    if (rows.itemCount == 0) return
     if (!animated) {
+      latestScroll.cancel()
       recycler.stopScroll()
       manager.scrollToPositionWithOffset(0, 0)
       return
     }
+    latestScroll.request(rowsVersion)
+    if (keyboardFrozen || rows.itemCount == 0) return
     // From far away, jump close first so the scroll is short.
     if (manager.findFirstVisibleItemPosition() > JUMP_FROM) manager.scrollToPositionWithOffset(JUMP_FROM, 0)
+    retargetLatest()
+  }
+
+  /** Recomputed after rows AND their inset laid out; never jumps to latest. */
+  private fun retargetLatest() {
+    if (!latestScroll.active || keyboardFrozen || keyboardEase?.isRunning == true) return
+    val ticket = latestScroll.ticket()
     recycler.post {
+      if (!latestScroll.accepts(ticket) || rows.itemCount == 0) return@post
+      recycler.stopScroll()
+      if (distanceFromLatest()?.let { it <= 1f } == true) return@post
       val scroller = object : LinearSmoothScroller(context) {
         override fun getVerticalSnapPreference() = SNAP_TO_END
         override fun calculateSpeedPerPixel(displayMetrics: DisplayMetrics) = 40f / displayMetrics.densityDpi
@@ -736,6 +789,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   fun scrollToRow(id: String, animated: Boolean) {
+    latestScroll.cancel()
+    recycler.stopScroll()
     val position = rows.rows.indexOfFirst { it.id == id }
     if (position < 0) return
     if (!animated || abs(position - manager.findFirstVisibleItemPosition()) > JUMP_FROM) {
@@ -830,6 +885,9 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
       when (e.actionMasked) {
         MotionEvent.ACTION_DOWN -> {
+          // Direct manipulation also cancels a restart posted just before
+          // the touch, even if the previous smooth scroll has already ended.
+          latestScroll.cancel()
           downX = e.x
           downY = e.y
           revealing = false
