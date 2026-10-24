@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { requireNativeView, requireOptionalNativeModule } from "expo";
 
 import type {
+  ComposerHost,
   MessageListViewMethods,
   MessageListViewProps,
   NativeSupport,
@@ -51,4 +52,12 @@ export const MessageListRow =
         style?: StyleProp<ViewStyle>;
         children?: ReactNode;
       }>("MessageList", "MessageListRow")
+    : null;
+
+/** Transparent bar host. Never request this named view from an older binary. */
+export const MessageListComposer =
+  nativeSupport?.features?.includes("composerLayout") === true
+    ? requireNativeView<
+        ComposerHost & { style?: StyleProp<ViewStyle>; children?: ReactNode }
+      >("MessageList", "MessageListComposer")
     : null;

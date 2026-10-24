@@ -369,6 +369,8 @@ export interface MessageListViewProps {
   readonly theme: Theme;
   readonly behavior: Behavior;
   readonly insets: Insets;
+  /** Binaries with `composerLayout`: one UI-thread owner of ordinary bottom geometry. */
+  readonly composer?: ComposerBinding;
   /**
    * Native follows the keyboard itself (frame by frame, interactive
    * dismissal by dragging the list), adding its height to `insets.bottom`.
@@ -403,6 +405,26 @@ export interface MessageListViewProps {
   /** Opens on this row (a search or notification) instead of the newest. */
   readonly initialRowId?: string;
   readonly onEvent: (event: { nativeEvent: ListEvent }) => void;
+}
+
+/**
+ * A transparent `MessageListComposer` host around the existing composer bar.
+ * Emitted from the SAME Composer render as its controlled clear/attachment
+ * reset, using that component's current send-store snapshot, not parent props.
+ * Native reads these props and actual bounds only after the surface mounts.
+ */
+export interface ComposerHost {
+  readonly owner: string;
+  readonly sequence: number;
+}
+
+/** Optional, feature-gated connection to this list's live composer host. */
+export interface ComposerBinding {
+  readonly owner: string;
+  /** Persistent latest sequence authorized by ACK + exact row + navigation/freeze readiness. */
+  readonly release: number;
+  /** Logical points between the bar and newest row, added to actual height exactly once. */
+  readonly gap: number;
 }
 
 /**
@@ -472,7 +494,7 @@ export type ListEvent =
       readonly frame?: Frame;
     }
   | {
-      /** Held (or double tapped): JavaScript opens the menu. */
+      /** Held: JavaScript opens the menu. */
       readonly type: "hold";
       readonly rowId: string;
       readonly part?: string;
@@ -540,6 +562,14 @@ export interface NativeSupport {
    * - `customRows`: custom rows drawn by React (`MessageListRow`).
    * - `benchFling`: the `benchFling` method, for benchmarks.
    * - `liftHandoff`: await `landLift` before removing the menu's Modal.
+   * - `composerLayout`: `MessageListComposer` host + `composer` binding.
+   *   Ordinary bottom is mounted host height + explicit gap; React retains
+   *   top/keyboardOverlap and the legacy fallback. New host sequence holds
+   *   geometry until its authorized release ACTUALLY applies with rows.
+   *   Older FIFO results never borrow a newer send's height. Native seals
+   *   after a complete mount, retains freeze/pair/real-landing barriers,
+   *   and falls back explicitly for an invalid/missing host. Full protocol:
+   *   .plans/native-composer-growth.md revision3.
    */
   readonly features?: readonly string[];
 }
