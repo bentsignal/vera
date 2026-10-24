@@ -17,11 +17,12 @@ data class Target(
   val messageId: String? = null,
 ) {
   /**
-   * Fires on the first tap. A tap on a message or a photo waits to see if
-   * it's a double tap, which holds it instead.
+   * Fires on the first tap. A tap on a message waits to see if it's a
+   * double tap, which holds it instead. A photo or video opens on its first
+   * release (see `Taps`); holding it opens its menu.
    */
   val immediate: Boolean
-    get() = type != "message" && type != "media"
+    get() = type != "message"
 
   fun event(): Map<String, Any> {
     val out = HashMap<String, Any>()
