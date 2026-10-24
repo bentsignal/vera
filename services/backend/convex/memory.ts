@@ -85,6 +85,8 @@ export async function recall(
   query: string,
   limit = RESULTS,
 ) {
+  // Photo-only messages have no text to embed. The reply still sees the photo.
+  if (query.trim().length === 0) return [];
   const { embedding } = await embed({
     model: embeddingModel(),
     providerOptions: dimensions,
@@ -192,6 +194,7 @@ export async function recallOlder(
     )
     .map((message) => message.body)
     .join("\n");
+  if (newMessages.trim().length === 0) return [];
   tally.memoryLookups += 1;
   return recallFor(ctx, conversationId, newMessages, visibleFrom);
 }
