@@ -105,8 +105,20 @@ say_photos() {
 toggle_front_media() {
   js_done '(veraDev.conversation().react(veraDev.motionTarget, "\u{1F44D}", 0), "done")'
 }
-COMPOSER_TEXT=$'Line one\nLine two\nLine three\nLine four\nLine five'
-COMPOSER_TEXT_JS='Line one\nLine two\nLine three\nLine four\nLine five'
+# The composer's field. Android labels it "Message"; iOS reads it as
+# "Message Message", which an exact label never matches, so there it's the
+# screen's only editable element (a second would fail as ambiguous).
+if [[ $PLATFORM == android ]]; then
+  COMPOSER_FIELD='label="Message" editable=true'
+else
+  COMPOSER_FIELD='editable=true'
+fi
+# Five lines, the first unique to the run and case, so an earlier case's
+# message can't pass for this one's.
+composer_text() {
+  COMPOSER_TEXT="Line one ${RUN:t} $1"$'\nLine two\nLine three\nLine four\nLine five'
+  COMPOSER_TEXT_JS=${COMPOSER_TEXT//$'\n'/\\n}
+}
 
 typing() { convex dev:type "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"typing\":$2}"; }
 
@@ -240,7 +252,8 @@ for layout in bubbles stacked; do
           summary+=("SKIP $label (set MOTION_AD to run agent-device on this device)")
           continue
         fi
-        if ! logged ${=MOTION_AD} fill 'label="Message"' $COMPOSER_TEXT; then
+        composer_text $layout
+        if ! logged ${=MOTION_AD} fill $COMPOSER_FIELD $COMPOSER_TEXT; then
           summary+=("FAIL $label (filling the composer failed: $ACTIONS)")
           failed=1
           continue

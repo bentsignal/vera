@@ -201,8 +201,12 @@ function NativeRows({
   const place = usePlace(shown.anchorId === undefined, hasNewer);
   const theme = useNativeTheme(layout);
   const safeTop = useSafeAreaInsets().top;
-  const { messageOf, rows } = useRows(shown);
-  const composer = useComposerInset(composerHeight, rows);
+  // A send's message waits for the composer's new height (`useComposerInset`).
+  const composer = useComposerInset(composerHeight, shown.messages);
+  const { messageOf, rows } = useRows({
+    ...shown,
+    messages: composer.messages,
+  });
   const { lift, change: changeLift } = useLift(view);
 
   function scrollToLatest() {
@@ -249,7 +253,7 @@ function NativeRows({
           theme={theme}
           behavior={BEHAVIOR}
           insets={{
-            bottom: composer + COMPOSER_GAP,
+            bottom: composer.inset + COMPOSER_GAP,
             keyboardOverlap: bottomInset,
             top: safeTop + topInset + HEADER_GAP,
           }}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import type { View } from "react-native";
+import type { LayoutChangeEvent, View } from "react-native";
 import type { AnimatedRef, SharedValue } from "react-native-reanimated";
+import { useRef } from "react";
 import { Platform } from "react-native";
 import { useReanimatedFocusedInput } from "react-native-keyboard-controller";
 import Animated, {
@@ -14,6 +15,7 @@ import { scheduleOnUI } from "react-native-worklets";
 
 import type { ComposerReport } from "./composer-height";
 import { GlassSurface } from "~/components/glass-surface";
+import { holdsForSend } from "~/features/native-list/send-inset-state";
 import { glassAbove } from "./glass-hold";
 
 const IOS = Platform.OS === "ios";
@@ -113,13 +115,16 @@ function reportShorter(
 }
 
 /**
- * What `GlassField` needs, and `settle`, to call just before sending empties
- * the field: rather than jumping down to the shorter field, the glass eases
- * down to it with the list (see `ComposerReport`).
+ * What `GlassField` needs (`glass`), and `settle`, to call just before
+ * sending empties the field: rather than jumping down to the shorter field,
+ * the glass eases down to it with the list (see `ComposerReport`). `least`
+ * is the field's height with one line and nothing above it.
  */
-export function useFieldGlass(report: ComposerReport) {
+export function useFieldGlass(report: ComposerReport, least: number) {
   /** The field, measured as it changes. */
   const field = useAnimatedRef<View>();
+  /** The field's height as last laid out, for `send` (`holdsForSend`). */
+  const laidOut = useRef(0);
   /** The least height the glass is drawn at, while it eases down. */
   const held = useSharedValue(0);
   const sends = useSharedValue(0);
@@ -139,17 +144,31 @@ export function useFieldGlass(report: ComposerReport) {
     },
   );
   return {
-    field,
-    held,
+    glass: {
+      field,
+      held,
+      /** Keeps the field's height, for `settle`. */
+      onLayout: (event: LayoutChangeEvent) => {
+        laidOut.current = event.nativeEvent.layout.height;
+      },
+    },
     /** For the field's text input. */
     focus: {
       onFocus: () => focused.set(true),
       onBlur: () => focused.set(false),
     },
-    // Android's bar is solid, with a border along its top that moves at
-    // once: glass held above it would show over the messages. With the
-    // native list, its send still has to reach the list's inset.
-    settle: () => {
+    /**
+     * `adds`: the send adds a message (not an edit's save). If its field
+     * will get shorter, the native list holds the message for the new
+     * height (`holdsForSend`, `report.onSend`), told in this same render.
+     * Android's bar is solid, with a border along its top that moves at
+     * once: glass held above it would show over the messages. With the
+     * native list, its send still has to reach the list's inset.
+     */
+    settle: (adds: boolean) => {
+      const height = laidOut.current;
+      const holds = holdsForSend({ editing: !adds, field: height, least });
+      if (holds) report.onSend();
       const { onSentShorter, room, roomCloses } = report;
       if (IOS) {
         scheduleOnUI(settle, field, held, sends, {
@@ -171,9 +190,10 @@ export function useFieldGlass(report: ComposerReport) {
 export function GlassField({
   field,
   held,
+  onLayout,
   minHeight,
   children,
-}: Omit<ReturnType<typeof useFieldGlass>, "settle" | "focus"> & {
+}: ReturnType<typeof useFieldGlass>["glass"] & {
   minHeight: number;
   children: ReactNode;
 }) {
@@ -184,6 +204,7 @@ export function GlassField({
   return (
     <Animated.View
       ref={field}
+      onLayout={onLayout}
       className="flex-1 justify-center"
       style={{ minHeight }}
     >

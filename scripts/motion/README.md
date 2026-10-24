@@ -91,7 +91,10 @@ MOTION_AD=.cache/round2/ad-ios scripts/motion/check.sh composer-send
 Each setup step and action of these cases is logged with its exit status to
 `.cache/motion/<run>/<label>.actions.log`. A step that fails fails the case,
 so a recording never counts when what it records didn't happen.
-`composer-send` also checks that the five-line message was sent. A filter
+`composer-send` fills the field with `editable=true` on iOS, where it reads
+as "Message Message", and `label="Message" editable=true` on Android. Its
+first line carries the run and layout, so it checks that this case's
+five-line message was sent, not an earlier one. A filter
 is a substring, so `react` runs these two along with `react-add` and
 `react-remove`. Without `MOTION_AD`, `composer-send` is skipped, not failed. agent-device
 reads the screen as it taps, which can stall the app for a moment, so look at

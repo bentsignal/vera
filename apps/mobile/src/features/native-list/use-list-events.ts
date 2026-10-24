@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { useRouter } from "expo-router";
+import { useRef } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import type { HeldPart } from "./held-part";
 import type { Frame, Lift, ListEvent } from "./native";
@@ -21,6 +22,7 @@ import { impact } from "~/lib/native-extras";
 import { openLink } from "~/lib/open-link";
 import { heldPart, mediaOf } from "./held-part";
 import { isJumbo } from "./jumbo";
+import { listFocused, pressMedia } from "./media-open";
 import { reactionAction, reactionMenuPlace } from "./reaction-events";
 
 type PressEvent = Extract<ListEvent, { type: "press" }>;
@@ -180,9 +182,17 @@ function menuTarget(
 /** Opens a message's photos and videos in the viewer, on `index`. */
 function useOpenMedia() {
   const router = useRouter();
+  /** Media opened from here is on its way or showing (`pressMedia`). */
+  const opening = useRef(false);
+  useFocusEffect(() => {
+    opening.current = listFocused();
+  });
   return (message: Message, index: number) => {
     const item = mediaOf(message)[index];
     if (item === undefined || handledStuck(item.attachment)) return;
+    const press = pressMedia(opening.current);
+    opening.current = press.opening;
+    if (!press.opens) return;
     const { attachment } = item;
     // A video opens playing, in the video player, as the React Native
     // list's did, not on its poster in the group.

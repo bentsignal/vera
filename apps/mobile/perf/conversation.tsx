@@ -15,6 +15,7 @@ const COMPOSER = {
   laidOut: 56,
   live: makeMutable(56),
   room: makeMutable(56),
+  sends: 0,
   sent: makeMutable(false),
   stepsUntil: makeMutable(0),
 };

@@ -22,8 +22,12 @@ import type {
 import type { PastedImage } from "~/lib/paste-images";
 import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { useSendProbe } from "~/features/dev/send-timing";
 import { cn } from "~/lib/cn";
-import { PASTE_IMAGES_NATIVE_ID, usePastedImages } from "~/lib/paste-images";
+import {
+  PASTE_IMAGES_NATIVE_ID,
+  useFocusedPastedImages,
+} from "~/lib/paste-images";
 import { AttachMenu } from "./attach-menu";
 import { readDraft, saveDraftText } from "./drafts";
 import { GlassField, useFieldGlass } from "./field-glass";
@@ -314,9 +318,7 @@ export function Composer({
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }));
   // Only the field being pasted into is focused; another conversation's
   // composer can be mounted beneath this one.
-  usePastedImages((images) => {
-    if (input.current?.isFocused() === true) onPaste(images);
-  });
+  useFocusedPastedImages(input, onPaste);
   const editing = edit?.editing;
   const { draft, change, mention, pick, sent, saved } = useDraft(
     editing === undefined || edit === undefined ? draftKey : edit.editDraftKey,
@@ -324,15 +326,17 @@ export function Composer({
     reportedChanges(onChangeText, editing !== undefined),
     mentionable,
   );
-  const { field, held, settle, focus } = useFieldGlass(report);
+  const { glass, settle, focus } = useFieldGlass(report, CONTROL);
   const fieldText = useFieldText(draft);
   const canSend = canSendNow(draft, staged, editing);
   const saves = editing !== undefined;
   const hint = staged.length > 0 || saves ? "Add a message" : placeholder;
+  const probe = useSendProbe(report, glass.field, input, { draft, hint });
 
   function send() {
     if (!canSend) return;
-    settle();
+    probe.begin();
+    settle(editing === undefined);
     const text = draft.trim();
     if (editing === undefined) onSend(text, sent(text));
     else edit?.save(text, saved(text));
@@ -347,10 +351,10 @@ export function Composer({
           onPick={pick}
         />
       )}
-      <Bar bottomInset={bottomInset} report={report}>
+      <Bar bottomInset={bottomInset} report={probe.report}>
         {/* An edit changes only the text. */}
         {editing === undefined && <AttachMenu onPick={onPick} />}
-        <GlassField field={field} held={held} minHeight={CONTROL}>
+        <GlassField {...glass} minHeight={CONTROL}>
           <FieldTop
             edit={edit}
             replyingTo={replyingTo}

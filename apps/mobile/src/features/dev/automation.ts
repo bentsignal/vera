@@ -19,6 +19,7 @@ import { devList, startStalls, stopStalls } from "./dev-list";
 import { devSignInPath } from "./dev-sign-in-path";
 import { frameReport, startFrames, stopFrames } from "./frames";
 import { photoTiming } from "./photo-timing";
+import { sendTiming } from "./send-timing";
 
 function isAppPath(path: string): path is Href & string {
   return path.startsWith("/");
@@ -58,6 +59,8 @@ export function installDevAutomation() {
       frames: { report: frameReport, start: startFrames, stop: stopFrames },
       /** Opening a photo from the list, timed: see photo-timing.ts. */
       photoTiming,
+      /** Committed composer geometry versus later height reports. */
+      sendTiming,
       /**
        * Turns the native message list on or off, and says which list
        * conversations show: "native", or "rn" (off, or not in this binary).

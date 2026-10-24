@@ -49,6 +49,11 @@ export interface ComposerHeight {
    */
   sent: SharedValue<boolean>;
   /**
+   * How many sends have waited for the composer to get shorter
+   * (`report.onSend`), for the native list (`useComposerInset`).
+   */
+  sends: number;
+  /**
    * Until when (`Date.now()`) the composer's height is changing a step at
    * a time, as attachments open or close.
    */
@@ -80,6 +85,7 @@ export function useComposerHeight({
   const sent = useSharedValue(false);
   const stepsUntil = useSharedValue(0);
   const [laidOut, setLaidOut] = useState<number>();
+  const [sends, setSends] = useState(0);
   /** The composer's bar, measured on the UI thread (see `heightNow`). */
   const bar = useAnimatedRef<View>();
   /**
@@ -94,6 +100,8 @@ export function useComposerHeight({
     return measure(bar)?.height ?? fallback;
   }
   const report = {
+    /** Read by the opt-in dev geometry probe; it never writes this value. */
+    live,
     onHeight: (height: number) => {
       // Already there, from `onSentShorter` or `onTyped`.
       if (Math.abs(height - live.get()) >= 0.5) live.set(height);
@@ -133,13 +141,19 @@ export function useComposerHeight({
      * for it.
      */
     roomCloses,
+    /**
+     * A send is about to make the composer shorter (`holdsForSend`): in
+     * the same render as the message sent, so the native list keeps it
+     * until the new height is measured (`useComposerInset`).
+     */
+    onSend: () => setSends((count) => count + 1),
     /** Attachments started to open or close, a height at a time. */
     onAttachmentsMove: () => {
       stepsUntil.set(Date.now() + ATTACHMENTS_MOVE_MS);
     },
   };
   return {
-    composerHeight: { laidOut, live, room, sent, stepsUntil },
+    composerHeight: { laidOut, live, room, sends, sent, stepsUntil },
     report,
   };
 }

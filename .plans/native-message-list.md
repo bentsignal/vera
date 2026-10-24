@@ -1932,7 +1932,7 @@ performance (his Galaxy A16 went from barely usable to fast), the new
 carousels, the reactions and their wrapping to a new line, and iOS
 dictation, which now works.
 
-Who writes what (current rule, from 2026-10-24 afternoon): every product,
+Who wrote what (superseded rule, from 2026-10-24 afternoon): every product,
 UI, test and doc edit is written by a headless Claude CLI, one saved
 session per platform, to save provider limits. The orchestrator (Codex)
 reads, orchestrates, builds and commits, and writes no code. This
@@ -1942,6 +1942,14 @@ Earlier today a direct Opus T3 run wrote `b5689cef` (this plan's round-2
 items), `50937867` (stacked typing faces), `5920a109` (send inset, menu
 keyboard hold) and `5162d2c3` (viewer close, video). This session reviews
 those and writes everything after.
+
+**Current authorship, 2026-10-24:** Shawn stopped all Claude work to save
+his remaining allowance. Sol now writes product, UI, tests and docs
+directly. Integration Claude PID 56222 was interrupted by the parent;
+no Claude process remains or may be resumed. Its saved session
+`446864ec-c77e-484a-9964-0166eed73a28` and partial source/logs under
+`.cache/claude-integration-polish/20261023-163203/` are preserved. Both
+native owners also stopped Claude and retain their source checkpoints.
 
 Owners: **integration** (this branch: shared JavaScript, combined builds,
 QA, the contract), **iOS** (#277, now thread
@@ -2075,10 +2083,11 @@ appendix (photo open: the double-tap wait, the route, a full-size decode
 from disk) are in
 `.cache/claude-integration-polish/20261023-163203/round2-reaction-handoff.md`.
 
-**Contract question for all three (not changed): can a send move the
-list down?** The accepted item 1 says native moves the rows by the new
-rows' height less the composer height given back, and if that's
-negative, eases down once. From the source, it can be negative:
+**Settled (2026-10-24): a send can ease the list down once.** The
+accepted item 1 stands, and the contract is unchanged: native moves the
+rows by the new rows' height less the composer height given back, and if
+that's negative, eases down once. That happens when the sent row is
+shorter than what the composer gave back, for example:
 
 - Stacked text runs in a column wider than the composer's text area, at
   a 20.3 pt line against the field's 22. So a long message continuing a
@@ -2088,11 +2097,81 @@ negative, eases down once. From the source, it can be negative:
   shows.
 - An edit save gives height back and adds no row.
 
-Shawn said the list must never move down on a send. That was about the
-flick, but it reads as a rule. Keeping the newest row 8 pt above the
-composer needs that one eased move down whenever the message is shorter
-than what the composer gave back; the only other way leaves a gap under
-the newest row. My proposal: keep the agreed shape, so one eased move
-down in that case and never a down-then-up, and ask Shawn if that matches
-what he meant. The contract text stays as agreed until all three and
-Shawn settle it.
+The parent thread's clarification settles it, and no further decision
+from Shawn is needed. One smooth downward ease that keeps the newest row
+8 pt above the composer is acceptable. These are not:
+
+- a flick down then up;
+- the newest row hidden;
+- a jump;
+- a gap under the newest row that stays.
+
+Item 1's "never down" means the flick, not a rule that the list never
+moves down. This is the acceptance for item 1 in combined QA. No
+implementation or device run has shown it yet.
+
+### Composer blocker and bounded geometry probe (Sol, 2026-10-24)
+
+The clean stacked eight-line clip **fails** item 1: the same old and new
+rows rise too far, then move down together. This is not the allowed
+single net-down easing. Evidence: `.cache/evidence/r2-ios-stacked-eight-line-clean.mp4`
+and `r2-ios-stacked-send-clean-contact.png`; Mac CPU averaged 24%, peaked
+at 25%. The older 77%-CPU recording is diagnostic only. Formal analyzer
+flags are separate from this direct row-identity finding.
+
+The source permits arrival rows with the old tall inset, followed by a
+shorter inset alone. The current **unaccepted checkpoint** holds new
+messages for a measured height but releases after 500 ms using `live`.
+That can still reverse if actual UI shrink happens later. Passing its
+tests does not make that boundary acceptable. No replacement deadline,
+including two seconds, has been adopted. This blocks fresh phone clients.
+
+The parent authorized a dev-only probe before choosing an acknowledgement.
+`veraDev.sendTiming.start()` enables a bounded local ring; `report()`
+returns raw marks, `sample()` reads current geometry, and `stop()` stops
+recording. It records owner/send identity, monotonic and wall timestamps,
+font scale, placeholder, bar/field/TextInput rectangles, `live`, and bar
+height callbacks. It stores no message text, adds no React state or frame
+loop, and never supplies a height or release signal to the list. A layout
+effect reads the existing clear commit, including same-height sends.
+Committed shadow-tree geometry is not an acknowledgement of physical UI
+completion.
+
+Measured in the combined iOS 27 Debug simulator with native `7176370b`:
+
+| Font scale | Placeholder | Send        | First empty commit bar / field | Later live |
+| ---------- | ----------- | ----------- | ------------------------------ | ---------- |
+| 1          | Message     | Eight lines | 76 / 40 pt                     | 76 pt      |
+| 1          | Message     | One line    | 76 / 40 pt                     | 76 pt      |
+| 1.353      | Message     | Eight lines | 84 / 48 pt                     | 84 pt      |
+| 1.353      | Message     | One line    | 84 / 48 pt                     | 84 pt      |
+| 1.353      | Reply       | Eight lines | 84 / 48 pt                     | 84 pt      |
+| 1          | Reply       | Three lines | 76 / 40 pt                     | 76 pt      |
+
+The multiline clear commits still read the old `live` (230 pt at scale 1,
+274 pt at scale 1.353) while their rectangles already had the empty
+height. Later reports and samples matched the rectangles. The normal
+one-line send had no height callback; its unchanged geometry was visible
+in the commit. Large-font empty field height was 48 pt, not a fixed 40 pt.
+These are measured cases, not a proof for every font, attachment, or
+placeholder. The large Reply sample was taken before restoring normal
+font size; later font-change marks must not be attributed to that send.
+
+Raw evidence: `.cache/round2/probe-ios-normal-settled.json`,
+`probe-ios-normal-one-first.json`, `probe-ios-large-settled.json`,
+`probe-ios-large-one-settled.json`, `probe-ios-large-reply-first.json`,
+and `probe-ios-final.json`. Text-entry automation returned
+`TEXT_ENTRY_MISMATCH` with visually identical multiline strings; snapshots
+and the sent message bodies were checked rather than counting the failed
+command as success. Android measurements are pending; no acknowledgement
+implementation or native contract change is selected yet.
+
+The separate approved fast-media change is integrated from iOS `7176370b`
+and Android `8d312353`. Same-photo iOS signposts measured finger-up to
+native dispatch at 0.329 ms, versus 351.746 ms before the recognizer
+change. These are single warm Debug profiler samples. JS press-to-display
+was separately 152.673 ms after; clocks are not subtracted or summed.
+Raw trace: `.cache/round2/profile/photo-open-fast.trace` and
+`photo-fast-native-spans.json`. This does not clear the composer blocker
+or the remaining round-2 runtime gates. The phone Metro on 8492 stays
+unchanged; no fresh physical phone build has started.
