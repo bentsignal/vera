@@ -2020,6 +2020,30 @@ Source findings only; nothing here is checked on a device.
   A unit test of them would restate the code, so they're left to runtime
   QA. Nothing is runtime-verified yet.
 
+### Reaction stand-ins (item 12), review of the shared side
+
+Asked by Android: does a toggle's stand-in last until the query shows the
+answer, or clear early and move the row twice? **No shared bug, from the
+source; not checked on a device.**
+
+The toggle's mutation and the reactions query's home source share one
+Convex connection, the home PDS's deployment URL. Convex runs the query
+subscribers for a `Transition` synchronously, before the mutation's
+promise continues. `RoutedPdsQueryObserver` and `PdsQueryClient` then
+`setQueryData` synchronously. TanStack 5.101.4 updates the
+`QueryObserver` and `QueriesObserver` results at once, deferring only
+React's notification. So the stand-in's `onSettled` clear and the
+server's answer arrive in one render, with the same reactions, and the
+same row height.
+
+Rapid taps, out-of-order answers, rollback and per-part toggles stay
+covered by `reaction-toggles.test.ts`. If Android still sees two moves
+for one toggle, look at whether native re-measures or re-animates a row
+whose reactions didn't change. Details and an item 7 measurement
+appendix (photo open: the double-tap wait, the route, a full-size decode
+from disk) are in
+`.cache/claude-integration-polish/20261023-163203/round2-reaction-handoff.md`.
+
 **Contract question for all three (not changed): can a send move the
 list down?** The accepted item 1 says native moves the rows by the new
 rows' height less the composer height given back, and if that's
