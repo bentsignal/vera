@@ -8,7 +8,7 @@ package chat.vera.messagelist
 const val CONTRACT_VERSION = 1
 val ROW_KINDS = listOf("message", "header", "notice", "typing", "custom")
 val BLOCK_TYPES = listOf("text", "media", "file", "linkCard", "quote", "deleted")
-val FEATURES = listOf("benchFling", "lift", "liftHandoff")
+val FEATURES = listOf("benchFling", "lift", "liftHandoff", "composerLayout")
 
 data class Person(
   val id: String,

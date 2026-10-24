@@ -26,12 +26,19 @@ class MessageListModule : Module() {
       )
     }
 
+    View(MessageListComposer::class) {
+      Name("MessageListComposer")
+      Prop("owner") { view: MessageListComposer, owner: String? -> view.owner = owner ?: "" }
+      Prop("sequence") { view: MessageListComposer, sequence: Double? -> view.sequence = sequence?.takeIf { it.isFinite() && it >= 0 }?.toLong() ?: 0L }
+    }
+
     View(MessageListView::class) {
       Events("onEvent")
 
       Prop("rows") { view: MessageListView, rows: ReadableArray? -> view.setRows(rows) }
       Prop("theme") { view: MessageListView, theme: ReadableMap? -> view.setTheme(theme) }
       Prop("behavior") { view: MessageListView, behavior: ReadableMap? -> view.setBehavior(behavior) }
+      Prop("composer") { view: MessageListView, composer: ReadableMap? -> view.setComposer(composer) }
       Prop("insets") { view: MessageListView, insets: ReadableMap? -> view.setInsets(insets) }
       Prop("keyboard") { view: MessageListView, keyboard: Boolean? -> view.setKeyboard(keyboard == true) }
       Prop("keyboardFrozen") { view: MessageListView, frozen: Boolean? -> view.setKeyboardFrozen(frozen == true) }

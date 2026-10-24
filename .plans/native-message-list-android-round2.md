@@ -349,3 +349,136 @@ regression gates. No device or full-client build runs in this checkout.
   stays at the bottom, no scroll; scrolled away: scrolls.
 - [ ] `sim.sh frames` around arrivals and sends (the forced layout runs
   once per rows update).
+
+## Native composer geometry, revision 3
+
+The shared contract checkpoint is integration `9affdc9e`; its JS placement and
+persistent release checkpoint is `b02996b5`. Integration alone owns those shared
+files. This Android implementation follows the stable revision 3 in integration's
+`.plans/native-composer-growth.md`.
+
+`MessageListComposer` is a retained transparent Yoga host around the existing
+Bar. It neither measures nor positions its child with Android LinearLayout;
+Fabric owns both frames. A valid sample has one Bar at origin zero with identical
+bounds, a unique owner in the list's Fabric surface and window, and a live host
+lifetime. No native size setter, predicted height, polling or timer is used.
+`composerLayout` advertises the optional host and list binding.
+
+`ComposerMounts` registers one native `UIManagerListener` with the list's
+attachment and removes it on detach. `willMountItems` invalidates the old seal;
+`didMountItems` reads current host metadata and bounds after all mount mutations.
+The idle `didDispatchMountItems` callback does nothing. A module-local weak index
+registers each host at attachment and owner changes, scoped by root, window,
+surface and owner. Ordinary observation is a key lookup and weak dereference,
+with duplicate-owner invalidation; it never traverses the window's view tree.
+The valid weak host cache is retained between seals. Installed RN's
+`MountItemDispatcher.kt` calls will-mount before view commands and normal mount
+items, and did-mount after executing them. Thus commands such as TextInput's own
+`setTextAndSelection` are inside this boundary; later attributed-state commits
+must still be exercised in the combined runtime proof. This is source ordering,
+not proof that every native text resize has the required mounted sequence.
+
+Each submitted rows result captures owner, authorized release, binding and host
+lifetime generations, and the paired React inset. The worker remains strictly
+FIFO with its existing chained diff base. Same-height/cancel/release-only changes
+submit a no-change barrier behind that work. Ordinary React inset reports,
+top/overlap changes and changed gaps do not submit worker barriers. Valid bound
+bottom ignores chasing React reports and reads actual geometry at the UI seal.
+A genuinely new React ordinary inset can still apply at a sealed missing-host
+legacy fallback, but a previously consumed bottom cannot replay just because
+the host vanished. A mounted newer sequence holds
+ordinary observations even before the list's new release prop arrives. An older
+S result after host T uses its captured S inset, advances only S and leaves T
+held. Matching authority instead uses current actual Bar height plus the explicit
+shared gap once. ACK permits release; it does not lock geometry against a new
+draft within that same sequence.
+
+After a complete mount, a missing, ambiguous, detached, wrong-surface or invalid
+host falls back through the same FIFO barrier to the captured React inset.
+Cached host heights are discarded. A new host has a fresh lifetime; old results
+cannot borrow it. A reattached list submits a fresh replay barrier after its next
+complete seal, behind any retained FIFO work. Binding nil explicitly returns
+bottom ownership to React. Top and keyboard overlap remain React-owned.
+
+Freeze and pending pairs buffer ordinary geometry and keyboard offset changes.
+A deferred landing waits for the final paired layout before capturing its home
+frame. The landing token stays active until Lifter's existing real-view restore
+and frame handback callback, including the landing cover. New lift, owner change
+and detach invalidate the old continuation. Owner and lift props are reconciled
+at the end of the props batch so setter ordering cannot cancel the new owner's
+lift. Normal landing has no additional timer. A replacement lift of the same
+part while the previous landing is closing first restores the previous borrow.
+
+Passive mount observations do not arm latest navigation. A canceled generic
+intent stays canceled, and unchanged seals do not restart an active scroller.
+Gesture routes, real carousel tile/deck front-card ownership, and keyboard drag
+behavior are unchanged.
+
+Opt-in development logs have no message text:
+
+```sh
+adb -s SERIAL shell setprop log.tag.VeraComposerLayout DEBUG
+adb -s SERIAL logcat -v threadtime VeraComposerLayout:D '*:S'
+adb -s SERIAL shell setprop log.tag.VeraComposerLayout INFO
+```
+
+The tag reports mount seals and FIFO applies with owner, authorized release,
+mounted sequence and height, bottom inset and native generation/version.
+Shared ACK/identity logs use their own clock; do not subtract unrelated clocks.
+Combined compilation, ordinary growth trajectories, actual text command/state
+mount ordering, 900 ms deliberate UI stall, rapid sends, cancellation/same-height,
+remount/fallback, keyboard freeze and real lift landing remain integration's
+runtime gate. Unit checks and source review do not clear physical growth.
+
+### Frozen paired-close coordination gate
+
+Source review found a narrow shared cycle. `use-menu-closing.ts` waits for native
+land before `onClosed`; `menu-keyboard-hold.ts` requests focus and starts its
+fallback release only in `onClosed`. A new-release pair frozen between release
+and worker completion cannot begin landing until thaw. Waiting on both in that
+order can prevent either from progressing. Normal unpaired landing stays
+immediate into the existing raised/frozen geometry, and ordinary rows can finish
+without changing frozen geometry. This does not resolve the true paired race.
+
+Moving the focus request to `onClosing` alone has no source guarantee on Android.
+Installed keyboard-controller's `KeyboardControllerModuleImpl.setFocusTo` calls
+`FocusedInputHolder.focus`, then `ReactEditText.requestFocusFromJS`. That requests
+view focus and calls `InputMethodManager.showSoftInput`; it does not move window
+focus, retry when focus returns, or acknowledge IME visibility. RN's
+`ReactModalHostView.showOrUpdate` clears `FLAG_NOT_FOCUSABLE` after Dialog.show,
+so the still-visible menu Dialog remains focusable throughout the opacity fade
+and landing wait. Android 36 SDK `InputMethodManager` requires window focus as
+well as view focus and checks whether the input is served.
+
+Parent and both native owners explicitly accepted the close-only pair exception.
+It is now implemented with captured owner, release, native generation and close
+token. At an explicit close, only the already-authorized pair may flush before
+land, after a complete seal. The applied frozen keyboard offset is retained at
+all apply sites and through handback; hidden root IME geometry is not sampled.
+An unfinished worker keeps the pending close; FIFO prefixes may finish without
+changing the frozen geometry, then the authorized pair lays out before Lifter
+captures destination. Older S after host T uses captured S inset and leaves T
+held. Later release authority cannot widen that close. A no-pair or unreleased
+host close does not wait for a future send or for ordinary queued work.
+
+New lift, refreeze, owner/lifetime change and detach cancel obsolete close work,
+restore borrowed pieces and resolve canceled handoffs. Ordinary observations
+remain blocked through actual restore. The close flush does not restart latest
+navigation, clear keyboardFrozen, follow the hidden keyboard, change window
+focus, add a timer, new event/field or dependency patch. Shared onClosed retains
+responsibility for keyboard return after handback. This closes the source-level
+cycle; combined runtime proof of continuous raised landing, worker-finish races,
+keyboard return and final 8 pt remains pending.
+
+### Source validation
+
+The final Android focused target compiles and passes 113/113 tests, with zero
+failures, errors or skips. Composer policy tests cover complete seals, ordinary
+actual growth while unrelated rows decode, explicit gap, pre-release HOLD,
+matching result authority, FIFO S/T geometry, same-height/cancel release,
+missing/rebound hosts, persistent replay, owner/sequence regression, freeze and
+landing buffering, and close before/after worker completion, close ceiling,
+unreleased-host close and stale/canceled tokens. Weak host tests cover duplicate
+invalidation, idempotent registration and detach/removal. Existing RecyclerView,
+lift, gesture, deck and pagination suites remain included. These checks do not
+exercise a real Fabric mount, Modal window or IME; integration owns that proof.
