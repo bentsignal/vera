@@ -124,6 +124,11 @@ recall questions correctly, including saying it didn't know things that
 were never said. Passages of 10 and 4 messages matched worse, and larger
 embedding models didn't do better.
 
+Photo-only messages skip the automatic memory lookup because there is no
+text to embed. The model still sees the photo and the recent conversation.
+Empty or whitespace-only memory searches return no matches without calling
+the embedding provider.
+
 `npx convex run usage:summary '{"bot":"vera"}'` totals what replies cost
 (tokens, dollars, searches), from the gateway's own numbers.
 
