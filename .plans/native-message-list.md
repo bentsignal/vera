@@ -2424,3 +2424,75 @@ eight minor flags, and zero Metro errors. Keep the formal failure until
 identity review; do not assume the previous firehose alias disposition
 applies to this new clip. Android's combined build acquired the heavy lock
 at 19:20:01 UTC, fingerprint `df063ad0e972e62e5f1c8654772458bc74c65ed0`.
+
+**Controlled physical UI-delay result, iOS stacked.** Exact outgoing ID
+`3d1e91d1-156a-4649-8405-89400ca0e8da`, owner `_r_1_`, sequence 1.
+The UI runtime records start1362404768.736583/end1362405668.736708,
+900.000125 ms in that clock. The JS state records ACK76, native command
+invocation, delayed resolution, arm and paired publication76. Keep those
+clock domains separate; no native/JS latency is calculated from them.
+The physical recording provides an independent delayed-clear observation:
+the Send button changes to its pressed appearance at video1.438333 s,
+field ink remains1774 pixels through2.385 s, and becomes0 at2.433333 s.
+Thus the tall field stays visible at least946.7 ms after pressed feedback.
+This is actual screen content, not a shadow-layout callback delay. The
+unchanged Maya/Firehose60 row then moves monotonically y263 to210 from
+2.496667 s onward, sampled template error at most2.18. No reversal is
+seen in this controlled case. It is deliberate fault injection, not a
+normal-load or FPS claim and not a universal layout-completion guarantee.
+
+Existing native signposts record the first102-row apply at trace2.434581
+through2.443629 s, followed by later reaction/typing applies. They log
+counts, not the exact ID/inset, so matching this span to the submitted
+pair uses its ordering, raw JS pair trace and existing native apply
+source; it is not a direct native per-send-ID measurement. Raw files:
+`ios-ui-stall-send-state.json`, `ios-ui-stall-physical-pixels.json`,
+`ios-ui-stall-identity.json`, `profile/send-ui-stall.trace`,
+`profile/send-ui-stall-{signposts.xml,native-spans.json}` and
+`r2-ios-ui-stall-send.mp4`. xctrace warned about one table lacking an
+input source; the requested signpost table exported successfully.
+The initial fill attempt ran before the field was ready and failed its
+selector. It is preserved as a setup failure, not a test result. The
+retry filled the verified field before the captured send. The one-shot
+arm was cleared on stop, and the iOS device/panel are down.
+
+**Exact-PTS firehose review.** The iOS owner's original frames 30–34
+and 70–74 include both formal flag timestamps. Jonah/Firehose1 moves
+up through the first neighborhood while Priya/Firehose2 enters the fixed
+740..764 band. Firehose7 and preceding Firehose6 remain nearly settled
+with slight upward movement in the second neighborhood. Neither named
+row makes the reported 23/25 pt return. This favors a fixed-band
+correspondence artifact, consistent with the analyzer's consecutive
+vectors at one screen band. The matched glyph is unproven without a
+matcher trace. Formal motion remains 17/18, with no threshold changes.
+The owner's original-PTS contact and manifest are in
+`.cache/sol-ios-coordination/firehose-review/` in its checkout.
+
+**Android ACK and keyboard status.** Normal eight-line sends in stacked
+and bubbles publish ACK80.381 with the exact outgoing ID after animated
+navigation invocation resolves. Stacked tracks the same Maya row upward
+without a reversal, but 23 slow frames/worst100 ms include a 41 pt
+between-frame movement; this is not a zero-jank claim. The bubbles retry
+has 27 slow frames/worst66.7 ms. Its first attempt never filled/sent in
+the intended conversation and is retained as setup failure. The settled
+newest row bottom1372/composer top1393 is 21 physical pixels, 8 dp.
+
+Android #165 is NOT passed. Both the automation fling and a real adb
+450 ms touchscreen swipe from550,700 to550,1250 leave the IME visible.
+The source owner confirmed the actual screen has a native
+KeyboardGestureArea wrapper on Android API36; the native-list comment
+saying otherwise is wrong. That wrapper requests interactive IME control
+before forwarding the same event to the list. The list's DOWN gate and
+MOVE/hide path still need runtime evidence before choosing a correction.
+An opt-in DEBUGGABLE-only native logger is being prepared by Android.
+The subsequent endpoint retest did not run because the emulator stopped;
+it is not another gesture result. Preserve the prior failed recording,
+raw IME state and row/bar bounds. Fresh Android phone readiness is blocked.
+
+iPhone delivery is independent. Its remaining gates include targeted
+short/tall/attachment/scrolled-up sends and interruptions, clean current
+deck/carousel keyboard landing, deck reaction-height and rapid swipes,
+DM/group typing visuals, frame-exact video dismissal/repeat-open routing,
+and a release-like cold busy-chat first-open profile. No fresh physical
+phone build has started; historical round-one install links are not this
+round's artifacts. Normal phone Metro8492 remains available.
