@@ -17,7 +17,7 @@ export function KeywordsSection({
     <FieldGroup.Section>
       <List.ForEach
         onDelete={(indices) =>
-          onRemove(keywords.filter((_, index) => indices.includes(index)))
+          onRemove(indices.flatMap((index) => keywords[index] ?? []))
         }
       >
         {keywords.map((keyword) => (

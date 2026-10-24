@@ -67,9 +67,10 @@ export default function KeywordsScreen() {
               </FieldGroup.Section>
               <KeywordsSection
                 keywords={keywords}
-                onRemove={(removed) =>
-                  save(keywords.filter((keyword) => !removed.includes(keyword)))
-                }
+                onRemove={(removed) => {
+                  const gone = new Set(removed);
+                  save(keywords.filter((keyword) => !gone.has(keyword)));
+                }}
               />
             </FieldList>
           </NativeHost>
