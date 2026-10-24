@@ -95,3 +95,150 @@ The latest product decision removes inline message double-tap menu arbitration
 and keeps fullscreen zoom. Both next updated Dev clients are delivered together
 only after the remaining bugs pass. Private production/camera testing follows
 later, with no merge, release, OTA or data pass in this work.
+
+## Revision2: concrete host proposal for review before implementation
+
+Both native reviews confirm the post-mount mechanism and attachment-height
+mount path. Android can subscribe directly to UIManagerListener.didMountItems.
+iOS needs a component-specific ObjC++ mounting bridge registered on Expo's
+adapter class BEFORE Fabric caches its selector flags. This is a real bridge
+and podspec scope cost. A Swift method on the list alone is insufficient.
+Neither owner has implemented a height change.
+
+Propose a small optional MessageListComposer native view around ONLY the
+existing Bar, leaving the current measured Animated.View, text input, layout,
+send ACK and styles inside it. The wrapper has no drawing, no padding and no
+height animation. Its mounted bounds must equal the current bar's height.
+Its metadata is {owner, sequence}, rendered in Composer itself. That component
+already reads the send store through useComposerCommit and owns the cleared
+text. A controlled clear changes React text state, not imperative TextInput
+clear; the latter is only the already-empty autocorrection rejection path.
+The new wrapper's sequence must be in EVERY commit that clears that field or
+its attachment strip, so post-mount sees the new sequence even if list props
+have not caught up. Verify this with real mount logs and delayed-layout cases.
+If it cannot be proved, stop rather than infer JS/UI FIFO.
+
+The list gets one optional composer binding {owner, release}. Owner matches
+only a live wrapper in the same surface, held weakly. Release is the latest
+send sequence whose existing JS ACK/exact-row/navigation/freeze requirements
+have passed. It is supplied WITH the corresponding rows and ACK inset. There
+is no new async HOLD command or native acknowledgement back to JS.
+
+Native observer states are ordinary, held(sequence), released-awaiting-apply,
+and landing/frozen. A mounted wrapper sequence newer than the list's applied
+sequence holds ordinary height immediately. The release prop binds that
+sequence to the actual rows apply version/generation. A stale completion never
+unholds a later sequence. A release cannot apply before its matching mounted
+host sequence is known; initial, same-height and canceled sends use the same
+explicit release, not a timeout. Android retains all FIFO diffs. Older binaries
+and RN fallback mount the existing Bar directly and use the current React path.
+
+Recommended reconciliation policy, requiring agreement: at matching paired
+apply use the latest valid ACTUAL mounted wrapper height once with the rows.
+The shared scalar ACK continues proving that this send's clear committed; it
+is permission to release, not a lock against a later draft's actual geometry.
+This avoids ACK-height followed by another ordinary-height move when new
+text or restaged media arrived during worker delay. While bound, stale React
+bottom insets cannot replace the native observed value; top and keyboardOverlap
+remain React-owned. No standalone observation enters InsetsGate/InsetHold while
+the pair is pending. Missing/unmounted hosts and owner replacement invalidate
+cached measurements and require an explicit fallback/lifecycle transition.
+
+The coordinator also holds ordinary measurements through real-view LANDING
+completion, not merely lift=null or rowId=nil. Add a narrow internal completion
+hook/token guarded for owner, newer lift and detach. Pair/freeze thaw computes
+final geometry before existing pending land starts. No-barrier landing keeps
+its current path. User scroll/anchor/latest behavior uses the existing paths.
+
+Concrete proposed scope is shared optional feature/view/prop types and host
+placement; one module-local native host/coordinator each; iOS component-specific
+ObjC++ adapter bridge and podspec source inclusion; Android mount listener;
+existing inset/apply/freeze integration and landing completion lifetime; focused
+state/order/lifecycle tests plus combined physical trajectory QA. No dependency
+upgrade, predicted size, polling, timer, new keyboard policy or send redesign.
+This is the architecture/contract review boundary. No implementation until its
+transport/order, reconciliation and bridge scope are accepted.
+
+## Revision3: exact optional contract and edge rules for mutual agreement
+
+This supersedes revision2 where they differ. Parent accepted the bounded scope
+and actual-height reconciliation in principle. Both native source reviews are
+complete. Implementation waits for agreement to these concrete refinements.
+
+- Native support feature: `composerLayout`.
+- Optional named view: `MessageListComposer`. Props `owner: string`,
+  `sequence: number`, normal style and children. It is a retained, transparent,
+  ordinary Yoga container around Bar ONLY. Existing inner Bar ref and ACK stay.
+  No flex:1, fixed height, padding, accessibility grouping or native size setter.
+  Shared uses the CURRENT snapshot returned by useComposerCommit in Composer,
+  never only parent report.sends. Bounds must match Bar at zero child origin.
+- Optional list prop: `composer: { owner: string; release: number; gap: number }`.
+  `gap` is explicitly COMPOSER_GAP, currently8 logical points. Bound native
+  bottom is actual wrapper height + gap EXACTLY ONCE, then the existing keyboard
+  overlap calculation. Never infer a gap from ACK minus actual height or copy
+  a native magic8. React continues owning top and keyboardOverlap.
+- `release` is a PERSISTENT latest authorized local send sequence. Add released
+  sequence to shared InsetState: initial0, updated only by acknowledged release,
+  retained while a newer send waits. Same-store remount replays a published
+  sequence; an unpublished send still waits. Existing ACK/exact-ID/navigation/
+  freeze prerequisites are unchanged. Cancellation uses that same explicit
+  release path; there is no native cancel-to-unhold shortcut.
+
+Post-mount seal: binding props/setters alone never authorize an immediate apply.
+All mutations on the surface must finish before reading actual wrapper props
+and bounds together. iOS bridge therefore covers ONLY the named Composer AND
+this module's default list adapters, prepared before selector-cache registration.
+Either callback may coordinate current owner; order and duplicate notifications
+must not matter. No category on Expo's global base class, global swizzle or RN
+patch. Android didMountItems, not idle didDispatchMountItems. Even first placement
+or empty-list synchronous measurement must retain its result until the current
+mount transaction seal. Worker applies between transactions use a valid sealed
+sample. Read latest metadata directly, not an observer-order dependent cache.
+
+Per-result authority: carry the authorized release and owner/binding generation
+through the actual rows result. An older result cannot borrow a newer release's
+height. Native state is keyed by owner plus native list/host lifetime generation.
+Same-height/cancel release with unchanged rows creates an explicit native apply
+barrier behind already-submitted work. Android keeps its FIFO worker chain and
+uses a no-change result/barrier, not a dropped diff or a request to wait for a
+future nonexistent row. iOS may retain its current latest-full-result policy.
+
+Rapid-send rule: if authorized S applies after wrapper sequence T>S mounted,
+finish S's rows in platform order using its captured React paired inset/valid
+S-scoped geometry. Do NOT use T's measured height, wait for host to become S
+again, clear T's hold or mark T applied. T remains held until its own authorized
+release/apply. Current actual geometry co-applies once only when host sequence
+matches that result's authorized release. Within that sequence, a newer draft
+or restaged files may change the actual height; ACK remains clear-readiness
+permission rather than a lock to its old scalar. iOS supersession can combine
+into T only through its existing current-full-result rules. Android cannot drop S.
+
+Explicit fallback: after a COMPLETE mount transaction, an absent/detached,
+ambiguous or wrong-surface host invalidates the bound sample. Never read another
+owner/window or reuse its cached height. Enter legacy mode for that list/binding
+generation, applying an authorized release with its captured React inset through
+the EXISTING native barrier rather than hiding its row indefinitely. Keep current
+applied geometry while transitioning; do not replay an arbitrary stale bottom
+setter merely because a weak reference vanished. A later valid host establishes
+a fresh bound lifetime from current native applied release and measured geometry;
+old callbacks/results cannot rebind it. Duplicate live owners are invalid. Owner
+change or sequence regression invalidates the old lifetime and uses explicit
+legacy/rebind handling, never resets an old applied release silently. Shared
+binding nil explicitly returns bottom ownership to React. Old binaries never
+mount the host or send the prop.
+
+Freeze/landing: buffer ordinary observations without touching InsetsGate/InsetHold
+while a pair, freeze or actual landing owns geometry. Resolve final geometry
+before a deferred landing captures its destination. A landing token remains
+active through real-view restoration/frame handback, not just animation end or
+lift=null. Completion/cancel guarded by owner, newer lift, detach and generation.
+No-barrier landing keeps its behavior. Neither a prop setter nor post-mount sample
+can restart an interrupted generic latest navigation.
+
+Runtime proof must include React TextInput's own useLayoutEffect native
+setTextAndSelection and later attributed-state mount, not assume controlled text
+never uses native commands. Log actual host sequence/height at complete mounts
+and native pair applies, plus the existing shared identity/ACK timeline, keeping
+clocks separate. Include autocorrection rejection clear, coalesced rapid sends,
+release-only cancel/same-height, remount/missing-host fallback and900 ms deliberate
+actual-UI stall. Source feasibility and unit tests alone do not clear growth.

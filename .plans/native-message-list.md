@@ -2986,3 +2986,21 @@ lint, typecheck, test, React Doctor against origin/t3/native-message-list,
 then format. Six composer hook tests and four press UI tests pass. These tests
 do not establish same-frame growth or native recognizer timing. Video before
 and after plus the still-failing growth experiment are uploaded in the PR.
+
+Shared checkpoint85ee82dc and native gesture merges9ef0592a are pushed. Combined
+ordered checks plus format pass. RN fallback actual tap on the existing
+8-line message opens its Thread route; a450 ms hold on its text opens Copy/Edit/
+View Reactions/Delete without another thread navigation. Recordings are
+`r2-ios-rn-thread-release.mp4` and `r2-ios-rn-text-hold.mp4`. The tap clip has
+15 slow frames/worst93.6 ms at22% average/26% peak Mac CPU, retained as behavior
+evidence. The hold clip accidentally overlaps the repository checks, so its
+three-slow-frame report is NOT uncontaminated performance evidence. That
+measurement mistake does not count as a motion pass; no repeat profiling loop.
+Both devices and Device panel are down, normal8492 continues serving phones.
+
+Concrete growth revision3 in `.plans/native-composer-growth.md` is at mutual
+native source review before code. Parent accepts its bounded direction and
+current-height reconciliation in principle, requiring exact8pt gap transport,
+post-mount ordering, rapid-send/FIFO, missing-host fallback and real landing
+lifetime rules. Those are now written explicitly; no height implementation or
+phone readiness is claimed.
