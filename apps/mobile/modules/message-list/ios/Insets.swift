@@ -93,6 +93,14 @@ struct InsetsGate {
     return next
   }
 
+  /// The bound coordinator is the sole bottom writer. Its result/hold
+  /// authority has already passed, rather than a standalone React setter.
+  mutating func composerApplied(_ next: UIEdgeInsets) {
+    sentThisBatch = false
+    thawedThisBatch = false
+    commit(next)
+  }
+
   private mutating func commit(_ next: UIEdgeInsets) {
     waiting = nil
     rowsVersion = nil

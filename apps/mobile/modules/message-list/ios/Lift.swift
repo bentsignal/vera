@@ -31,6 +31,11 @@ final class Lifter {
 
   private var lifted: Lifted?
   private weak var card: UIView?
+  private var restorations = ComposerLandingTokens()
+  private var landingAnimators: [Int: UIViewPropertyAnimator] = [:]
+  var isLanding: Bool { restorations.active }
+  /// A signal to re-evaluate CURRENT geometry, with no old owner/size payload.
+  var onRestored: (() -> Void)?
   /// The row whose part is out of the list, if any.
   var rowId: String? { lifted?.request.rowId }
 
@@ -50,6 +55,9 @@ final class Lifter {
       return
     }
     land(into: nil)
+    // A new lift cancels the old handoff. Return its real views before
+    // borrowing again, so the old container can never become their home.
+    finishLandings()
     guard let pieces = cell.liftPieces(part: request.part, index: request.index), !pieces.views.isEmpty else { return }
     let body = cell.bodyView
 
@@ -121,6 +129,7 @@ final class Lifter {
   func land(into cell: MessageCell?) {
     guard let lifted else { return }
     self.lifted = nil
+    let restoration = restorations.begin()
     let container = lifted.container
     // An update that waited for the part goes in as it lands.
     if let cell, cell === lifted.cell { cell.beginLanding(duration: 0.24) }
@@ -130,6 +139,7 @@ final class Lifter {
       return cell.bodyView.convert(pieces.frame, to: window)
     }()
     let animator = UIViewPropertyAnimator(duration: 0.24, timingParameters: Self.land)
+    landingAnimators[restoration] = animator
     let card = self.card
     animator.addAnimations {
       card?.alpha = 0
@@ -141,6 +151,8 @@ final class Lifter {
       }
     }
     animator.addCompletion { _ in
+      guard self.restorations.restored(restoration) else { return }
+      self.landingAnimators[restoration] = nil
       for (view, home, frame) in lifted.pieces {
         home.addSubview(view)
         view.frame = frame
@@ -149,6 +161,7 @@ final class Lifter {
       lifted.cell?.reseat(lifted.pieces.map(\.view))
       lifted.cell?.isLifted = false
       lifted.cell?.setTapbacksHidden(false, fade: Self.tapbacksReturn)
+      self.onRestored?()
     }
     let shadow = CABasicAnimation(keyPath: "shadowOpacity")
     shadow.fromValue = container.layer.presentation()?.shadowOpacity ?? 0.22
@@ -157,6 +170,13 @@ final class Lifter {
     container.layer.shadowOpacity = 0
     container.layer.add(shadow, forKey: "shadow")
     animator.startAnimation()
+  }
+
+  func finishLandings() {
+    for animator in Array(landingAnimators.values) {
+      animator.stopAnimation(false)
+      animator.finishAnimation(at: .end)
+    }
   }
 
   /// Scaled from its top corner on its side (or top middle), then moved.

@@ -614,5 +614,189 @@ check(!latest.follows(rowsVersion: 24, generation: secondNavigation), "drag, sto
 latest.begin(rowsVersion: 25)
 check(latest.follows(rowsVersion: 25, generation: latest.generation), "a new explicit command works after user interruption")
 
+// MARK: Composer layout revision 3, mounted geometry and release authority
+
+func composerBinding(_ release: Int, owner: String = "composer", gap: CGFloat = 8) -> ComposerLayout.Binding {
+  ComposerLayout.Binding(json: ["owner": owner, "release": release, "gap": gap])!
+}
+let composerHostA = NSObject()
+let composerHostB = NSObject()
+func composerSample(_ sequence: Int, _ height: CGFloat, secondHost: Bool = false) -> ComposerLayout.Sample {
+  ComposerLayout.Sample(host: ObjectIdentifier(secondHost ? composerHostB : composerHostA), sequence: sequence, height: height)
+}
+func composerInset(_ bottom: CGFloat, top: CGFloat = 12) -> UIEdgeInsets {
+  UIEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
+}
+var composer = ComposerLayout()
+check(composer.configure(composerBinding(0), inset: composerInset(84)), "binding creates an initial apply barrier")
+let beforeSeal = composer.capture(inset: .zero, fallback: composerInset(84))!
+check(!composer.canApply(beforeSeal), "initial synchronous measurement cannot apply before complete mount")
+composer.seal(composerSample(0, 76))
+check(!composer.accepts(beforeSeal), "first actual host establishes a fresh result generation")
+let initialComposer = composer.capture(inset: .zero, fallback: composerInset(84))!
+check(composer.canApply(initialComposer), "complete mount authorizes initial placement")
+equal(composer.target(for: initialComposer, current: .zero, top: 12), composerInset(84), "actual bar76 plus explicit gap8 once")
+composer.applied(initialComposer)
+composer.seal(composerSample(0, 98))
+equal(composer.ordinary(current: composerInset(84), react: composerInset(84), blocked: false), composerInset(106), "ordinary newline follows actual mounted height without React bottom")
+equal(composer.ordinary(current: composerInset(106), react: composerInset(84, top: 20), blocked: false), composerInset(106, top: 20), "top remains React-owned while bottom stays native")
+equal(composer.ordinary(current: composerInset(84), react: composerInset(84), blocked: true), nil, "freeze, held pair, lift and actual landing block ordinary writes")
+
+// The clear mounts before the list's new props: host sequence alone holds.
+composer.seal(composerSample(1, 76))
+equal(composer.ordinary(current: composerInset(106), react: composerInset(84), blocked: false), nil, "host ahead of applied release holds its clear immediately")
+check(composer.configure(composerBinding(1), inset: composerInset(84)), "same-height/cancel release alone creates work, with no rows change")
+let releaseOneUnsealed = composer.capture(inset: composerInset(106), fallback: composerInset(84))!
+check(!composer.canApply(releaseOneUnsealed), "release setter is not a mount seal")
+composer.seal(composerSample(1, 120))
+let releaseOne = composer.capture(inset: composerInset(106), fallback: composerInset(84))!
+equal(composer.target(for: releaseOne, current: composerInset(106), top: 12), composerInset(128), "new draft in matching sequence co-applies actual120 plus gap once")
+check(composer.pending, "React release/publication does not clear worker apply barrier")
+equal(composer.ordinary(current: composerInset(106), react: composerInset(128), blocked: false), nil, "standalone ordinary report cannot supersede pending pair")
+
+// S was released, then T cleared before S's result. S cannot borrow T.
+composer.seal(composerSample(2, 60))
+check(composer.canApply(releaseOne), "older authorized S can finish when host has advanced to T")
+equal(composer.target(for: releaseOne, current: composerInset(106), top: 12), composerInset(84), "S uses captured React paired inset, never T's actual height")
+composer.applied(releaseOne)
+equal(composer.appliedRelease, 1, "finishing S cannot mark T applied")
+equal(composer.ordinary(current: composerInset(84), react: composerInset(68), blocked: false), nil, "T stays held after S completion")
+_ = composer.configure(composerBinding(2), inset: composerInset(68))
+composer.seal(composerSample(2, 76))
+let releaseTwo = composer.capture(inset: composerInset(84), fallback: composerInset(68))!
+composer.applied(releaseOne)
+check(composer.pending, "duplicate S completion cannot unblock released T")
+equal(composer.target(for: releaseTwo, current: composerInset(84), top: 12), composerInset(84), "matching T can apply changed actual geometry even if ACK scalar was68")
+composer.applied(releaseTwo)
+equal(composer.appliedRelease, 2, "T advances only at its native apply")
+
+// Missing/ambiguous/wrong-surface hosts all arrive as nil after full mount.
+let oldBoundResult = composer.capture(inset: composerInset(84), fallback: composerInset(68))!
+composer.seal(nil)
+check(composer.legacy, "missing host explicitly enters legacy mode")
+check(!composer.accepts(oldBoundResult), "missing host invalidates cached result lifetime")
+let missingHostResult = composer.capture(inset: composerInset(84), fallback: composerInset(68))!
+check(composer.canApply(missingHostResult), "absent host cannot hide an authorized row indefinitely")
+equal(composer.target(for: missingHostResult, current: composerInset(84), top: 12), composerInset(84), "legacy transition retains current geometry, not stale React68")
+equal(composer.ordinary(current: composerInset(84), react: composerInset(68), blocked: false), nil, "weak-host loss alone cannot replay arbitrary old bottom")
+_ = composer.configure(composerBinding(2), inset: composerInset(98))
+composer.seal(nil)
+equal(composer.ordinary(current: composerInset(84), react: composerInset(98), blocked: false), composerInset(98), "a subsequent actual React fallback report can follow in legacy mode")
+_ = composer.configure(composerBinding(3), inset: composerInset(84))
+composer.seal(nil)
+let missingRelease = composer.capture(inset: composerInset(98), fallback: composerInset(84))!
+check(composer.canApply(missingRelease), "canceled/no-change release with no host uses explicit legacy barrier")
+equal(composer.target(for: missingRelease, current: composerInset(98), top: 12), composerInset(84), "missing-host release uses captured authorized inset")
+composer.applied(missingRelease)
+
+composer.seal(composerSample(3, 98, secondHost: true))
+check(!composer.accepts(missingRelease), "rebind creates a fresh generation")
+equal(composer.appliedRelease, 3, "rebind preserves applied release")
+equal(composer.ordinary(current: composerInset(84), react: composerInset(84), blocked: false), composerInset(106), "fresh host can resume current ordinary geometry")
+composer.seal(composerSample(2, 76, secondHost: true))
+check(composer.legacy, "host sequence regression falls back rather than resets applied release")
+equal(composer.appliedRelease, 3, "regression cannot regress authority")
+_ = composer.configure(composerBinding(2), inset: composerInset(12))
+composer.seal(composerSample(3, 98, secondHost: true))
+check(composer.legacy, "regressed release publisher remains legacy until it catches up")
+equal(composer.binding?.release, 3, "old release cannot replace latest authorized sequence")
+_ = composer.configure(composerBinding(3), inset: composerInset(84))
+composer.seal(composerSample(3, 98, secondHost: true))
+check(!composer.legacy, "valid publisher can establish a fresh bound lifetime")
+let detachedAuthority = composer.capture(inset: composerInset(106), fallback: composerInset(84))!
+composer.detach()
+check(!composer.accepts(detachedAuthority), "detach rejects pending owner callbacks/results")
+check(!composer.sealed, "detach needs a new complete mount")
+_ = composer.configure(composerBinding(0, owner: "other"), inset: composerInset(84))
+composer.seal(composerSample(0, 76))
+check(!composer.accepts(detachedAuthority), "another conversation cannot use old owner's result")
+equal(composer.appliedRelease, 0, "only an explicit owner lifetime change starts a new release space")
+_ = composer.configure(nil, inset: composerInset(84))
+equal(composer.capture(inset: composerInset(84), fallback: composerInset(84)), nil, "binding nil explicitly restores the old React path")
+
+// Same-store remount replays persistent release without waiting for new rows.
+var remountedComposer = ComposerLayout()
+_ = remountedComposer.configure(composerBinding(4, gap: 13), inset: composerInset(89))
+remountedComposer.seal(composerSample(4, 76))
+let replay = remountedComposer.capture(inset: .zero, fallback: composerInset(89))!
+check(remountedComposer.canApply(replay), "published release can replay on a new list")
+equal(remountedComposer.target(for: replay, current: .zero, top: 12), composerInset(89), "gap is explicit13, never native magic8")
+remountedComposer.applied(replay)
+equal(remountedComposer.appliedRelease, 4, "replay completes persistent authority")
+let invalidComposerBindings: [JSON] = [["owner": "", "release": 0, "gap": 8], ["owner": "x", "release": -1, "gap": 8], ["owner": "x", "release": 0.5, "gap": 8], ["owner": "x", "release": 1, "gap": -1]]
+for invalid in invalidComposerBindings {
+  equal(ComposerLayout.Binding(json: invalid), nil, "invalid binding cannot establish an authority")
+}
+var landingTokens = ComposerLandingTokens()
+let oldLanding = landingTokens.begin()
+let newLanding = landingTokens.begin()
+check(landingTokens.active, "landing blocks ordinary geometry before real restoration")
+check(landingTokens.restored(oldLanding), "old landing restores its own views")
+check(landingTokens.active, "old completion cannot release a newer landing")
+check(!landingTokens.restored(oldLanding), "duplicate old completion cannot restore/unblock twice")
+check(landingTokens.restored(newLanding), "new landing has its own restoration token")
+check(!landingTokens.active, "ordinary geometry may resume only after all real restores")
+
+// CLOSE grants a fixed release ceiling, not a general frozen-geometry flush.
+var closingComposer = ComposerLayout()
+_ = closingComposer.configure(composerBinding(0), inset: composerInset(128))
+closingComposer.seal(composerSample(0, 120))
+closingComposer.applied(closingComposer.capture(inset: .zero, fallback: composerInset(128))!)
+var closing = ComposerClose()
+closing.begin(closingComposer.capture(inset: composerInset(128), fallback: composerInset(128)), applied: 0, work: 10)
+equal(closing.permission?.token, nil, "normal no-pair close never waits or gains a frozen flush")
+closingComposer.seal(composerSample(1, 76))
+closing.begin(closingComposer.capture(inset: composerInset(128), fallback: composerInset(84)), applied: 0, work: 10)
+equal(closing.permission?.token, nil, "unreleased host ahead cannot delay normal frozen close")
+
+_ = closingComposer.configure(composerBinding(1), inset: composerInset(84))
+let closingS = closingComposer.capture(inset: composerInset(128), fallback: composerInset(84))!
+closing.begin(closingS, applied: 0, work: 11)
+check(closing.current(in: closingComposer), "close before worker finish captures already authorized S")
+check(!closing.permits(closingS, work: 11, layout: closingComposer), "even explicit close cannot bypass complete mount seal")
+closingComposer.seal(composerSample(1, 76))
+check(closing.permits(closingS, work: 11, layout: closingComposer), "matching worker can flush S after complete mount")
+check(!closing.permits(closingS, work: 10, layout: closingComposer), "pre-close result generation cannot use close permission")
+check(closing.permits(closingS, work: 12, layout: closingComposer), "fresh full remeasurement of the same authorized S retains permission")
+let closeBeforeWorker = closing.permission!.token
+closing.begin(closingS, applied: 0, work: 12)
+check(closing.permission!.token != closeBeforeWorker, "a replacement close has a distinct token")
+check(!closing.permits(closingS, work: 11, layout: closingComposer), "replacement close rejects prior worker floor")
+check(closing.permits(closingS, work: 12, layout: closingComposer), "close after held worker finish can flush that current result")
+
+closingComposer.seal(composerSample(2, 60))
+check(closing.permits(closingS, work: 12, layout: closingComposer), "newer unreleased host T does not expand or cancel authorized S")
+equal(closingComposer.target(for: closingS, current: composerInset(128), top: 12), composerInset(84), "frozen close S uses captured S inset, never mounted T60")
+closingComposer.applied(closingS)
+equal(closingComposer.appliedRelease, 1, "close flush releases only S")
+equal(closingComposer.ordinary(current: composerInset(84), react: composerInset(68), blocked: false), nil, "T remains held after the close S apply")
+closing.cancel()
+check(!closing.permits(closingS, work: 12, layout: closingComposer), "real landing consumes close permission before restoration")
+
+_ = closingComposer.configure(composerBinding(2), inset: composerInset(68))
+closingComposer.seal(composerSample(2, 60))
+let closingT = closingComposer.capture(inset: composerInset(84), fallback: composerInset(68))!
+closing.begin(closingT, applied: 1, work: 13)
+check(closing.permits(closingT, work: 13, layout: closingComposer), "later explicit close can authorize T independently")
+check(closing.cancel(), "refreeze/new lift cancels the active close handoff")
+check(!closing.permits(closingT, work: 13, layout: closingComposer), "refreeze/new lift cannot run an obsolete frozen apply")
+closing.begin(closingT, applied: 1, work: 14)
+_ = closingComposer.configure(composerBinding(3), inset: composerInset(84))
+closingComposer.seal(composerSample(3, 76))
+check(!closing.current(in: closingComposer), "new authorized release invalidates older close instead of widening it")
+let closingNewer = closingComposer.capture(inset: composerInset(84), fallback: composerInset(84))!
+check(!closing.permits(closingNewer, work: 14, layout: closingComposer), "S close cannot flush newer authorized result T")
+closing.begin(closingNewer, applied: 1, work: 15)
+closingComposer.seal(nil)
+check(!closing.current(in: closingComposer), "missing-host lifetime change cancels obsolete close generation")
+let closingLegacy = closingComposer.capture(inset: composerInset(84), fallback: composerInset(84))!
+closing.begin(closingLegacy, applied: 1, work: 16)
+check(closing.permits(closingLegacy, work: 16, layout: closingComposer), "explicit legacy release can close after its complete missing-host seal")
+closingComposer.detach()
+check(!closing.current(in: closingComposer), "detach invalidates the old close owner lifetime")
+_ = closingComposer.configure(composerBinding(3, owner: "other"), inset: composerInset(84))
+closingComposer.seal(composerSample(3, 76))
+check(!closing.permits(closingLegacy, work: 17, layout: closingComposer), "new owner never inherits an old close permission")
+
 print("\(checks - failures) of \(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

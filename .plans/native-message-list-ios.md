@@ -274,6 +274,77 @@ link, production build, merge, release or data operation is authorized here.
 The Android camera Dev crash and unrounded production preview remain a
 bounded private production retest item with integration, not an iOS task.
 
+## Mounted composer geometry, revision 3, 2026-10-24
+
+This supersedes the earlier statement that no native height path was selected.
+Both native owners and the parent accepted integration's stable revision 3,
+contract checkpoint `9affdc9e` and shared checkpoint `b02996b5`. Shared remains
+the sole owner of types and React publication. The optional named
+MessageListComposer wraps only the existing Bar and publishes owner/sequence.
+The list receives persistent authorized release plus explicit gap. No editor
+text, height prediction, timer, second shared inset writer, or new keyboard
+policy is added.
+
+The iOS module prepares only its default-list and named-composer Fabric
+adapters before selector caching. Its local Objective-C++ mount observer seals
+after the complete surface transaction, including initial synchronous work.
+Surface identity is read on attachment. A module-local weak registry indexes
+hosts by surface/owner and checks duplicates when membership or owner changes.
+Height-only seals reuse that weak index and read the current host bounds,
+without a window search or repeated ancestor walk. The wrapper must have one
+Bar child with matching origin and dimensions or the binding falls back.
+
+Native owns ordinary bottom geometry while bound: actual mounted Bar height
+plus the explicit shared gap once. Host sequence ahead of the applied release
+holds geometry before list props arrive. Every measured full result captures
+owner, binding generation, release and paired React inset. Only the current
+measurement may apply. Release-only, same-height and cancellation props still
+create an apply barrier. A result S after newer host T uses captured S inset,
+never T height or authority. Missing/ambiguous hosts after a complete seal use
+explicit legacy geometry and a fresh generation; stale cached heights cannot
+escape. Rebinding, owner changes and detach reject old results.
+
+### Explicit close while an authorized pair is frozen
+
+The parent and both native owners also accepted a close-only exception. At
+close, native captures owner, binding generation, authorized release, close
+token and work-generation floor. Only that release can finish after its mount
+seal while the keyboard remains frozen. Both result completion and layout
+retain the applied keyboard offset, so the hidden root keyboard is never used
+for this flush. The real part remains borrowed until the final paired layout,
+then its existing 240 ms landing captures the new raised destination. S after
+unreleased T still uses captured S inset and leaves T held. This can delay
+landing start until worker/seal completion, but no longer requires thaw.
+
+No-pair or merely unreleased-host close starts normally into current raised
+geometry. A newer release, binding lifetime, refreeze, new lift or detach
+invalidates obsolete close authority. Cancellation lands into current geometry
+rather than waiting on a canceled permit. A new lift completes any interrupted
+real-view restoration before borrowing again, preventing an old landing
+container from becoming the new views' home. Ordinary observations remain
+blocked through actual restoration. No native thaw, focus/window handoff,
+latest-navigation restart or new shared field is added. iOS retains its
+current latest-full-result policy; Android keeps its separate FIFO policy.
+
+Focused checks pass: 314/314 compiled host checks, all 23 Swift files against
+the installed arm64 simulator SDK, and the Objective-C++ bridge against actual
+React Native headers and SDK. These cover release/host order, complete seals,
+S/T authority, fallback, remount, cancellation, stale generations and close
+permissions. They do not prove physical Fabric mounting, UIKit motion, or
+Modal lifetime. Opt-in DEBUG `VeraComposerLayoutTrace` default or
+`VERA_COMPOSER_LAYOUT_TRACE=1` logs owner/sequence/height/seal/apply metadata,
+including frozen-close keyboard offset, with no text. Ordered lint,
+typecheck, tests and React Doctor against `origin/t3/native-message-list`,
+then format:fix pass. The heavy lock is released.
+
+Integration owns the combined Pod/link build and runtime gate: both layouts,
+fonts, newline/backspace/wrap and attachment growth with same-row trajectories;
+clear-before-list and delayed UI send ordering; matching actual draft height;
+missing/rebound hosts; real menu close before and after worker finish; raised
+landing and keyboard return; normal unpaired close, interruption and final
+8 pt gap. Both updated Dev clients must be delivered together. This checkout
+has run no device, full-client or phone build and claims no runtime pass.
+
 ## Checks
 
 - Earlier phone-polish checkpoint: `Tests/run.sh`, 94 checks. 61 of them are new, for the reaction toggle
