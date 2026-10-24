@@ -67,6 +67,41 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   private var pendingRows: ReadableArray? = null
   private var rowsChanged = false
   private var rowsVersion = 0L
+  private data class ApplyResult(val next: List<Row>, val diff: DiffUtil.DiffResult?, val inset: Inset?, val version: Long,
+    val composer: ComposerApply?, val changed: Boolean)
+  private val applies = ArrayDeque<ApplyResult>()
+  private val composer = ComposerLayout()
+  private var composerBarrier = false
+  private var ordinaryInset: Inset? = null
+  private var composerOwnerChanged = false
+  private var liftChanged = false
+  private var mounting = false
+  private var draining = false
+  private var pendingApplies = 0
+  private var composerNeedsReplay = false
+  private var composerThawed = false
+  private var landing = false
+  private var landingGeneration = 0L
+  private var pendingLand = false
+  private var closePermission: ComposerClose? = null
+  private var closeKeyboard: Int? = null
+  private val landCompletions = mutableListOf<() -> Unit>()
+  private val composerMounts = ComposerMounts(this, {
+    mounting = true
+    composer.invalidate()
+  }, { sample ->
+    mounting = false
+    composer.seal(sample)
+    if (composerNeedsReplay) {
+      composerNeedsReplay = false
+      if (composer.binding != null) {
+        composerBarrier = true
+        commit()
+      }
+    }
+    composerTrace(this) { "seal owner=${composer.binding?.owner} release=${composer.binding?.release} sequence=${sample?.sequence} height=${sample?.height} generation=${composer.generation}" }
+    drainApplies()
+  })
   private val latestScroll = LatestScroll()
 
   private var behavior = Behavior.DEFAULT
@@ -172,6 +207,22 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     animator.fadeMs = behavior.fadeMs
   }
 
+  fun setComposer(map: ReadableMap?) {
+    val owner = map?.str("owner")?.takeIf { it.isNotEmpty() }
+    val release = map?.num("release")?.takeIf { it.isFinite() && it >= 0 }
+    val gap = map?.num("gap")?.takeIf { it.isFinite() && it >= 0 }
+    val binding = if (owner != null && release != null && gap != null) ComposerBinding(owner, release.toLong(), gap.toFloat()) else null
+    val previous = composer.binding
+    val previousGeneration = composer.generation
+    val change = composer.bind(binding)
+    if (change != ComposerChange.NONE) {
+      // A changed gap is ordinary UI geometry, not send authorization.
+      if (change == ComposerChange.BARRIER) composerBarrier = true
+      if (previous != null && previousGeneration != composer.generation) composerOwnerChanged = true
+    }
+    composerMounts.owner = binding?.owner
+  }
+
   fun setInsets(map: ReadableMap?) {
     keyboardOverlap = map?.num("keyboardOverlap")?.let { units.px(it.toFloat()) }
     // Applied in `commit`, once the update's other props are in: with the
@@ -188,6 +239,12 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     easing?.cancel()
     if (frozen) {
       if (latestScroll.active) recycler.stopScroll()
+      if (pendingLand || landing) cancelLanding()
+      return
+    }
+    if (composer.binding != null) {
+      // The mount seal drains paired rows before sampling final IME geometry.
+      composerThawed = true
       return
     }
     // Following again: ease to where the keyboard is now, if it moved meanwhile.
@@ -219,6 +276,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   fun setKeyboard(enabled: Boolean) {
     followKeyboard = enabled
+    if (composer.binding != null && (mounting || !composer.sealed || keyboardFrozen || composer.waiting() || pendingLand || landing)) return
     if (!enabled) keyboard = 0 else keyboard = keyboardLift(ViewCompat.getRootWindowInsets(this))
     padApplied()
   }
@@ -244,12 +302,17 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   fun setLift(request: LiftRequest?) {
     if (request == lift) return
     lift = request
-    if (request == null) lifter.land()
+    liftChanged = true
+  }
+
+  private fun updateLift(request: LiftRequest?) {
+    if (request == null) requestLand()
     else {
       latestScroll.cancel()
       recycler.stopScroll()
       val position = rows.rows.indexOfFirst { it.id == request.rowId }
       val holder = recycler.findViewHolderForAdapterPosition(position) as? RowHolder ?: return
+      cancelLanding()
       val pressed = heldScale?.takeIf { it.first == HoldTarget(request.rowId, request.part, request.index) }?.second
       heldScale = null
       lifter.lift(request, holder, pressed)
@@ -258,36 +321,189 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   fun landLift(promise: expo.modules.kotlin.Promise) {
     lift = null
-    lifter.land { promise.resolve(null) }
+    requestLand { promise.resolve(null) }
+  }
+
+  private fun cancelLanding() {
+    landingGeneration++
+    landing = false
+    pendingLand = false
+    closePermission = null
+    closeKeyboard = null
+    composer.cancelClose()
+    // finish resolves active callbacks only after returning the real pieces.
+    lifter.finish()
+    val canceled = landCompletions.toList()
+    landCompletions.clear()
+    canceled.forEach { it() }
+  }
+
+  private fun requestLand(completion: (() -> Unit)? = null) {
+    if (composer.binding == null || landing) {
+      // An active landing can acquire another waiter without taking another
+      // destination or widening its already captured close authority.
+      lifter.land(completion)
+      return
+    }
+    completion?.let { landCompletions.add(it) }
+    if (pendingLand) return
+    pendingLand = true
+    closePermission = composer.close(++landingGeneration)
+    closeKeyboard = if (keyboardFrozen) keyboard else null
+    // Props can still be mounting. No destination capture before the seal.
+    if (!mounting && composer.sealed) drainApplies()
+  }
+
+  private fun beginLandIfReady() {
+    if (!pendingLand || landing || mounting || !composer.sealed) return
+    val permission = closePermission ?: return
+    if (!composer.accepts(permission)) {
+      cancelLanding()
+      return
+    }
+    if (composer.closeWaiting(permission)) return
+    pendingLand = false
+    landing = true
+    val token = permission.token
+    val completions = landCompletions.toList()
+    landCompletions.clear()
+    composerTrace(this) { "land:begin owner=${permission.owner} release=${permission.release} token=$token keyboardPx=$keyboard" }
+    lifter.land {
+      composerTrace(this) { "land:restored owner=${permission.owner} token=$token current=${token == landingGeneration}" }
+      completions.forEach { it() }
+      if (token == landingGeneration && composer.accepts(permission)) {
+        landing = false
+        closePermission = null
+        closeKeyboard = null
+        composer.cancelClose()
+        drainApplies()
+      }
+    }
   }
 
   /** Applies the props that changed together, once they're all in. */
   fun commit() {
+    // Owner and lift props can arrive in either order. Cancel the previous
+    // owner's restoration before opening this batch's lift, never afterward.
+    if (composerOwnerChanged) {
+      composerOwnerChanged = false
+      cancelLanding()
+      if (!liftChanged) lift = null
+    }
+    if (liftChanged) {
+      liftChanged = false
+      updateLift(lift)
+    }
     val inset = insets.take()
-    if (!rowsChanged) {
-      if (inset != null) applyPadding()
+    val changed = rowsChanged
+    val bound = composer.binding != null
+    val barrier = bound && composerBarrier
+    val unbind = composerBarrier && !bound
+    composerBarrier = false
+    if (!changed && !barrier && !unbind) {
+      if (bound) {
+        // React bottom reports can trail actual UI growth. Keep current top
+        // and an explicit legacy fallback, but never queue a worker for them.
+        if (inset != null) ordinaryInset = inset
+      } else if (inset != null) applyPadding()
       return
     }
+    ordinaryInset = null
     rowsChanged = false
-    // An inset change that comes with rows (a send: the composer shrinks as
-    // the message arrives) applies with them, in the same layout pass, so
-    // the rows above make one move. Until then the list keeps the old inset.
     val array = pendingRows
+    val authority = composer.capture(inset ?: insets.latest)
     val version = ++rowsVersion
+    pendingApplies++
+    val carried = if (unbind) inset ?: insets.latest else inset
+    // Even a release-only same-height/cancel result follows every submitted
+    // diff. workerRows is the chained diff base and must never be skipped.
     work.execute {
-      val next = decodeRows(array)
+      val next = if (changed) decodeRows(array) else workerRows
       val before = workerRows
       workerRows = next
-      val diff = if (before.isEmpty()) null else DiffUtil.calculateDiff(RowsDiff(before, next), false)
-      main.post { timed({ "apply ${next.size} rows" }) { apply(next, diff, inset, version) } }
+      val diff = if (!changed || before.isEmpty()) null else DiffUtil.calculateDiff(RowsDiff(before, next), false)
+      main.post {
+        applies.addLast(ApplyResult(next, diff, carried, version, authority, changed))
+        drainApplies()
+      }
+    }
+  }
+
+  private fun drainApplies() {
+    if (draining || mounting || landing) return
+    if (composer.sealed && !composerMounts.valid(composer.sample)) {
+      composer.seal(null)
+      composerTrace(this) { "fallback owner=${composer.binding?.owner} staleHostBetweenMounts=true" }
+    }
+    draining = true
+    try {
+      while (applies.isNotEmpty()) {
+        // With no authorized pair left, normal close wins over ordinary or
+        // later-release work. That work remains FIFO behind restoration.
+        if (pendingLand && closePermission?.let { !composer.closeWaiting(it) } == true) break
+        val result = applies.first()
+        val holdingCloseKeyboard = closeKeyboard != null && (pendingLand || landing)
+        val frozenCloseFlush = holdingCloseKeyboard && composer.closeFlush(result.composer, closePermission)
+        val coordinated = composer.binding != null || result.composer != null
+        if (coordinated && !composer.canApply(result.composer, (keyboardFrozen || holdingCloseKeyboard) && !frozenCloseFlush)) break
+        applies.removeFirst()
+        pendingApplies--
+        val padding = when {
+          coordinated && (keyboardFrozen || holdingCloseKeyboard) && !frozenCloseFlush -> null
+          result.composer != null -> composer.inset(result.composer)
+          else -> insets.withRows(result.inset)
+        }
+        if (holdingCloseKeyboard) keyboard = closeKeyboard!!
+        else if (coordinated && !keyboardFrozen) keyboard = keyboardLift(ViewCompat.getRootWindowInsets(this))
+        composerTrace(this) { "apply owner=${result.composer?.binding?.owner} release=${result.composer?.binding?.release} sequence=${composer.sample?.sequence} height=${composer.sample?.height} bottom=${padding?.bottom} version=${result.version} generation=${result.composer?.generation} closeFlush=$frozenCloseFlush keyboardPx=$keyboard" }
+        timed({ "apply ${result.next.size} rows" }) {
+          if (result.changed) apply(result.next, result.diff, padding, result.version, resumeLatest = !pendingLand && !holdingCloseKeyboard)
+          else if (padding != null) {
+            setPaddingOnly(padding)
+            layoutNow()
+          }
+        }
+        result.composer?.let { composer.applied(it) }
+      }
+      refreshComposerGeometry()
+      if (composer.binding != null && composer.sealed && !keyboardFrozen && !landing && !pendingLand && pendingApplies == 0 && !composer.waiting()) {
+        val target = keyboardLift(ViewCompat.getRootWindowInsets(this))
+        if (target != keyboard) {
+          keyboard = target
+          padApplied()
+        }
+        if (composerThawed) {
+          composerThawed = false
+          retargetLatest()
+        }
+      }
+    } finally { draining = false }
+    beginLandIfReady()
+  }
+
+  private fun refreshComposerGeometry() {
+    val actual = composer.ordinary(keyboardFrozen, landing || pendingLand)
+    val legacy = if (composer.binding != null && composer.sealed && composer.sample == null && !composer.waiting() &&
+      !keyboardFrozen && !landing && !pendingLand && pendingApplies == 0) ordinaryInset else null
+    val inset = actual?.copy(top = insets.latest.top) ?: legacy ?: return
+    // A valid native sample ignores a chasing React bottom. Once consumed,
+    // its old fallback can never replay merely because the host disappears.
+    ordinaryInset = null
+    if (!keyboardFrozen) keyboard = keyboardLift(ViewCompat.getRootWindowInsets(this))
+    if (insets.applied != inset || recycler.paddingBottom != units.px(inset.bottom) + keyboard) {
+      setPaddingOnly(inset)
+      layoutNow()
+      // Passive observations cannot create a navigation request. This only
+      // continues an existing, uncanceled generic intent.
+      retargetLatest()
     }
   }
 
   // MARK: Applying rows
 
-  private fun apply(next: List<Row>, diff: DiffUtil.DiffResult?, padding: Inset? = null, version: Long = rowsVersion) {
-    // A newer inset than the one these rows came with has applied already.
-    val inset = insets.withRows(padding)
+  private fun apply(next: List<Row>, diff: DiffUtil.DiffResult?, padding: Inset? = null, version: Long = rowsVersion, resumeLatest: Boolean = true) {
+    // Legacy supersession or composer authority was resolved before entering.
+    val inset = padding
     val before = rows.rows
     hasBubbles = next.any { it is MessageRow && !it.stacked }
     if (!shown || before.isEmpty()) {
@@ -298,7 +514,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
       if (next.isNotEmpty()) {
         if (width == 0 || height == 0) placeWhenSized = true else placeInitially(next)
       }
-      if (latestScroll.follows(version)) retargetLatest()
+      if (resumeLatest && latestScroll.follows(version)) retargetLatest()
       return
     }
     // Measured before the composer's inset changes.
@@ -328,7 +544,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     animator.rising = emptySet()
     animator.handoff = null
     animator.animate = true
-    if (following) retargetLatest()
+    if (resumeLatest && following) retargetLatest()
     recycler.post { report(0) }
   }
 
@@ -408,6 +624,10 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   // MARK: Insets and the keyboard
 
   private fun applyPadding() {
+    if (composer.binding != null) {
+      refreshComposerGeometry()
+      return
+    }
     val inset = insets.latest
     insets.markApplied(inset)
     val top = units.px(inset.top)
@@ -443,6 +663,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   private fun setKeyboardLift(lift: Int) {
     if (lift == keyboard) return
+    if (composer.binding != null && (mounting || !composer.sealed || composer.waiting() || landing || pendingLand)) return
     keyboard = lift
     padApplied()
   }
@@ -486,6 +707,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
+    composerMounts.attach(appContext.reactContext as? com.facebook.react.bridge.ReactContext)
     // Frozen under the menu, the list keeps the keyboard it had.
     if (!keyboardFrozen) setKeyboardLift(keyboardLift(ViewCompat.getRootWindowInsets(this)))
   }
@@ -509,9 +731,14 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   override fun onDetachedFromWindow() {
+    composerMounts.detach()
+    composer.detach()
+    composerNeedsReplay = composer.binding != null
+    composerThawed = false
+    ordinaryInset = null
+    cancelLanding()
     latestScroll.cancel()
     recycler.stopScroll()
-    lifter.finish()
     super.onDetachedFromWindow()
     revealAnimator?.cancel()
   }
