@@ -106,3 +106,37 @@ final class AvatarView: UIImageView {
     return image
   }
 }
+
+/// A typing face, as typing-parts.tsx `Faces` draws one: the photo (or
+/// monogram) at its own size, `xs` 18 or `sm` 28, inside a ring in the
+/// page's color that sets it off from the face under it. The ring sits
+/// around the photo, never over it, so initials keep their size and fit.
+final class RingedAvatarView: UIView {
+  private let avatar = AvatarView()
+  private var ring: CGFloat = 0
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    isUserInteractionEnabled = false
+    addSubview(avatar)
+  }
+
+  convenience init() { self.init(frame: .zero) }
+
+  required init?(coder: NSCoder) { fatalError() }
+
+  /// `size` is the photo's; the view is `ring` larger on every side.
+  func set(_ person: Person, size: CGFloat, theme: Theme, ring: CGFloat) {
+    self.ring = ring
+    backgroundColor = theme.background
+    layer.cornerRadius = size / 2 + ring
+    avatar.set(person, size: size, theme: theme)
+    setNeedsLayout()
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    layer.cornerRadius = bounds.width / 2
+    avatar.frame = bounds.insetBy(dx: ring, dy: ring)
+  }
+}

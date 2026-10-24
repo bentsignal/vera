@@ -8,8 +8,9 @@ import UIKit
 // the menu's blur included, go where JavaScript says they fit, and come
 // back to their place in the list when it closes. Only one is ever drawn.
 
-/// What a message lifts: its held part and that part's tapbacks, with the
-/// part's frame in the message's coordinates.
+/// What a message lifts: its held part (a deck's front card, a carousel's
+/// photo), with its frame in the message's coordinates. Its tapbacks stay
+/// in the row, hidden while it's up.
 struct LiftPieces {
   let frame: CGRect
   let views: [UIView]
@@ -36,6 +37,9 @@ final class Lifter {
   /// The menu's open spring (glass-message-menu.tsx: damping 19, mass 0.9,
   /// stiffness 230).
   private static let spring = UISpringTimingParameters(mass: 0.9, stiffness: 230, damping: 19, initialVelocity: .zero)
+  /// How long the row's tapbacks take to fade back in once it's landed
+  /// (tapbacks.tsx RETURN_MS).
+  private static let tapbacksReturn = 0.26
   /// The menu's close: 240 ms, ease-out cubic.
   private static let land = UICubicTimingParameters(controlPoint1: CGPoint(x: 0.215, y: 0.61), controlPoint2: CGPoint(x: 0.355, y: 1))
 
@@ -90,6 +94,8 @@ final class Lifter {
     let lifted = Lifted(request: request, container: container, overlay: overlay, pieces: moved, cell: cell)
     self.lifted = lifted
     cell.isLifted = true
+    cell.outViews = Set(moved.map { ObjectIdentifier($0.0) })
+    cell.setTapbacksHidden(true, fade: 0)
     keepOnTop(overlay, in: window)
     move(lifted, to: request)
   }
@@ -116,6 +122,8 @@ final class Lifter {
     guard let lifted else { return }
     self.lifted = nil
     let container = lifted.container
+    // An update that waited for the part goes in as it lands.
+    if let cell, cell === lifted.cell { cell.beginLanding(duration: 0.24) }
     let destination: CGRect? = {
       guard let cell, let pieces = cell.liftPieces(part: lifted.request.part, index: lifted.request.index, frameOnly: true),
             let window = container.window else { return nil }
@@ -138,7 +146,9 @@ final class Lifter {
         view.frame = frame
       }
       lifted.overlay.removeFromSuperview()
+      lifted.cell?.reseat(lifted.pieces.map(\.view))
       lifted.cell?.isLifted = false
+      lifted.cell?.setTapbacksHidden(false, fade: Self.tapbacksReturn)
     }
     let shadow = CABasicAnimation(keyPath: "shadowOpacity")
     shadow.fromValue = container.layer.presentation()?.shadowOpacity ?? 0.22

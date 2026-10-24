@@ -353,5 +353,154 @@ check(Row(message("g")).message?.morphsFromTyping == true, "text grows out of th
 check(Row(message("g", blocks: [photo(10, 10)])).message?.morphsFromTyping == false, "a photo doesn't")
 check(Row(message("g", layout: "stacked")).message?.morphsFromTyping == false, "nor a stacked row")
 
+// MARK: Phone feedback round 2, 2026-10-24
+
+// Deck cards of different shapes are centered in the tallest one's height,
+// so the pile keeps its height and its middle whichever card is in front.
+let mixedDeck = message("m", blocks: [media([
+  item("0", width: 1200, height: 900), item("1", width: 900, height: 1600), item("2", width: 1000, height: 1000),
+  item("3", reactions: [reaction("3 ❤️")], width: 800, height: 1600),
+])])
+if let layout = messageLayout(mixedDeck), case let .deck(deck) = layout.parts.first?.content {
+  let middles = deck.items.indices.map { deck.cardFrame($0).midY }
+  check(middles.allSatisfy { abs($0 - middles[0]) <= 0.5 }, "every card's middle is the pile's: \(middles)")
+  check(deck.items.indices.allSatisfy { deck.cardFrame($0).minY >= deck.cardTop - 0.5 && deck.cardFrame($0).maxY <= deck.cardTop + deck.tallest + 0.5 },
+        "every card inside the tallest's height")
+  equal(deck.tallest, deck.sizes.map { $0.height }.max() ?? 0, "the tallest of all the cards, not just the front three")
+  // The fourth card is the tallest here; the row is as tall with any in front.
+  if let tapback = deck.tapbacks[3].first {
+    check(abs(tapback.frame.minY - (deck.cardFrame(3).minY - Metrics.tapbackSpace)) < 0.5, "a card's tapbacks sit over its own top corner")
+  } else { check(false, "the fourth card's tapback") }
+  check(deck.cardFrame(9) == .zero, "no card, no frame")
+} else { check(false, "a deck of mixed shapes") }
+
+// A thrown card's trip: about 120 ms out, sooner the faster the finger,
+// never under 70, then 160 ms in behind.
+equal(DeckPile.throwOut(distance: 200, speed: 0), 0.12, "no fling: 120 ms out")
+check(DeckPile.throwOut(distance: 200, speed: 3000) <= DeckPile.throwOut(distance: 200, speed: 1500), "faster finger, quicker throw")
+equal(DeckPile.throwOut(distance: 200, speed: 100_000), 0.07, "never under 70 ms")
+check(DeckPile.throwOut(distance: 200, speed: 500) <= 0.12, "a slow fling is never slower than a release")
+equal(DeckPile.tuckIn, 0.16, "160 ms in behind")
+
+// Stacked typing: photos at their own size inside the ring, the count chip
+// overlapping the last face, the dots centered on the line.
+func typingPeople(_ count: Int, _ layout: String) -> TypingLayout? {
+  let json: JSON = ["id": "t", "kind": "typing", "layout": layout, "people": (0..<count).map { person("p\($0)") }, "label": "People are typing"]
+  if case let .typing(typing) = measurer.layout(Row(json)) { return typing }
+  return nil
+}
+if let line = typingPeople(5, "stacked"), let chip = line.overflow, let label = line.label, let last = line.faces.last?.1 {
+  equal(line.faces.count, 3, "five typing: three faces, then the count")
+  equal(line.faces.first?.1.size, CGSize(width: 18, height: 18), "stacked faces are 18")
+  check(chip.frame.minX < last.maxX, "the count overlaps the last face")
+  check(chip.frame.height >= 18 + 2 * line.faceRing - 0.5, "the count is at least a face, with its ring")
+  check(label.frame.minX >= chip.frame.maxX - line.faceRing, "the label starts after the count")
+  check(abs(line.dots[0].midY - last.midY) < 0.5, "the dots are centered on the faces' line")
+} else { check(false, "five people typing, stacked") }
+if let bubble = typingPeople(5, "bubbles"), let chip = bubble.overflow, let last = bubble.faces.last?.1, let frame = bubble.bubble {
+  equal(bubble.faces.first?.1.size, CGSize(width: 28, height: 28), "bubbles faces are 28")
+  check(chip.frame.minX < last.maxX, "the count overlaps the last face")
+  check(chip.frame.width >= 28 + 4, "the count is at least a face, with its 2-point ring")
+  check(frame.minX >= chip.frame.maxX - 2 + Metrics.avatarGap - 0.5, "the bubble starts a gap after the count")
+} else { check(false, "five people typing, bubbles") }
+
+// Insets: a send's shorter composer goes in with the message sent, a
+// freeze holds them, the order props arrive in doesn't matter, and only the
+// latest insets JavaScript sent can ever go in.
+let tall = UIEdgeInsets(top: 100, left: 0, bottom: 120, right: 0)
+let short = UIEdgeInsets(top: 100, left: 0, bottom: 80, right: 0)
+let medium = UIEdgeInsets(top: 100, left: 0, bottom: 100, right: 0)
+var gate = InsetsGate(applied: tall)
+gate.received(short)
+equal(gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 7), .withRows(version: 7), "with the rows of the same batch")
+equal(gate.applied, tall, "not before those rows")
+equal(gate.take(forRows: 6, frozen: false), nil, "not with rows measured before them")
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 7), .none, "a later batch without insets keeps them waiting")
+equal(gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 8), .none, "so do later rows without insets")
+equal(gate.take(forRows: 7, frozen: false), short, "with their rows")
+equal(gate.applied, short, "then applied")
+equal(gate.take(forRows: 8, frozen: false), nil, "and only once")
+
+// Back to what's laid out while those rows are measured: nothing goes in.
+gate = InsetsGate(applied: tall)
+gate.received(short)
+_ = gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 7)
+gate.received(tall)
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 7), .none, "a revert changes nothing now")
+equal(gate.take(forRows: 7, frozen: false), nil, "and the rows don't bring the old insets in")
+equal(gate.applied, tall, "the list keeps what JavaScript last sent")
+
+// Newer insets with newer rows, before the older rows are measured: the
+// older result takes nothing, the newer one takes the newer insets.
+gate = InsetsGate(applied: tall)
+gate.received(short)
+_ = gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 7)
+gate.received(medium)
+equal(gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 8), .withRows(version: 8), "newer insets wait for their own rows")
+equal(gate.take(forRows: 7, frozen: false), nil, "the older rows don't take the newer insets")
+equal(gate.take(forRows: 8, frozen: false), medium, "their rows do")
+equal(gate.applied, medium, "never the older value")
+
+// Newer insets alone replace those waiting for rows, at once.
+gate = InsetsGate(applied: tall)
+gate.received(short)
+_ = gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 7)
+gate.received(medium)
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 7), .now(medium, eased: false), "newer insets alone: at once")
+equal(gate.take(forRows: 7, frozen: false), nil, "and the rows after bring nothing older")
+
+gate = InsetsGate(applied: tall)
+gate.received(short)
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 7), .now(short, eased: false), "alone: at once")
+gate.received(short)
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 7), .none, "the same again: nothing")
+
+// A freeze holds them; replaced or reverted during it, the thaw brings
+// only the latest.
+gate = InsetsGate(applied: tall)
+gate.received(short)
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 1), .none, "frozen: they wait")
+equal(gate.take(forRows: 5, frozen: true), nil, "rows while frozen don't take them")
+gate.thawed()
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 5), .now(short, eased: true), "at the thaw, eased")
+
+gate = InsetsGate(applied: tall)
+gate.received(short)
+_ = gate.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 7)
+_ = gate.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 7)
+equal(gate.take(forRows: 7, frozen: true), nil, "their rows arriving frozen don't take them")
+gate.received(medium)
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 7), .none, "replaced while frozen: still waiting")
+gate.thawed()
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 7), .now(medium, eased: true), "the thaw brings the replacement")
+equal(gate.take(forRows: 7, frozen: false), nil, "and the old rows bring nothing after")
+
+gate = InsetsGate(applied: tall)
+gate.received(short)
+_ = gate.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 1)
+gate.received(tall)
+_ = gate.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 1)
+gate.thawed()
+equal(gate.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 1), .none, "reverted while frozen: the thaw changes nothing")
+equal(gate.applied, tall, "still what JavaScript last sent")
+
+for thawFirst in [true, false] {
+  var order = InsetsGate(applied: tall)
+  _ = order.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 0)
+  if thawFirst { order.thawed(); order.received(short) } else { order.received(short); order.thawed() }
+  equal(order.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 9), .withRows(version: 9),
+        "thaw and insets with rows, \(thawFirst ? "thaw first" : "insets first"): with the rows")
+}
+
+gate = InsetsGate(applied: tall)
+gate.received(short)
+equal(gate.batchEnded(rowsChanged: true, placed: false, frozen: false, rowsVersion: 1), .now(short, eased: false), "before the first rows are placed: at once")
+
+// Stacked typing shows the photos one-on-one too (integration's map-rows,
+// as React Native's typing line); bubbles don't.
+equal(typing("stacked", showFaces: true)?.faces.count, 1, "stacked, showFaces true: the other person's photo")
+check(typing("stacked", showFaces: true).map { $0.label!.frame.minX < theme.horizontalPadding + theme.avatarSize + 12 } == true,
+      "and the label after it, not at the text column")
+
 print("\(checks - failures) of \(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

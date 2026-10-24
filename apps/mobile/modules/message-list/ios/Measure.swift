@@ -97,13 +97,23 @@ struct CarouselLayout {
 
 struct DeckLayout {
   var items: [MediaItem]
-  /// Each card's size; the front card is drawn at the top-left of the box.
+  /// Each card's size. Every card is centered in the height of the deck's
+  /// tallest (`tallest`, under `cardTop`), at the box's left, so the pile
+  /// keeps its height whichever card is in front.
   var sizes: [CGSize]
   var cardTop: CGFloat
+  var tallest: CGFloat
   var dotsY: CGFloat
   /// Each card's own tapbacks, over its top corner while it's in front, in
   /// the deck's coordinates.
   var tapbacks: [[TapbackLayout]] = []
+
+  /// Where card `item` rests in front, in the deck's coordinates.
+  func cardFrame(_ item: Int) -> CGRect {
+    guard item >= 0, item < sizes.count else { return .zero }
+    let size = sizes[item]
+    return CGRect(x: 0, y: cardTop + ((tallest - size.height) / 2).rounded(), width: size.width, height: size.height)
+  }
 
   /// The front card's tapback at a point in the deck's coordinates.
   func tapback(at point: CGPoint, front: Int) -> TapbackLayout? {
@@ -568,11 +578,13 @@ struct Measurer {
           content = .media(items[0], radius: Metrics.mediaRadius)
         } else {
           let sizes = items.map(deckCardSize)
-          let tallest = sizes.prefix(3).map(\.height).max() ?? 220
+          // The tallest of all, not just those showing: the row keeps its
+          // height as the cards go round (Android does the same).
+          let tallest = sizes.map(\.height).max() ?? 220
           size = CGSize(width: Metrics.deckWidth, height: 10 + tallest + 6 + 6)
-          var deck = DeckLayout(items: items, sizes: sizes, cardTop: 10, dotsY: 10 + tallest + 6)
-          deck.tapbacks = zip(items, sizes).map { item, card in
-            tapbacks(item.reactions, part: item.part, over: CGRect(origin: CGPoint(x: 0, y: deck.cardTop), size: card), side: tapbackSide)
+          var deck = DeckLayout(items: items, sizes: sizes, cardTop: 10, tallest: tallest, dotsY: 10 + tallest + 6)
+          deck.tapbacks = items.indices.map { index in
+            tapbacks(items[index].reactions, part: items[index].part, over: deck.cardFrame(index), side: tapbackSide)
           }
           content = .deck(deck)
         }
@@ -985,9 +997,14 @@ struct Measurer {
       var overflow: TextBox?
       if faced.count > 4 {
         let string = plain("+\(faced.count - 3)", 12, theme.muted, weight: .semibold, lineHeight: 16, alignment: .center)
-        let width = max(32, measure(string, width: 60, lineHeight: 16).width + 8)
-        overflow = TextBox(string: string, frame: CGRect(x: x - 6, y: height - size - 2, width: width, height: size + 4))
-        x += width - 6
+        // Ringed like the faces and overlapping the last as they overlap
+        // (`Faces`' more: marginLeft -overlap - ring, margin -ring), so
+        // what follows starts a ring in from its outer edge. At least the
+        // faces' size with its ring; 4 of padding each side, in the ring.
+        let ring: CGFloat = 2
+        let width = max(size + ring * 2, measure(string, width: 60, lineHeight: 16).width + 8 + ring * 2)
+        overflow = TextBox(string: string, frame: CGRect(x: x - 6 - ring, y: height - size - ring, width: width, height: size + ring * 2))
+        x += width - 6 - ring * 2
       }
       if !faced.isEmpty { x += Metrics.avatarGap }
       let bubble = CGRect(x: x, y: 14, width: Metrics.typingBubble.width, height: Metrics.typingBubble.height)
@@ -1008,14 +1025,19 @@ struct Measurer {
     var x = faced.isEmpty ? pad + theme.avatarSize + 12 : pad + CGFloat(faces.count - 1) * (size - 4) + size + 8
     var overflow: TextBox?
     if faced.count > 4 {
-      let string = plain("+\(faced.count - 3)", 10, theme.muted, weight: .semibold, lineHeight: 20)
-      let measured = measure(string, width: 40, lineHeight: 20)
-      overflow = TextBox(string: string, frame: CGRect(x: x - 4, y: 10, width: measured.width, height: 20))
-      x += measured.width + 4
+      // How many more, on a chip in the bubble color that overlaps the
+      // last face as the faces overlap (typing-parts.tsx `Faces`): at least
+      // the faces' size, 4 of padding at each side, the ring around it.
+      let ring: CGFloat = 1.5
+      let string = plain("+\(faced.count - 3)", 10, theme.muted, weight: .semibold, lineHeight: 16, alignment: .center)
+      let inner = CGRect(x: x - 8 - 4, y: 11, width: max(size, measure(string, width: 40, lineHeight: 16).width + 8), height: size)
+      overflow = TextBox(string: string, frame: inner.insetBy(dx: -ring, dy: -ring))
+      x = inner.maxX + 8
     }
-    let text = box(plain(label, 13, theme.muted, lineHeight: 20, truncate: true), x: x, y: 10, maxWidth: width - x - pad - 20, lineHeight: 20, maxLines: 1)
+    let text = box(plain(label, 13, theme.muted, lineHeight: 20, truncate: true), x: x, y: 10, maxWidth: width - x - pad - 22, lineHeight: 20, maxLines: 1)
+    // 4-point dots 2 apart, 8 after the label (`gap-2`), centered on the line.
     let dots = (0..<3).map { index in
-      CGRect(x: text.frame.maxX + 6 + CGFloat(index) * 6, y: 10 + 10, width: 4, height: 4)
+      CGRect(x: text.frame.maxX + 8 + CGFloat(index) * 6, y: 10 + 8, width: 4, height: 4)
     }
     return TypingLayout(height: height, faces: faces, faceRing: 1.5, bubble: nil, label: text, dots: dots, overflow: overflow)
   }
@@ -1101,6 +1123,18 @@ enum DeckPile {
   /// Where a thrown card goes, beside the pile, before it tucks in: just
   /// past the card's width, so it changes sides with nothing overlapping.
   static func out(width: CGFloat) -> CGFloat { width + 12 }
+
+  /// How long a thrown card takes to get beside the pile: about 120 ms,
+  /// sooner when the finger was faster than that would carry it (the move
+  /// eases out, so it starts at about twice its average speed), never
+  /// under 70. Then it takes `tuckIn` to go in behind. Android's are the
+  /// same.
+  static func throwOut(distance: CGFloat, speed: CGFloat) -> Double {
+    let base = 0.12
+    guard distance > 0, speed > 0 else { return base }
+    return min(base, max(0.07, Double(2 * distance / speed)))
+  }
+  static let tuckIn = 0.16
 
   /// What `item` is in a pile of `count` with `front` in front. With two,
   /// the card behind is on `lone`'s side: where the last card went.

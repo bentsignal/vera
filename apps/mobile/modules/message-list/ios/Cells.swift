@@ -98,6 +98,8 @@ final class MessageCell: RowCell {
   private let avatar = AvatarView()
   private let revealTime = TextView()
   private let replyCurve = LineView()
+  /// The message's tapbacks, over its parts; hidden while a part is lifted.
+  private let tapbackBox = UIView()
   private let tapbacks = ReactionPool<TapbackView>()
   private let chips = ReactionPool<ChipView>()
 
@@ -130,6 +132,47 @@ final class MessageCell: RowCell {
     pendingConfigure = nil
     configure(row, layout, state: state, animated: false)
   }
+
+  /// The views out in the menu (Lift.swift), which updates leave alone.
+  var outViews: Set<ObjectIdentifier> = []
+  /// What the row last drew, which `reseat` draws again.
+  private var shown: (Row, RowLayout, ListState)?
+  private var landing = false
+
+  /// The menu is closing and the held part is about to land: an update
+  /// that waited while it was out (a reaction picked in the menu, say)
+  /// goes in now, animated over the landing (`duration`), so the row
+  /// opens or closes around the part in one move instead of snapping
+  /// once it's back. The part itself then lands where the update puts it
+  /// (`liftPieces(frameOnly:)` reads the new layout).
+  func beginLanding(duration: Double) {
+    guard isLifted, let (row, layout, state) = pendingConfigure else { return }
+    pendingConfigure = nil
+    landing = true
+    let animator = UIViewPropertyAnimator(duration: duration, timingParameters: UICubicTimingParameters(
+      controlPoint1: CGPoint(x: 0.25, y: 0.1), controlPoint2: CGPoint(x: 0.25, y: 1)
+    ))
+    animator.addAnimations { self.configure(row, layout, state: state, animated: true) }
+    animator.startAnimation()
+    landing = false
+  }
+
+  /// The held part is back in the row (Lift.swift put its views home):
+  /// the row is drawn once more from what it last showed, without
+  /// animation, so the returned views take everything an update gave the
+  /// row while they were out. A deck's front card gets its new tapbacks
+  /// and photo, a carousel's photo its new image, a bubble its edited
+  /// text, and a part its frame in the new layout, which is where it just
+  /// landed, so nothing moves. Everything else already is as drawn: the
+  /// landing's update (`beginLanding`) finished as the part landed. The
+  /// tapbacks stay hidden until the lifter fades them back.
+  func reseat(_ views: [UIView]) {
+    outViews = []
+    guard let (row, layout, state) = shown else { return }
+    landing = true
+    configure(row, layout, state: state, animated: false)
+    landing = false
+  }
   private var pendingConfigure: (Row, RowLayout, ListState)?
   var bodyView: UIView { body }
   private(set) var layout: MessageLayout?
@@ -146,6 +189,8 @@ final class MessageCell: RowCell {
     body.addSubview(name)
     body.addSubview(headerTime)
     body.addSubview(avatar)
+    tapbackBox.isUserInteractionEnabled = false
+    body.addSubview(tapbackBox)
     contentView.addSubview(revealTime)
   }
 
@@ -158,12 +203,13 @@ final class MessageCell: RowCell {
     body.bounds = bounds
     body.center = CGPoint(x: bounds.midX, y: bounds.midY)
     parts.frame = body.bounds
+    tapbackBox.frame = body.bounds
   }
 
   override func configure(_ row: Row, _ rowLayout: RowLayout, state: ListState, animated: Bool) {
     guard let message = row.message, case let .message(layout) = rowLayout else { return }
     let sameRow = rowId == row.id
-    if isLifted || isGrowing, sameRow {
+    if isLifted && !landing || isGrowing, sameRow {
       pendingConfigure = (row, rowLayout, state)
       return
     }
@@ -174,6 +220,8 @@ final class MessageCell: RowCell {
       isGrowing = false
     }
     super.configure(row, rowLayout, state: state, animated: animated)
+    shown = (row, rowLayout, state)
+    if !sameRow, !isLifted { setTapbacksHidden(false, fade: 0) }
     let animate = animated && sameRow
     let theme = state.theme
     self.theme = theme
@@ -195,6 +243,7 @@ final class MessageCell: RowCell {
     body.bounds = bounds
     body.center = CGPoint(x: bounds.midX, y: bounds.midY)
     parts.frame = bounds
+    tapbackBox.frame = bounds
     highlight.frame = bounds
     parts.alpha = message.status == .sending ? 0.5 : 1
 
@@ -202,6 +251,8 @@ final class MessageCell: RowCell {
     /// from wherever it last was, fading in if the row is animating; one
     /// already showing moves within the animation.
     func show(_ view: UIView, _ configure: () -> Void) {
+      // A part out in the menu is placed when it's back (`reseat`).
+      if outViews.contains(ObjectIdentifier(view)) { return }
       guard view.isHidden else { return configure() }
       UIView.performWithoutAnimation(configure)
       view.isHidden = false
@@ -357,7 +408,7 @@ final class MessageCell: RowCell {
 
     // Reactions: tapbacks over the corner, or chips under the message.
     tapbacks.update(
-      layout.tapbacks, id: \.id, frame: \.frame, in: body, animated: animated,
+      layout.tapbacks, id: \.id, frame: \.frame, in: tapbackBox, animated: animated,
       make: { TapbackView() }, set: { $0.set($1, theme: theme) },
       popIn: { Pop.popIn($0, duration: 0.32, overshoot: 1.12) },
       popOut: { Pop.popOut($0, duration: 0.16) }
@@ -442,10 +493,12 @@ final class MessageCell: RowCell {
 
   // MARK: Lifting into the menu
 
-  /// The held part (by the `part` and `index` a hold reported) and its
-  /// tapbacks, in the message's coordinates. `frameOnly` asks just where
-  /// it goes (while its views are out). A part this message doesn't have
-  /// lifts nothing, rather than some other part (a caption) in its place.
+  /// The held part (by the `part` and `index` a hold reported), in the
+  /// message's coordinates. `frameOnly` asks just where it goes (while its
+  /// views are out). A part this message doesn't have lifts nothing,
+  /// rather than some other part (a caption) in its place. Its tapbacks
+  /// stay, hidden while it's up (`setTapbacksHidden`): the menu draws its
+  /// own, and nothing from the list goes over the menu.
   func liftPieces(part: String?, index: Int?, frameOnly: Bool = false) -> LiftPieces? {
     guard let layout, let at = layout.liftedPart(part, index: index) else { return nil }
     let held = layout.parts[at]
@@ -462,20 +515,43 @@ final class MessageCell: RowCell {
       guard let tile = strip.tile(card) else { return nil }
       return LiftPieces(frame: frame, views: [tile])
     }
+    if case let .deck(deck) = held.content {
+      // A deck's front card lifts alone, never the pile behind it, framed
+      // where it rests in front: the frame the hold reported.
+      let stack = at < partViews.count ? partViews[at] as? DeckView : nil
+      let card = stack?.index ?? index ?? 0
+      guard card >= 0, card < deck.items.count else { return nil }
+      let frame = deck.cardFrame(card).offsetBy(dx: held.frame.minX, dy: held.frame.minY)
+      if frameOnly { return LiftPieces(frame: frame, views: []) }
+      guard let view = stack?.cardView(card) else { return nil }
+      return LiftPieces(frame: frame, views: [view])
+    }
     if frameOnly { return LiftPieces(frame: held.frame, views: []) }
     guard at < partViews.count else { return nil }
-    var views = [partViews[at]]
-    // Its tapbacks go with it: those over this part's top corner.
-    let corner = held.frame.insetBy(dx: -Metrics.tapbackOverhang - 1, dy: -Metrics.tapbackSpace - 1)
-    for tapback in layout.tapbacks
-      where (part != nil && tapback.part == part) || (tapback.frame.midY < held.frame.minY + 10 && corner.contains(tapback.frame)) {
-      if let view = tapbacks.views[tapback.id] { views.append(view) }
-    }
-    var pieces = LiftPieces(frame: held.frame, views: views)
+    var pieces = LiftPieces(frame: held.frame, views: [partViews[at]])
     if case let .text(_, bubble, _) = held.content, bubble?.fill == nil, bubble?.border == nil {
       pieces.card = theme?.backgroundElevated
     }
     return pieces
+  }
+
+  /// Hides the row's tapbacks (its own and its decks' cards') at once as a
+  /// part lifts into the menu, and fades them back in over `fade` once
+  /// it's back, as the React Native list's `Tapbacks` do (RETURN_MS 260).
+  func setTapbacksHidden(_ hidden: Bool, fade: Double) {
+    tapbackBox.layer.removeAllAnimations()
+    if hidden || fade <= 0 {
+      tapbackBox.alpha = hidden ? 0 : 1
+    } else {
+      UIView.animate(withDuration: fade, delay: 0, options: [.allowUserInteraction]) { self.tapbackBox.alpha = 1 }
+    }
+    for deck in decks { deck.setTapbacksHidden(hidden, fade: fade) }
+  }
+
+  /// A deck's front card at rest, in the body: where a hold on it lifts
+  /// from, whatever pose a swipe left it in.
+  private func frontCard(_ stack: DeckView, _ deck: DeckLayout) -> CGRect {
+    deck.cardFrame(stack.index).offsetBy(dx: stack.frame.minX, dy: stack.frame.minY)
   }
 
   // MARK: Taps and holds
@@ -552,7 +628,7 @@ final class MessageCell: RowCell {
       case let .deck(deck):
         guard let stack = view as? DeckView else { break }
         let card = stack.index
-        return press("media", ["index": card, "part": deck.items[card].part], frame: stack.convert(stack.front.frame, to: body), view: stack.front)
+        return press("media", ["index": card, "part": deck.items[card].part], frame: frontCard(stack, deck), view: stack.front)
       case let .file(_, _, _, url):
         return press("file", ["url": url], frame: part.frame, view: view)
       case let .linkCard(card):
@@ -624,8 +700,8 @@ final class MessageCell: RowCell {
     switch layout.parts[at].content {
     case .carousel:
       if let index, let strip = view as? CarouselView, let card = strip.cardFrame(index) { return (index, strip.convert(card, to: body)) }
-    case .deck:
-      if let stack = view as? DeckView { return (index, stack.convert(stack.front.frame, to: body)) }
+    case let .deck(deck):
+      if let stack = view as? DeckView { return (index, frontCard(stack, deck)) }
     default:
       break
     }
@@ -833,7 +909,7 @@ final class TextRowCell: RowCell {
 
 final class TypingCell: RowCell {
   private let bubble = BubbleView()
-  private var faces: [String: AvatarView] = [:]
+  private var faces: [String: RingedAvatarView] = [:]
   private let overflow = TextView()
   private let overflowBack = UIView()
   private let label = TextView()
@@ -875,26 +951,31 @@ final class TypingCell: RowCell {
     UIView.performWithoutAnimation {
       for (person, frame) in layout.faces {
         let added = faces[person.id] == nil
-        let face = faces[person.id] ?? AvatarView()
+        let face = faces[person.id] ?? RingedAvatarView()
         faces[person.id] = face
         if added { contentView.insertSubview(face, at: 0) }
         face.isHidden = false
         face.frame = frame.insetBy(dx: -layout.faceRing, dy: -layout.faceRing)
-        face.set(person, size: face.frame.width, theme: theme, ring: layout.faceRing)
+        face.set(person, size: frame.width, theme: theme, ring: layout.faceRing)
         if added && changing { Self.zoom(face, entering: true) }
       }
-      // The first face is on top.
+      // The first face is on top, and the count under them all.
       for (person, _) in layout.faces {
         if let face = faces[person.id] { contentView.sendSubviewToBack(face) }
       }
+      contentView.sendSubviewToBack(overflow)
+      contentView.sendSubviewToBack(overflowBack)
       if let box = layout.overflow {
         overflow.isHidden = false
-        overflowBack.isHidden = layout.bubble == nil
+        overflowBack.isHidden = false
         overflow.text = box.string
         overflow.frame = box.frame.insetBy(dx: 0, dy: (box.frame.height - 16) / 2)
+        // A chip in the bubble color, ringed like the faces (`Faces`' more).
         overflowBack.frame = box.frame
         overflowBack.backgroundColor = theme.bubbleIncoming
         overflowBack.layer.cornerRadius = box.frame.height / 2
+        overflowBack.layer.borderWidth = layout.faceRing
+        overflowBack.layer.borderColor = theme.background.cgColor
       } else {
         overflow.isHidden = true
         overflowBack.isHidden = true

@@ -118,9 +118,53 @@ the dark theme, or Android. Before iOS 26 glass would be an unmeasured
 blur, so it's fill there. Shawn's phone is the real check.
 The PR description has every run's numbers.
 
+## Phone feedback round 2 (2026-10-24)
+
+- **Deck lift.** A held deck lifts only its front card (the plan's #9).
+  Every tapback of the held row hides while it's up and fades back over
+  260 ms (RN `Tapbacks hidden={lifted}`), so nothing from the list goes
+  over the menu.
+- **Deck motion.** Cards are centered in the tallest card's height and
+  antialiased. A throw goes out in about 120 ms (less with speed),
+  changes stacking order only once out beside the pile, and tucks under
+  in 160 ms. A touch during a throw stops its animators.
+- **Reaction picked in the menu.** It used to snap the row once the
+  part was back. Now the waiting update goes in animated as the part
+  lands, the part lands where it puts it, and the row is drawn once more
+  when the part's views are home (`reseat`). So a card, photo or bubble
+  that was out shows what changed while it was out.
+- **Insets.** They go in with the rows that came with them (contract
+  `insets`, send-inset.ts), and wait out a `keyboardFrozen`
+  (menu-keyboard-hold.ts), with the keyboard eased in the same move at
+  the thaw. `InsetsGate` (Insets.swift) keeps one intent, the latest sent,
+  so an older value never goes in after a newer one. The waiting for the
+  message sent is JS's.
+- **#165.** With the keyboard up at the newest message, a swipe down
+  closes it without scrolling.
+- **Typing.** Faces draw at their own size inside the ring (RN Avatar's
+  fonts). A stacked DM shows the other person's photo, as RN does; a
+  bubbles DM shows no face. Both follow `showFaces`.
+- **Profiling.** `Perf.swift` signposts (subsystem
+  `chat.vera.message-list`) are for a cold-open profile in a release
+  build.
+- **Photo-tap signposts.** A photo tap is timed from the touch reaching
+  the single tap to the press going to JavaScript (`media tap`), with
+  the finger's lift marked inside it, which separates contact time from
+  the double tap's wait. They're compared with JS's own timestamps by
+  order, not by clock.
+
+Current round 2 validation, 2026-10-24: 171/171 host checks pass.
+All 19 module Swift files, including `MessageListModule.swift`, typecheck
+against the installed ExpoModulesCore and SDWebImage plus the real iOS
+simulator SDK for arm64, without stubs or copied-source edits. This does
+not link or run an app. Lint, typecheck, tests and React Doctor against
+`origin/t3/native-message-list` pass. Integration owns the combined client
+compile, motion recordings, antialiasing cost and release-like cold-open
+profile; none of those is claimed here. No phone client was built.
+
 ## Checks
 
-- `Tests/run.sh`: 94 checks. 61 of them are new, for the reaction toggle
+- Earlier phone-polish checkpoint: `Tests/run.sh`, 94 checks. 61 of them are new, for the reaction toggle
   and hits, exact parts, deck tapbacks and the pile, the carousel's bounds
   and settling, the avatar recede, `showFaces`, and morph eligibility.
 - Still to do in integration's combined client: the motion check and
