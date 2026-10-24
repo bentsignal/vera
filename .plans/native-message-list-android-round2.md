@@ -218,6 +218,36 @@ playback, profiling, and Shawn's phone checks below.
 
 ## Still needs a device
 
+### Message first-release presses, 2026-10-24
+
+Shawn explicitly removed message/text double-tap focus/menu arbitration.
+Android now dispatches the existing message press on its first release;
+shared code opens its thread. Every later valid release is independent.
+The pending 200 ms message timer, second-tap menu branch and target-specific
+immediate flag are removed. The existing 320 ms long-press timer still
+opens the held part's menu and real-view lift, consuming its release.
+
+The touch eligibility state is tested through release, hold, cancellation
+and scroll-stop sequences. Media releases still carry their visible
+part/index; reaction releases keep their part/key. Existing release hit
+testing, keyboard drag consumption, horizontal swipes, scroll-stop rules,
+send ACK, freeze, generic latest navigation and real-content landing are
+unchanged. Fullscreen viewer double-tap zoom is outside this native list
+module and is not touched. No contract changes or native cooldown.
+
+Integration owns combined runtime checks and delivers both updated phone
+clients together. Thread first-release timing, repeated text taps,
+long hold with no thread open, reaction/media routing and swipe/scroll-stop
+controls remain runtime gates. No client or device build runs here.
+
+Ordinary composer/list growth lag on the Galaxy A16 and residual iOS lag
+remain a separate shared/native height-ownership decision. Source input
+was sent to integration: ordinary bar updates currently cross JS and React
+before native insets arrive, and rows props in the same batch also route
+the inset through Android's FIFO worker. No native height observer, field
+or guessed geometry is added here. Camera Dev crash and production preview
+rounding remain bounded private-production retest items, not a broad audit.
+
 ### Opt-in keyboard drag trace, 2026-10-24
 
 The slow adb swipe still failed to dismiss the keyboard in integration's

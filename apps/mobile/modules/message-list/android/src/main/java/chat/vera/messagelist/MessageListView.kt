@@ -673,7 +673,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   /**
-   * A hold (or double tap) on a row: its part's frame in window coordinates,
+   * A long hold on a row: its part's frame in window coordinates,
    * for the menu. On a reaction it says so (`element`, `reactionKey`) and
    * still reports the part the reaction belongs to, so JavaScript shows who
    * reacted, and JavaScript without that opens the menu on the part.
@@ -842,12 +842,9 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   /**
-   * Taps, double taps, and holds, with the React Native list's timings (a
-   * double tap within 200 ms, a hold at 320 ms), plus dragging the list
-   * left to bring times in (bubbles). Photos, videos, links, mentions,
-   * chips and the like fire on the first release; a tap on a message waits
-   * 200 ms to be sure it isn't the first of a double tap, which holds it
-   * instead (see `Taps`). Holding anything holds it.
+   * Every tap fires on its first release. A long press (320 ms) holds the
+   * part for its menu and real-view lift. Successive taps never become a
+   * hold. Dragging left still reveals times in bubbles.
    */
   private inner class Touch : RecyclerView.OnItemTouchListener {
     private val keyboardTrace = KeyboardDragTrace(
@@ -864,14 +861,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     private var horizontalTaken = false
     private var revealing = false
 
-    /** Still a tap: not moved past the slop, not held, not a fling being stopped. */
-    private var tapping = false
-
-    /** Which taps are double taps, and what each release does. */
-    private val taps = Taps(DOUBLE_TAP_MS, slop.toFloat())
-
-    /** A message's press, waiting to see if a second tap makes it a double tap. */
-    private var pendingTap: Runnable? = null
+    private val taps = Taps()
 
     /**
      * Began with the keyboard up and the list at its newest row: dragging
@@ -882,7 +872,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     private var keyboardDrag = false
 
     private val holdRunnable = Runnable {
-      tapping = false
+      if (!taps.takeHold()) return@Runnable
       val (holder, hit) = under(downX, downY) ?: return@Runnable
       hold(holder, hit)
       shrink.release()
@@ -903,7 +893,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
     private fun cancelTap() {
       shrink.release()
-      tapping = false
+      taps.cancel()
       main.removeCallbacks(holdRunnable)
     }
 
@@ -924,17 +914,12 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           }
           revealAnimator?.cancel()
           val stoppedScroll = rv.scrollState != RecyclerView.SCROLL_STATE_IDLE
-          tapping = !stoppedScroll
+          taps.begin(stoppedScroll)
           val hit = under(e.x, e.y)
-          if (taps.down(e.eventTime, e.x, e.y, hit?.second?.press)) {
-            pendingTap?.let { main.removeCallbacks(it) }
-            pendingTap = null
-          }
-          val second = taps.second
           horizontalTaken = hit?.second?.horizontal == true
           // A touch that stops a moving carousel only stops it.
-          if (hit != null && inMovingScroller(hit.second.pressView ?: hit.second.holdView, hit.first.itemView)) tapping = false
-          if (tapping && !second && hit?.first?.row is MessageRow) {
+          if (hit != null && inMovingScroller(hit.second.pressView ?: hit.second.holdView, hit.first.itemView)) taps.cancel()
+          if (taps.isTap && hit?.first?.row is MessageRow) {
             main.postDelayed(holdRunnable, LONG_PRESS_MS)
             // A reaction fires on the tap: it shows the press at once.
             if (hit.second.press?.type == "reaction") hit.second.pressView?.let { shrink.pressNow(it) }
@@ -945,7 +930,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           if (keyboardTrace.active) keyboardTrace.firstMove {
             "eventTime=${e.eventTime} dx=${e.x - downX} dy=${e.y - downY} keyboardDrag=$keyboardDrag ${keyboardTraceState()}"
           }
-          if (tapping && (abs(e.x - downX) > slop || abs(e.y - downY) > slop)) cancelTap()
+          if (taps.isTap && (abs(e.x - downX) > slop || abs(e.y - downY) > slop)) cancelTap()
           if (closingKeyboard) return true
           if (keyboardDrag && e.y - downY > slop && abs(e.y - downY) > abs(e.x - downX)) {
             keyboardTrace.event("MOVE:recognized") {
@@ -974,8 +959,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           }
           shrink.release()
           main.removeCallbacks(holdRunnable)
-          if (tapping) tapped(e)
-          tapping = false
+          if (taps.isTap) tapped(e)
+          taps.cancel()
         }
         MotionEvent.ACTION_CANCEL -> {
           keyboardTrace.end("CANCEL:intercept") {
@@ -990,21 +975,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     private fun tapped(e: MotionEvent) {
       val found = under(e.x, e.y) ?: return
       val (holder, hit) = found
-      when (val action = taps.release(e.eventTime, e.x, e.y, hit.press, holder.row is MessageRow)) {
-        is TapAction.Press ->
-          if (action.target.type == "reaction") reactionTapped(holder, hit, action.target) else press(action.target)
-        is TapAction.PressLater -> {
-          val fire = Runnable {
-            pendingTap = null
-            taps.fired()
-            press(action.target)
-          }
-          pendingTap = fire
-          main.postDelayed(fire, DOUBLE_TAP_MS)
-        }
-        TapAction.Hold -> hold(holder, hit)
-        TapAction.None -> Unit
-      }
+      val target = taps.release(hit.press) ?: return
+      if (target.type == "reaction") reactionTapped(holder, hit, target) else press(target)
     }
 
     override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {
@@ -1050,8 +1022,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     private const val PRELOADS_PER_FRAME = 3
     private const val JUMP_FROM = 20
 
-    /** The React Native list's: a double tap's second tap within this, and a hold. */
-    private const val DOUBLE_TAP_MS = 200L
+    /** The existing long-press threshold, with no double-tap arbitration. */
     private const val LONG_PRESS_MS = 320L
 
     /** `visible` at most this often. */
