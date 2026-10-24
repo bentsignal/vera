@@ -6,6 +6,7 @@ import { PixelRatio, Platform } from "react-native";
 import type { ComposerReport } from "~/features/conversation/composer-height";
 import type { SendCommit } from "~/features/conversation/send-commit";
 import { env } from "~/env";
+import { beginSendUIFault, sendUIFault } from "./send-ui-fault";
 
 interface Host {
   getBoundingClientRect?: () => { height: number; y: number };
@@ -58,11 +59,16 @@ export const sendTiming = {
     active = available;
     marks = [];
     states.length = 0;
+    sendUIFault.reset();
     return { active };
   },
   stop: () => {
     active = false;
+    sendUIFault.clear();
   },
+  /** Deliberate UI fault for the next real send, only after start() in DEV. */
+  blockUIOnce: (milliseconds: number) => sendUIFault.arm(milliseconds, active),
+  faultReport: sendUIFault.report,
   report: () => marks.slice(),
   stateReport: () => states.slice(),
   sample: () => {
@@ -122,6 +128,7 @@ export function useSendProbe(
       if (!active) return;
       send.current += 1;
       mark("before send");
+      beginSendUIFault(owner, report.sendCommit.read().sequence + 1);
     },
     report: {
       ...report,

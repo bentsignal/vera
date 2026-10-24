@@ -2397,3 +2397,30 @@ post-release/pre-apply freeze barrier, deck landing, or delayed layout.
 The full iOS motion suite is running; no all-pass claim yet. A second
 compiled-hook regression now exercises lift interruption while the native
 Promise is pending, and verifies its resolution cannot re-arm navigation.
+
+**Authorized bounded UI-layout fault test, plan before code.** After the
+normal motion suite, arm one opt-in DEV-only worklet stall for the next
+real composer send. The UI thread busy period is bounded at 1500 ms,
+with a 900 ms test target, consumed once and reset on probe stop. Nothing
+changes normal release behavior, row readiness, or inset calculation.
+Record UI-runtime start/end/next-frame markers in their own clock domain,
+JS before-send/committed geometry/ACK/ID/command/publication separately,
+physical screen recording, and existing native apply signposts in a
+Time Profiler trace. Reanimated `measure` and host
+`getBoundingClientRect` can read Fabric shadow layout, so neither alone
+will be labelled actual mounted view geometry. The video must show the
+old tall bar through the stall and the physical clear afterward; native
+trace must show apply work separately. If those observations cannot
+establish mount delay, qualify that result instead of declaring the
+boundary passed. This is deliberate fault injection, not a frame-rate or
+normal-load comparison. No native field, contract change, dependency,
+production flag, timeout release, or longer fallback is introduced.
+
+**Current full iOS motion result.** Run `20261024-151125` completed 17/18.
+Bubbles all nine cases pass, and stacked arrival, typing-reply, reaction
+add/remove, first reply, send, edit and delete pass. Stacked firehose has
+two failing jump-back correlations at 3.032 s/-23 pt and 3.707 s/+25 pt,
+eight minor flags, and zero Metro errors. Keep the formal failure until
+identity review; do not assume the previous firehose alias disposition
+applies to this new clip. Android's combined build acquired the heavy lock
+at 19:20:01 UTC, fingerprint `df063ad0e972e62e5f1c8654772458bc74c65ed0`.
