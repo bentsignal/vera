@@ -12,8 +12,8 @@ import Foundation
 ///   longer opens the menu (approved by Shawn, as the React Native list's
 ///   own photos behaved); holding it still does.
 /// - Everything else, a caption's text included, goes to the message's
-///   single tap and double tap: the single tap waits for the double tap,
-///   which opens the menu.
+///   single tap and dispatches on its first release. Repeated taps never
+///   turn into a menu gesture.
 ///
 /// The long press isn't routed: it sees every touch and opens the menu
 /// whatever is under it.
@@ -21,7 +21,7 @@ enum TapRoute: Equatable {
   case reaction, media, message
 
   enum Recognizer: CaseIterable {
-    case reactionTap, mediaPress, tap, doubleTap
+    case reactionTap, mediaPress, tap
   }
 
   init(onReaction: Bool, element: String?) {
@@ -37,7 +37,7 @@ enum TapRoute: Equatable {
   /// Whether `recognizer` gets a touch routed here.
   func receives(_ recognizer: Recognizer) -> Bool {
     switch (self, recognizer) {
-    case (.reaction, .reactionTap), (.media, .mediaPress), (.message, .tap), (.message, .doubleTap):
+    case (.reaction, .reactionTap), (.media, .mediaPress), (.message, .tap):
       return true
     default:
       return false

@@ -240,6 +240,40 @@ particular, check the delayed landing start through keyboard return, removed
 lifted rows, and ordinary holds without a pending pair. No client or device
 was built or run in this checkout.
 
+## Message taps on first release, 2026-10-24
+
+Shawn explicitly removed the remaining message/text double-tap focus and
+menu gesture. This supersedes the earlier media-only approval above. Sol
+removed the message's double-tap recognizer and its single tap's failure
+dependency. A valid message release now sends the existing press event
+immediately. Consecutive valid releases remain presses. Only the existing
+320 ms long press invokes the menu callback, which still reports the real
+part and frame for lifting. VoiceOver activation is unchanged.
+
+Media and reaction recognizers keep their existing behavior. Release-target
+guards, scroll-stop swallowing, latest-intent cancellation, swipe/reveal,
+deck/carousel gestures, lift/landing, send ACK, frozen pairs and keyboard
+policies are unchanged. No fullscreen viewer zoom, shared source, event field,
+native suppression window or composer-height code changed.
+
+Focused validation: 235/235 native host checks and all 21 Swift module files
+against the installed arm64 simulator SDK pass. Routing sequences cover
+first and consecutive releases, mixed text/media/reaction touches, and
+movement across route boundaries. They exercise production routing policy,
+not synthesized UIKit touch timing. Ordered lint, typecheck, tests and React
+Doctor against `origin/t3/native-message-list`, then format:fix pass. The
+heavy lock is released. Integration owns the combined compile
+and actual first-release thread opening, rapid taps, long holds with no
+press, reaction taps, scroll-stop and swipe recordings in both layouts.
+
+The ordinary composer/list growth bug remains open. The direct Bar.onLayout
+observation is shared-owned; no native height path or new field is selected.
+Integration owns the one cross-platform height proposal, shared changes and
+both updated development clients, delivered together. No early single-client
+link, production build, merge, release or data operation is authorized here.
+The Android camera Dev crash and unrounded production preview remain a
+bounded private production retest item with integration, not an iOS task.
+
 ## Checks
 
 - Earlier phone-polish checkpoint: `Tests/run.sh`, 94 checks. 61 of them are new, for the reaction toggle

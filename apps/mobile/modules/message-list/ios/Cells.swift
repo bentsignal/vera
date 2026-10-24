@@ -686,7 +686,7 @@ final class MessageCell: RowCell {
   }
 
   /// Whether a point in the content view is on a reaction, which a tap
-  /// toggles at once (MessageListView routes it past the double tap).
+  /// toggles at once with its own recognizer and haptic.
   func reaction(at point: CGPoint) -> ReactionHit? {
     reaction(inBody: body.convert(point, from: contentView))?.0
   }

@@ -502,37 +502,41 @@ equal(typing("stacked", showFaces: true)?.faces.count, 1, "stacked, showFaces tr
 check(typing("stacked", showFaces: true).map { $0.label!.frame.minX < theme.horizontalPadding + theme.avatarSize + 12 } == true,
       "and the label after it, not at the text column")
 
-// MARK: Media taps open on the first release (approved 2026-10-24)
+// MARK: All list taps dispatch on the first release (approved 2026-10-24)
 
-// Which tap recognizer takes a touch, from what `hit` reports under it.
-// This checks the routing policy only; that UIKit then fails the tap when
-// the long press recognizes is the runtime's to show.
+// UIKit owns tap/hold/pan recognition. These sequence checks exercise the
+// production routing policy at touch-down and release, including movement
+// between adjacent targets. They do not synthesize UIKit recognition timing.
 equal(TapRoute(onReaction: false, element: "media"), .media, "a photo, video, carousel card or deck card: the media tap")
 equal(TapRoute(onReaction: true, element: "media"), .reaction, "a reaction over a card: the reaction tap, not the photo")
 for element in ["message", "link", "mention", "quote", "file", "linkCard", "author", "replies", "notSent"] {
-  equal(TapRoute(onReaction: false, element: element), .message, "\(element): the message's taps, as before")
+  equal(TapRoute(onReaction: false, element: element), .message, "\(element): the message's first-release tap")
 }
-equal(TapRoute(onReaction: false, element: nil), .message, "nothing hit: the message's taps, as before")
-// Each touch goes to exactly one single-tap recognizer, so it presses once.
-for route in [TapRoute.reaction, .media, .message] {
-  let singles = [TapRoute.Recognizer.reactionTap, .mediaPress, .tap].filter { route.receives($0) }
-  equal(singles.count, 1, "\(route): one single-tap recognizer")
+equal(TapRoute(onReaction: false, element: nil), .message, "nothing hit: the message route, with hit testing still required")
+
+func tapReleases(_ touches: [(TapRoute, TapRoute)]) -> [TapRoute.Recognizer] {
+  touches.flatMap { down, up in
+    TapRoute.Recognizer.allCases.filter { down.receives($0) && up.receives($0) }
+  }
 }
-// Only the message's touches reach the double tap: a double tap on media
-// or a reaction never opens the menu.
-check(TapRoute.message.receives(.doubleTap), "text: a double tap still opens the menu")
-check(!TapRoute.media.receives(.doubleTap), "media: a double tap doesn't open the menu")
-check(!TapRoute.reaction.receives(.doubleTap), "a reaction: a double tap is two taps")
-// Media never waits on the message's tap, and text never takes the media tap.
-check(!TapRoute.media.receives(.tap), "media isn't the message's single tap, which waits for the double tap")
-check(!TapRoute.message.receives(.mediaPress), "a caption's text isn't a photo")
-// A release is honoured only where its recognizer would have been routed:
-// the message's taps check the route under the finger as it comes up, so a
-// tap that slid within its slop from text onto a photo or a chip does
-// nothing, and a text double tap still opens the menu.
-check(!TapRoute(onReaction: false, element: "media").receives(.doubleTap), "text, then the second tap up on a photo: no media menu")
-check(!TapRoute(onReaction: true, element: nil).receives(.tap), "text down, up on a chip: no reaction press from the message's tap")
-check(TapRoute(onReaction: false, element: "message").receives(.doubleTap), "a text double tap ending on text: the menu, as before")
+
+for (route, recognizer) in [(TapRoute.message, TapRoute.Recognizer.tap), (.media, .mediaPress), (.reaction, .reactionTap)] {
+  equal(tapReleases([(route, route)]), [recognizer], "\(route): dispatch on the first release without another touch")
+  equal(tapReleases([(route, route), (route, route)]), [recognizer, recognizer], "\(route): two releases remain two presses, never a menu")
+}
+// A short move within tap slop must not turn the original route's release
+// into another target's action. A fresh subsequent touch can use that target.
+for down in [TapRoute.message, .media, .reaction] {
+  for up in [TapRoute.message, .media, .reaction] where down != up {
+    equal(tapReleases([(down, up)]), [], "\(down) down, \(up) up: no cross-target dispatch")
+    let expected = TapRoute.Recognizer.allCases.filter { up.receives($0) }
+    equal(tapReleases([(down, up), (up, up)]), expected, "\(down) to \(up), then a new tap: only the new release dispatches")
+  }
+}
+equal(tapReleases([(.message, .message), (.media, .media), (.reaction, .reaction), (.message, .message)]),
+      [.tap, .mediaPress, .reactionTap, .tap], "successive text, photo, reaction and text taps keep independent actions")
+equal(tapReleases([(.message, .message), (.message, .media)]), [.tap], "text tap followed by text down/media up cannot open media or its menu")
+equal(tapReleases([(.media, .media), (.message, .message)]), [.mediaPress, .tap], "media then text dispatches both releases without double-tap arbitration")
 
 // MARK: A freeze starts between the paired props and their worker result
 
