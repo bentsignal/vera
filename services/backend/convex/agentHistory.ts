@@ -1,6 +1,7 @@
 import type { Message } from "@decentralized-convex/messages";
 import type { ModelMessage, UserContent } from "ai";
 
+import type { AssistantModel } from "../assistant-models";
 import { LIMIT_NOTICE_START } from "../assistant-limits";
 
 // How an assistant's conversation reaches the model (agent.ts): in the
@@ -30,12 +31,31 @@ export function inAnswerOrder(
   ];
 }
 
+/** The person's newest images, the ones the model is shown. */
+function visibleImages(history: readonly Message[], self: string) {
+  return history
+    .filter((message) => message.authorId !== self)
+    .flatMap((message) => message.attachments)
+    .filter((attachment) => attachment.kind === "image")
+    .slice(-VISIBLE_IMAGES);
+}
+
+/** The formats of the images the model is shown, to pick a model that reads them. */
+export function visibleImageTypes(history: readonly Message[], self: string) {
+  return visibleImages(history, self).map((image) => image.mimeType);
+}
+
 /**
  * The conversation as the model sees it: the person's messages as user
- * turns, with their newest images attached, and the assistant's own as the
- * `send_message` calls that sent them, so it keeps answering that way.
+ * turns, with their newest images attached (those in a format the model
+ * reads), and the assistant's own as the `send_message` calls that sent
+ * them, so it keeps answering that way.
  */
-export function toModelMessages(history: readonly Message[], self: string) {
+export function toModelMessages(
+  history: readonly Message[],
+  self: string,
+  model: AssistantModel,
+) {
   const messages: ModelMessage[] = [];
   let pendingCalls: { body: string; id: string }[] = [];
   function flush() {
@@ -62,11 +82,7 @@ export function toModelMessages(history: readonly Message[], self: string) {
     );
     pendingCalls = [];
   }
-  const images = history
-    .filter((message) => message.authorId !== self)
-    .flatMap((message) => message.attachments)
-    .filter((attachment) => attachment.kind === "image").length;
-  let imageCount = 0;
+  const visible = new Set(visibleImages(history, self));
   for (const message of history) {
     if (message.authorId === self && isLimitNotice(message.body)) {
       flush();
@@ -87,16 +103,9 @@ export function toModelMessages(history: readonly Message[], self: string) {
     }
     const attached: Exclude<UserContent, string> = [];
     for (const attachment of message.attachments) {
-      if (attachment.kind !== "image") {
-        lines.push(`[${attachment.kind}: ${attachment.name}]`);
-        continue;
-      }
-      imageCount += 1;
-      if (images - imageCount < VISIBLE_IMAGES) {
-        attached.push({ image: new URL(attachment.url), type: "image" });
-      } else {
-        lines.push("[an older image, no longer visible]");
-      }
+      const part = attachmentPart(attachment, visible.has(attachment), model);
+      if (typeof part === "string") lines.push(part);
+      else attached.push(part);
     }
     const text = lines.filter(Boolean).join("\n");
     messages.push({
@@ -109,6 +118,29 @@ export function toModelMessages(history: readonly Message[], self: string) {
   }
   flush();
   return messages;
+}
+
+/**
+ * An attachment as the model gets it: an image it's shown and can read,
+ * or a note saying what was sent.
+ */
+function attachmentPart(
+  attachment: Message["attachments"][number],
+  visible: boolean,
+  model: AssistantModel,
+) {
+  if (attachment.kind !== "image") {
+    return `[${attachment.kind}: ${attachment.name}]`;
+  }
+  if (!visible) return "[an older image, no longer visible]";
+  if (!model.images.includes(attachment.mimeType.toLowerCase())) {
+    return "[an image in a format you can't open]";
+  }
+  return {
+    data: new URL(attachment.url),
+    mediaType: attachment.mimeType,
+    type: "file" as const,
+  };
 }
 
 function isLimitNotice(body: string) {

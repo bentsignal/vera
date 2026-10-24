@@ -1,17 +1,22 @@
 import type { ModelMessage, StepResult, ToolSet } from "ai";
-import { convexGateway } from "@convex-dev/ai-sdk-provider";
-import { generateText, isStepCount } from "ai";
+import { isStepCount } from "ai";
 import { v } from "convex/values";
 
 import type { ActionCtx } from "./_generated/server";
 import type { Turn } from "./agentTools";
 import type { BotAccount } from "./bots";
 import type { Tally } from "./usage";
-import { NO_TOOL_CALL, replyOutcome } from "../reply-outcome";
+import { modelOrder } from "../assistant-models";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
-import { teamNote, toAnswer, toModelMessages } from "./agentHistory";
-import { currentTools, keepTyping, messageSender, MODEL } from "./agentTools";
+import {
+  teamNote,
+  toAnswer,
+  toModelMessages,
+  visibleImageTypes,
+} from "./agentHistory";
+import { generateReply } from "./agentModels";
+import { currentTools, keepTyping, messageSender } from "./agentTools";
 import { waitWhileTyping } from "./assistantHook";
 import { botAccount, botAddress, sendAsBot } from "./bots";
 import { recallOlder } from "./memory";
@@ -43,7 +48,7 @@ const MAX_STEPS = 8;
 /** A reply that has run this long is assumed to have died. */
 const STALE_RUN = 10 * 60 * 1000;
 
-/** How hard Grok thinks before each step: lower is faster and cheaper. */
+/** How hard the model thinks before each step: lower is faster and cheaper. */
 const REASONING = { convexGateway: { reasoningEffort: "low" } };
 
 const FAILURE_NOTICE =
@@ -189,47 +194,6 @@ function saidItsPiece({ steps }: { steps: StepResult<ToolSet>[] }) {
   );
 }
 
-type ReplyOptions = Parameters<typeof generateText<ToolSet>>[0] & {
-  messages: ModelMessage[];
-};
-
-/**
- * Runs the model for a reply. It speaks only through tools, and text it
- * writes outside them is never sent, so a reply with neither a message nor
- * stay_quiet gets its turn back once, told why (reply-outcome.ts).
- */
-async function generateReply(
-  options: ReplyOptions,
-  sender: { sent: () => number },
-  bot: BotAccount,
-) {
-  function generate(more: ModelMessage[] = []) {
-    const attempt = { ...options, messages: [...options.messages, ...more] };
-    return generateText(attempt).catch((error: unknown) => {
-      // A model call that stalled: try once more if nothing went out yet.
-      if (sender.sent() > 0) throw error;
-      console.warn(`${bot.username} retrying a failed reply`, error);
-      return generateText(attempt);
-    });
-  }
-  const first = await generate();
-  if (replyOutcome(first.steps, sender.sent()) !== "noToolCall") {
-    return [first];
-  }
-  console.warn(`${bot.username} answered without a tool call`, first.text);
-  const retry = await generate([
-    ...first.response.messages,
-    { content: NO_TOOL_CALL, role: "system" },
-  ]);
-  if (replyOutcome(retry.steps, sender.sent()) === "noToolCall") {
-    console.error(
-      `${bot.username} again answered without a tool call`,
-      retry.text,
-    );
-  }
-  return [first, retry];
-}
-
 /**
  * Answers the person's messages that no reply has seen yet, and returns
  * when the newest of them was sent (undefined when there were none).
@@ -263,7 +227,6 @@ async function reply(
   });
   const typing = keepTyping(ctx, bot, conversationId);
   try {
-    const messages = toModelMessages(history, self);
     const sender = messageSender(ctx, bot, conversationId, typing);
     const tally: Tally = { memoryLookups: 0, searches: 0 };
     const started = Date.now();
@@ -291,28 +254,32 @@ async function reply(
     };
     const assistant = ASSISTANTS[bot.username];
     const tools = assistant.tools(turn);
+    // Last before it answers, where it outweighs what the chat says.
+    const closing: ModelMessage[] = [
+      ...(note === null
+        ? []
+        : [{ content: teamNote(note), role: "system" as const }]),
+      { content: currentTools(tools), role: "system" as const },
+    ];
+    const models = modelOrder(visibleImageTypes(history, self)).map(
+      (model) => ({
+        messages: [...toModelMessages(history, self, model), ...closing],
+        model,
+      }),
+    );
     const options = {
       allowSystemInMessages: true,
       instructions: await assistant.instructions(turn),
-      // Last before it answers, where it outweighs what the chat says.
-      messages: [
-        ...messages,
-        ...(note === null
-          ? []
-          : [{ content: teamNote(note), role: "system" as const }]),
-        { content: currentTools(tools), role: "system" as const },
-      ],
-      model: convexGateway(MODEL, { zdr: true }),
       providerOptions: REASONING,
       stopWhen: [isStepCount(MAX_STEPS), saidItsPiece],
       // Every step calls a tool: it speaks only through send_message (or
-      // stays quiet), and Grok otherwise often answers in plain text.
+      // stays quiet), and models otherwise often answer in plain text.
       toolChoice: "required" as const,
       timeout: { stepMs: STEP_TIMEOUT },
       toolCallConcurrency: 1,
       tools,
     };
-    const results = await generateReply(options, sender, bot);
+    const results = await generateReply(options, models, sender, bot);
     await ctx.runMutation(internal.usage.record, {
       ...usageOf(results, tally),
       accountId,

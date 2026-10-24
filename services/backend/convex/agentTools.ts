@@ -13,9 +13,6 @@ import { localTime } from "./timeZones";
 // conversation. No tool takes a conversation or an account, so a model can't
 // reach anyone else's messages or send to anyone else.
 
-/** Grok 4.7 through the Convex AI Gateway (billed on the Convex bill). */
-export const MODEL = "x-ai/grok-4.7";
-
 /** The most messages one reply sends. */
 const MAX_MESSAGES_PER_TURN = 3;
 
