@@ -1923,3 +1923,36 @@ JavaScript's motion runs had no Metro errors.
   ways, typing hand-off in a DM and the busy group.
 - `sim.sh frames` for each motion, before and after. Glass vs solid chips.
 - Nothing committed; upload with `scripts/evidence.sh`.
+
+## Phone feedback round 2, 2026-10-24
+
+Shawn tested the Vera Dev clients from round 1 (Metro on 8492, the
+isolated backend `uncommon-curlew-869`, no data pass). Keep: the
+performance (his Galaxy A16 went from barely usable to fast), the new
+carousels, the reactions and their wrapping to a new line, and iOS
+dictation, which now works. All three threads run on Claude Opus 5.5 and
+implement directly; the headless-CLI rule is gone.
+
+Owners: **integration** (this branch: shared JavaScript, combined builds,
+QA, the contract), **iOS** (#277), **Android** (#275). Contract changes
+are agreed by all three before anyone builds them.
+
+| # | Item | Owners |
+|---|---|---|
+| 1 | A multiline send flicks the list down, then back up. The composer's shrink and the arrival must be one move, never down. | integration, iOS, Android |
+| 2 | A long press with the keyboard up: the message stays raised as the keyboard goes down, and on close goes straight to its place above the returning keyboard. | integration, iOS, Android |
+| 3 | Swiping down to close the keyboard also scrolls the chat (#165). One swipe closes it and leaves you at the bottom. | iOS, Android |
+| 4 | Stacked typing: a DM shows the other person's photo; initials circles in groups are squished. Match the React Native indicator exactly. | iOS, Android (integration if the mapping) |
+| 5 | The viewer's close button flickers and ghosts 100–200 pt toward the swipe while paging. | integration |
+| 6 | Video opens paused (must play at once), and its play button flashes on the row after a swipe-down dismiss. A regression. | integration, natives (cells) |
+| 7 | Opening a photo from a carousel takes about a second. Open at once from the loaded image, then sharpen. | integration, natives |
+| 8 | The busy group lagged on its first open on his iPhone. Profile a cold open of a busy media chat on a release-like build. | integration, iOS |
+| 9 | A held deck lifts the whole pile, and its reactions draw over the menu. Lift the front card only; nothing from the list over the menu. | iOS, Android, integration (menu layering) |
+| 10 | Deck: center cards of different aspect ratios vertically; antialias the rotated edges. | iOS, Android |
+| 11 | Deck animation: too slow on quick swipes; a card coming back under the pile stays on top, then flickers behind. | Android (check iOS) |
+| 12 | Reaction height changes: Android jerks and moves twice; iOS doesn't move at all. One smooth move on both. | iOS, Android |
+| 13 | Android arrivals don't rise and fade in (the first reply after typing just appears). | Android |
+
+Status, 2026-10-24 16:00: the iOS thread's run failed at the provider
+handoff ("Insufficient context allowance"), so iOS hasn't started; this
+was reported to the orchestrator. Android is running.
