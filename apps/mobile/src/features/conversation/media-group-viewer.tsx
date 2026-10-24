@@ -20,42 +20,41 @@ function sizeOf(item: ViewerItem) {
 }
 
 /**
- * The close button over the shown photo, held still while its page
- * slides, and fading with it as it's swiped away.
+ * The close button, drawn once over every page so it never moves as they
+ * slide (it used to ride in the shown page, counter-moved, and jumped a
+ * frame toward the swipe when the shown page changed). It fades with the
+ * backdrop as the shown photo is swiped away, and closes through it.
  */
-function CloseChrome({
-  index,
-  width,
-  pager,
-  onPress,
-}: {
-  index: number;
-  width: number;
-  pager: Pager;
-  onPress: () => void;
-}) {
+function CloseChrome({ pager }: { pager: Pager }) {
   const insets = useSafeAreaInsets();
-  const still = useAnimatedStyle(() => ({
-    transform: [{ translateX: (pager.position.get() - index) * width }],
-  }));
+  const fade = useAnimatedStyle(() => ({ opacity: pager.backdrop.get() }));
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[StyleSheet.absoluteFill, still]}
+      style={[StyleSheet.absoluteFill, fade]}
     >
       <View className="absolute left-4" style={{ top: insets.top + 8 }}>
-        <ViewerCloseButton onPress={onPress} />
+        <ViewerCloseButton
+          onPress={() => pager.closeRequests.set(pager.closeRequests.get() + 1)}
+        />
       </View>
     </Animated.View>
   );
 }
 
-function PlayButton({ url }: { url: string }) {
+/**
+ * A video's play button over its poster. It fades with the backdrop as
+ * the page is swiped away, rather than staying over the conversation
+ * until the viewer closes.
+ */
+function PlayButton({ url, pager }: { url: string; pager: Pager }) {
   const router = useRouter();
+  const fade = useAnimatedStyle(() => ({ opacity: pager.backdrop.get() }));
   return (
-    <View
+    <Animated.View
       pointerEvents="box-none"
       className="absolute inset-0 items-center justify-center"
+      style={fade}
     >
       <Pressable
         accessibilityRole="button"
@@ -66,7 +65,7 @@ function PlayButton({ url }: { url: string }) {
       >
         <PlayBadge />
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -97,20 +96,8 @@ function Page({
         onClose={onClose}
         pager={pager}
         current={current}
-        chrome={
-          current
-            ? (close) => (
-                <CloseChrome
-                  index={index}
-                  width={width}
-                  pager={pager}
-                  onPress={close}
-                />
-              )
-            : undefined
-        }
       />
-      {item.kind === "video" && <PlayButton url={item.url} />}
+      {item.kind === "video" && <PlayButton url={item.url} pager={pager} />}
     </Animated.View>
   );
 }
@@ -136,7 +123,14 @@ export function MediaGroupViewer({
   const [index, setIndex] = useState(first);
   const position = useSharedValue(first);
   const backdrop = useSharedValue(1);
-  const pager = { backdrop, count: items.length, onTurn: setIndex, position };
+  const closeRequests = useSharedValue(0);
+  const pager = {
+    backdrop,
+    closeRequests,
+    count: items.length,
+    onTurn: setIndex,
+    position,
+  };
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdrop.get() }));
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -162,6 +156,7 @@ export function MediaGroupViewer({
           )
         );
       })}
+      <CloseChrome pager={pager} />
     </View>
   );
 }

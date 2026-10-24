@@ -182,6 +182,16 @@ function useOpenMedia() {
   return (message: Message, index: number) => {
     const item = mediaOf(message)[index];
     if (item === undefined || handledStuck(item.attachment)) return;
+    const { attachment } = item;
+    // A video opens playing, in the video player, as the React Native
+    // list's did, not on its poster in the group.
+    if (attachment.kind === "video") {
+      router.push({
+        params: { kind: "video", url: attachment.localUrl ?? attachment.url },
+        pathname: "/media",
+      });
+      return;
+    }
     router.push({
       params: { group: groupParam(viewerItems(message)), index: String(index) },
       pathname: "/media",

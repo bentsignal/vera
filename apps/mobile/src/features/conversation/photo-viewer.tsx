@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { Image } from "expo-image";
 
 import type { Size } from "./photo-transform";
@@ -68,6 +69,14 @@ export function PhotoViewer({
     () => fadeOf(viewer),
     (fade) => {
       if (current) pager?.backdrop.set(fade);
+    },
+    [current],
+  );
+  // The group's close button (see `Pager`'s `closeRequests`).
+  useAnimatedReaction(
+    () => pager?.closeRequests.get() ?? 0,
+    (now, before) => {
+      if (current && before !== null && now !== before) scheduleOnRN(close);
     },
     [current],
   );

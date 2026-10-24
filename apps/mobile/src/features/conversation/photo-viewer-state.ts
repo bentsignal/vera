@@ -121,6 +121,11 @@ export interface Pager {
   count: number;
   onTurn: (index: number) => void;
   backdrop: SharedValue<number>;
+  /**
+   * Bumped by the group's close button, which sits still over the pages:
+   * the shown page closes the viewer, as its own `close` does.
+   */
+  closeRequests: SharedValue<number>;
 }
 
 const PAGE_SPRING = { dampingRatio: 1, duration: 380 } as const;
