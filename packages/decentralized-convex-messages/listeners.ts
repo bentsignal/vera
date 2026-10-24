@@ -14,7 +14,7 @@ import { threadMember, threadMembers } from "./threads.ts";
 export type ReplyPush = "thread" | "yours" | null;
 
 /** Someone who hears about a message, and as what. */
-interface Listener {
+export interface Listener {
   readonly accountId: string;
   readonly reply: ReplyPush;
 }
@@ -175,4 +175,34 @@ export async function listeners(
     if (reply !== undefined) heard.push({ accountId, reply });
   }
   return heard;
+}
+
+/**
+ * The members who'd hear of a message only if it says their display name:
+ * they turned those pushes on, it doesn't reach them already (`heard`),
+ * and it would as an @mention. The caller checks their names, which live
+ * in Accounts (see `accountProfile`).
+ */
+export async function nameListeners(
+  ctx: QueryCtx,
+  message: Doc<"messages">,
+  conversation: Doc<"conversations">,
+  members: readonly string[],
+  heard: readonly Listener[],
+) {
+  if (message.body.length === 0) return [];
+  const reached = new Set(heard.map(({ accountId }) => accountId));
+  const wanting = new Set<string>();
+  for (const accountId of members) {
+    if (accountId === message.authorId || reached.has(accountId)) continue;
+    const settings = await notificationSettings(ctx, accountId);
+    if (settings.enabled && settings.yourName) wanting.add(accountId);
+  }
+  if (wanting.size === 0) return [];
+  const asMentioned = {
+    ...message,
+    mentions: [...wanting].map((accountId) => ({ accountId, name: "" })),
+  };
+  const named = await listeners(ctx, asMentioned, conversation, [...wanting]);
+  return named.filter(({ accountId }) => wanting.has(accountId));
 }

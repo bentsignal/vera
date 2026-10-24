@@ -16,6 +16,20 @@ function isWritten(name: string, body: string) {
 }
 
 /**
+ * Whether a message's text says a display name: the whole name, in any
+ * case, not inside a longer word ("Maya" isn't in "Mayan").
+ */
+export function saysName(text: string, name: string) {
+  const wanted = name.trim();
+  if (wanted.length === 0) return false;
+  const escaped = wanted.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(
+    String.raw`(?<![\p{L}\p{N}])${escaped}(?![\p{L}\p{N}])`,
+    "iu",
+  ).test(text);
+}
+
+/**
  * The mentions that hold: of members other than the author whose `@name`
  * is in the body, each once; undefined when none do. Direct messages have
  * none.

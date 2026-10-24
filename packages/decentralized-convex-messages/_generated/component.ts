@@ -166,6 +166,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   reactions?: boolean;
                   replies?: boolean;
                   threadReplies?: boolean;
+                  yourName?: boolean;
                 };
                 type: "setNotificationSettings";
               }
@@ -1118,6 +1119,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 reactions: boolean;
                 replies?: boolean;
                 threadReplies?: boolean;
+                yourName?: boolean;
               };
             }
           | {
@@ -2652,6 +2654,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               reactions: boolean;
               replies?: boolean;
               threadReplies?: boolean;
+              yourName?: boolean;
             };
           }
         | {

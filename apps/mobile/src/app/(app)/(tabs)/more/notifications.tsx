@@ -16,6 +16,7 @@ import { useNotificationSettings } from "~/features/settings/notification-settin
 const KINDS = [
   { kind: "directMessages", label: "Direct Messages" },
   { kind: "replies", label: "Replies to Your Messages" },
+  { kind: "yourName", label: "Messages With Your Name" },
   { kind: "threadReplies", label: "Thread Updates" },
   { kind: "reactions", label: "Reactions" },
   { kind: "invites", label: "Space Invites" },
@@ -69,7 +70,12 @@ export default function NotificationSettingsScreen() {
               </FieldGroup.Section>
               {settings.enabled && (
                 <FieldGroup.Section title="Notify Me About">
-                  {KINDS.map(({ kind, label }) => (
+                  {KINDS.filter(
+                    // Servers from before it leave your name out, and
+                    // can't send those.
+                    ({ kind }) =>
+                      kind !== "yourName" || settings.yourName !== undefined,
+                  ).map(({ kind, label }) => (
                     <OptimisticSwitch
                       key={kind}
                       label={label}

@@ -35,6 +35,21 @@ messages keep Hide Alerts (everything or nothing).
   …"), taken out of its conversation's messages row so nothing counts
   twice.
 
+## Your name
+
+Settings > Notifications > Messages With Your Name (off until turned on)
+pushes a message that says your display name as if it @mentioned you:
+whole words, any case ("Maya" matches "maya!" but not "Mayans"). It
+follows the same alert levels, so it adds pushes only where you'd hear
+mentions but not every message (a group or channel at only @mentions, or
+a thread you're not in); a conversation at nothing stays silent.
+
+- The push sender (`notifications.send`, an action) checks names, since
+  display names live in Accounts, which the messages Component reads
+  over HTTP (`accountProfile`). `nameListeners` limits the lookups to
+  members who turned it on and wouldn't hear of the message otherwise.
+- Pushes only: it adds no Activity row, badge, or highlight.
+
 ## Later
 
 - @everyone (decided against for now).

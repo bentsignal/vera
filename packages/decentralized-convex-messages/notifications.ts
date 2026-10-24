@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 
-import type { ReplyPush } from "./listeners.ts";
+import type { Listener, ReplyPush } from "./listeners.ts";
 import { internal } from "./_generated/api.js";
 import {
   internalAction,
@@ -9,7 +9,8 @@ import {
 } from "./_generated/server.js";
 import { badgeCount } from "./badges.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
-import { listeners } from "./listeners.ts";
+import { listeners, nameListeners } from "./listeners.ts";
+import { saysName } from "./mentions.ts";
 import { getConversation, getSpace, memberAddresses } from "./model.ts";
 import { listNames } from "./naming.ts";
 import { inboxKind } from "./protocol.ts";
@@ -35,23 +36,32 @@ export const targets = internalQuery({
     if (conversation === null) return null;
 
     const members = await memberAddresses(ctx, conversation);
-    const recipients: (ReturnType<typeof recipientOf> & {
-      reply: ReplyPush;
-    })[] = [];
-    for (const { accountId, reply } of await listeners(
+    async function devices(heard: readonly Listener[]) {
+      const found: (ReturnType<typeof recipientOf> & { reply: ReplyPush })[] =
+        [];
+      for (const { accountId, reply } of heard) {
+        const rows = await ctx.db
+          .query("pushTokens")
+          .withIndex("by_account", (index) => index.eq("accountId", accountId))
+          .collect();
+        found.push(...rows.map((row) => ({ ...recipientOf(row), reply })));
+      }
+      return found;
+    }
+    const heard = await listeners(ctx, message, conversation, members);
+    const named = await nameListeners(
       ctx,
       message,
       conversation,
       members,
-    )) {
-      const rows = await ctx.db
-        .query("pushTokens")
-        .withIndex("by_account", (index) => index.eq("accountId", accountId))
-        .collect();
-      recipients.push(...rows.map((row) => ({ ...recipientOf(row), reply })));
-    }
+      heard,
+    );
     return {
       body: previewText(message),
+      // Who hears of it only if it says their name, which `send` checks.
+      nameRecipients: await devices(named),
+      recipients: await devices(heard),
+      text: named.length === 0 ? "" : message.body,
       conversationId: conversation.conversationId,
       conversationName: await conversationName(ctx, conversation),
       messageId: message.messageId,
@@ -62,7 +72,6 @@ export const targets = internalQuery({
           ? members
           : null,
       kind: conversation.kind,
-      recipients,
       senderId: message.authorId,
       senderName: message.authorName,
       threadId: message.threadId ?? null,
@@ -70,6 +79,25 @@ export const targets = internalQuery({
     };
   },
 });
+
+/**
+ * The devices of the accounts whose display name the text says. A name
+ * that can't be looked up says nothing.
+ */
+async function namedIn<Device extends { accountId: string }>(
+  text: string,
+  devices: readonly Device[],
+) {
+  const accountIds = [...new Set(devices.map(({ accountId }) => accountId))];
+  const profiles = await Promise.all(accountIds.map(accountProfile));
+  const named = new Set(
+    accountIds.filter((_, index) => {
+      const name = profiles[index]?.displayName;
+      return name !== undefined && saysName(text, name);
+    }),
+  );
+  return devices.filter(({ accountId }) => named.has(accountId));
+}
 
 /** A reply push's body: what it is, then the reply. */
 function replyBody(reply: ReplyPush, body: string) {
@@ -138,10 +166,15 @@ export const send = internalAction({
     const target = await ctx.runQuery(internal.notifications.targets, {
       messageId,
     });
-    if (target === null || target.recipients.length === 0) return;
+    if (target === null) return;
+    const recipients = [
+      ...target.recipients,
+      ...(await namedIn(target.text, target.nameRecipients)),
+    ];
+    if (recipients.length === 0) return;
     const [sender, badges, memberNames] = await Promise.all([
       accountProfile(target.senderId),
-      badgeCounts(ctx, target.recipients),
+      badgeCounts(ctx, recipients),
       displayNames([...(target.unnamedGroupMembers ?? [])].sort()),
     ]);
     const senderName = sender?.displayName ?? target.senderName;
@@ -156,7 +189,7 @@ export const send = internalAction({
 
     await deliver(
       ctx,
-      target.recipients.map((recipient) => {
+      recipients.map((recipient) => {
         const { accountId, reply, token } = recipient;
         const conversationName = conversationNameFor(accountId);
         // A reply kept in its thread opens the thread. Its `messageId` is

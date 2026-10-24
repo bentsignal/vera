@@ -248,9 +248,10 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_space", ["spaceId"]),
-  // Kinds of pushes an account turned off; absent fields are on. Default
-  // alerts for groups and channels are `groupAlerts` and `channelAlerts`,
-  // or else `none` where `groups` or `channels` is false, else `all`.
+  // Kinds of pushes an account turned off; absent fields are on, but for
+  // `yourName`. Default alerts for groups and channels are `groupAlerts`
+  // and `channelAlerts`, or else `none` where `groups` or `channels` is
+  // false, else `all`.
   notificationSettings: defineTable({
     accountId: v.string(),
     channelAlerts: v.optional(alertLevel),
@@ -263,6 +264,8 @@ export default defineSchema({
     reactions: v.optional(v.boolean()),
     replies: v.optional(v.boolean()),
     threadReplies: v.optional(v.boolean()),
+    // Pushes for messages that say the account's name: off until turned on.
+    yourName: v.optional(v.boolean()),
   }).index("by_account", ["accountId"]),
   pushTokens: defineTable({
     accountId: v.string(),
