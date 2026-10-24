@@ -91,13 +91,13 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private var latestIntent = LatestIntent()
   private var latestScrollRunning = false
   private var stoppedLatestTouch: (id: ObjectIdentifier, time: TimeInterval)?
-  // Reactions answer a tap at once: their own recognizer, which doesn't
-  // wait for a double tap, a light haptic, and the chip drawn toggled.
+  // Reactions answer a tap at once, with a light haptic and the chip
+  // drawn toggled. Each route has one first-release tap recognizer.
   private lazy var reactionTap = UITapGestureRecognizer(target: self, action: #selector(reactionTapped(_:)))
   // Photos and videos open on the first release, with no double-tap wait
   // (TapRoute.swift): their own recognizer, as reactions have.
   private lazy var mediaPress = UITapGestureRecognizer(target: self, action: #selector(mediaPressed(_:)))
-  private var messageTaps: [UIGestureRecognizer] = []
+  private lazy var messageTap = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
   /// The route of the touch the recognizers are being asked about, worked
   /// out once for all of them (`shouldReceive`).
   private var routed: (touch: ObjectIdentifier, time: TimeInterval, route: TapRoute)?
@@ -127,14 +127,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     collectionView.onAccessibilityScroll = { [weak self] direction in self?.accessibilityPage(direction) ?? false }
     addSubview(collectionView)
 
-    let tap = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
-    let doubleTap = UITapGestureRecognizer(target: self, action: #selector(held(_:)))
-    doubleTap.numberOfTapsRequired = 2
-    tap.require(toFail: doubleTap)
     let hold = UILongPressGestureRecognizer(target: self, action: #selector(held(_:)))
     hold.minimumPressDuration = 0.32
-    messageTaps = [tap, doubleTap]
-    for gesture in [tap, doubleTap, hold, reactionTap, mediaPress] {
+    for gesture in [messageTap, hold, reactionTap, mediaPress] {
       gesture.cancelsTouchesInView = false
       gesture.delegate = self
       collectionView.addGestureRecognizer(gesture)
@@ -1156,8 +1151,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   }
 
   @objc private func tapped(_ gesture: UITapGestureRecognizer) {
+    guard gesture.state == .ended else { return }
     // Landed on text but came up within the slop on a photo or a reaction:
-    // nothing, rather than that part's press after the double-tap wait.
+    // nothing, rather than dispatching that part's press.
     guard route(at: gesture.location(in: collectionView)).receives(.tap),
           let (hit, _) = hit(gesture, hold: false) else { return }
     send(hit.event)
@@ -1171,7 +1167,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     // Only a photo's press goes this way. A touch that landed on a photo
     // but came up within the tap's slop on something else (a chip at its
     // edge, a caption) does nothing: a reaction has its own tap, haptic and
-    // preview, and text waits for the double tap.
+    // preview, and text has its own first-release tap.
     guard let (hit, _) = hit(gesture, hold: false), hit.event["element"] as? String == "media" else {
       if let interval = mediaTap {
         mediaTap = nil
@@ -1276,15 +1272,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     return cell.hit(at: cell.contentView.convert(point, from: collectionView), hold: true)?.view
   }
 
-  @objc private func held(_ gesture: UIGestureRecognizer) {
-    if let press = gesture as? UILongPressGestureRecognizer, press.state != .began { return }
+  @objc private func held(_ gesture: UILongPressGestureRecognizer) {
+    guard gesture.state == .began else { return }
     shrink.release()
-    if gesture is UITapGestureRecognizer, gesture.state != .ended { return }
-    // A double tap is the message's: if its second tap came up within the
-    // slop on a photo or a reaction, it opens nothing, rather than that
-    // part's menu. The long press holds whatever is under it, media and
-    // reactions included.
-    if gesture is UITapGestureRecognizer, !route(at: gesture.location(in: collectionView)).receives(.doubleTap) { return }
     guard let (hit, cell) = hit(gesture, hold: true) else { return }
     cancelLatest()
     var event = hit.event
@@ -1322,19 +1312,15 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       if let strip = current as? CarouselView, strip.isDecelerating { return false }
       view = current.superview
     }
-    // A reaction's tap and a photo's are their own: the message's tap
-    // waits for the double tap to fail (about 0.3 s), which neither may
-    // (TapRoute.swift). The hold still sees every touch: who reacted, or
-    // the menu.
+    // Each route answers on its first release (TapRoute.swift). The hold
+    // still sees every touch: who reacted, or the menu.
     let recognizer: TapRoute.Recognizer
     if gesture === reactionTap {
       recognizer = .reactionTap
     } else if gesture === mediaPress {
       recognizer = .mediaPress
-    } else if gesture === messageTaps.first {
+    } else if gesture === messageTap {
       recognizer = .tap
-    } else if gesture === messageTaps.last {
-      recognizer = .doubleTap
     } else {
       return true
     }
