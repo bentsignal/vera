@@ -130,6 +130,8 @@ final class CarouselView: UIScrollView, UIScrollViewDelegate {
         tile.isHidden = true
         continue
       }
+      // A photo out in the menu (Lift.swift) is placed as it comes back.
+      guard tile.superview === self else { continue }
       tile.isHidden = false
       tile.frame = layout.cards[index]
       tile.set(layout.items[index], theme: theme, size: layout.cards[index].size)
@@ -194,6 +196,9 @@ final class DeckCardView: UIView {
   let tile = MediaTileView()
   private let blurred = UIImageView()
   private let dim = UIView()
+  /// Hides the tapbacks while the card is lifted into the menu (`DeckView.
+  /// tapbacksHidden`); `tapbackBox` inside it fades them with depth.
+  let tapbackShell = UIView()
   private let tapbackBox = UIView()
   private let tapbacks = ReactionPool<TapbackView>()
   private(set) var item: Int = -1
@@ -208,7 +213,14 @@ final class DeckCardView: UIView {
     dim.layer.cornerCurve = .continuous
     dim.isUserInteractionEnabled = false
     tapbackBox.isUserInteractionEnabled = false
-    [tile, blurred, dim, tapbackBox].forEach(addSubview)
+    tapbackShell.isUserInteractionEnabled = false
+    tapbackShell.addSubview(tapbackBox)
+    [tile, blurred, dim, tapbackShell].forEach(addSubview)
+    // Turned, the cards' straight edges would step: each layer that draws
+    // an edge smooths it. Only the few cards of a pile pay for it.
+    for layer in [tile.layer, tile.image.layer, blurred.layer, dim.layer] {
+      layer.allowsEdgeAntialiasing = true
+    }
     isUserInteractionEnabled = false
     // Turned and scaled about its bottom center, as a photo on a pile.
     layer.anchorPoint = CGPoint(x: 0.5, y: 1)
@@ -252,6 +264,7 @@ final class DeckCardView: UIView {
     tile.frame = bounds
     blurred.frame = bounds
     dim.frame = bounds
+    tapbackShell.frame = bounds
     tapbackBox.frame = bounds
   }
 }
@@ -281,6 +294,13 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
 
   private static let throwAway: CGFloat = 70
   private static let spring = UISpringTimingParameters(mass: 1, stiffness: 240, damping: 18, initialVelocity: .zero)
+  /// A thrown card's trip (`DeckPile.throwOut`, `tuckIn`): out beside the
+  /// pile, then in behind it, about 0.28 s in all, as on Android.
+  private static let tuck = UICubicTimingParameters(animationCurve: .easeInOut)
+  /// Whether the tapbacks are hidden, while the front card is lifted.
+  private var tapbacksHidden = false
+  /// A throw's animators, while it runs (`finishNow` stops them).
+  private var throwing: [UIViewPropertyAnimator] = []
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -292,6 +312,24 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
 
   /// The card in front (for taps, holds, and the lift).
   var front: UIView { cards[index] ?? self }
+
+  /// Card `item`'s view, if the pile shows it: the front one lifts alone.
+  func cardView(_ item: Int) -> DeckCardView? { cards[item] }
+
+  /// Hides the cards' tapbacks at once while the front card is in the
+  /// menu, and fades them back in after it lands (`Tapbacks`' `hidden`,
+  /// RETURN_MS 260): the menu draws its own.
+  func setTapbacksHidden(_ hidden: Bool, fade: Double) {
+    tapbacksHidden = hidden
+    for card in cards.values {
+      card.tapbackShell.layer.removeAllAnimations()
+      if hidden || fade <= 0 {
+        card.tapbackShell.alpha = hidden ? 0 : 1
+      } else {
+        UIView.animate(withDuration: fade, delay: 0, options: [.allowUserInteraction]) { card.tapbackShell.alpha = 1 }
+      }
+    }
+  }
 
   func tapbackView(_ id: String) -> TapbackView? { cards[index]?.tapbackView(id) }
 
@@ -306,6 +344,9 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
       refreshContent(animated: animated)
       return
     }
+    // Another deck (a recycled row): a throw still going is the old one's.
+    stopThrow()
+    settling = false
     generation += 1
     self.index = index
     lone = .right
@@ -335,6 +376,7 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
     for item in shown where cards[item] == nil {
       let card = spare.popLast() ?? DeckCardView()
       card.isHidden = false
+      card.tapbackShell.alpha = tapbacksHidden ? 0 : 1
       if card.superview !== self { insertSubview(card, at: 0) }
       cards[item] = card
       added.append(item)
@@ -360,15 +402,17 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
 
   private func refreshContent(animated: Bool) {
     guard let layout else { return }
-    for (item, card) in cards where item < layout.items.count {
+    // A card out in the menu (Lift.swift) is left alone until it's back.
+    for (item, card) in cards where item < layout.items.count && card.superview === self {
       let size = layout.sizes[item]
+      let frame = layout.cardFrame(item)
       UIView.performWithoutAnimation {
         card.bounds = CGRect(origin: .zero, size: size)
         // `center` is the anchor: the card's bottom center.
-        card.center = CGPoint(x: size.width / 2, y: layout.cardTop + size.height)
+        card.center = CGPoint(x: frame.midX, y: frame.maxY)
       }
       // Outside it: a tapback taken back shrinks away.
-      card.set(layout.items[item], item: item, size: size, top: layout.cardTop,
+      card.set(layout.items[item], item: item, size: size, top: frame.minY,
                tapbacks: item < layout.tapbacks.count ? layout.tapbacks[item] : [], theme: theme, animated: animated)
     }
   }
@@ -399,6 +443,27 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
       dot.frame = CGRect(x: (width - total) / 2 + CGFloat(offset) * 10, y: layout.dotsY, width: 6, height: 6)
       dot.backgroundColor = offset == index % max(1, count) ? theme.foreground : theme.muted.withAlphaComponent(0.4)
     }
+  }
+
+  /// A finger down during a throw ends it at once, so quick flicks chain
+  /// and every swipe starts from a pile at rest.
+  func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    if gesture === pan, settling { finishNow() }
+    return true
+  }
+
+  private func finishNow() {
+    settling = false
+    generation += 1
+    stopThrow()
+    rebuild()
+  }
+
+  /// Stops a throw's animators where they are, without their completions:
+  /// the pile is rebuilt at rest right after.
+  private func stopThrow() {
+    for animator in throwing where animator.state == .active { animator.stopAnimation(true) }
+    throwing = []
   }
 
   override func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
@@ -437,13 +502,8 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
     let x = pan.translation(in: self).x
     switch pan.state {
     case .began:
-      if settling {
-        // A new swipe during the last one's settle: that one ends now, so
-        // quick flicks chain.
-        settling = false
-        generation += 1
-        rebuild()
-      }
+      // (A throw still going ended as the finger came down.)
+      if settling { finishNow() }
       tick.prepare()
     case .changed:
       follow(x)
@@ -452,7 +512,7 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
       let fling = abs(velocity) >= 600 && (x == 0 || velocity.sign == x.sign)
       let thrown = pan.state == .ended && (abs(x) >= Self.throwAway || fling)
       if thrown {
-        settle(forward: (abs(x) >= Self.throwAway ? x : velocity) < 0)
+        settle(forward: (abs(x) >= Self.throwAway ? x : velocity) < 0, from: x, speed: abs(velocity))
       } else {
         let animator = UIViewPropertyAnimator(duration: 0.4, timingParameters: Self.spring)
         animator.addAnimations { self.rest(except: nil) }
@@ -464,9 +524,13 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
   }
 
   /// The swipe goes through: the front card carries on out with the
-  /// finger, just past the pile, then tucks in behind on that side, as
-  /// the card it uncovered comes forward and the rest move a place.
-  private func settle(forward: Bool) {
+  /// finger to just beside the pile, decelerating (sooner the faster the
+  /// finger went), drops to the back there, where nothing overlaps it, and
+  /// tucks in behind on that side, as the card it uncovered comes forward
+  /// and the rest move a place. Changing its order only while it's out to
+  /// the side means it never comes back over the pile and then flickers
+  /// behind it.
+  private func settle(forward: Bool, from x: CGFloat = 0, speed: CGFloat = 0) {
     let n = count
     guard n > 1 else { return }
     let mover = index
@@ -489,27 +553,45 @@ final class DeckView: UIView, UIGestureRecognizerDelegate {
     }
     updateDots()
 
-    let others = UIViewPropertyAnimator(duration: 0.45, timingParameters: Self.spring)
+    // Both moves end before the pile is rebuilt at rest.
+    var running = 2
+    let ended = { [weak self] in
+      running -= 1
+      if running == 0 { self?.finishSettle(generation) }
+    }
+    let others = UIViewPropertyAnimator(duration: DeckPile.throwOut(distance: 0, speed: 0) + DeckPile.tuckIn,
+                                        timingParameters: UISpringTimingParameters(dampingRatio: 1))
     others.addAnimations { self.rest(except: mover) }
+    others.addCompletion { _ in ended() }
+    throwing = [others]
     others.startAnimation()
 
-    guard let card = cards[mover] else { return finishSettle(generation) }
+    guard let card = cards[mover] else { return ended() }
     let sign: CGFloat = forward ? -1 : 1
     let out = DeckPose(x: sign * DeckPile.out(width: cardWidth), angle: sign * 12 * .pi / 180)
     let home = DeckPile.pose(role(mover))
-    UIView.animateKeyframes(withDuration: 0.44, delay: 0, options: [.allowUserInteraction]) {
-      UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 0.42) { card.apply(out) }
-      // Beside the pile, nothing overlaps it: it goes behind there.
-      UIView.addKeyframe(withRelativeStartTime: 0.42, relativeDuration: 0.01) { card.layer.zPosition = -1 }
-      UIView.addKeyframe(withRelativeStartTime: 0.42, relativeDuration: 0.58) { card.apply(home) }
-    } completion: { _ in
-      self.finishSettle(generation)
+    card.layer.zPosition = 1
+    let throwOut = UIViewPropertyAnimator(duration: DeckPile.throwOut(distance: abs(out.x - x), speed: speed), curve: .easeOut) {
+      card.apply(out)
     }
+    throwOut.addCompletion { [weak self] _ in
+      guard let self, generation == self.generation else { return ended() }
+      // Beside the pile: behind it from here on.
+      card.layer.zPosition = Self.z(.behind(side))
+      let tuckIn = UIViewPropertyAnimator(duration: DeckPile.tuckIn, timingParameters: Self.tuck)
+      tuckIn.addAnimations { card.apply(home) }
+      tuckIn.addCompletion { _ in ended() }
+      self.throwing.append(tuckIn)
+      tuckIn.startAnimation()
+    }
+    throwing.append(throwOut)
+    throwOut.startAnimation()
   }
 
   private func finishSettle(_ generation: Int) {
     guard generation == self.generation else { return }
     settling = false
+    throwing = []
     rebuild()
   }
 }

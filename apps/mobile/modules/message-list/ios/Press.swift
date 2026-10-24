@@ -7,6 +7,8 @@ import UIKit.UIGestureRecognizerSubclass
 final class PressTracker: UIGestureRecognizer {
   var onBegan: ((CGPoint) -> Void)?
   var onEnded: (() -> Void)?
+  /// The finger came up (not moved away or cancelled), for Perf only.
+  var onLifted: (() -> Void)?
   private var start: CGPoint = .zero
 
   override init(target: Any?, action: Selector?) {
@@ -31,7 +33,10 @@ final class PressTracker: UIGestureRecognizer {
     if hypot(point.x - start.x, point.y - start.y) > 10 { finish() }
   }
 
-  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish() }
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+    onLifted?()
+    finish()
+  }
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish() }
 
   private func finish() {

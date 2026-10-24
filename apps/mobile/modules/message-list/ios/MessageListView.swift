@@ -31,7 +31,6 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private var rowsChanged = false
   private var themeJSON: JSON?
   private var themeChanged = false
-  private var insets = UIEdgeInsets.zero
   private var followsKeyboard = true
   private var initialRowId: String?
   private var keyboardHeight: CGFloat = 0
@@ -43,6 +42,14 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private var keyboardThawed = false
   /// A thread: short, the rows sit at the top (`alignTop`).
   private var alignTop = false
+  /// When JavaScript's insets go in (Insets.swift).
+  private var insetsGate = InsetsGate()
+  /// The insets the list is laid out with.
+  private var insets: UIEdgeInsets { insetsGate.applied }
+  /// Bumped with every `rows` prop, so a measurement knows whose it is.
+  private var rowsVersion = 0
+  /// This drag closed the keyboard: it doesn't scroll (#165).
+  private var keyboardSwipe = false
 
   // Measuring, off the main thread.
   private let measurer = MeasureQueue()
@@ -124,6 +131,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       self?.shrink.begin { [weak self] in self?.pressedView(at: point) }
     }
     pressTracker.onEnded = { [weak self] in self?.shrink.release() }
+    pressTracker.onLifted = { [weak self] in
+      if self?.mediaTap != nil { Perf.event("media finger up", "") }
+    }
     collectionView.addGestureRecognizer(pressTracker)
 
     // Follows the keyboard frame by frame, interactive dismissal included.
@@ -145,6 +155,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   func setRows(_ rows: [JSON]) {
     rawRows = rows
     rowsChanged = true
+    rowsVersion += 1
   }
 
   /// JavaScript's rows with the chips toggled since then drawn as toggled.
@@ -194,6 +205,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     state.behavior = behavior.map(Behavior.init) ?? Behavior()
   }
 
+  /// Insets wait for the end of the props batch (`propsDidUpdate`):
+  /// they go with the rows that came with them, or wait out a freeze.
   func setInsets(_ json: JSON?) {
     let json = json ?? [:]
     let next = UIEdgeInsets(top: json.cg("top", 0), left: 0, bottom: json.cg("bottom", 0), right: 0)
@@ -202,9 +215,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       keyboardOverlap = overlap
       setNeedsLayout()
     }
-    guard next != insets else { return }
-    insets = next
-    applyInsets(keepDistance: true)
+    insetsGate.received(next)
   }
 
   func setKeyboardFrozen(_ frozen: Bool) {
@@ -212,6 +223,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     keyboardFrozen = frozen
     if !frozen {
       keyboardThawed = true
+      insetsGate.thawed()
       setNeedsLayout()
     }
   }
@@ -260,6 +272,13 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   }
 
   /// After a batch of props: measure and apply what changed.
+  ///
+  /// New insets in the same batch as new rows go in with those rows, in
+  /// their one move (`apply`): a send's shorter composer (contract
+  /// `insets.bottom`, send-inset.ts) and the message sent then make room
+  /// together, instead of the list dropping by the composer's height and
+  /// rising again. While `keyboardFrozen`, insets wait, and go in at the
+  /// thaw. Otherwise they go in now.
   func propsDidUpdate() {
     if themeChanged {
       themeChanged = false
@@ -269,6 +288,16 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       backgroundColor = .clear
       rowsChanged = true
     }
+    switch insetsGate.batchEnded(rowsChanged: rowsChanged, placed: placed, frozen: keyboardFrozen, rowsVersion: rowsVersion) {
+    case .none:
+      break
+    case let .now(_, eased):
+      applyNewInsets(eased: eased)
+    case .withRows:
+      // `apply` takes them with those rows: every rows prop is measured
+      // and applied, nothing changed on screen included.
+      break
+    }
     if rowsChanged {
       rowsChanged = false
       measure()
@@ -276,6 +305,21 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     if liftChanged {
       liftChanged = false
       applyLift()
+    }
+  }
+
+  /// Lays the list out with insets just applied: at once, or, back from
+  /// the menu, over the keyboard's own duration and curve, as the
+  /// keyboard's thaw does.
+  private func applyNewInsets(eased: Bool) {
+    guard eased, placed else { return applyInsets(keepDistance: true) }
+    UIView.animate(withDuration: 0.25, delay: 0, options: [UIView.AnimationOptions(rawValue: 7 << 16), .beginFromCurrentState]) {
+      self.applyInsets(keepDistance: true)
+      // The keyboard thawed in this batch too: its height (and any
+      // `keyboardOverlap` held through the freeze) goes in in the same
+      // move, not a separate one.
+      self.layoutIfNeeded()
+      self.collectionView.layoutIfNeeded()
     }
   }
 
@@ -306,7 +350,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
           self.collectionView.layoutIfNeeded()
         }
       } else {
-        applyInsets(keepDistance: !collectionView.isTracking)
+        // Under a finger the list stays put, except a swipe closing the
+        // keyboard, which keeps it on the newest message (#165).
+        applyInsets(keepDistance: !collectionView.isTracking || keyboardSwipe)
       }
     }
     keyboardThawed = false
@@ -362,30 +408,38 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     measuring = true
     measureAgain = false
     let input = MeasureQueue.Input(rows: rowsToMeasure(), theme: state.theme, width: width, customHeights: customHeights)
+    let version = rowsVersion
     if !placed {
       // The first rows: measured right away, so the list never shows empty.
+      let interval = Perf.begin("measure now", "\(input.rows.count) rows")
       let result = measurer.measureNow(input)
-      finish(result)
+      Perf.end(interval)
+      finish(result, version: version)
       return
     }
     measurer.measure(input) { [weak self] result in
-      self?.finish(result)
+      self?.finish(result, version: version)
     }
   }
 
-  private func finish(_ result: MeasureQueue.Output) {
+  private func finish(_ result: MeasureQueue.Output, version: Int) {
     measuring = false
     if result.width != measuredWidth { drawnTheme = -1 }
     measuredWidth = result.width
-    apply(result.rows, result.layouts, themeVersion: result.themeVersion)
+    let interval = Perf.begin("apply", "\(result.rows.count) rows")
+    apply(result.rows, result.layouts, themeVersion: result.themeVersion, version: version)
+    Perf.end(interval)
     if measureAgain || result.width != bounds.width {
       measure()
     }
   }
 
-  private func apply(_ newRows: [Row], _ newLayouts: [RowLayout], themeVersion: Int) {
+  private func apply(_ newRows: [Row], _ newLayouts: [RowLayout], themeVersion: Int, version: Int) {
     let started = CACurrentMediaTime()
     defer { Slow.check("apply \(newRows.count) rows", since: started) }
+    // Insets that came with these rows go in with them, below.
+    // (`take` applies them to `insets` already.)
+    let nextInsets = insetsGate.take(forRows: version, frozen: keyboardFrozen)
     guard placed, !rows.isEmpty else {
       drawnTheme = themeVersion
       rows = newRows
@@ -407,6 +461,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     if diff.isEmpty {
       rows = newRows
       layouts = newLayouts
+      if nextInsets != nil { applyInsets(keepDistance: true) }
       return
     }
     let removed = diff.removed
@@ -464,9 +519,11 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
         }
         height += rowHeight
       }
+      // Where the newest row will rest, with the insets that go in now.
+      let futureInsets = insets
       let bottom = alignTop
-        ? max(insets.bottom + keyboardHeight, collectionView.bounds.height - insets.top - height)
-        : collectionView.adjustedContentInset.top
+        ? max(futureInsets.bottom + keyboardHeight, collectionView.bounds.height - futureInsets.top - height)
+        : futureInsets.bottom + keyboardHeight
       let futureOffset = pinned ? -bottom : anchor.flatMap { anchor in
         futureFrames[anchor.id].map { $0.minY - anchor.offset }
       } ?? oldOffset
@@ -500,7 +557,12 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
           collectionView.reloadItems(at: reloaded.map { IndexPath(item: $0, section: 0) })
         }
       }
-      if alignTop { applyInsets(keepDistance: pinned) }
+      // The new insets after the old positions were taken (`oldOffset`,
+      // the anchor): the rows slide from where they were drawn to where
+      // the insets and the new rows put them, in one move.
+      if nextInsets != nil || alignTop {
+        applyInsets(keepDistance: pinned)
+      }
       if pinned {
         setOffset(latestOffset)
       } else if let anchor, let frame = listLayout.frame(of: anchor.id) {
@@ -641,6 +703,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   /// The first rows: open on `initialRowId` (centered) or the newest.
   private func place() {
+    let interval = Perf.begin("place", "\(rows.count) rows")
+    defer { Perf.end(interval) }
     fitCollectionView()
     collectionView.layoutIfNeeded()
     applyInsets(keepDistance: false)
@@ -695,7 +759,11 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
     let started = CACurrentMediaTime()
-    defer { Slow.check("cell \(rows[indexPath.item].id)", since: started) }
+    let interval = Perf.begin("cell", ListDiff.cellKind(rows[indexPath.item]))
+    defer {
+      Perf.end(interval)
+      Slow.check("cell \(rows[indexPath.item].id)", since: started)
+    }
     let row = rows[indexPath.item]
     let cell = collectionView.dequeueReusableCell(withReuseIdentifier: Self.reuseIdentifier(row), for: indexPath)
     if let cell = cell as? RowCell {
@@ -768,6 +836,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
     guard placed else { return }
+    // Closing the keyboard with a swipe down doesn't scroll (#165).
+    if keyboardSwipe { setOffset(latestOffset) }
     let started = CACurrentMediaTime()
     defer { Slow.check("scroll", since: started) }
     afterChange()
@@ -775,11 +845,29 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
     shrink.release()
+    // #165: at the newest message with the keyboard up, a swipe down is
+    // for the keyboard. It goes down, and the list stays on the newest
+    // message instead of scrolling with the finger, as it did with
+    // interactive dismissal. The next swipe scrolls as any does. Scrolled
+    // up, or with no keyboard, nothing changes.
+    let down = collectionView.panGestureRecognizer.velocity(in: self).y > 0
+      || collectionView.panGestureRecognizer.translation(in: self).y > 0
+    if keyboardHeight > 0.5, !keyboardFrozen, distanceFromLatest <= 2, down {
+      keyboardSwipe = true
+      window?.endEditing(true)
+      setOffset(latestOffset)
+    }
   }
 
   /// After dragging the keyboard away, the bottom inset has shrunk under
   /// the finger: settle at the newest row instead of past it.
   func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+    if keyboardSwipe {
+      // It ends where it started: on the newest message.
+      targetContentOffset.pointee.y = latestOffset
+      keyboardSwipe = false
+      return
+    }
     if targetContentOffset.pointee.y < latestOffset { targetContentOffset.pointee.y = latestOffset }
   }
 
@@ -930,7 +1018,42 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   @objc private func tapped(_ gesture: UITapGestureRecognizer) {
     guard let (hit, _) = hit(gesture, hold: false) else { return }
+    if let interval = mediaTap {
+      // The press is going to JavaScript now: the tap's wait ends here.
+      mediaTap = nil
+      if hit.event["element"] as? String == "media" { Perf.event("media press sent", Self.mediaDetail(hit.event)) }
+      Perf.end(interval)
+    }
     send(hit.event)
+  }
+
+  /// Timing a photo tap (Perf.swift, profiling only): from the touch
+  /// reaching the message's single tap (`shouldReceive`) to its press
+  /// going to JavaScript (`tapped`), which includes the finger's time down
+  /// and the wait for the double tap to fail; "media finger up" marks
+  /// where the one ends and the other begins. A tap that becomes a double
+  /// tap, a hold, or a scroll is ended at the next touch, marked dropped.
+  private var mediaTap: Perf.Interval?
+
+  private func timeMediaTouch(_ touch: UITouch) {
+    guard Perf.isEnabled else { return }
+    if let open = mediaTap {
+      Perf.event("media tap dropped", "")
+      Perf.end(open)
+      mediaTap = nil
+    }
+    let point = touch.location(in: collectionView)
+    guard let indexPath = collectionView.indexPathForItem(at: point),
+          let cell = collectionView.cellForItem(at: indexPath) as? RowCell,
+          let hit = cell.hit(at: touch.location(in: cell.contentView), hold: false),
+          hit.event["element"] as? String == "media" else { return }
+    mediaTap = Perf.begin("media tap", Self.mediaDetail(hit.event))
+  }
+
+  /// Which photo, without anything a person wrote or a URL: the row's ID
+  /// and the item's index.
+  private static func mediaDetail(_ event: [String: Any]) -> String {
+    "row \(event["rowId"] as? String ?? "?") index \(event["index"] as? Int ?? -1)"
   }
 
   /// A reaction tapped: a light haptic and, for a stacked chip, the toggle
@@ -1011,6 +1134,8 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     if gesture === reactionTap || messageTaps.contains(where: { $0 === gesture }) {
       let reaction = onReaction(touch)
       if reaction, gesture === reactionTap { reactionHaptic.prepare() }
+      // Once per touch: only the single tap's acceptance is timed.
+      if !reaction, gesture === messageTaps.first { timeMediaTouch(touch) }
       return gesture === reactionTap ? reaction : !reaction
     }
     return true
@@ -1096,6 +1221,11 @@ final class MeasureQueue {
       cacheTheme = input.theme.version
     }
     let measurer = Measurer(theme: input.theme, width: input.width, customHeights: input.customHeights)
+    // Decoding and measuring, off the main thread except for the first
+    // rows (`measureNow`): how many were measured, not taken from the cache.
+    var measured = 0
+    let interval = Perf.begin("measure rows", "\(input.rows.count) rows")
+    defer { Perf.end(interval) }
     var rows: [Row] = []
     var layouts: [RowLayout] = []
     var seen: Set<String> = []
@@ -1114,12 +1244,14 @@ final class MeasureQueue {
         layout = entry.layout
       } else {
         layout = measurer.layout(row)
+        measured += 1
       }
       rows.append(row)
       layouts.append(layout)
       next[row.id] = Entry(row: row, layout: layout)
     }
     cache = next
+    Perf.event("measured", "\(measured) of \(rows.count) rows new")
     return Output(rows: rows, layouts: layouts, width: input.width, themeVersion: input.theme.version)
   }
 }
