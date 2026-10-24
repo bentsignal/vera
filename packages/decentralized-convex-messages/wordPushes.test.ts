@@ -1,21 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { activity } from "./activity.ts";
 import { setAlerts } from "./alerts.ts";
 import { fakeCtx } from "./fakeCtx.ts";
-import { listeners, wordListeners } from "./listeners.ts";
-import { saysWord } from "./mentions.ts";
+import { listeners } from "./listeners.ts";
+import { noteWordsSaid, saysWord, wordCandidates } from "./mentions.ts";
 import { notificationSettings, setNotificationSettings } from "./settings.ts";
 import { GROUP, LEO, MAYA, ME, setup } from "./threads.testing.ts";
 
-/**
- * Who would hear of a stored message only because it says their keyword,
- * or if it says their name.
- */
-async function wordsOf(
-  ctx: ReturnType<typeof setup>["ctx"],
-  messageId: string,
-) {
+type Ctx = ReturnType<typeof setup>["ctx"];
+
+/** A stored message, and the group it's in. */
+async function stored(ctx: Ctx, messageId: string) {
   const [message, conversation] = await Promise.all([
     ctx.db
       .query("messages")
@@ -29,9 +26,19 @@ async function wordsOf(
       .unique(),
   ]);
   assert.ok(message !== null && conversation !== null);
-  const members = [ME, MAYA, LEO];
-  const heard = await listeners(ctx, message, conversation, members);
-  return wordListeners(ctx, message, conversation, members, heard);
+  return { conversation, members: [ME, MAYA, LEO], message };
+}
+
+/** Whose words a stored message may say. */
+async function candidatesOf(ctx: Ctx, messageId: string) {
+  const { conversation, members, message } = await stored(ctx, messageId);
+  return wordCandidates(ctx, message, conversation, members);
+}
+
+/** Who hears of a stored message, and as what. */
+async function heardOf(ctx: Ctx, messageId: string) {
+  const { conversation, members, message } = await stored(ctx, messageId);
+  return listeners(ctx, message, conversation, members);
 }
 
 void test("a name or keyword is said whole, in any case", () => {
@@ -49,66 +56,96 @@ void test("a name or keyword is said whole, in any case", () => {
   assert.equal(saysWord("anything", "  "), false);
 });
 
-void test("only those who turned it on would hear of their name", async (t) => {
+void test("a message may say the keywords of others, and the names of those who want them", async (t) => {
   const { ctx, say } = setup(t);
-  await setAlerts(ctx, ME, { alerts: "mentions", conversationId: GROUP });
-  await setAlerts(ctx, LEO, { alerts: "mentions", conversationId: GROUP });
-  await setNotificationSettings(ctx, LEO, { yourName: true });
-  await say(MAYA, "hello");
-  assert.deepEqual((await wordsOf(ctx, "hello")).name, [
-    { accountId: LEO, reply: null },
-  ]);
-  // Never for your own message.
-  await say(LEO, "mine");
-  assert.deepEqual((await wordsOf(ctx, "mine")).name, []);
-});
-
-void test("a message that reaches you anyway, or can't, isn't one", async (t) => {
-  const { ctx, say } = setup(t);
-  await setNotificationSettings(ctx, LEO, { yourName: true });
-  await say(MAYA, "hello");
-  // At all, it reaches Leo already.
-  assert.deepEqual((await wordsOf(ctx, "hello")).name, []);
-  // At none, it never does.
-  await setAlerts(ctx, LEO, { alerts: "none", conversationId: GROUP });
-  assert.deepEqual((await wordsOf(ctx, "hello")).name, []);
-  // Nor with pushes off.
-  await setAlerts(ctx, LEO, { alerts: "mentions", conversationId: GROUP });
-  await setNotificationSettings(ctx, LEO, { enabled: false });
-  assert.deepEqual((await wordsOf(ctx, "hello")).name, []);
-});
-
-void test("a thread reply that says your name reaches you as a mention would", async (t) => {
-  const { ctx, say } = setup(t);
-  await setNotificationSettings(ctx, LEO, { yourName: true });
-  await say(ME, "root");
-  await say(MAYA, "kept", "root", { threadOnly: true });
-  assert.deepEqual((await wordsOf(ctx, "kept")).name, [
-    { accountId: LEO, reply: "thread" },
-  ]);
-});
-
-void test("a message that says your keyword reaches you as a mention would", async (t) => {
-  const { ctx, say } = setup(t);
-  await setAlerts(ctx, LEO, { alerts: "mentions", conversationId: GROUP });
   await setNotificationSettings(ctx, LEO, {
     keywords: ["launch day", "deploy"],
     yourName: true,
   });
+  await setNotificationSettings(ctx, ME, { yourName: true });
   await say(MAYA, "deploy");
-  // A keyword settles it here; a name still needs checking.
-  assert.deepEqual(await wordsOf(ctx, "deploy"), {
-    keyword: [{ accountId: LEO, reply: null }],
-    name: [],
+  // A keyword settles it; a name still needs checking.
+  assert.deepEqual(await candidatesOf(ctx, "deploy"), {
+    keywords: [{ accountId: LEO, keyword: "deploy" }],
+    names: [ME],
   });
   await say(MAYA, "deployed");
-  assert.deepEqual(await wordsOf(ctx, "deployed"), {
-    keyword: [],
-    name: [{ accountId: LEO, reply: null }],
+  assert.deepEqual(await candidatesOf(ctx, "deployed"), {
+    keywords: [],
+    names: [ME, LEO],
+  });
+  // Never for your own message, nor anyone it @mentions.
+  await say(LEO, "deploy now", undefined, {
+    mentions: [{ accountId: ME, name: ME }],
+  });
+  assert.deepEqual(await candidatesOf(ctx, "deploy now"), {
+    keywords: [],
+    names: [],
+  });
+});
+
+void test("once its words are noted, a message reaches them as a mention, once", async (t) => {
+  const { ctx, say } = setup(t);
+  await setAlerts(ctx, LEO, { alerts: "mentions", conversationId: GROUP });
+  await say(MAYA, "hello");
+  assert.deepEqual(await heardOf(ctx, "hello"), [
+    { accountId: ME, reply: null },
+  ]);
+  await noteWordsSaid(ctx, "hello", [
+    { accountId: LEO, said: { keyword: "hello", kind: "keyword" } },
+    { accountId: ME, said: { kind: "name" } },
+  ]);
+  // Leo hears of it now, and Me, who hears of every message, still once.
+  assert.deepEqual(await heardOf(ctx, "hello"), [
+    { accountId: ME, reply: null },
+    { accountId: LEO, reply: null },
+  ]);
+  // Its words are worked out once.
+  assert.deepEqual(await candidatesOf(ctx, "hello"), {
+    keywords: [],
+    names: [],
   });
   // Not at none.
   await setAlerts(ctx, LEO, { alerts: "none", conversationId: GROUP });
-  assert.deepEqual((await wordsOf(ctx, "deploy")).keyword, []);
+  assert.deepEqual(await heardOf(ctx, "hello"), [
+    { accountId: ME, reply: null },
+  ]);
+});
+
+void test("a thread reply that says your name reaches you as a mention would", async (t) => {
+  const { ctx, say } = setup(t);
+  await say(ME, "root");
+  await say(MAYA, "kept", "root", { threadOnly: true });
+  await noteWordsSaid(ctx, "kept", [
+    { accountId: LEO, said: { kind: "name" } },
+  ]);
+  assert.deepEqual(await heardOf(ctx, "kept"), [
+    { accountId: ME, reply: "yours" },
+    { accountId: LEO, reply: "thread" },
+  ]);
+});
+
+void test("a message that says your words is in your activity as a mention", async (t) => {
+  const { ctx, say } = setup(t);
+  await say(MAYA, "first");
+  await say(MAYA, "ramen");
+  await noteWordsSaid(ctx, "ramen", [
+    { accountId: LEO, said: { keyword: "Ramen", kind: "keyword" } },
+  ]);
+  const items = await activity(ctx, LEO, { mentions: true, threads: true });
+  const mention = items.find((item) => item.kind === "mention");
+  assert.equal(mention?.kind, "mention");
+  assert.equal(mention.message.messageId, "ramen");
+  assert.deepEqual(mention.said, { keyword: "Ramen", kind: "keyword" });
+  // It leaves the conversation's item, so it's there once.
+  const messages = items.find((item) => item.kind === "messages");
+  assert.equal(messages?.kind === "messages" && messages.count, 1);
+  // Nobody else's.
+  const mine = await activity(ctx, ME, { mentions: true, threads: true });
+  assert.equal(
+    mine.some((item) => item.kind === "mention"),
+    false,
+  );
 });
 
 void test("keywords are kept trimmed, once each, and within limits", async () => {

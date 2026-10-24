@@ -10,6 +10,7 @@ import {
   linkPreview,
   mention,
   quote,
+  said,
   spaceRole,
 } from "./protocol.ts";
 
@@ -95,6 +96,10 @@ export default defineSchema({
     linkPreviews: v.optional(v.array(linkCard)),
     mentions: v.optional(v.array(mention)),
     messageId: v.string(),
+    // Who it counts as @mentioning because it says their name or a keyword
+    // (see `noteWords`), set once its push works that out. Only for this
+    // PDS's activity and pushes, never in what's sent.
+    saidTo: v.optional(v.array(v.string())),
     // A reply's quote of the message it answers, its thread (the original's
     // ID), and whether it stays out of the conversation (one sent in the
     // thread). See `message` in the protocol.
@@ -110,11 +115,13 @@ export default defineSchema({
     .index("by_thread_sent", ["threadId", "sentAt"])
     // Replies to an account's messages, so their activity finds them.
     .index("by_quote_author_sent", ["quote.authorId", "sentAt"]),
-  // One per account a message @mentions, so their activity finds it.
+  // One per account a message @mentions, or says the name or a keyword
+  // of (`said`), so their activity finds it.
   mentions: defineTable({
     accountId: v.string(),
     conversationId: v.string(),
     messageId: v.string(),
+    said: v.optional(said),
     sentAt: v.number(),
     // The thread of a reply kept there, which shows it instead of the
     // conversation.

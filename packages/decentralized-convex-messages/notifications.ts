@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 
-import type { Listener, ReplyPush } from "./listeners.ts";
+import type { ReplyPush } from "./listeners.ts";
 import { internal } from "./_generated/api.js";
 import {
   internalAction,
@@ -9,11 +9,11 @@ import {
 } from "./_generated/server.js";
 import { badgeCount } from "./badges.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
-import { listeners, wordListeners } from "./listeners.ts";
-import { saysWord } from "./mentions.ts";
+import { listeners } from "./listeners.ts";
+import { noteWordsSaid, saysWord, wordCandidates } from "./mentions.ts";
 import { getConversation, getSpace, memberAddresses } from "./model.ts";
 import { listNames } from "./naming.ts";
-import { inboxKind } from "./protocol.ts";
+import { inboxKind, said } from "./protocol.ts";
 import {
   accountProfile,
   ANDROID_DELIVERY,
@@ -36,32 +36,29 @@ export const targets = internalQuery({
     if (conversation === null) return null;
 
     const members = await memberAddresses(ctx, conversation);
-    async function devices(heard: readonly Listener[]) {
-      const found: (ReturnType<typeof recipientOf> & { reply: ReplyPush })[] =
-        [];
-      for (const { accountId, reply } of heard) {
-        const rows = await ctx.db
-          .query("pushTokens")
-          .withIndex("by_account", (index) => index.eq("accountId", accountId))
-          .collect();
-        found.push(...rows.map((row) => ({ ...recipientOf(row), reply })));
-      }
-      return found;
-    }
-    const heard = await listeners(ctx, message, conversation, members);
-    const words = await wordListeners(
+    const recipients: (ReturnType<typeof recipientOf> & {
+      reply: ReplyPush;
+    })[] = [];
+    for (const { accountId, reply } of await listeners(
       ctx,
       message,
       conversation,
       members,
-      heard,
-    );
+    )) {
+      const rows = await ctx.db
+        .query("pushTokens")
+        .withIndex("by_account", (index) => index.eq("accountId", accountId))
+        .collect();
+      recipients.push(...rows.map((row) => ({ ...recipientOf(row), reply })));
+    }
     return {
       body: previewText(message),
-      // Who hears of it only if it says their name, which `send` checks.
-      nameRecipients: await devices(words.name),
-      recipients: await devices([...heard, ...words.keyword]),
-      text: words.name.length === 0 ? "" : message.body,
+      recipients,
+      // Who it may say the words of, which `send` notes before it pushes.
+      words: {
+        ...(await wordCandidates(ctx, message, conversation, members)),
+        text: message.body,
+      },
       conversationId: conversation.conversationId,
       conversationName: await conversationName(ctx, conversation),
       messageId: message.messageId,
@@ -81,23 +78,38 @@ export const targets = internalQuery({
 });
 
 /**
- * The devices of the accounts whose display name the text says. A name
- * that can't be looked up says nothing.
+ * What a message says of the candidates' words (see `wordCandidates`):
+ * their keywords, and the display names of those who want to hear of
+ * theirs. A name that can't be looked up says nothing.
  */
-async function namedIn<Device extends { accountId: string }>(
-  text: string,
-  devices: readonly Device[],
-) {
-  const accountIds = [...new Set(devices.map(({ accountId }) => accountId))];
-  const profiles = await Promise.all(accountIds.map(accountProfile));
-  const named = new Set(
-    accountIds.filter((_, index) => {
+async function wordsSaid(words: {
+  keywords: readonly { accountId: string; keyword: string }[];
+  names: readonly string[];
+  text: string;
+}) {
+  const profiles = await Promise.all(words.names.map(accountProfile));
+  return [
+    ...words.keywords.map(({ accountId, keyword }) => ({
+      accountId,
+      said: { keyword, kind: "keyword" as const },
+    })),
+    ...words.names.flatMap((accountId, index) => {
       const name = profiles[index]?.displayName;
-      return name !== undefined && saysWord(text, name);
+      return name !== undefined && saysWord(words.text, name)
+        ? [{ accountId, said: { kind: "name" as const } }]
+        : [];
     }),
-  );
-  return devices.filter(({ accountId }) => named.has(accountId));
+  ];
 }
+
+/** Counts a message as @mentioning those whose words it says. */
+export const noteWords = internalMutation({
+  args: {
+    messageId: v.string(),
+    said: v.array(v.object({ accountId: v.string(), said })),
+  },
+  handler: (ctx, args) => noteWordsSaid(ctx, args.messageId, args.said),
+});
 
 /** A reply push's body: what it is, then the reply. */
 function replyBody(reply: ReplyPush, body: string) {
@@ -163,14 +175,25 @@ export const inviteTargets = internalQuery({
 export const send = internalAction({
   args: { messageId: v.string() },
   handler: async (ctx, { messageId }) => {
-    const target = await ctx.runQuery(internal.notifications.targets, {
+    const first = await ctx.runQuery(internal.notifications.targets, {
       messageId,
     });
+    if (first === null) return;
+    // A message that says someone's name or keyword counts as @mentioning
+    // them, so they hear of it as they would a mention, once.
+    const words = await wordsSaid(first.words);
+    if (words.length > 0) {
+      await ctx.runMutation(internal.notifications.noteWords, {
+        messageId,
+        said: words,
+      });
+    }
+    const target =
+      words.length === 0
+        ? first
+        : await ctx.runQuery(internal.notifications.targets, { messageId });
     if (target === null) return;
-    const recipients = [
-      ...target.recipients,
-      ...(await namedIn(target.text, target.nameRecipients)),
-    ];
+    const { recipients } = target;
     if (recipients.length === 0) return;
     const [sender, badges, memberNames] = await Promise.all([
       accountProfile(target.senderId),

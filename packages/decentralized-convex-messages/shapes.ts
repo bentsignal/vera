@@ -73,6 +73,18 @@ export type Mention = Infer<typeof mention>;
 export const MAX_MENTIONS = 50;
 
 /**
+ * Why a message that doesn't @mention someone counts as if it did: it
+ * says their display name, or one of their keywords (see
+ * `notificationSettings`).
+ */
+export const said = v.union(
+  v.object({ kind: v.literal("name") }),
+  v.object({ keyword: v.string(), kind: v.literal("keyword") }),
+);
+
+export type Said = Infer<typeof said>;
+
+/**
  * What a group or channel alerts its members about: every message, only
  * ones that @mention them, or nothing (it stays out of activity and sends
  * no pushes). Direct messages are `all` or `none`.

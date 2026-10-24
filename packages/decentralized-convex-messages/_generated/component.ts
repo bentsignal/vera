@@ -852,6 +852,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                       threadId?: string;
                       threadOnly?: boolean;
                     };
+                    said?:
+                      | { kind: "name" }
+                      | { keyword: string; kind: "keyword" };
                     seenAt?: number;
                     seenThrough?: number;
                   }
@@ -2388,6 +2391,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                     threadId?: string;
                     threadOnly?: boolean;
                   };
+                  said?:
+                    | { kind: "name" }
+                    | { keyword: string; kind: "keyword" };
                   seenAt?: number;
                   seenThrough?: number;
                 }

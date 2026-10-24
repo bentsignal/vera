@@ -80,8 +80,8 @@ async function reactionItems(ctx: QueryCtx, scope: Scope) {
 }
 
 export /**
- * Messages that @mention the caller and still show, an item each. A
- * mention shows from any conversation that alerts about something, even a
+ * Messages that @mention the caller and still show, an item each, with
+ * those that say their name or a keyword instead (`said`). A mention shows from any conversation that alerts about something, even a
  * channel left out of the inbox. One in a reply kept in its thread shows
  * only to apps that show threads, since only they can open it.
  */
@@ -111,6 +111,7 @@ async function mentionItems(ctx: QueryCtx, scope: Scope) {
         key,
         kind: "mention",
         message: toMessage(message),
+        ...(row.said === undefined ? {} : { said: row.said }),
       };
     }),
   );

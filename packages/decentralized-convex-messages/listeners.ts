@@ -2,8 +2,7 @@ import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
 import type { AlertLevel } from "./protocol.ts";
 import type { AccountSettings } from "./settings.ts";
-import { alerts, alertsFor } from "./alerts.ts";
-import { saysWord } from "./mentions.ts";
+import { alerts, alertsFor, mentionedBy } from "./alerts.ts";
 import { findAccess } from "./model.ts";
 import { notificationSettings } from "./settings.ts";
 import { threadMember, threadMembers } from "./threads.ts";
@@ -15,7 +14,7 @@ import { threadMember, threadMembers } from "./threads.ts";
 export type ReplyPush = "thread" | "yours" | null;
 
 /** Someone who hears about a message, and as what. */
-export interface Listener {
+interface Listener {
   readonly accountId: string;
   readonly reply: ReplyPush;
 }
@@ -119,9 +118,9 @@ async function threadListeners(
       member,
     ]),
   );
-  const mentioned = (message.mentions ?? [])
-    .map(({ accountId }) => accountId)
-    .filter((accountId) => members.includes(accountId));
+  const mentioned = mentionedBy(message).filter((accountId) =>
+    members.includes(accountId),
+  );
   const heard = new Array<Listener>();
   for (const accountId of new Set([...inThread.keys(), ...mentioned])) {
     if (accountId === message.authorId) continue;
@@ -176,46 +175,4 @@ export async function listeners(
     if (reply !== undefined) heard.push({ accountId, reply });
   }
   return heard;
-}
-
-/**
- * The members who'd hear of a message only because of the words it says:
- * it doesn't reach them already (`heard`), it would as an @mention, and
- * it says one of their keywords (`keyword`) or they want to hear of their
- * name (`name`). The caller checks names, which live in Accounts (see
- * `accountProfile`).
- */
-export async function wordListeners(
-  ctx: QueryCtx,
-  message: Doc<"messages">,
-  conversation: Doc<"conversations">,
-  members: readonly string[],
-  heard: readonly Listener[],
-) {
-  const none = { keyword: [], name: [] };
-  if (message.body.length === 0) return none;
-  const reached = new Set(heard.map(({ accountId }) => accountId));
-  const keyword = new Set<string>();
-  const name = new Set<string>();
-  for (const accountId of members) {
-    if (accountId === message.authorId || reached.has(accountId)) continue;
-    const settings = await notificationSettings(ctx, accountId);
-    if (!settings.enabled) continue;
-    if (settings.keywords.some((word) => saysWord(message.body, word))) {
-      keyword.add(accountId);
-    } else if (settings.yourName) {
-      name.add(accountId);
-    }
-  }
-  const wanting = [...keyword, ...name];
-  if (wanting.length === 0) return none;
-  const asMentioned = {
-    ...message,
-    mentions: wanting.map((accountId) => ({ accountId, name: "" })),
-  };
-  const found = await listeners(ctx, asMentioned, conversation, wanting);
-  return {
-    keyword: found.filter(({ accountId }) => keyword.has(accountId)),
-    name: found.filter(({ accountId }) => name.has(accountId)),
-  };
 }
