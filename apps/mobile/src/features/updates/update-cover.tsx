@@ -2,20 +2,13 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
-  Platform,
   Pressable,
   Text,
   View,
 } from "react-native";
 
 import { useRequiredUpdate } from "./app-updates";
-
-/** Where to get a new binary when no over-the-air update can fix this one. */
-const STORE_URL =
-  Platform.OS === "ios"
-    ? // Opens Vera in TestFlight, where every tester gets builds today.
-      "itms-beta://beta.itunes.apple.com/v1/app/6818656155"
-    : "https://play.google.com/store/apps/details?id=chat.vera.app";
+import { STORE_LABEL, STORE_URL } from "./store-link";
 
 /**
  * Covers the app while a breaking backend change waits for this app's
@@ -54,7 +47,7 @@ export function UpdateCover() {
               onPress={() => void Linking.openURL(STORE_URL)}
             >
               <Text className="text-body text-accent font-semibold">
-                {Platform.OS === "ios" ? "Open TestFlight" : "Open Play Store"}
+                {STORE_LABEL}
               </Text>
             </Pressable>
           </>

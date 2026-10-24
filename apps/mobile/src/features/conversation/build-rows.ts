@@ -1,6 +1,6 @@
 import type { MemberNotice, Message } from "./types";
 import type { MessageLayout } from "~/features/preferences/store";
-import { isSameDay } from "~/lib/format";
+import { isSameDay } from "../../lib/format.ts";
 
 /** Bubbles get a time header after a pause this long, like iMessage. */
 const HEADER_GAP_MS = 60 * 60 * 1000;

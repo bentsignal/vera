@@ -25,6 +25,7 @@ import type { ListRow } from "./typing-row";
 import type { MessageLayout } from "~/features/preferences/store";
 import { useBlankSpace } from "./blank-space";
 import { newestFirst } from "./build-rows";
+import { useDevFling } from "./dev-fling";
 import { GrowthProvider } from "./grow";
 import { JumpToLatest } from "./jump-to-latest";
 import { useLeavingRows } from "./leave-rows";
@@ -50,9 +51,12 @@ function ChatScrollView({
   ref?: Ref<Animated.ScrollView>;
   scrollRef: AnimatedRef<Animated.ScrollView>;
 }) {
+  // Benchmarks' constant-speed fling (dev tools only).
+  const sizes = useDevFling(scrollRef, props);
   return (
     <KeyboardChatScrollView
       {...props}
+      {...sizes}
       ref={(node: Animated.ScrollView | null) => {
         scrollRef(node);
         if (typeof ref === "function") ref(node);
@@ -239,7 +243,7 @@ function Rows({
   );
 }
 
-type MessageListProps = Omit<
+export type MessageListProps = Omit<
   RowsProps,
   "blank" | "freeze" | "latest" | "leaving" | "listRef" | "onReady" | "shown"
 > & {

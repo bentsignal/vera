@@ -13,6 +13,7 @@ the release with the `vera-release` skill and
 | ---------------- | -------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
 | Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
 | Play build       | Vera     | `production` (app bundle, Play signing) | `vera.chat`     | `production`   | Play internal testing ("Vera testers")          |
+| Private preview  | Vera     | `preview` (ad hoc iOS, signed APK)      | `vera.chat`     | `preview`      | Shawn only, installed from an install page     |
 | Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, for update and channel checks    |
 | Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone, the same                 |
 | Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
@@ -37,6 +38,22 @@ Google's key, whose SHA-256 is in the passkey variables and
 TestFlight and the App Store run the same binary: Apple promotes a TestFlight
 build to the App Store, so there is one store profile and one production
 channel.
+
+Private production tests use `eas build --local --profile preview`, then
+`scripts/install-page.sh` with its fourth argument `production`, so its
+page names Vera and explains the replacement. This profile inherits
+production configuration,
+uses an empty, separate preview update channel, and submits to no store.
+It can build the integration branch before Shawn approves merging it.
+The native-list switch defaults on in that channel and is available under
+Testing in conversation info and More → About.
+
+The iOS preview uses the production bundle ID and signing team. Install it
+over TestFlight without deleting Vera to keep its app data and keychain;
+reinstall from TestFlight to return. Android's APK uses EAS's production
+key, while Play uses Google's key, so switching in either direction needs
+uninstalling Vera and signing in again. Check the APK certificate against
+the live passkey and invite-link association files before distributing it.
 
 Each binary accepts over-the-air updates (EAS Update, `expo-updates`) only
 for its **runtime version**, which is the native fingerprint (`runtimeVersion:

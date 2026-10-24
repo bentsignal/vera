@@ -1,6 +1,6 @@
 import type { View as NativeView } from "react-native";
 import { useRef } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -10,10 +10,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { AttachmentUpload, MessageAttachment } from "./types";
 import { SymbolIcon } from "~/components/symbol-icon";
-import { removeOutgoingItem, retryOutgoing } from "~/features/messaging/outbox";
 import { formatBytes, formatDuration } from "~/lib/format";
 import { openLink } from "~/lib/open-link";
 import { useMenuTarget } from "./message-actions";
+import { showUploadProblem } from "./upload-problem";
 
 const MEDIA_WIDTH = 240;
 const MAX_MEDIA_HEIGHT = 300;
@@ -53,35 +53,6 @@ function mediaHeight({ height, width }: MessageAttachment) {
 
 function isStuck(upload: AttachmentUpload | undefined) {
   return upload?.state === "failed" || upload?.state === "too-large";
-}
-
-/** Retry or remove an attachment that didn't upload. */
-function showUploadProblem({ itemId, messageId, state }: AttachmentUpload) {
-  const remove = {
-    onPress: () => removeOutgoingItem(messageId, itemId),
-    style: "destructive" as const,
-    text: "Remove",
-  };
-  const cancel = { style: "cancel" as const, text: "Cancel" };
-  if (state === "too-large") {
-    Alert.alert(
-      "Too Big to Send",
-      "Remove it to send the rest of the message.",
-      [cancel, remove],
-      { cancelable: true },
-    );
-    return;
-  }
-  Alert.alert(
-    "Couldn't Upload",
-    "Check your connection and try again.",
-    [
-      cancel,
-      remove,
-      { onPress: () => retryOutgoing(messageId), text: "Try Again" },
-    ],
-    { cancelable: true },
-  );
 }
 
 function RetryBadge() {

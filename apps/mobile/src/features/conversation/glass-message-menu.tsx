@@ -1,17 +1,14 @@
 import type { ReactNode } from "react";
 import type { SharedValue } from "react-native-reanimated";
-import { useState } from "react";
 import { Modal, Pressable, useWindowDimensions } from "react-native";
 import Animated, {
   clamp,
-  Easing,
   LayoutAnimationConfig,
   useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
@@ -38,6 +35,7 @@ import { EDGE, menuLayout } from "./menu-layout";
 import { menuTitleHeight } from "./menu-title";
 import { REACTORS_HEIGHT, reactorsWidth } from "./reactor-rows";
 import { Reactors } from "./reactors";
+import { useMenuClosing } from "./use-menu-closing";
 
 export type TargetAlign = "end" | "start";
 
@@ -64,6 +62,16 @@ export interface MenuTarget {
    * (`reactions`: a double tap, or tapping its tapbacks).
    */
   readonly mode: "actions" | "reactions";
+  /**
+   * The native list lifts the held message itself (its `lift`), so the
+   * menu draws no copy of it: it says where the message goes as it opens
+   * (`onLift`), and `onLand` as it starts closing, when the message plays
+   * back into place with it.
+   */
+  readonly lift?: {
+    readonly onLift: (layout: MenuLayout) => void;
+    readonly onLand: () => void | Promise<void>;
+  };
 }
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -196,6 +204,27 @@ function belowSize(target: MenuTarget, actions: number, reactorsMax: number) {
 }
 
 /**
+ * How far open the menu is, springing open as it mounts. A message the
+ * native list lifts itself (`onLift`) is sent where to go then, so it
+ * springs there with the menu.
+ */
+function useOpening(
+  layout: MenuLayout,
+  onLift: ((layout: MenuLayout) => void) | undefined,
+) {
+  const progress = useSharedValue(0);
+  useAnimatedReaction(
+    () => true,
+    (_, previous) => {
+      if (previous !== null) return;
+      progress.set(withSpring(1, OPEN_SPRING));
+      if (onLift !== undefined) scheduleOnRN(onLift, layout);
+    },
+  );
+  return progress;
+}
+
+/**
  * The iMessage-style overlay: the conversation blurs, the message lifts, a
  * Liquid Glass reaction bar springs out above it, and below it the actions
  * (a long press) or who reacted (a double tap, or its tapbacks). Closing
@@ -239,36 +268,16 @@ export function GlassMessageMenu({
     menu: belowSize(target, actions.length, reactorsMax),
     screen,
   });
-  const progress = useSharedValue(0);
-  const [closing, setClosing] = useState(false);
-  useAnimatedReaction(
-    () => true,
-    (_, previous) => {
-      if (previous === null) progress.set(withSpring(1, OPEN_SPRING));
-    },
-  );
+  const progress = useOpening(layout, target.lift?.onLift);
+  const menuClose = useMenuClosing(progress, target, onClosing, onClosed);
+  const { closing } = menuClose;
 
   /**
    * Plays the overlay back into place, then runs `then`. Back to the chat
    * unless `then` opens something else; reacting stays in the chat.
    */
   function close(then?: () => void, toChat?: boolean) {
-    const backToChat = toChat ?? then === undefined;
-    function closed() {
-      onClosed(backToChat);
-      then?.();
-    }
-    onClosing?.();
-    setClosing(true);
-    progress.set(
-      withTiming(
-        0,
-        { duration: 240, easing: Easing.out(Easing.cubic) },
-        (finished) => {
-          if (finished === true) scheduleOnRN(closed);
-        },
-      ),
-    );
+    menuClose.close(then, toChat);
   }
 
   return (
@@ -279,7 +288,9 @@ export function GlassMessageMenu({
       onRequestClose={() => close()}
     >
       <Backdrop progress={progress} onPress={() => close()} />
-      <Lifted target={target} layout={layout} progress={progress} />
+      {target.lift === undefined && (
+        <Lifted target={target} layout={layout} progress={progress} />
+      )}
       <ReactionBar
         target={target}
         progress={progress}

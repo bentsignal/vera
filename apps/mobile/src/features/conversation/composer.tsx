@@ -1,6 +1,5 @@
-import type { Mention } from "@decentralized-convex/messages";
-import type { ReactNode, Ref, RefObject } from "react";
-import { useImperativeHandle, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
+import { useRef, useState } from "react";
 import { Platform, StyleSheet, TextInput, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, {
@@ -12,21 +11,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withUniwind } from "uniwind";
 
 import type { ComposerReport } from "./composer-height";
+import type { ComposerProps } from "./composer-props";
 import type { MentionCandidate } from "./mention-text";
-import type { ReplyingTo } from "./reply-bar";
-import type { EditSession } from "./use-editing";
-import type {
-  AttachmentSource,
-  StagedFile,
-} from "~/features/messaging/attachments";
-import type { PastedImage } from "~/lib/paste-images";
 import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
+import { useSendProbe } from "~/features/dev/send-timing";
 import { cn } from "~/lib/cn";
-import { PASTE_IMAGES_NATIVE_ID, usePastedImages } from "~/lib/paste-images";
+import { PASTE_IMAGES_NATIVE_ID } from "~/lib/paste-images";
 import { AttachMenu } from "./attach-menu";
+import { useComposerCommit } from "./composer-commit";
+import { useComposerInput } from "./composer-input";
+import { composerSubmission } from "./composer-submission";
 import { readDraft, saveDraftText } from "./drafts";
 import { GlassField, useFieldGlass } from "./field-glass";
+import { SEND, useFieldText } from "./field-text";
 import { FieldTop } from "./field-top";
 import { MentionPicker } from "./mention-picker";
 import { canSendNow } from "./use-editing";
@@ -35,7 +33,6 @@ import { useMentions } from "./use-mentions";
 const StyledTextInput = withUniwind(TextInput);
 /** Every control in the composer shares this height so they line up. */
 const CONTROL = 40;
-const SEND = 32;
 /** How long after a send the keyboard may still apply an autocorrection. */
 const AUTOCORRECT_WINDOW_MS = 1000;
 /**
@@ -52,29 +49,6 @@ const IOS_TYPING_EDGE = 16;
 const ANDROID_EDGE = 12;
 /** The bar's padding above and below the controls. */
 const PADDING = 8;
-/**
- * The field's padding around its text. On iOS, UIKit lays a line out
- * taller than React Native measures it (21pt against 20.33), so a field
- * with text in it was a little too short for its text and could scroll.
- * Low on the screen, iOS also pads a scrolling field's bottom out of the
- * home indicator's inset, and with the keyboard down the text could sit
- * about 6pt high until the keyboard came back. A whole-point line height makes
- * both measure the same, so the text always fits. iOS puts the extra line
- * height above the text, so a point moves from the top to the bottom to
- * keep it centered. The space under the text is a margin rather than
- * padding: once the field scrolls, iOS keeps the cursor in view but not
- * the padding under it, which left the last line on the field's edge. The
- * field stays `CONTROL` tall.
- */
-const TEXT_SPACING =
-  Platform.OS === "ios"
-    ? { lineHeight: 22, marginBottom: 10, paddingTop: 8 }
-    : { paddingBottom: 9, paddingTop: 9 };
-/**
- * The field's text: it grows to about ten lines before it scrolls, and the
- * send button floats over its right padding, so text never jumps.
- */
-const FIELD_TEXT = { ...TEXT_SPACING, maxHeight: 228, paddingRight: SEND + 12 };
 
 /**
  * Space to leave below the composer bar for the home indicator or the
@@ -150,21 +124,6 @@ function useSides() {
 }
 
 /**
- * How many lines the field measures: an empty field is one line tall,
- * whatever it last held. React Native sizes a field by the text its native
- * view last reported, not by `value`, so a field emptied by sending stayed
- * as tall as the message until that report came back through JavaScript,
- * busy then with the message just sent. Measuring a line at most while
- * it's empty shrinks it in the same frame as its text clears, and keeps it
- * from growing back while the keyboard puts an autocorrected message back
- * (see `useDraft`). Only on iOS, where `numberOfLines` limits just the
- * measuring: on Android it fixes the field's lines, and keeps one after.
- */
-function measuredLines(draft: string) {
-  return draft === "" && Platform.OS === "ios" ? 1 : undefined;
-}
-
-/**
  * What the composer reports of the field's changes. While editing, every
  * change reports an empty field: an edit isn't a new message on its way,
  * so it never shows as typing, and it stops any typing the draft started.
@@ -188,18 +147,22 @@ function useDraft(
   onChangeText: ((text: string, sent: boolean) => void) | undefined,
   mentionable: readonly MentionCandidate[] | undefined,
 ) {
-  const [draft, setDraft] = useState(() => readDraft(draftKey).text);
+  const [written, setDraft] = useState(() => ({
+    text: readDraft(draftKey).text,
+    clear: 0,
+  }));
+  const { text: draft, clear } = written;
   const [shownKey, setShownKey] = useState(draftKey);
   if (shownKey !== draftKey) {
     setShownKey(draftKey);
-    setDraft(readDraft(draftKey).text);
+    setDraft({ text: readDraft(draftKey).text, clear });
   }
   const mention = useMentions(draft, mentionable, draftKey, input);
   /** When the field was last emptied by sending, until something is typed. */
   const sentAt = useRef<number | null>(null);
 
   function show(text: string, sent = false) {
-    setDraft(text);
+    setDraft((current) => ({ text, clear: current.clear + (sent ? 1 : 0) }));
     saveDraftText(draftKey, text);
     onChangeText?.(text, sent);
   }
@@ -223,6 +186,7 @@ function useDraft(
   }
 
   return {
+    clear,
     change,
     draft,
     mention,
@@ -316,64 +280,33 @@ export function Composer({
   onCancelReply,
   edit,
   placeholder = "Message",
-}: {
-  ref?: Ref<ComposerHandle>;
-  /** From `draftKey`: the account and conversation the draft belongs to. */
-  draftKey: string;
-  staged: readonly StagedFile[];
-  /** Who can be @mentioned; undefined where nobody can. */
-  mentionable?: readonly MentionCandidate[];
-  /** Sends the text (possibly empty) and who it mentions, with everything staged. */
-  onSend: (text: string, mentions: readonly Mention[]) => void;
-  onPick: (source: AttachmentSource) => void;
-  /** Photos pasted into the field. */
-  onPaste: (images: readonly PastedImage[]) => void;
-  onRemoveStaged: (id: string) => void;
-  /**
-   * Every change to the text, including emptying it on send (`sent`).
-   * See `reportedChanges` for edits.
-   */
-  onChangeText?: (text: string, sent: boolean) => void;
-  /** Its height, for the list (see `useComposerHeight`). */
-  report: ComposerReport;
-  /** From `useComposerBottomInset`. */
-  bottomInset: number;
-  /** Set while the next message is a reply. */
-  replyingTo?: ReplyingTo;
-  onCancelReply?: () => void;
-  /**
-   * Editing a message of yours (see `useEditing`): while it's `editing`,
-   * the field shows its text instead of the draft, with no attachments.
-   */
-  edit?: EditSession;
-  placeholder?: string;
-}) {
-  const input = useRef<TextInput>(null);
-  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }));
-  // Only the field being pasted into is focused; another conversation's
-  // composer can be mounted beneath this one.
-  usePastedImages((images) => {
-    if (input.current?.isFocused() === true) onPaste(images);
-  });
+}: ComposerProps) {
+  const input = useComposerInput(ref, onPaste);
   const editing = edit?.editing;
-  const { draft, change, mention, pick, sent, saved } = useDraft(
+  const { draft, clear, change, mention, pick, sent, saved } = useDraft(
     editing === undefined || edit === undefined ? draftKey : edit.editDraftKey,
     input,
     reportedChanges(onChangeText, editing !== undefined),
     mentionable,
   );
-  const { field, held, settle, focus } = useFieldGlass(report);
+  const { glass, settle, focus } = useFieldGlass(report);
+  useComposerCommit(
+    report,
+    clear,
+    staged.map((file) => file.id),
+  );
+  const fieldText = useFieldText(draft);
   const canSend = canSendNow(draft, staged, editing);
   const saves = editing !== undefined;
   const hint = staged.length > 0 || saves ? "Add a message" : placeholder;
+  const probe = useSendProbe(report, glass.field, input, { draft, hint });
 
-  function send() {
-    if (!canSend) return;
-    settle();
-    const text = draft.trim();
-    if (editing === undefined) onSend(text, sent(text));
-    else edit?.save(text, saved(text));
-  }
+  const send = composerSubmission(
+    { canSend, edit, onSend },
+    { draft, clear, sent, saved },
+    report.sendCommit,
+    { settle, staged, begin: probe.begin },
+  );
 
   return (
     <View>
@@ -384,23 +317,23 @@ export function Composer({
           onPick={pick}
         />
       )}
-      <Bar bottomInset={bottomInset} report={report}>
+      <Bar bottomInset={bottomInset} report={probe.report}>
         {/* An edit changes only the text. */}
         {editing === undefined && <AttachMenu onPick={onPick} />}
-        <GlassField field={field} held={held} minHeight={CONTROL}>
+        <GlassField {...glass} minHeight={CONTROL}>
           <FieldTop
             edit={edit}
             replyingTo={replyingTo}
             onCancelReply={() => onCancelReply?.()}
             staged={staged}
             onRemoveStaged={onRemoveStaged}
+            send={report.sends}
           />
           <StyledTextInput
             ref={input}
             nativeID={PASTE_IMAGES_NATIVE_ID}
             {...focus}
             multiline
-            numberOfLines={measuredLines(draft)}
             value={draft}
             onChangeText={change}
             onSelectionChange={mention.onSelectionChange}
@@ -410,7 +343,7 @@ export function Composer({
             autoComplete="off"
             textContentType="none"
             className="text-body text-foreground pl-4"
-            style={FIELD_TEXT}
+            {...fieldText}
             placeholderTextColorClassName="accent-muted"
             cursorColorClassName="accent-accent"
           />

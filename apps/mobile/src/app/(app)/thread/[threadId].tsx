@@ -13,10 +13,8 @@ import type { ComposerHeight } from "~/features/conversation/composer-height";
 import type { MessageListHandle } from "~/features/conversation/message-list";
 import { Pending } from "~/components/pending";
 import { useComposerBottomInset } from "~/features/conversation/composer";
-import { useComposerHeight } from "~/features/conversation/composer-height";
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
-import { MessageList } from "~/features/conversation/message-list";
 import { usePacedMessages } from "~/features/conversation/paced-messages";
 import {
   THREAD_HEADER_HEIGHT,
@@ -35,6 +33,10 @@ import {
   useThreadState,
 } from "~/features/messaging/threads";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
+import {
+  ConversationList,
+  useConversationComposerHeight,
+} from "~/features/native-list/conversation-list";
 import { useActiveThread } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 import { useAccountPending } from "~/features/saved/offline-pill";
@@ -184,7 +186,7 @@ function Thread({
   // Others' new replies, paced in a busy thread (see `usePacedMessages`).
   const replies = usePacedMessages(thread.messages, address);
   const typing = useThreadTyping(conversationId, threadId, replies);
-  const { composerHeight, report } = useComposerHeight();
+  const { composerHeight, report } = useConversationComposerHeight();
   const list = useRef<MessageListHandle>(null);
   const { composer, draftId, editing } = useDraft(conversationId, threadId);
   useWhileOpen(conversationId, threadId, thread);
@@ -215,7 +217,7 @@ function Thread({
       <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
         <Pending phase={pending} />
         {shown !== null && pending === "ready" && (
-          <MessageList
+          <ConversationList
             ref={list}
             key={thread.viewKey}
             thread={{ replyCount: thread.replyCount, root: shown.root }}
@@ -254,9 +256,10 @@ function Thread({
           report={report}
           onChangeText={typing.report}
           onSend={(draft) => {
-            thread.sendMessage(draft);
+            const messageId = thread.sendMessage(draft);
             list.current?.scrollToLatest();
             devTools.replyToMe(conversationId, threadId);
+            return messageId;
           }}
         />
       )}

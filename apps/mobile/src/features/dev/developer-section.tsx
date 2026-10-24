@@ -6,6 +6,7 @@ import { Button, FieldGroup, Row, Spacer, Text } from "@expo/ui";
 import type { ServerDelay } from "./server-delay";
 import { ChoiceMenu } from "~/components/choice-menu";
 import { useAccount } from "~/features/messaging/account";
+import { NativeListSwitch } from "~/features/native-list/native-list-switch";
 import { forgetForNow } from "~/features/saved/saving";
 import { fillRow } from "~/lib/ui-modifiers";
 import { useDevTools } from "./dev-tools";
@@ -96,6 +97,7 @@ export function DeveloperSection() {
         onPress={() => void openLongThread()}
       />
       <ServerAnswersRow />
+      <NativeListSwitch />
       <Button
         label="Forget Saved Conversations"
         variant="text"

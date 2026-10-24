@@ -20,6 +20,7 @@ import {
   threadPeople,
   useConversationThreads,
 } from "~/features/messaging/thread-lists";
+import { ConversationListSection } from "~/features/native-list/native-list-switch";
 import { ProfileCard } from "~/features/profile/profile-card";
 
 const CHANNEL_GLYPH = { android: "tag", ios: "number" } as const;
@@ -75,6 +76,7 @@ function Details({
         <FieldList clearsNavigationBar>
           <ProfileCard {...card} />
           <InboxSection conversation={conversation} />
+          <ConversationListSection />
           <ThreadsSection
             conversationId={conversationId}
             title={card.name}

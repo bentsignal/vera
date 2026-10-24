@@ -61,6 +61,11 @@ export function useIsLifted(messageId: string, part: ReactionPart) {
   return lifted?.messageId === messageId && lifted.part === part;
 }
 
+/** The message lifted into the menu right now, if one is. */
+export function useLiftedMessageId() {
+  return use(LiftedPartContext)?.messageId;
+}
+
 const ReactionPartContext = createContext<ReactionPart>("message");
 
 /**

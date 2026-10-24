@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
+import { NativeListTesting } from "~/features/native-list/native-list-switch";
 import { AboutSection } from "~/features/settings/about-section";
 
 export default function AboutScreen() {
@@ -12,6 +13,7 @@ export default function AboutScreen() {
       <NativeHost style={{ flex: 1 }}>
         <FieldList>
           <AboutSection />
+          <NativeListTesting />
         </FieldList>
       </NativeHost>
     </>
