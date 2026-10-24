@@ -2366,3 +2366,34 @@ and one animated call with successful arming afterward. Raw traces/logs:
 `ios-ack-gate-flags-before.json` and `send-latest-hook-{before,after}.log`.
 Ordered repository checks passed after this correction. Runtime replay is
 still required; pure state checks alone did not catch this lifecycle bug.
+
+**ACK runtime progress, not final acceptance.** After the compiled-hook
+fix at `2355ed38`, the clean stacked eight-line replay publishes one
+rows/inset pair. JS trace records ACK 76, animated command invocation,
+resolution, arm and pair publication in that order. The same pre-existing
+Priya row moves monotonically y263 to y210 from 1.567 to 1.932 seconds;
+its text template's sampled mean absolute pixel error stays below 2.7.
+A later reaction adds a separate upward move. Full identity coordinates
+are in `ios-ack-stacked-eight-identity.json`; the clip is
+`r2-ios-ack-stacked-eight-retry.mp4`. Mac CPU 11% average/13% peak, two
+slow frames at 33.3 ms. The own row has a 40 pt gap while a 32 pt typing
+row is beneath it, and after bot replies settle the actual newest Maya
+row bottom is 482, composer top 490, exactly 8 pt. Do not call the
+intermediate typing space a persistent composer gap.
+
+Bubbles eight-line replay also calls/arms/releases; its clip and state
+are `r2-ios-ack-bubbles-eight.mp4` and
+`ios-ack-bubbles-eight-state.json`. Contact-sheet inspection shows the
+arrival rising without the old whole-list reversal; exact identity
+tracking still needs its own review. Two slow frames at 33.3 ms, Mac CPU
+20% average/35% peak. The first downward keyboard swipe then closes the
+keyboard and leaves the newest Jonah row bottom 790/composer top 798.
+A second swipe scrolls away and exposes the jump button, as intended.
+Normal text hold with the keyboard up keeps the real bubble raised;
+menu close restores keyboard and ends with the same row frame 401..482
+and composer top 490. Clip `r2-ios-text-keyboard-lift.mp4` and before/after
+raw dumps preserve this normal case. It does not exercise the rare
+post-release/pre-apply freeze barrier, deck landing, or delayed layout.
+The full iOS motion suite is running; no all-pass claim yet. A second
+compiled-hook regression now exercises lift interruption while the native
+Promise is pending, and verifies its resolution cannot re-arm navigation.

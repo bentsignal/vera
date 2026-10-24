@@ -49,3 +49,25 @@ test("a later external-store request arms after the actual ACK", async () => {
   expect(mockLatest).toHaveBeenCalledWith(true);
   expect(commit.read().latestArmed).toBe(true);
 });
+
+test("lift interruption cleans a pending native Promise without reviving navigation", async () => {
+  const pending = Promise.withResolvers<void>();
+  mockLatest.mockReturnValueOnce(pending.promise);
+  const commit = createSendCommit();
+  await render(<SendLatest commit={commit} />);
+  await act(() => {
+    const sequence = commit.begin(1, []);
+    commit.requestLatest();
+    commit.expect(sequence, "own-row");
+    commit.acknowledge(sequence, 76);
+  });
+  expect(mockLatest).toHaveBeenCalledTimes(1);
+  await act(() => commit.interruptLatest());
+  await act(async () => {
+    pending.resolve();
+    await pending.promise;
+  });
+  expect(commit.read().latestRequested).toBe(false);
+  expect(commit.read().latestArmed).toBe(false);
+  expect(commit.read().height).toBe(76);
+});
