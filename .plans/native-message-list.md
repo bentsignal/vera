@@ -2719,3 +2719,98 @@ hit a transient adb-offline error; final raw/screenshot succeeded on retry,
 so preserve that collection failure separately from the mInputShown=false
 outcome. Native mode is restored. Midgesture preference switching is not
 claimed tested. No phone Android artifact is ready yet.
+
+## Phone feedback round 2 follow-up, October24 after fresh iPhone delivery
+
+Shawn's actual iPhone passes: sending feels good; menu plus keyboard fixed
+without jank; keyboard dismissal fixed; typing faces good in both layouts;
+photo viewer good; carousel opens much faster; front-only deck lift/focus
+good; mixed-shape deck good; quick iOS swipes perfect; per-photo reactions
+good in stacked, deck and carousel. Preserve these as phone evidence, not
+merge approval and not a reason to re-audit unchanged areas broadly.
+
+Three explicit remaining bugs, now the shared integration owner's scope:
+
+1. Playing video swipe-down starts downward, rubber-bands back, flickers,
+   then disappears. Capture before and inspect video playback/layer,
+   gesture and close lifecycle. Acceptance is continuous photo-like
+   dismissal with no return or flicker, including while playing.
+2. Adding media makes composer expansion lag. Measure actual bar/field,
+   attachment strip and newest row during add/remove before choosing a fix.
+3. Enter/newline makes composer height/list shift desynchronize by about
+   a frame and feel janky. Measure the same physical trajectories during
+   growth, preserving the phone-passing per-send ACK semantics. No guessed
+   minimum-height patch or timer fallback, and no broad rewrite.
+
+Android full motion plus reaction capture keeps product source frozen until
+complete. Finish its finite gates and deliver its fresh artifact
+independently of these iOS follow-ups. The iOS owner may give bounded
+read-only native/RN source input; shared implementation has one owner here.
+Keep normal8492 serving and use hot reload for shared-only fixes. If native
+code is actually needed, report it and use phone.sh for that fingerprint.
+
+Shawn cannot judge cold first-open through Dev's roughly3-second connection
+startup. He wants private production builds only after bugs are worked
+through on BOTH platforms. Do not start them now, do more profiling, or
+publish to stores/production OTA/merge/release. The prior Release simulator
+profile remains bounded evidence, not clearance of the phone cold-open test.
+
+**Android current motion, unchanged source during captures.**
+Full run `.cache/motion/20261024-172004` formally passes5/18 overall.
+Sixteen clips have zero visual analyzer failures; eleven otherwise clean
+cases fail because the existing React state-update-before-mounted ERROR
+appears during relaunch. This same warning is in older baseline logs; its
+source is not established here and it is neither suppressed nor silently
+excluded. Both firehose clips retain visual failures: bubbles3.316 s
+middle212 jump29,4.998 s left428 jump-40/left452 flicker37; stacked4.525 s
+middle740 jump23, plus four minor flags. Native owner is reviewing only
+original-PTS neighborhoods and named-row identity under one short lock gap.
+No alias dismissal or all-pass claim is accepted in advance.
+
+Named front-media reactions `.cache/motion/20261024-172857` formally pass
+3/4 overall,4/4 visual. Stacked remove has the same startup Metro ERROR
+and zero visual flags. Exact action logs confirm per-item front reactions
+were added/removed. Keep both formal and visual-only counts. The isolated
+query warns roughly29.3k of32k documents after this required finite run;
+no further burst/seeding loop is planned.
+
+The finite Android owner's original-PTS identity review is complete. At
+bubbles3.316, named Jonah/Leo rows and Firehose1 move upward throughout
+six inspected source frames. At stacked4.525, Maya Firehose3 and its
+neighbors keep order and move upward. Neither reviewed identity trajectory
+shows the reported jump-back. The exact detector match is not proven.
+Bubbles4.998 remains unresolved: the window contains only source frame
+4.997900, with adjacent frames4.560633 and5.445033. That sparse sample
+cannot decide reversal, flicker, missing rows or model arrival order. No
+native defect was confirmed, no thresholds changed, and formal counts
+remain5/18 and3/4. No further extraction or burst run is planned.
+
+**Android actual UI delay boundary.** Both layouts now have a deliberate
+one-shot900 ms UI-thread stall, not a delayed JS callback alone. Stacked
+sent ID5724354d-3c72-403f-8009-950bd24c5e6c and bubbles
+3620132d-9305-493d-963e-4f6af0f28693 each preserve the old222.857 dp
+inset until matching committed80.381 dp ACK, exact row and generic latest
+command resolution, then publish the pair. UI worklet start/end and next
+frame markers are preserved separately from JS and video clocks. Video
+keeps the tall field until the next changed source frame after a roughly
+one-second VFR gap; that interval is not a sequence of captured60 Hz
+frames. The physical empty field appears before paired arrival motion.
+The same stacked media strip moves monotonically250→162 logical pixels;
+the same bubbles Priya "I'm in" strip moves352→280, with template error
+at most1.572 through the first settle. No down/up return is seen in these
+identity trajectories. Bubbles newest Priya row bottom1372 and composer
+bar top1393 leave21 physical pixels,8 dp at2.625 density. Deliberate worst
+frames are900 ms; host CPU51/61% average and91/95% peaks preclude any
+normal-performance claim. Raw states, pixels, trajectories and recordings
+are under `.cache/round2/android-delayed-*` and `.cache/evidence/`.
+
+Two warm, no-relaunch typing/arrival clips preserve the actual query path.
+Stacked detail shows the typing label fading away and the new text rising
+into place, initially lighter and then dark. The bubbles warm clip ends
+with typing still present; its message is present in the next clip, so it
+does not prove that transition's opacity. The bubbles delayed-send clip
+separately shows the new own bubble fading/rising. Full analyzer positions
+are not opacity proof, and these clips have substantial software-emulator
+slow frames. No further arrival/seeding loop is added before the phone
+artifact. Shawn should check first incoming arrival opacity explicitly in
+both layouts on the Galaxy A16.
