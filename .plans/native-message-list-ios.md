@@ -192,6 +192,54 @@ Still pending in integration's combined client:
 - a long hold opening the menu with no gallery;
 - deck and carousel gestures.
 
+## Native send coordination, 2026-10-24
+
+Shawn authorized Sol for all subsequent work. This checkpoint changes only
+native internals and tests, with no contract fields or shared JavaScript.
+Shared owns the per-send committed composer-height ACK and exact optimistic
+sent-ID readiness. It arms the existing animated latest command immediately
+before releasing those rows and their inset together.
+
+If a keyboard freeze starts before the worker applies that pair, native now
+holds the entire measured result. It retains one latest full result, rejects
+superseded measurement generations, and keeps the current displayed rows,
+inset and keyboard offset. The thaw resumes with rows rather than applying
+the inset alone. Newer inset intent replaces the old one, and a return to
+the applied inset cancels it. iOS diffs the retained full result against the
+actually displayed rows; Android's chained worker diffs require its separate
+FIFO policy.
+
+A close that meets this barrier keeps the actual borrowed views lifted and
+the tapbacks hidden. After the final paired layout is applied, native starts
+the existing landing into that cell, or its existing fade if the row left.
+This can delay the start of landing until thaw and current measurement are
+ready. That behavior cost is explicit; normal landing without the barrier
+is unchanged. No copy or guessed landing timer is added.
+
+Animated latest navigation is a generic intent, not an exact-send ACK. It
+preserves the visible anchor during an off-bottom row apply and smoothly
+retargets the new latest offset after layout, without snapping to the end.
+The intent survives applies and scroll completion. A new true command
+replaces it; a touch, drag, explicit navigation, lift, or detach cancels it.
+A freeze pauses motion and starts. Shared suppresses a canceled or
+superseded send before arming; after arming, failure or cancellation can
+still finish this generic navigation, as agreed by the parent. There is no
+hidden native target, expiration timer, or new API argument.
+
+Validation: 225/225 focused native host checks and all 21 Swift module files
+against the real installed arm64 simulator SDK pass. The state tests cover
+freeze between release and measurement, already-frozen pairing, thaw and
+refreeze, inset supersession/cancellation, stale work, detach, and latest
+intent generations/floors/interruption. They do not exercise UIKit motion.
+
+Integration still gates this checkpoint on a combined client compile and
+recordings of smooth scrolled-up sends with short and tall messages, exact
+8 pt final spacing, interruption and supersession, freeze during measurement,
+and real deck/carousel/text landing with reaction height changes. In
+particular, check the delayed landing start through keyboard return, removed
+lifted rows, and ordinary holds without a pending pair. No client or device
+was built or run in this checkout.
+
 ## Checks
 
 - Earlier phone-polish checkpoint: `Tests/run.sh`, 94 checks. 61 of them are new, for the reaction toggle

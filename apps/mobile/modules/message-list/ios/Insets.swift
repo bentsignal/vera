@@ -6,8 +6,8 @@ import UIKit
 /// - Insets that come in the same props batch as new rows go in with those
 ///   rows (or later ones), in their one move: a send's shorter composer
 ///   (send-inset.ts) and the message sent make room together. Every rows
-///   batch is measured and applied, so they always go in; how long they
-///   wait for the message sent is JavaScript's (its 333 ms).
+///   batch is measured and applied. Shared supplies a send's exact row
+///   and acknowledged composer height together.
 /// - While `keyboardFrozen` (menu-keyboard-hold.ts), insets wait, and go
 ///   in at the thaw, eased as the keyboard is.
 /// - Otherwise they go in at the end of the batch.
@@ -59,18 +59,29 @@ struct InsetsGate {
   /// will be measured and applied, and `rowsVersion` is theirs. Insets
   /// already waiting for earlier rows keep waiting for them, unless this
   /// batch sent insets or ended a freeze.
-  mutating func batchEnded(rowsChanged: Bool, placed: Bool, frozen: Bool, rowsVersion version: Int) -> Step {
+  mutating func batchEnded(rowsChanged: Bool, placed: Bool, frozen: Bool, rowsVersion version: Int, holdingRows: Bool = false) -> Step {
     let sent = sentThisBatch
     let thawed = thawedThisBatch
     sentThisBatch = false
     thawedThisBatch = false
-    guard let next = waiting, !frozen, sent || thawed else { return .none }
-    if rowsChanged, placed {
+    guard let next = waiting else { return .none }
+    // Record pairing even if this batch is already frozen. A thaw of a
+    // held row apply must not commit its inset as a standalone update.
+    if placed, holdingRows || rowsChanged && (sent || thawed) {
       rowsVersion = version
+      guard !frozen else { return .none }
       return .withRows(version: version)
     }
+    guard !frozen, sent || thawed else { return .none }
     commit(next)
     return .now(next, eased: thawed)
+  }
+
+  /// Whether these rows carry the pending inset. The view holds the
+  /// entire measured result when frozen, not just its inset.
+  func carriesInsets(forRows version: Int) -> Bool {
+    guard waiting != nil, let wanted = rowsVersion else { return false }
+    return version >= wanted
   }
 
   /// The rows of `version` are going in: the latest insets, if they were
