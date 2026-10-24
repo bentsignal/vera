@@ -125,11 +125,12 @@ export interface TypingRow extends RowBase {
   readonly layout: "bubbles" | "stacked";
   readonly people: readonly Person[];
   /**
-   * Their photos: true in groups and spaces, false in a one-on-one
-   * conversation (the Vera assistant's too). Without them, bubbles draw
-   * the typing bubble where a DM's incoming bubble starts, and stacked rows
-   * start the label and dots at the text column (`horizontalPadding +
-   * avatarSize + 12`). `people` is still sent, for the hand-off to their
+   * Their photos. Stacked rows: always true (the React Native typing line
+   * shows them in a one-on-one conversation too). Bubbles: true in groups
+   * and spaces, false one-on-one (the Vera assistant's too). Without them,
+   * bubbles draw the typing bubble where a DM's incoming bubble starts, and
+   * stacked rows start the label and dots at the text column
+   * (`horizontalPadding + avatarSize + 12`). `people` is still sent, for the hand-off to their
    * message. Missing (older JavaScript): drawn.
    */
   readonly showFaces?: boolean;

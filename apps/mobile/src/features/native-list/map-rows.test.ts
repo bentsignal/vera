@@ -276,13 +276,13 @@ void test("who's typing is the newest row", () => {
   assert.equal(typing.showFaces, true);
 });
 
-void test("one-on-one, who's typing shows no photos, in either layout", () => {
+void test("one-on-one, who's typing shows photos in stacked rows only", () => {
   for (const layout of ["bubbles", "stacked"] as const) {
     const rows = rowsOf([message("a", 0)], { layout, showAuthors: false }, [
       MAYA,
     ]);
     const typing = rowAt(rows, 0, "typing");
-    assert.equal(typing.showFaces, false);
+    assert.equal(typing.showFaces, layout === "stacked");
     // Still sent, for the hand-off to their message.
     assert.equal(typing.people[0]?.id, MAYA);
   }

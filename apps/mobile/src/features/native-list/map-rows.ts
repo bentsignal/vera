@@ -251,8 +251,10 @@ function typingRow(typists: readonly string[], context: RowContext) {
       label,
       layout: context.layout,
       people,
-      // Photos only where messages show who sent them: not one-on-one.
-      showFaces: context.showAuthors,
+      // Stacked rows always show the photos, one-on-one too, as the React
+      // Native list's typing line does; bubbles only where messages show
+      // who sent them, not one-on-one.
+      showFaces: context.layout === "stacked" || context.showAuthors,
     },
   ] satisfies Row[];
 }
