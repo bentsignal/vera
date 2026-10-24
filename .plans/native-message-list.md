@@ -2845,3 +2845,144 @@ normal8492 stays serving. All required ordered checks and format pass,
 including the later DEV-only growth probe. Formal motion/opacity/sparse
 frame limits above remain, not an all-pass claim. New iPhone follow-ups
 continue independently. No private production build, merge or release.
+
+**Playing-video before reproduction and narrow correction.**
+On the current cached iOS client, sourcec888b6f3 with viewer unchanged,
+`r2-ios-playing-dismiss-before.mp4` reproduces the reported return while
+flower.mp4 is playing. Original frames show its colored bounds at y324,
+then608 by3.145 s, then back to324 by3.368 s before route dismissal. Native
+fullscreen opening and playback occur in the first seconds of the5-second
+clip. Mac CPU21% average/27% peak,13 slow frames/worst308.6 ms including
+opening; not a latency comparison. Raw color bounds/contact remain local.
+
+The iOS path auto-presents AVPlayer fullscreen over a full-size inline
+VideoView, then closes the React media route onFullscreenExit. Its return
+animation targets that full-size inline player before route teardown.
+This two-stage ownership matches the observed downward-then-upward move.
+The selected narrow correction uses the existing shared video drag path
+on iOS too: transform the playing inline layer offscreen once, then close
+the route. Retain native playback controls, autoplay and PiP; disable a
+nested fullscreen presentation on iOS because the media route is already
+full screen. No player dependency/native/contract change. Verify actual
+playing dismissal, short-drag cancellation, controls/scrubbing and Close.
+The send ACK path remains unchanged.
+
+The shared video after clip removes the full-size return. A slow60 pt,
+1000 ms drag cancels to the unchanged viewer; Close returns to chat. Native
+playback controls appear and respond to tapping the video, with the native
+AirPlay/control row kept below the app's Close button by a48 pt iOS header.
+PiP remains enabled but simulator routing/PiP is not a physical-device
+capability claim. Final screenshot and playing-dismiss clip are preserved;
+seven slow frames/worst48.8 ms, Mac20% average/27% peak. The prior nine-slow
+iteration is separate, not a comparative performance result.
+
+**Newline before measurement.** Three real Return keys in a stationary
+keyboard produce committed bar76→98→120→142 pt. In original video frames,
+the field border rises497→475 at2.471667 s while the same newest
+"Warm stacked arrival after typing" strip stays455 until2.515 s, then433.
+The third border453→431 at5.761667 precedes that strip411→389 at5.781667.
+These are43.3 ms and20 ms physical desynchronizations, with template error
+below0.24. First callbacks see the previous live height before later
+commits update it. Mac17% average/22% peak. This proves the reported growth
+lag in this case, not a guessed minimum-height mismatch. The second border
+sample is less clean, so it is not assigned an exact delay.
+
+Attachment add before capture uses the actual photo picker and existing
+local flower poster. Picker dismissal and keyboard return overlap, so
+that video is not a stationary-keyboard latency comparison. The retained
+whitespace draft gives initial bar120 pt, not an empty76 pt bar: automated
+clear reported a mismatch and is not treated as a successful clear. Strip
+addition changes120→192 pt through per-frame intermediate heights while
+live reports trail. A separate removal capture holds the keyboard still.
+No send occurs, and no attachment/typing height fix is selected yet.
+
+The native owner's source review confirms animatedProps can reach Expo's
+normal props batch, but a second animated inset writer could retain stale
+registry values or escape a pending rows dependency. No animated writer,
+new native command or contract field is selected. First try a smaller
+shared shortcut: the bar's existing onLayout callback already runs on JS
+with committed host geometry. Report that measured height directly through
+the existing SendCommit.observeLayout instead of waiting for live to make
+another JS→UI→JS round trip. Keep the current single React inset owner and
+all pending-send ACK/exact-ID/navigation/freeze guards. Do not trust the
+callback's possibly stale scalar over the current committed bar rect.
+The RN-list height path stays unchanged. This is a measured latency
+reduction candidate; actual after trajectories must decide whether it
+removes the desynchronization, with no same-frame guarantee inferred.
+
+The direct-report candidate's first after sample reduces43.3 ms to20 ms,
+but later Return samples still show about20 ms. It is not accepted as the
+complete newline fix. Before proposing a new UI/native ownership scheme,
+try the TextInput's existing content-size event as an earlier notification
+of committed text layout. It reports the CURRENT total bar geometry through
+the same generic report, only for the native list; it never substitutes the
+text content-size for total composer height or supplies a clear ACK.
+This does not cover attachment-only growth. Keep the result conditional on
+actual after frames and preserve the known one-frame residual honestly.
+
+### October24 phone feedback: Android passes and remaining shared work
+
+Shawn tested the fresh Android client on his Galaxy A16. Sending, first-swipe
+keyboard dismissal without scrolling, keyboard-up hold/menu, typing faces,
+stacked carousel/viewer, bubbles photos/viewer, video, immediate photo opening
+and navigation feel good. Android does not show the iOS playing-video return.
+The prior iPhone passes above remain physical-phone evidence, not merge approval.
+
+The ordinary composer growth bug remains on BOTH platforms. On the A16 the
+composer rises while the chat follows roughly100–200 ms later. iOS original
+frames show20–43 ms. Earlier notifications are experiments, not acceptance of
+a residual frame. Measure newline and attachment add/remove bar/field/newest-row
+trajectories on both platforms. Preserve passing send ACK, exact optimistic-ID,
+atomic freeze/lift and smooth latest behavior. No guessed height, timer fallback
+or independent native height writer. If the JS-only notification still trails,
+write and review one coherent UI/native height ownership proposal before code.
+
+Shawn explicitly removes message/text double-tap focus/menu on both platforms.
+A valid single release opens its thread immediately. Long press retains the
+menu and real-content lift; inline media remains first-release gallery.
+Reaction taps/holds, scrolling, carousel/deck gestures and stop-scroll touches
+stay intact. Fullscreen photo double-tap zoom is retained. Native owners own
+their recognizer changes; integration removes the RN fallback row double-tap
+arbitration. Existing press message/quote/replies events already call openThread
+synchronously, so no new event or contract field is required.
+
+Bounded camera follow-up: on the physical A16, composer Camera → selfie → OK
+shows an unrounded staged preview in production, while the new Dev client
+crashed. Memory pressure is unproven. Preserve available logs and inspect only
+the existing accept/staging path now; no camera/dependency rewrite. Before any
+release, the later physical Android PRIVATE PRODUCTION test must cover camera
+accept → rounded staged preview → send → reopen, with no crash. A Dev pass
+alone cannot clear that check.
+
+Delivery override: prepare and verify the next two Vera Dev artifacts as ready,
+but deliver BOTH updated clients TOGETHER after the remaining fixes pass. This
+supersedes independent iPhone delivery. Keep8492 serving both phones. Private
+production builds wait until this bug round passes on both; no production build,
+store upload, OTA, main merge, release or data-pass integration now.
+
+The content-size experiment still leaves11.7 ms on the first Return and21.7 ms
+on the third, with the same newest text retained and template error below0.24.
+It is removed from product source. See `.plans/native-composer-growth.md` for
+the bounded native UI-observation ownership proposal now under source review.
+No native field, observer or height patch has been selected or implemented.
+
+RN fallback now forwards text-part presses to the row's thread action using
+Pressables. The previous exclusive double-tap recognizer is removed. Actual
+compiled UI tests cover row and nested-part first press, rapid repeat, nested
+control ownership and a400 ms hold suppressing the thread action. Native first
+release source checkpoints are iOS16c33ea9 and Androidb32331ee, to combine next.
+Fullscreen photo zoom remains unchanged.
+
+Bounded camera source/log review: the composer awaits `pickAttachments`, then
+stages its returned assets. Camera uses Expo ImagePicker; accepted still images
+read file size/metadata without video-poster extraction. The staged MediaTile
+already requests `rounded-xl` plus overflow clipping. No physical A16 crash
+trace is available in the existing integration logs, and no cause is proven.
+No camera code/dependency change follows this source-only check. The physical
+private-production acceptance remains required in docs/next-release.md.
+
+Shared viewer/direct-height-fallback/press checkpoint checks pass in order:
+lint, typecheck, test, React Doctor against origin/t3/native-message-list,
+then format. Six composer hook tests and four press UI tests pass. These tests
+do not establish same-frame growth or native recognizer timing. Video before
+and after plus the still-failing growth experiment are uploaded in the PR.

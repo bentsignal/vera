@@ -117,6 +117,12 @@ export function useComposerHeight({
     sendCommit,
     sends,
     onHeight: (height: number) => {
+      // Layout is already committed here. The native list needn't wait for
+      // this JS callback to go through `live` on UI and back to JS again.
+      // Read the current host, since a queued callback may carry an old size.
+      if (!roomCloses && bar.current !== null) {
+        sendCommit.observeLayout(bar.current.getBoundingClientRect().height);
+      }
       // Already there, from `onSentShorter` or `onTyped`.
       if (Math.abs(height - live.get()) >= 0.5) live.set(height);
       if (Platform.OS !== "ios" || laidOut === undefined) setLaidOut(height);

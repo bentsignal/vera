@@ -14,6 +14,19 @@ the heading and intro so the file stays in place for the next release).
 Adding steps: any PR whose release needs something beyond `pnpm release`
 adds a section here in that PR (see AGENTS.md → Releases).
 
+## Native list: physical Android camera acceptance before release
+
+Before releasing the combined native-list work, test the private production
+APK on Shawn's Galaxy A16 after the current Dev bug round passes on both phones.
+From a conversation, open composer Camera, take a selfie, accept with OK, and
+verify the staged preview has rounded corners. Send it, reopen the conversation
+and image, and verify the app survives throughout. Retain crash logs if it fails.
+Shawn observed an unrounded preview in current production and a crash in the
+new Vera Dev client on October24. The cause, including memory pressure, is not
+established. Neither a simulator result nor a Dev-only pass replaces this
+physical production-config check. No build, upload or release is authorized by
+this checklist.
+
 ## Native message list: the store-update gate for older binaries
 
 From the native message list (#284 into `t3/native-message-list`, then

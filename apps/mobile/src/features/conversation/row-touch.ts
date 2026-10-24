@@ -4,18 +4,10 @@ import { createContext, use, useId, useImperativeHandle } from "react";
 
 import type { MenuTarget } from "./glass-message-menu";
 
-/** The actions (a hold) or who reacted (a double tap). */
+/** The actions on a hold, or who reacted on a tapback press. */
 export type LiftMode = MenuTarget["mode"];
 
-/** What a touch on a message's row landed on: the row, or a part's text. */
-export type TouchedPart = "row" | { readonly openMenu: () => void };
-
-/**
- * Where the latest touch landed, as the row or a part with its own menu
- * reports it, and when the row's gesture seeing it began. One touch lands
- * at a time, so they're kept for every row at once.
- */
-let touch: { at: number; part: TouchedPart } | undefined;
+/** When the current row or text-part press began, for inline link routing. */
 let gestureBegan = 0;
 
 /**
@@ -26,11 +18,6 @@ let gestureBegan = 0;
  */
 const REPORT_SLACK_MS = 250;
 
-/** Says the latest touch landed on the row, or on a part with a menu. */
-export function reportTouch(part: TouchedPart) {
-  touch = { at: Date.now(), part };
-}
-
 /** Marks a row's gesture beginning, for a new touch. */
 export function rowGestureBegan() {
   gestureBegan = Date.now();
@@ -39,17 +26,6 @@ export function rowGestureBegan() {
 /** Whether something at this time belongs to the row gesture's touch. */
 export function ofLatestTouch(at: number) {
   return at >= gestureBegan - REPORT_SLACK_MS;
-}
-
-/**
- * What the row gesture's touch landed on: the row, a part with a menu, or
- * null for something with a press of its own (a photo, a reaction).
- */
-export function touchedPart() {
-  if (touch === undefined || !ofLatestTouch(touch.at)) {
-    return null;
-  }
-  return touch.part;
 }
 
 /** Something a hold lifts with its menu, squeezing it while held. */
@@ -204,6 +180,8 @@ export function rowTarget(id: string) {
  * the row's, or a part's own, which ignores where the touch is.
  */
 export interface MenuPress {
+  /** The row's thread action, forwarded only by text parts. */
+  readonly onPress?: () => void;
   readonly delayLongPress: number;
   readonly onLongPress: (event: GestureResponderEvent) => void;
   readonly onPressIn: (event: GestureResponderEvent) => void;
