@@ -291,3 +291,29 @@ cleanly.
   production build. Floods of new messages too.
 - The motion check passes for every scenario, both layouts.
 - Shawn has tried it in his real group chat in the production app.
+
+## iOS implementation check, 2026-10-23
+
+PR #277 targets `t3/native-message-list`. The iOS module now supports the
+real-view lift, press shrink, cached deck blur, React custom rows measured
+by Fabric, and oldest-first accessibility order with paging. The lift uses
+JavaScript's menu geometry and spring, then returns the same views during
+the menu's 240 ms close. Plain stacked text gets the existing menu card.
+`NativeSupport.features` advertises `lift`, `customRows`, and `benchFling`.
+
+The integration thread owns real-app parity checks, the head-to-head
+against React Native, and the phone clients. It supplied `keyboardOverlap`,
+`keyboardFrozen`, `alignTop`, and the `replies` header style. iOS copies the
+contract fields and the React Native divider's measurements. Its native
+height and diff suite has 33 checks, run with
+`apps/mobile/modules/message-list/ios/Tests/run.sh`.
+
+The native benchmark drives `setContentOffset(animated: false)` on a
+display link, towards older messages, and reports distance and edge wait.
+The dev-screen baseline at 5,500 pt/s travelled 44,000 pt in eight seconds
+with no edge wait. The 9.767-second frame capture had five slow frames,
+worst 43.9 ms. It includes the button tap that starts the benchmark and is
+not a comparison with React Native. The integration thread must compare
+the same data, production bundle, speed, and duration. The simulator has
+not reproduced the reported 5 FPS in Shawn's chat; the phone test remains
+the release gate.
