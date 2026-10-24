@@ -3,20 +3,15 @@ import { useAnimatedReaction } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
 import type { Row } from "./contract";
+import type { InsetState } from "./send-inset-state";
 import type { ComposerHeight } from "~/features/conversation/composer-height";
+import { changed, expired, insetOf, sentShorter } from "./send-inset-state";
 
 /**
  * How long a send's shorter composer waits for the message sent (#257's
  * 20 frames): one that went in off screen never moves anything for it.
  */
 const SEND_WAIT_MS = 333;
-
-interface Held {
-  /** The composer's height before the send. */
-  readonly height: number;
-  /** The newest row when it was sent, which the message sent replaces. */
-  readonly newest: string | undefined;
-}
 
 /**
  * The composer's height for the native list's `insets.bottom`. Sending
@@ -34,16 +29,20 @@ export function useComposerInset(
 ) {
   // The newest row, typing aside: the message sent replaces it.
   const newest = rows.find((row) => row.kind !== "typing")?.id;
-  const [height, setHeight] = useState(laidOut ?? 0);
-  const [held, setHeld] = useState<Held>();
+  const [state, setState] = useState<InsetState>({
+    height: laidOut ?? 0,
+    held: undefined,
+  });
   function onSentShorter(before: number, now: number) {
     const hold = { height: before, newest };
-    setHeld(hold);
-    setHeight(now);
+    setState((current) => sentShorter(current, now, hold));
     // A later send's hold isn't this one's to drop.
     setTimeout(() => {
-      setHeld((current) => (current === hold ? undefined : current));
+      setState((current) => expired(current, hold));
     }, SEND_WAIT_MS);
+  }
+  function onChanged(now: number) {
+    setState((current) => changed(current, now));
   }
   useAnimatedReaction(
     () => live.get(),
@@ -53,10 +52,10 @@ export function useComposerInset(
         sent.set(false);
         scheduleOnRN(onSentShorter, before, now);
       } else {
-        scheduleOnRN(setHeight, now);
+        scheduleOnRN(onChanged, now);
       }
     },
   );
   // Released in the render where the message sent is the newest row.
-  return held !== undefined && held.newest === newest ? held.height : height;
+  return insetOf(state, newest);
 }

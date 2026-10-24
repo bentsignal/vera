@@ -81,6 +81,38 @@ function settle(
 }
 
 /**
+ * Android, with the native list: tells the list (`onSentShorter`) when a
+ * send makes the field shorter, as `settle` does on iOS, so the list keeps
+ * the composer's old height until the message sent is in its rows
+ * (`useComposerInset`). There's no glass to hold: Android's bar is solid.
+ */
+function reportShorter(
+  field: AnimatedRef<View>,
+  sends: SharedValue<number>,
+  onSentShorter: ComposerReport["onSentShorter"],
+) {
+  "worklet";
+  // A later send takes over.
+  const send = sends.get() + 1;
+  sends.set(send);
+  const before = measure(field);
+  if (before === null) return;
+  const from = before.height;
+  let frames = 0;
+  function frame() {
+    if (sends.get() !== send) return;
+    frames += 1;
+    const now = measure(field)?.height ?? from;
+    if (now < from - 0.5) {
+      onSentShorter(from - now);
+      return;
+    }
+    if (frames < WAIT_FRAMES) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+/**
  * What `GlassField` needs, and `settle`, to call just before sending empties
  * the field: rather than jumping down to the shorter field, the glass eases
  * down to it with the list (see `ComposerReport`).
@@ -115,7 +147,8 @@ export function useFieldGlass(report: ComposerReport) {
       onBlur: () => focused.set(false),
     },
     // Android's bar is solid, with a border along its top that moves at
-    // once: glass held above it would show over the messages.
+    // once: glass held above it would show over the messages. With the
+    // native list, its send still has to reach the list's inset.
     settle: () => {
       const { onSentShorter, room, roomCloses } = report;
       if (IOS) {
@@ -124,6 +157,8 @@ export function useFieldGlass(report: ComposerReport) {
           room,
           roomCloses,
         });
+      } else if (!roomCloses) {
+        scheduleOnUI(reportShorter, field, sends, onSentShorter);
       }
     },
   };

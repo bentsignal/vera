@@ -1930,29 +1930,114 @@ Shawn tested the Vera Dev clients from round 1 (Metro on 8492, the
 isolated backend `uncommon-curlew-869`, no data pass). Keep: the
 performance (his Galaxy A16 went from barely usable to fast), the new
 carousels, the reactions and their wrapping to a new line, and iOS
-dictation, which now works. All three threads run on Claude Opus 5.5 and
-implement directly; the headless-CLI rule is gone.
+dictation, which now works.
+
+Who writes what (current rule, from 2026-10-24 afternoon): every product,
+UI, test and doc edit is written by a headless Claude CLI, one saved
+session per platform, to save provider limits. The orchestrator (Codex)
+reads, orchestrates, builds and commits, and writes no code. This
+integration session writes the shared JavaScript, the contract, this
+plan and the PR text; native files belong to the platform sessions.
+Earlier today a direct Opus T3 run wrote `b5689cef` (this plan's round-2
+items), `50937867` (stacked typing faces), `5920a109` (send inset, menu
+keyboard hold) and `5162d2c3` (viewer close, video). This session reviews
+those and writes everything after.
 
 Owners: **integration** (this branch: shared JavaScript, combined builds,
-QA, the contract), **iOS** (#277), **Android** (#275). Contract changes
-are agreed by all three before anyone builds them.
+QA, the contract), **iOS** (#277, now thread
+`mcp:c30488f8-01dc-4b59-859b-3cf5befd505e`), **Android** (#275, unchanged).
+Contract changes are agreed by all three before anyone builds them.
 
-| # | Item | Owners |
-|---|---|---|
-| 1 | A multiline send flicks the list down, then back up. The composer's shrink and the arrival must be one move, never down. | integration, iOS, Android |
-| 2 | A long press with the keyboard up: the message stays raised as the keyboard goes down, and on close goes straight to its place above the returning keyboard. | integration, iOS, Android |
-| 3 | Swiping down to close the keyboard also scrolls the chat (#165). One swipe closes it and leaves you at the bottom. | iOS, Android |
-| 4 | Stacked typing: a DM shows the other person's photo; initials circles in groups are squished. Match the React Native indicator exactly. | iOS, Android (integration if the mapping) |
-| 5 | The viewer's close button flickers and ghosts 100–200 pt toward the swipe while paging. | integration |
-| 6 | Video opens paused (must play at once), and its play button flashes on the row after a swipe-down dismiss. A regression. | integration, natives (cells) |
-| 7 | Opening a photo from a carousel takes about a second. Open at once from the loaded image, then sharpen. | integration, natives |
-| 8 | The busy group lagged on its first open on his iPhone. Profile a cold open of a busy media chat on a release-like build. | integration, iOS |
-| 9 | A held deck lifts the whole pile, and its reactions draw over the menu. Lift the front card only; nothing from the list over the menu. | iOS, Android, integration (menu layering) |
-| 10 | Deck: center cards of different aspect ratios vertically; antialias the rotated edges. | iOS, Android |
-| 11 | Deck animation: too slow on quick swipes; a card coming back under the pile stays on top, then flickers behind. | Android (check iOS) |
-| 12 | Reaction height changes: Android jerks and moves twice; iOS doesn't move at all. One smooth move on both. | iOS, Android |
-| 13 | Android arrivals don't rise and fade in (the first reply after typing just appears). | Android |
+| #   | Item                                                                                                                                                         | Owners                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| 1   | A multiline send flicks the list down, then back up. The composer's shrink and the arrival must be one move, never down.                                     | integration, iOS, Android                 |
+| 2   | A long press with the keyboard up: the message stays raised as the keyboard goes down, and on close goes straight to its place above the returning keyboard. | integration, iOS, Android                 |
+| 3   | Swiping down to close the keyboard also scrolls the chat (#165). One swipe closes it and leaves you at the bottom.                                           | iOS, Android                              |
+| 4   | Stacked typing: a DM shows the other person's photo; initials circles in groups are squished. Match the React Native indicator exactly.                      | iOS, Android (integration if the mapping) |
+| 5   | The viewer's close button flickers and ghosts 100–200 pt toward the swipe while paging.                                                                      | integration                               |
+| 6   | Video opens paused (must play at once), and its play button flashes on the row after a swipe-down dismiss. A regression.                                     | integration, natives (cells)              |
+| 7   | Opening a photo from a carousel takes about a second. Open at once from the loaded image, then sharpen.                                                      | integration, natives                      |
+| 8   | The busy group lagged on its first open on his iPhone. Profile a cold open of a busy media chat on a release-like build.                                     | integration, iOS                          |
+| 9   | A held deck lifts the whole pile, and its reactions draw over the menu. Lift the front card only; nothing from the list over the menu.                       | iOS, Android, integration (menu layering) |
+| 10  | Deck: center cards of different aspect ratios vertically; antialias the rotated edges.                                                                       | iOS, Android                              |
+| 11  | Deck animation: too slow on quick swipes; a card coming back under the pile stays on top, then flickers behind.                                              | Android (check iOS)                       |
+| 12  | Reaction height changes: Android jerks and moves twice; iOS doesn't move at all. One smooth move on both.                                                    | iOS, Android                              |
+| 13  | Android arrivals don't rise and fade in (the first reply after typing just appears).                                                                         | Android                                   |
 
 Status, 2026-10-24 16:00: the iOS thread's run failed at the provider
 handoff ("Insufficient context allowance"), so iOS hasn't started; this
 was reported to the orchestrator. Android is running.
+
+### Items 1 and 2: review of the shared side (`5920a109`), and its tests
+
+Source findings only; nothing here is checked on a device.
+
+- **Item 1, the agreed shape.** `useComposerInset` (`send-inset.ts`) keeps
+  the composer's old height in `insets.bottom` after a send, and lets the
+  new one go in the render whose newest row changes, so native gets it
+  with the message's rows. It lets go anyway after 333 ms (#257's 20
+  frames). Every other height change goes at once.
+- **Fixed: Android never armed it.** The hold starts only when
+  `ComposerHeight.sent` is set, and only `onSentShorter` sets it. Its one
+  caller was `settle` in `field-glass.tsx`, which runs only on iOS,
+  because it's #257's glass path. So on Android a send's shrink reached
+  native one render ahead of the message: the round-1 down-then-up
+  flick. Now on Android, with the native list only (`roomCloses` false),
+  `reportShorter` watches the field after a send and calls
+  `onSentShorter` when it gets shorter, with no glass hold. iOS and the
+  React Native list on both platforms are unchanged.
+- **Kept, with limits (from the source, not reproduced):**
+  - The hold is taken under the newest row as JavaScript sees it when the
+    shrink arrives. If the message sent already rendered before that, only
+    the timer lets go, and the composer's height reaches native alone, a
+    beat late. #257 measured the row about 70 ms after the shrink, so this
+    should be rare.
+  - Someone else's message landing first lets the hold go with that
+    arrival, still as one move.
+  - If the Bar's `onLayout` reaches JavaScript before the UI thread sees
+    the shrink, `onSentShorter` finds the height already taken and doesn't
+    arm the hold. That's #257's own race.
+  - An edit save also calls `settle`. It adds no row, so the shorter height
+    goes after 333 ms, alone.
+- **Item 2.** `useMenuKeyboardHold` (`menu-keyboard-hold.ts`) freezes in
+  the same event that opens the menu, so `keyboardFrozen` reaches native
+  in the update that starts the lift, before the modal takes the keyboard.
+  Closing into the chat sets `returning`, refocuses the field if the
+  keyboard is down, and lets go on the keyboard's next `onEnd` with height
+  above 0, or after 1.5 s. Closing into a sheet or link lets go at once.
+  No defect found in the source. Its keyboard handler is set up once, but
+  `release` uses only refs, setters and shared values, so that's sound. One
+  edge: if the keyboard never went down (Android with a modal may not take
+  it), there's no `onEnd` to wait for, and the freeze holds for up to 1.5 s
+  after closing. Android's own modal sync usually reports an end. Check it
+  at runtime before changing anything.
+- **Tests.** `send-inset-state.ts` holds the inset's state as plain steps,
+  used by the hook. `send-inset-state.test.ts` covers: the message
+  arriving after the shrink; a timeout; a later send's hold surviving the
+  earlier timer; someone else's message first; a line typed during the
+  hold; and the late-capture limit above. The Android `reportShorter`
+  worklet and the menu hold run on keyboard-controller events and timers.
+  A unit test of them would restate the code, so they're left to runtime
+  QA. Nothing is runtime-verified yet.
+
+**Contract question for all three (not changed): can a send move the
+list down?** The accepted item 1 says native moves the rows by the new
+rows' height less the composer height given back, and if that's
+negative, eases down once. From the source, it can be negative:
+
+- Stacked text runs in a column wider than the composer's text area, at
+  a 20.3 pt line against the field's 22. So a long message continuing a
+  run can take fewer points in the list than the composer gives back
+  (up to about 200 pt from ten lines).
+- A reply's bar in the composer can be taller than the quote the message
+  shows.
+- An edit save gives height back and adds no row.
+
+Shawn said the list must never move down on a send. That was about the
+flick, but it reads as a rule. Keeping the newest row 8 pt above the
+composer needs that one eased move down whenever the message is shorter
+than what the composer gave back; the only other way leaves a gap under
+the newest row. My proposal: keep the agreed shape, so one eased move
+down in that case and never a down-then-up, and ask Shawn if that matches
+what he meant. The contract text stays as agreed until all three and
+Shawn settle it.
