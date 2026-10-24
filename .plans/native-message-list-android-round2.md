@@ -218,6 +218,48 @@ playback, profiling, and Shawn's phone checks below.
 
 ## Still needs a device
 
+### Smooth scrolled-up sends, 2026-10-24
+
+Sol implements the approved generic latest-navigation policy. Shared code
+arms the existing animated command only after its clear-commit height ACK
+and exact optimistic row are ready, immediately before releasing that
+row and inset together. Native does not acknowledge a send or hold rows
+waiting for an ID. Canceling a send after arming may still finish generic
+latest navigation. No contract changes.
+
+Previously the smooth scroller could finish against the old rows while
+the sent row was held or decoded. Its numeric target zero did not retain
+an intent to follow the next apply. The new controller retains that
+intent through ordinary applies and scroll completion. Eligible off-bottom
+applies preserve a stable visible row's screen position with the new
+padding, then retarget smoothly after layout. They do not snap to latest
+within the broader near-latest threshold. Already-bottom arrivals keep
+the existing pin and arrival animation. The existing initial jump-close
+optimization for very distant requests is unchanged.
+
+Submitted row revisions exclude older FIFO results from restarting a
+newer request. Posted starts carry generations so a new command, freeze,
+layout or cancellation invalidates older callbacks. Worker diffs still
+apply in FIFO order; none are dropped or coalesced. Direct list touches,
+drag, explicit row/nonanimated navigation, lift, benchmark scrolling and
+detach cancel the intent. Direct touch also prevents a queued restart
+from beginning under the finger after an earlier scroll has finished.
+
+Freeze pauses motion while retaining the anchor intent; thaw resumes
+against current layout after keyboard easing. Android already applies
+carried rows and inset together while frozen, so no additional frozen
+result barrier or delayed real-view landing was added. Keyboard/lift
+behavior without a latest intent is preserved.
+
+Focused coverage adds eight intent-ordering tests and two real
+Robolectric reverse-RecyclerView tests for stable anchoring through a
+paired row insertion plus inset shrink and removal of the anchor row.
+Integration must still record smooth short/tall scrolled-up sends,
+worker delay, freeze/thaw/refreeze, user interruption, superseding sends
+and post-arm cancellation, both layouts and the final 8 pt gap. Existing
+real-content lift/keyboard landing and reaction-height recordings remain
+regression gates. No device or full-client build runs in this checkout.
+
 ### Batch 2 device checks
 
 - [ ] Deck: quick swipes both ways, chained flicks, the thrown card sliding

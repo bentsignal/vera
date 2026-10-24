@@ -89,6 +89,63 @@ class ListMotionTest {
     controller.pause().stop().destroy()
   }
 
+  @Test fun aPairedSendKeepsTheVisibleAnchorWhileItsSmoothTargetChanges() {
+    val controller = Robolectric.buildActivity(Activity::class.java).setup()
+    val activity = controller.get()
+    val manager = ListLayoutManager(activity)
+    val rows = Rows((0 until 30).map { "m$it" }.toMutableList())
+    val list = RecyclerView(activity).apply {
+      layoutManager = manager
+      adapter = rows
+      itemAnimator = null
+      setPadding(0, 0, 0, 180)
+    }
+    activity.setContentView(list)
+    list.layoutInPlace(400, 800)
+    manager.scrollToPositionWithOffset(10, 27)
+    list.layoutInPlace(400, 800)
+    val anchor = manager.captureScrollAnchor(list)!!
+
+    // Real reverse-layout geometry: the composer gives back 120 px while
+    // the sent row is inserted. Preserve the reader before retargeting.
+    list.setPadding(0, 0, 0, 60)
+    rows.ids.add(0, "sent")
+    rows.notifyItemInserted(0)
+    manager.restoreScrollAnchor(list, anchor)
+    list.layoutInPlace(400, 800)
+
+    // The larger viewport can reveal a newer row below this anchor, so
+    // first-visible identity can change even though this row stayed put.
+    val kept = list.findViewHolderForItemId(anchor.id)!!.itemView
+    assertEquals(anchor.bottom, manager.getDecoratedBottom(kept))
+    assertTrue(manager.findFirstVisibleItemPosition() > 0)
+    controller.pause().stop().destroy()
+  }
+
+  @Test fun aRemovedAnchorDoesNotTurnAnOffbottomApplyIntoALatestSnap() {
+    val controller = Robolectric.buildActivity(Activity::class.java).setup()
+    val activity = controller.get()
+    val manager = ListLayoutManager(activity)
+    val rows = Rows((0 until 30).map { "m$it" }.toMutableList())
+    val list = RecyclerView(activity).apply {
+      layoutManager = manager
+      adapter = rows
+      itemAnimator = null
+    }
+    activity.setContentView(list)
+    list.layoutInPlace(400, 800)
+    manager.scrollToPositionWithOffset(10, 0)
+    list.layoutInPlace(400, 800)
+    val anchor = manager.captureScrollAnchor(list)!!
+    val removed = rows.ids.indexOfFirst { it.hashCode().toLong() == anchor.id }
+    rows.ids.removeAt(removed)
+    rows.notifyItemRemoved(removed)
+    manager.restoreScrollAnchor(list, anchor)
+    list.layoutInPlace(400, 800)
+    assertTrue(manager.findFirstVisibleItemPosition() > 0)
+    controller.pause().stop().destroy()
+  }
+
   @Test fun aPhotoReactionTakenBackMovesOnlyTheRowsAbove() {
     // A deck in a bubble loses its tapback: the row's top comes down by the
     // tapbacks' room while its bottom (fixed by the rows under it) stays.
