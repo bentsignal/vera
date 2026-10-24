@@ -1,16 +1,14 @@
 import type { RefObject } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Platform, View } from "react-native";
+import { View } from "react-native";
 import Animated, {
-  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { scheduleOnRN } from "react-native-worklets";
 
 import type { Lift, MessageListViewMethods } from "./native";
 import type { TypingHold } from "./typing-hold";
@@ -18,7 +16,6 @@ import type { MessageListProps } from "~/features/conversation/message-list";
 import type { Message } from "~/features/conversation/types";
 import { newestFirst } from "~/features/conversation/build-rows";
 import { JumpToLatest } from "~/features/conversation/jump-to-latest";
-import { useMenuKeyboard } from "~/features/conversation/menu-keyboard";
 import {
   MessageActionsProvider,
   useLiftedMessageId,
@@ -27,6 +24,7 @@ import {
 import { useDevNativeFling } from "./dev-native-fling";
 import { LiftedPreview } from "./lifted-preview";
 import { nativeRows } from "./map-rows";
+import { useMenuKeyboardHold } from "./menu-keyboard-hold";
 import {
   CONTRACT_VERSION,
   MessageListView,
@@ -34,6 +32,7 @@ import {
   V1_BLOCK_TYPES,
   V1_ROW_KINDS,
 } from "./native";
+import { useComposerInset } from "./send-inset";
 import { BEHAVIOR, useNativeTheme } from "./theme";
 import {
   dropLeaving,
@@ -57,50 +56,18 @@ const HEADER_GAP = 8;
 /** How long the conversation takes to fade in (`FADE_MS`). */
 const FADE_MS = 220;
 
-/**
- * The composer's height in React. On iOS it reaches only the UI thread
- * after the first (see `useComposerHeight`), and the native list takes it
- * as a prop.
- */
-function useComposerHeightNow(live: SharedValue<number>, first: number) {
-  const [height, setHeight] = useState(first);
-  useAnimatedReaction(
-    () => live.get(),
-    (now, before) => {
-      if (now !== before) scheduleOnRN(setHeight, now);
-    },
-  );
-  return height;
-}
-
 type RowsProps = Omit<
   MessageListProps,
   "editing" | "onReply" | "onViewReactions" | "ref"
 > & {
   handle: MessageListProps["ref"];
-  /** The menu has the keyboard held where it was (`useMenuKeyboard`). */
+  /** The menu has the keyboard held where it was (`useMenuKeyboardHold`). */
   keyboardFrozen: boolean;
-  /** The menu's freeze, as it happens, for the jump button (iOS). */
-  keyboardFreeze: SharedValue<boolean> | undefined;
+  /** The menu's freeze, as it happens, for the jump button. */
+  keyboardFreeze: SharedValue<boolean>;
+  /** A message was held: freezes the keyboard before the menu opens. */
+  onHold: () => void;
 };
-
-/**
- * Holds the keyboard where it is while the long-press menu (a modal) takes
- * it down and brings it back, as the React Native list does
- * (`useMenuKeyboard`). Only on iOS: Android's quirk it also covers is the
- * React Native list's keyboard handling, which the native list doesn't use.
- */
-function useFrozenKeyboard() {
-  const keyboard = useMenuKeyboard();
-  const [frozen, setFrozen] = useState(false);
-  useAnimatedReaction(
-    () => keyboard.freeze.get(),
-    (now, before) => {
-      if (now !== before) scheduleOnRN(setFrozen, now);
-    },
-  );
-  return { frozen: Platform.OS === "ios" && frozen, keyboard };
-}
 
 /**
  * Who the typing row shows: who's typing, and for a moment anyone who
@@ -224,6 +191,7 @@ function NativeRows({
   bottomInset,
   keyboardFrozen,
   keyboardFreeze,
+  onHold,
   ...shown
 }: RowsProps) {
   const view = useRef<MessageListViewMethods>(null);
@@ -233,11 +201,8 @@ function NativeRows({
   const place = usePlace(shown.anchorId === undefined, hasNewer);
   const theme = useNativeTheme(layout);
   const safeTop = useSafeAreaInsets().top;
-  const composer = useComposerHeightNow(
-    composerHeight.live,
-    composerHeight.laidOut ?? 0,
-  );
   const { messageOf, rows } = useRows(shown);
+  const composer = useComposerInset(composerHeight, rows);
   const { lift, change: changeLift } = useLift(view);
 
   function scrollToLatest() {
@@ -260,7 +225,11 @@ function NativeRows({
       lift: LIFTS ? changeLift : undefined,
     },
     messageOf,
-    openMenu: open,
+    // Frozen in the render the menu opens in, before it takes the keyboard.
+    openMenu: (target) => {
+      onHold();
+      open(target);
+    },
     openThread: onOpenThread,
     pages: { ...place, onLoadNewer, onLoadOlder },
     toggleReaction: onToggleReaction,
@@ -325,7 +294,7 @@ export function NativeMessageList({
   editing,
   ...props
 }: MessageListProps) {
-  const { frozen, keyboard } = useFrozenKeyboard();
+  const keyboard = useMenuKeyboardHold();
   return (
     <MessageActionsProvider
       onToggleReaction={props.onToggleReaction}
@@ -333,13 +302,14 @@ export function NativeMessageList({
       onOpenThread={props.onOpenThread}
       onReply={onReply}
       editing={editing}
-      menuKeyboard={keyboard}
+      menuKeyboard={keyboard.menuKeyboard}
     >
       <NativeRows
         {...props}
         handle={ref}
-        keyboardFrozen={frozen}
-        keyboardFreeze={Platform.OS === "ios" ? keyboard.freeze : undefined}
+        keyboardFrozen={keyboard.frozen}
+        keyboardFreeze={keyboard.freeze}
+        onHold={keyboard.hold}
       />
     </MessageActionsProvider>
   );
