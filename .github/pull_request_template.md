@@ -2,6 +2,8 @@
 
 <!-- What changed and why, in a few sentences. Note any decisions you made on Shawn's behalf. -->
 
+<!-- Fixing a GitHub issue? Add "Fixes #<issue>" (one line per issue). Vera Support follows that link to tell the reporter about the fix. -->
+
 ## Evidence
 
 <!-- Screenshots (before/after for UI changes) and videos for motion, from scripts/evidence.sh. Never commit them. -->

@@ -50,6 +50,11 @@ authenticates once, selects the installed plugin, and crosses one Component
 boundary. `defineComponentDispatchers` performs exact operation validation and
 invokes the plugin handler.
 
+A host that needs to react to writes passes `afterMutation`. It runs in the
+same transaction after each successful plugin write, with the caller's
+identity, the plugin, the operation, and its result. Vera uses it to start
+its assistant accounts' replies when someone messages them.
+
 `pdsDescriptorFromApp(app, host)` derives the ecosystem release and installed
 plugin `lastChanged` metadata from the same app declaration. This is the PDS
 management boundary that future Component migration controls will extend.

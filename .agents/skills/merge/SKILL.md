@@ -1,13 +1,14 @@
 ---
-name: close-it-out
-description: Finish a piece of work in its worktree once Shawn is happy with it, covering merging its PR, tearing down an isolated backend, pushing main's backend to the shared dev deployment when the backend changed, stopping devices and dev servers, and settling the T3 Code thread. Use when Shawn says to close it out, wrap it up, or finish up a piece of work, or approves its PR to merge ("merge it", "ship it", "approved").
+name: merge
+description: Use whenever Shawn asks you to merge this thread's pull request or approves it to merge, such as "merge it", "merge", "ship it", or "approved".
 ---
 
-# Close it out
+# Merge
 
-"Close it out" is Shawn's approval to merge this thread's PR and finish
-everything that follows a merge. It covers the PRs linked to this thread
-and nothing else. Do each step that applies, in order, without asking.
+Shawn's approval to merge covers the PRs linked to this thread and nothing
+else, and everything that follows a merge: the dev server and devices come
+down and the thread is settled. Do each step that applies, in order,
+without asking.
 
 ## 1. Stop what's running
 

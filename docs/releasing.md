@@ -142,7 +142,10 @@ the release a PR removes the finished steps.
    only what merging could have broken: places where the changes overlap
    or interact (shared files and screens, the same flow from two ends,
    backend changes against the app and against old app versions, native
-   changes together in one store build). Send both to Shawn.
+   changes together in one store build). The agent runs that list itself
+   first, in the iOS simulator and Android emulator, and fixes what fails.
+   Then it sends Shawn the notes, what it checked (with evidence), and the
+   steps left for him: what a simulator can't settle.
 2. **Test in the dev client.** Push `main`'s backend to the shared dev
    deployment (`pnpm release backend dev`; usually already current, since
    backend PRs push it when they merge), then serve `main` to Vera Dev
@@ -150,8 +153,8 @@ the release a PR removes the finished steps.
    changes work together: JavaScript fixes reach the phone without a build. The
    real app gets tested in TestFlight. An internal build or internal OTA is
    only for checking update or channel behavior, or when Shawn asks.
-3. **Shawn tests** that list, plus his own quick use of the app, and
-   approves, or asks for fixes (straight to `main` when small, feature PRs
+3. **Shawn tests** the steps left for him, plus his own quick use of the
+   app, and approves, or asks for fixes (straight to `main` when small, feature PRs
    when not, then back to step 1).
 4. **Ship.**
    - If the backend changed, ship it together with the app:

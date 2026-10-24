@@ -36,12 +36,17 @@ export function rowGestureBegan() {
   gestureBegan = Date.now();
 }
 
+/** Whether something at this time belongs to the row gesture's touch. */
+export function ofLatestTouch(at: number) {
+  return at >= gestureBegan - REPORT_SLACK_MS;
+}
+
 /**
  * What the row gesture's touch landed on: the row, a part with a menu, or
  * null for something with a press of its own (a photo, a reaction).
  */
 export function touchedPart() {
-  if (touch === undefined || touch.at < gestureBegan - REPORT_SLACK_MS) {
+  if (touch === undefined || !ofLatestTouch(touch.at)) {
     return null;
   }
   return touch.part;

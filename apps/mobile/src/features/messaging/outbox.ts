@@ -12,6 +12,7 @@ import { pds } from "@vera/backend/pds";
 import type { StagedFile } from "./attachments";
 import type { AccountSession } from "~/features/session/account-session";
 import { TooLargeError, uploadStaged } from "./attachments";
+import { enqueueSend, sendPatiently } from "./send-limit";
 import { setUploadProgress } from "./upload-progress";
 
 // Messages this device sent that the PDS hasn't confirmed yet, with their
@@ -199,7 +200,9 @@ async function upload(
  * Sends a message whose files are all uploaded. A send can hang (a dropped
  * connection the client keeps retrying), so after a while it shows as not
  * sent and can be tried again. Sends are idempotent by message ID, so a
- * late success and a retry agree, and whichever lands marks it sent.
+ * late success and a retry agree, and whichever lands marks it sent. A
+ * send refused for going over the sender's limit waits its turn, still
+ * showing as sending.
  */
 async function send(
   session: AccountSession,
@@ -209,33 +212,35 @@ async function send(
   const { messageId } = message;
   const attempt = (attempts.get(messageId) ?? 0) + 1;
   attempts.set(messageId, attempt);
-  const sent = session.pds
-    .mutate(
-      pds.messages.send({
-        attachments,
-        body: message.body,
-        conversationId: message.conversationId,
-        // Undefined (left out) when empty: older servers don't take it.
-        mentions: message.mentions,
-        messageId,
-        ...replyArgs(message.reply),
-      }),
-    )
-    .then(
-      (sent) => {
-        update(messageId, (current) => ({
-          ...current,
-          // Where the PDS put it (see `inChat`).
-          reply:
-            current.reply === undefined
-              ? undefined
-              : { ...current.reply, inChat: sent.threadOnly !== true },
-          status: "sent",
-        }));
-        return true;
-      },
-      () => false,
-    );
+  const request = pds.messages.send({
+    attachments,
+    body: message.body,
+    conversationId: message.conversationId,
+    // Undefined (left out) when empty: older servers don't take it.
+    mentions: message.mentions,
+    messageId,
+    ...replyArgs(message.reply),
+  });
+  const giveUpAt = Date.now() + SEND_TIMEOUT_MS;
+  const sent = enqueueSend(session.address, SEND_TIMEOUT_MS, () =>
+    Date.now() >= giveUpAt
+      ? Promise.reject(new Error("Timed out waiting to send"))
+      : sendPatiently(() => session.pds.mutate(request), giveUpAt),
+  ).then(
+    (sent) => {
+      update(messageId, (current) => ({
+        ...current,
+        // Where the PDS put it (see `inChat`).
+        reply:
+          current.reply === undefined
+            ? undefined
+            : { ...current.reply, inChat: sent.threadOnly !== true },
+        status: "sent",
+      }));
+      return true;
+    },
+    () => false,
+  );
   const settled = await Promise.race([
     sent,
     new Promise<false>((resolve) =>

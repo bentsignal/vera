@@ -22,7 +22,7 @@ export function DeletedBubble() {
   return (
     <View
       className="border-separator border px-3.5 py-2"
-      style={{ borderCurve: "continuous", borderRadius: BUBBLE_RADIUS }}
+      style={{ borderRadius: BUBBLE_RADIUS }}
     >
       <Text className="text-body text-muted leading-[22px] italic">
         {DELETED_TEXT}

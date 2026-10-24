@@ -9,8 +9,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 
+import { inNextFrame } from "~/lib/next-frame";
+import { Fading } from "./fading";
 import { useGrowth } from "./grow";
 import { GROW_EASING, GROW_MS, inFrame, land, startMove } from "./moves";
 import { useOnMount } from "./typing-parts";
@@ -63,14 +66,15 @@ export function useBecoming() {
  * it shows at once, growing out of the indicator in bubbles.
  */
 /**
- * An opening row's styles: its own box (`style`), what shows of it
- * (`window`), and what's in it (`content`), by its `height` (`CLOSED`, a
- * height, then `OWN`) and how much it shows.
+ * An opening row's `height` (`CLOSED`, a height, then `OWN`), how much of
+ * it is `shown`, and its styles: its own box (`style`), what shows of it
+ * (`window`), and what's in it (`content`). Once it's open, React draws
+ * them open too (see `useOpened`), told by `laidOut` and `fadedIn`.
  */
-function useOpenStyles(
-  height: SharedValue<number>,
-  shown: SharedValue<number>,
-) {
+function useOpenStyles() {
+  const height = useSharedValue(CLOSED);
+  const shown = useSharedValue(0);
+  const { opened: open, laidOut, fadedIn } = useOpened();
   // Its height and how much it shows change together, in the same layout
   // commit as the moves (see `Move`).
   const style = useAnimatedStyle(() => ({
@@ -90,7 +94,71 @@ function useOpenStyles(
   const content = useAnimatedStyle(() => ({
     position: height.get() === OWN ? "relative" : "absolute",
   }));
-  return { content, style, window };
+  return {
+    height,
+    shown,
+    laidOut,
+    fadedIn,
+    content: [content, open && OPEN.content],
+    style: [style, open && OPEN.style],
+    window: [window, open && OPEN.window],
+  };
+}
+
+/**
+ * An open row's styles, as React draws them (see `useOpened`): the same as
+ * `useOpenStyles` gives once it's open and has faded in.
+ */
+const OPEN = {
+  content: { position: "relative" },
+  style: { height: "auto", opacity: 1 },
+  window: { height: "auto", overflow: "visible" },
+} as const;
+
+/**
+ * Whether the row is open and has faded in, for React: from then on it
+ * draws the row open itself (`OPEN`), not only through its animated styles.
+ *
+ * React's own props for an animated view are the styles it first rendered
+ * with, here closed and hidden. Reanimated draws the animated values over
+ * them, and a second after they last change it copies them back into
+ * React, on the JavaScript thread. Two seconds after, it forgets them,
+ * copied or not. When that thread is too busy to copy them in between
+ * (several messages arriving at once), the row's next render puts its
+ * first styles back: 0 tall and transparent, a message gone from the list
+ * until it's opened again.
+ */
+function useOpened() {
+  const [opened, setOpened] = useState(false);
+  // With the others opening now: several arrive together in a busy
+  // conversation (see `inNextFrame`).
+  function markOpened() {
+    inNextFrame(() => setOpened(true));
+  }
+  // Each step once: laid out at its own height, and faded in.
+  const laidOut = useSharedValue(false);
+  const fadedIn = useSharedValue(false);
+  function settle() {
+    "worklet";
+    if (laidOut.get() && fadedIn.get()) scheduleOnRN(markOpened);
+  }
+  return {
+    opened,
+    /** It's as tall as what's in it now. */
+    laidOut: () => {
+      "worklet";
+      if (laidOut.get()) return;
+      laidOut.set(true);
+      settle();
+    },
+    /** It has faded in. */
+    fadedIn: () => {
+      "worklet";
+      if (fadedIn.get()) return;
+      fadedIn.set(true);
+      settle();
+    },
+  };
 }
 
 function Opening({
@@ -107,8 +175,8 @@ function Opening({
   const morphs = becoming?.morphs === true;
   const outer = useAnimatedRef<View>();
   const inner = useAnimatedRef<View>();
-  const height = useSharedValue(CLOSED);
-  const shown = useSharedValue(0);
+  const { height, shown, laidOut, fadedIn, style, window, content } =
+    useOpenStyles();
   // How far below its place it's drawn, rising with the messages above.
   const rise = useSharedValue(0);
   const rising = useSharedValue(false);
@@ -130,7 +198,7 @@ function Opening({
       }
       height.set(natural);
       // Growing out of the indicator, it's there at once.
-      shown.set(withTiming(1, { duration: morphs ? 0 : FADE_MS }));
+      shown.set(withTiming(1, { duration: morphs ? 0 : FADE_MS }, fadedIn));
       const move = startMove(
         growth,
         { order, place: 0, whole: true },
@@ -146,6 +214,7 @@ function Opening({
       // changes, and nothing cuts it off.
       function release() {
         height.set(OWN);
+        laidOut();
       }
       if (rises) {
         rising.set(true);
@@ -173,7 +242,6 @@ function Opening({
     }
     inFrame(open);
   });
-  const { style, window, content } = useOpenStyles(height, shown);
   // In the layout commit with the opening, then on the fast path.
   const risen = useAnimatedStyle(() => {
     const moved = { transform: [{ translateY: rise.get() }] };
@@ -194,7 +262,9 @@ function Opening({
             className="inset-x-0 top-0"
             style={content}
           >
-            <BecomingContext value={morphs}>{children}</BecomingContext>
+            <Fading opacity={shown}>
+              <BecomingContext value={morphs}>{children}</BecomingContext>
+            </Fading>
           </Animated.View>
         </Animated.View>
         <Fade rise={rise} />

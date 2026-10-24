@@ -28,7 +28,11 @@ export function useListRows({
   | "onLoadOlder"
   | "onReady"
   | "typists"
-> & { rows: readonly MessageRow[] }) {
+> & {
+  rows: readonly MessageRow[];
+  /** Puts the list at the newest message, then calls back (see `useLatest`). */
+  toLatest: (done: () => void) => void;
+}) {
   const typing = useTypingRow({
     layout,
     newest: newestOf(rows),

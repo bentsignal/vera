@@ -27,6 +27,23 @@ function threadIdsOf(messages: readonly Message[]) {
   ];
 }
 
+/**
+ * The reactions and thread summaries of everything after `since`, as an
+ * app asks for them for the newest messages, which are still arriving.
+ */
+function since(conversationId: string, after: number) {
+  return [
+    queryRequest(messagesProtocol, "reactions", {
+      conversationId,
+      since: after,
+    }),
+    queryRequest(messagesProtocol, "threadSummaries", {
+      conversationId,
+      since: after,
+    }),
+  ];
+}
+
 /** The reactions and thread summaries of one batch of messages. */
 function batch(conversationId: string, messages: readonly Message[]) {
   const messageIds = messages.map((message) => message.messageId);
@@ -69,16 +86,31 @@ async function shownPeople(ctx: QueryCtx, messages: readonly Message[]) {
   ];
 }
 
-/** What a page of a conversation shows its messages with. */
+/**
+ * What a page of a conversation shows its messages with. `live` is the
+ * cursor of a page of the newest messages (`after`, with none newer),
+ * whose reactions and threads apps follow by time as messages arrive.
+ */
 export async function pageIncludes(
   ctx: QueryCtx,
   conversationId: string,
   messages: readonly Message[],
+  live?: number,
 ): Promise<QueryRequest[]> {
   return [
-    ...batch(conversationId, messages),
+    ...(live === undefined
+      ? batch(conversationId, messages)
+      : since(conversationId, live)),
     ...profiles(await shownPeople(ctx, messages)),
   ];
+}
+
+/** The cursor of a page of the newest messages, for `pageIncludes`. */
+export function liveCursor(
+  args: { readonly after?: number },
+  page: { readonly hasNewer: boolean },
+) {
+  return page.hasNewer ? undefined : args.after;
 }
 
 /**
@@ -91,6 +123,7 @@ export async function threadPageIncludes(
   { conversationId, threadId }: { conversationId: string; threadId: string },
   root: Message | null,
   messages: readonly Message[],
+  live?: number,
 ): Promise<QueryRequest[]> {
   const rootOnly = root === null ? [] : [root];
   return [
@@ -107,14 +140,21 @@ export async function threadPageIncludes(
             messageIds: [root.messageId],
           }),
         ]),
-    ...(messages.length > 0 && messages.length <= MAX_REACTION_MESSAGES
+    ...(live !== undefined
       ? [
           queryRequest(messagesProtocol, "reactions", {
             conversationId,
-            messageIds: messages.map((message) => message.messageId),
+            since: live,
           }),
         ]
-      : []),
+      : messages.length > 0 && messages.length <= MAX_REACTION_MESSAGES
+        ? [
+            queryRequest(messagesProtocol, "reactions", {
+              conversationId,
+              messageIds: messages.map((message) => message.messageId),
+            }),
+          ]
+        : []),
     ...profiles(await shownPeople(ctx, [...rootOnly, ...messages])),
   ];
 }

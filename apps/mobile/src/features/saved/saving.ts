@@ -11,11 +11,19 @@ import type { Saved, SavedEntry } from "./saved-files";
 import { inboxQuery, rowProfiles } from "~/features/messaging/inbox";
 import {
   latestOpenedAt,
+  latestPageParts,
   latestPageQueries,
 } from "~/features/messaging/message-window";
-import { chunks, reactionsQuery } from "~/features/messaging/reactions";
+import {
+  chunks,
+  reactionsQuery,
+  reactionsSinceQuery,
+} from "~/features/messaging/reactions";
 import { pdsResult, pdsResultOr } from "~/features/messaging/results";
-import { summariesQuery } from "~/features/messaging/threads";
+import {
+  summariesQuery,
+  summariesSinceQuery,
+} from "~/features/messaging/threads";
 import {
   onAccountSession,
   queryClient,
@@ -136,28 +144,41 @@ function inboxSaved(
 }
 
 /**
- * The queries the latest messages' pages show with: their reactions and
+ * The queries the latest messages' pages show with, as the window opened
+ * at `openedAt` asks for them (see `windowParts`): their reactions and
  * threads, a group's joins and leaves, and who they show.
  */
 function pageParts(
   queryClient: QueryClient,
   address: string,
   conversation: Conversation,
-  pages: readonly { messages: readonly PdsMessage[] }[],
+  window: {
+    openedAt: number;
+    pages: readonly { messages: readonly PdsMessage[] }[];
+  },
 ) {
+  const { openedAt, pages } = window;
   const { conversationId, kind, members } = conversation;
-  const reactions = pages.flatMap(({ messages }) =>
-    chunks(messages.map(({ messageId }) => messageId)).map(
-      (ids) => reactionsQuery(address, conversationId, ids).queryKey,
-    ),
+  const parts = latestPageParts(
+    openedAt,
+    pages.map(({ messages }) => ({
+      hasNewer: false,
+      hasOlder: false,
+      messages,
+    })),
   );
-  const summaries = pages.flatMap(({ messages }) =>
-    chunks([
-      ...new Set(
-        messages.map(({ messageId, threadId }) => threadId ?? messageId),
-      ),
-    ]).map((ids) => summariesQuery(address, conversationId, ids)),
-  );
+  const reactions = [
+    ...parts.messageIds
+      .flatMap(chunks)
+      .map((ids) => reactionsQuery(address, conversationId, ids).queryKey),
+    reactionsSinceQuery(address, conversationId, openedAt).queryKey,
+  ];
+  const summaries = [
+    ...parts.threadIds
+      .flatMap(chunks)
+      .map((ids) => summariesQuery(address, conversationId, ids)),
+    summariesSinceQuery(address, conversationId, openedAt),
+  ];
   const repliers = summaries.flatMap((query) =>
     (liveSelected(queryClient, query) ?? []).flatMap(
       ({ repliers }) => repliers,
@@ -207,7 +228,10 @@ function conversationSaved(
     pageQueries.map((query) => liveSelected(queryClient, query)),
   );
   if (conversation == null || pages === undefined) return undefined;
-  const parts = pageParts(queryClient, address, conversation, pages);
+  const parts = pageParts(queryClient, address, conversation, {
+    openedAt,
+    pages,
+  });
   const entries = complete(
     [
       found.queryKey,

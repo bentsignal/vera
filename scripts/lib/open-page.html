@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  Opens Vera Dev at the Metro server in `?url=` (scripts/phone.sh uploads it
+  to bunny.net). Chat apps only make http(s) links tappable, so Shawn gets
+  this page instead of the vera-dev:// link it opens.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Open in Vera Dev</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font:
+          17px/1.4 -apple-system,
+          system-ui,
+          sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        background: Canvas;
+        color: CanvasText;
+      }
+      main {
+        max-width: 340px;
+        padding: 32px;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 8px;
+      }
+      p {
+        color: GrayText;
+        margin: 0 0 24px;
+        word-break: break-all;
+      }
+      a {
+        display: block;
+        padding: 14px;
+        border-radius: 999px;
+        background: #ec8a1e;
+        color: #fff;
+        font-weight: 600;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Open in Vera Dev</h1>
+      <p id="server"></p>
+      <a id="open" href="#">Open in Vera Dev</a>
+    </main>
+    <script>
+      const server = new URLSearchParams(location.search).get("url") ?? "";
+      let protocol = "";
+      try {
+        protocol = new URL(server).protocol;
+      } catch {}
+      if (protocol === "http:" || protocol === "https:") {
+        const open = `vera-dev://expo-development-client/?url=${encodeURIComponent(server)}`;
+        document.getElementById("server").textContent = server;
+        document.getElementById("open").href = open;
+        location.href = open;
+      } else {
+        document.querySelector("main").textContent =
+          "No server address in this link.";
+      }
+    </script>
+  </body>
+</html>

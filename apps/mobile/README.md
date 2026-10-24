@@ -62,20 +62,38 @@ The phone holds one Vera Dev at a time:
 
 - **The dev client, day to day.** `scripts/phone.sh up` builds it (once per
   native fingerprint, cached in `~/Library/Caches/vera` for every worktree),
-  starts the worktree's Metro, and prints its server address
-  (`http://<Mac's Wi-Fi IP>:<port>`), an install link, and an open link. In
-  Vera Dev, pick that server from the list (every running worktree's Metro
-  shows up there by address), or use the open link
-  (`vera-dev://expo-development-client/?url=...`). It
+  starts the worktree's Metro, and prints open links, an install link,
+  and its server address (`http://<Mac's Wi-Fi IP>:<port>`). An open link
+  is an https page (`scripts/lib/open-page.html`, on bunny.net) that opens
+  `vera-dev://expo-development-client/?url=...`, because chat apps only make
+  http and https links tappable. Tap it, or pick the server from Vera Dev's
+  list (every running worktree's Metro shows up there by address). It
   loads the worktree's JavaScript over the local network, so the phone has to
-  be on the same Wi-Fi as the Mac, and edits hot-reload. It's a plain IP, not
-  a tailnet address: iOS's App Transport Security blocks plain HTTP to
-  tailnet (100.x) addresses but allows local network ones. A worktree with an isolated backend serves
+  be on the same Wi-Fi as the Mac, and edits hot-reload. Away from home, the
+  `away:` link loads the same Metro over Tailscale, with Tailscale on on the
+  phone. That one goes through `tailscale serve` (HTTPS, tailnet only),
+  because iOS's App Transport Security blocks plain HTTP to tailnet (100.x)
+  addresses but allows local network ones. Both links reach the same Metro.
+
+  **Android open links.** On Android, an open link crashes Vera Dev with a
+  `NullPointerException` in `DevLauncherController.createAppIntent`, so for
+  now Shawn pastes the server address there. A browser adds the `BROWSABLE`
+  category to every link it opens, and expo-dev-launcher 57 copies the
+  link's categories into a new `Intent` with `categories.addAll(...)`.
+  A new `Intent` has no categories set (`null`), so that copy throws.
+  Expo fixed it in SDK 58 (`addCategory` per category). `sim.sh`'s
+  `adb shell am start` link has no category, so emulators never hit it.
+  Patching it ourselves changes every native fingerprint (dev and
+  production, both platforms), which means a store build. So it waits for
+  the SDK 58 upgrade, or a release that needs a store build anyway.
+
+  A worktree with an isolated backend serves
   that backend's domain, which starts with no accounts: sign in there by
   opening `<site>/dev/sign-in?username=ios` on the iPhone and
   `username=android` on Android in any browser (`scripts/backend.sh status`
   prints both).
   Release testing uses it too, serving `main`.
+
 - **Main's dev client is the one the phone keeps.** It runs every worktree
   that hasn't changed native code. `up` says whether a worktree uses it or
   needs its own (native changes); after testing one with its own,

@@ -245,7 +245,6 @@ export function BubbleBackdrop({
           className="absolute inset-0"
           style={{
             backgroundColor: fill,
-            borderCurve: "continuous",
             borderRadius: BUBBLE_RADIUS,
           }}
         />

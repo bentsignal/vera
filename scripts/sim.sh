@@ -15,15 +15,22 @@
 #   reload           reload the JavaScript
 #   relaunch         restart the app (clears in-memory state)
 #   eval "<js>"      evaluate JavaScript in the running app
-#   frames start     record the UI thread's frames (to measure an animation)
-#   frames stop      stop, and report the frames that drew slowly
+#   frames start     record the UI thread's frames (to measure an animation);
+#                    waits until no device on the Mac is booting
+#   frames stop      stop, and report the frames that drew slowly and how
+#                    busy the Mac was
 #   status           devices, port, Metro, and backend
 #   queue            the simulator queue: devices up on this Mac, who is waiting, and why
 #   down             delete this platform's device; stops Metro when no device is left
 #
-# `up` waits its turn in the simulator queue (scripts/simq.ts), which starts
-# a device only while the Mac has memory for it. Exit code 75 means still
-# queued: run `up` again to keep your place. VERA_SIMQ=off skips the queue.
+# `up` and `frames start` wait their turn in the simulator queue
+# (scripts/simq.ts): up to three devices at once, and a boot never overlaps
+# a performance measurement. Exit code 75 means still queued: run the same
+# command again to keep your place. VERA_SIMQ=off skips the queue.
+#
+# iOS simulators are clones of a template that has already booted once, so
+# they skip iOS's first-boot setup (two minutes of every core on a fresh
+# device; a clone settles in about 40 seconds).
 #
 # Each dev client (Vera Dev, the dev variant in app.config.ts, as a Debug
 # build with no notification extension) is built once per native fingerprint
@@ -146,9 +153,61 @@ latest_ios_runtime() {
     })'
 }
 
+# The Mac's CPU, busy percent of all cores over two seconds.
+cpu_busy() {
+  top -l 2 -s 2 -n 0 | awk '/CPU usage/ { for (i = 1; i <= NF; i++) if ($i == "idle") idle = $(i - 1) } END { sub("%", "", idle); printf "%d\n", 100 - idle }'
+}
+
+# The simulator every worktree's is cloned from: booted once until iOS's
+# first-boot work is done, then shut down for good. One per runtime, made by
+# the first `up` that needs it, inside that `up`'s queue slot; a new runtime
+# (an Xcode update) replaces it.
+ios_template() {
+  local runtime record udid lock name calm=0 started old
+  runtime="$(latest_ios_runtime)"
+  record="$CACHE/ios-template-$runtime"
+  udid="$(cat "$record" 2>/dev/null || true)"
+  if [ -n "$udid" ] && xcrun simctl list devices -j | grep -q "\"$udid\""; then
+    echo "$udid"
+    return
+  fi
+  lock="$CACHE/ios-template.lock"
+  until mkdir "$lock" 2>/dev/null; do
+    echo "another worktree is preparing the simulator template; waiting" >&2
+    sleep 10
+  done
+  # shellcheck disable=SC2064 # the path now: lock is local
+  trap "rmdir '$lock' 2>/dev/null || true" EXIT
+  udid="$(cat "$record" 2>/dev/null || true)"
+  if [ -z "$udid" ] || ! xcrun simctl list devices -j | grep -q "\"$udid\""; then
+    name="Vera template ${runtime##*.}"
+    echo "preparing the simulator template for ${runtime##*.} (once per iOS version, about 3 minutes)" >&2
+    udid="$(xcrun simctl create "$name" "$IOS_DEVICE_TYPE" "$runtime")"
+    xcrun simctl bootstatus "$udid" -b >/dev/null
+    # First-boot setup has finished when the CPU stays calm.
+    started=$SECONDS
+    sleep 60
+    while [ $((SECONDS - started)) -lt 300 ] && [ "$calm" -lt 3 ]; do
+      if [ "$(cpu_busy)" -lt 40 ]; then calm=$((calm + 1)); else calm=0; fi
+      sleep 5
+    done
+    xcrun simctl shutdown "$udid"
+    echo "$udid" >"$record"
+    # Templates for older runtimes.
+    for old in "$CACHE"/ios-template-*; do
+      [ "$old" = "$record" ] && continue
+      xcrun simctl delete "$(cat "$old")" 2>/dev/null || true
+      rm -f "$old"
+    done
+  fi
+  rmdir "$lock"
+  trap - EXIT
+  echo "$udid"
+}
+
 ensure_ios_device() {
   if [ -z "$DEVICE" ] || ! xcrun simctl list devices -j | grep -q "\"$DEVICE\""; then
-    DEVICE="$(xcrun simctl create "Vera $(slug)" "$IOS_DEVICE_TYPE" "$(latest_ios_runtime)")"
+    DEVICE="$(xcrun simctl clone "$(ios_template)" "Vera $(slug)")"
     echo "created simulator Vera $(slug) ($DEVICE)"
   fi
   xcrun simctl bootstatus "$DEVICE" -b >/dev/null
@@ -261,6 +320,7 @@ up() {
   load
   ensure_client
   rm -f "$STATE_DIR/$PLATFORM.reclaimed"
+  "$ROOT/scripts/phone.sh" sweep || true
   queue acquire "$PLATFORM"
   "ensure_${PLATFORM}_device"
   install_client
@@ -268,7 +328,6 @@ up() {
   save
   launch
   queue ready "$PLATFORM" --device "$DEVICE" --serial "$SERIAL" --metro-pid "$METRO_PID"
-  [ "$PLATFORM" = ios ] && open -ga Simulator
   status
   echo "watch it in T3 Code: device_open with deviceId $([ "$PLATFORM" = ios ] && echo "$DEVICE" || echo "$SERIAL"), once (device_list shows what's open)"
   echo "when done: device_close, then scripts/sim.sh$([ "$PLATFORM" = android ] && echo " --android") down, before you end your turn"
@@ -377,7 +436,10 @@ case "$command" in
   frames)
     require_up
     case "${1:-}" in
-      start) app_eval "globalThis.veraDev.frames.start()" >/dev/null && echo "recording frames" ;;
+      start)
+        queue perf-start "$PLATFORM"
+        app_eval "globalThis.veraDev.frames.start()" >/dev/null && echo "recording frames"
+        ;;
       stop)
         app_eval "globalThis.veraDev.frames.stop()" >/dev/null
         for _ in $(seq 1 20); do
@@ -385,6 +447,7 @@ case "$command" in
           [ -n "$report" ] && echo "$report" && break
           sleep 0.25
         done
+        queue perf-stop "$PLATFORM" || true
         ;;
       *) echo "usage: scripts/sim.sh frames start|stop" >&2 && exit 2 ;;
     esac
@@ -398,7 +461,7 @@ case "$command" in
   queue) queue status ;;
   down) down ;;
   *)
-    sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

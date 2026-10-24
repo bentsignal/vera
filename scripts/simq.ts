@@ -1,26 +1,34 @@
 // The simulator queue. Every worktree that runs `scripts/sim.sh up` asks it
-// for a slot first, and it admits simulators and emulators one at a time,
-// only while the Mac has free memory for another. Many agents can then ask
-// at once without slowing the machine to a crawl. scripts/sim.sh is the
-// only caller; the daemon starts on first use and exits after ten idle
-// minutes. `VERA_SIMQ=off scripts/sim.sh up` skips it.
+// for a slot first, and so does every performance measurement
+// (`sim.sh frames start`). Up to three simulators and emulators run at once
+// by default (a stress test on Shawn's 32 GB M4: three animating together
+// draw like one; at four the GPU runs out and every device lags). A boot
+// pins every core until it settles, so boots and performance measurements
+// wait in one line and never overlap: a boot runs alone, from its slot
+// until the Mac's CPU calms down after launch, while measurements can run
+// side by side. scripts/sim.sh is the only caller; the daemon starts on
+// first use and exits after ten idle minutes. `VERA_SIMQ=off` skips it.
 //
 //   node --experimental-strip-types scripts/simq.ts <command> [--worktree <path>]
 //
 //   acquire <ios|android> [--wait <seconds>]   wait for a slot; exit 75 means still queued, run again
 //   ready <ios|android> [--device <id>] [--serial <serial>] [--metro-pid <pid>]
-//                                               the device is up, so memory can be measured again
+//                                               the device is up; it boots alone until the CPU settles
 //   release <ios|android>                       give the slot back
+//   perf-start <ios|android> [--wait <seconds>] wait until no device is booting, then hold boots off
+//   perf-stop <ios|android>                     let boots go again; prints how busy the Mac was
 //   status                                      slots, the queue, memory, and the config in effect
 //   stop                                        stop the daemon (slots persist in state.json)
 //   daemon                                      run the daemon in the foreground
 //
-// Admission, in order: one device starts at a time (the next waits until
-// the last one has launched, plus a few seconds for memory to settle); the
-// first device always gets in; then the queue's head gets in only if
-// memory pressure is normal and free memory covers its estimate plus a
-// reserve. When the head can't get in, a device nobody has used for
-// `idleMinutes` is shut down to make room.
+// Admission takes the line in order. Nothing goes while a device is booting
+// (from its slot until the CPU settles after launch, at most a few
+// minutes). A measurement then goes right away, alongside any others. A
+// device waits for running measurements to finish; then the first device
+// always gets in, and the next only while fewer than `max` are up, memory
+// pressure is normal, and free memory covers its estimate plus a reserve.
+// When a device can't get in, one nobody has used for `idleMinutes` is shut
+// down to make room. A measurement holds boots off for `PERF_LIMIT` at most.
 //
 // Devices also come down with nobody waiting: one unused for
 // `maxIdleMinutes` (an agent that ended its turn with it up), and one that
@@ -28,7 +36,7 @@
 // simulator), so its slot, Metro, and state don't linger. Tune it in
 // ~/.config/vera/simq.json:
 //
-//   { "reserveGb": 5, "iosGb": 3, "androidGb": 4, "max": 6, "idleMinutes": 20, "maxIdleMinutes": 30 }
+//   { "max": 3, "reserveGb": 5, "iosGb": 3, "androidGb": 4, "idleMinutes": 10, "maxIdleMinutes": 30 }
 //
 // Edits apply on the next check, with no restart.
 import { execFileSync, spawn } from "node:child_process";
@@ -44,7 +52,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createServer, request } from "node:http";
-import { freemem, homedir, platform, totalmem } from "node:os";
+import { cpus, freemem, homedir, platform, totalmem } from "node:os";
 import { basename, join } from "node:path";
 
 type Kind = "ios" | "android";
@@ -58,22 +66,36 @@ type Lease = Device & {
   queuedAt: number;
   grantedAt: number;
   readyAt?: number;
+  // When the CPU calmed down after launch; until then the device is booting.
+  settledAt?: number;
   reclaiming?: boolean;
   // Its sim.sh couldn't run; never picked for reclaiming again.
   reclaimFailed?: boolean;
 };
+type Op = "device" | "perf";
 type Waiter = {
+  op: Op;
   worktree: string;
   kind: Kind;
   pid: number;
   since: number;
   seenAt: number;
 };
+// A performance measurement in progress, and the Mac's CPU during it.
+type Perf = {
+  worktree: string;
+  kind: Kind;
+  startedAt: number;
+  cpu: number[];
+  // A device booted during it anyway (it outlasted PERF_LIMIT).
+  overlapped: boolean;
+  expired?: boolean;
+};
 type Config = {
   reserveGb: number;
   iosGb: number;
   androidGb: number;
-  max?: number;
+  max: number;
   idleMinutes: number;
   maxIdleMinutes: number;
 };
@@ -83,7 +105,7 @@ type Memory = {
   pressure: "normal" | "warn" | "critical";
 };
 
-const VERSION = 2;
+const VERSION = 4;
 const DIR = join(homedir(), "Library/Caches/vera/simq");
 const SOCKET = join(DIR, "daemon.sock");
 const LOCK = join(DIR, "daemon.lock");
@@ -96,8 +118,16 @@ const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 // How long a granted device may take to boot and launch before the next
 // one is let in anyway.
-const START_LIMIT = 5 * MINUTE;
+const START_LIMIT = 8 * MINUTE;
 const SETTLE = 15 * SECOND;
+// After launch, a device keeps booting until the Mac's CPU is under
+// SETTLED_CPU percent for two checks in a row, at least SETTLE_MIN and at
+// most SETTLE_LIMIT after it launched.
+const SETTLE_MIN = 10 * SECOND;
+const SETTLE_LIMIT = 150 * SECOND;
+const SETTLED_CPU = 40;
+// A measurement that runs longer than this stops holding boots off.
+const PERF_LIMIT = 3 * MINUTE;
 // A waiter that stops polling loses its turn to the next one after this,
 // and its place in line after WAITER_TIMEOUT.
 const ACTIVE = 10 * SECOND;
@@ -109,6 +139,8 @@ const LIVENESS = 30 * SECOND;
 const key = (worktree: string, kind: Kind) => `${worktree}#${kind}`;
 const label = (x: { worktree: string; kind: Kind }) =>
   `${basename(x.worktree)} ${x.kind}`;
+const describe = (waiter: Waiter) =>
+  `${label(waiter)}${waiter.op === "perf" ? "'s measurement" : ""}`;
 const gb = (bytes: number) => `${(bytes / GB).toFixed(1)} GB`;
 const ago = (ms: number) =>
   ms < MINUTE ? `${Math.round(ms / SECOND)}s` : `${Math.round(ms / MINUTE)}m`;
@@ -119,7 +151,8 @@ function readConfig(): Config {
     reserveGb: Math.max(4, Math.round((totalmem() / GB) * 0.15 * 10) / 10),
     iosGb: 3,
     androidGb: 4,
-    idleMinutes: 20,
+    max: 3,
+    idleMinutes: 10,
     maxIdleMinutes: 30,
   };
   try {
@@ -148,6 +181,18 @@ function readMemory(): Memory {
     free: (total * (level ?? 0)) / 100,
     pressure: pressure === 4 ? "critical" : pressure === 2 ? "warn" : "normal",
   };
+}
+
+// Total and idle CPU time across every core, to take the busy share between
+// two readings.
+function cpuTimes() {
+  let idle = 0;
+  let total = 0;
+  for (const { times } of cpus()) {
+    idle += times.idle;
+    total += times.user + times.nice + times.sys + times.idle + times.irq;
+  }
+  return { idle, total };
 }
 
 // sim.sh's state file for a worktree's device: DEVICE=... when one exists.
@@ -217,12 +262,22 @@ function daemon() {
   try {
     for (const lease of JSON.parse(readFileSync(STATE, "utf8"))
       .leases as Lease[]) {
+      // Saved by an older daemon, which didn't track settling.
+      if (lease.readyAt) lease.settledAt ??= lease.readyAt;
       leases.set(key(lease.worktree, lease.kind), lease);
     }
   } catch {
     // No saved slots.
   }
   const waiters: Waiter[] = [];
+  const perfs = new Map<string, Perf>();
+  // Measurements that outlasted PERF_LIMIT, kept for their perf-stop.
+  const expired = new Map<string, Perf>();
+  // The Mac's CPU: busy percent over the last tick, and how many ticks in
+  // a row it has been under SETTLED_CPU.
+  let cpuReading = cpuTimes();
+  let cpuBusy = 0;
+  let calmTicks = 0;
   // Why the queue's head is waiting, for status and for the waiters.
   let blocked = "";
   let idleSince = Date.now();
@@ -269,11 +324,53 @@ function daemon() {
     }
     for (let i = waiters.length - 1; i >= 0; i--) {
       const waiter = waiters[i]!;
-      if (
-        now - waiter.seenAt > WAITER_TIMEOUT ||
-        leases.has(key(waiter.worktree, waiter.kind))
-      ) {
+      const id = key(waiter.worktree, waiter.kind);
+      const done =
+        waiter.op === "device"
+          ? leases.has(id)
+          : perfs.has(id) || !leases.get(id)?.readyAt;
+      if (now - waiter.seenAt > WAITER_TIMEOUT || done) {
         waiters.splice(i, 1);
+      }
+    }
+    for (const [id, perf] of perfs) {
+      if (!leases.has(id)) {
+        perfs.delete(id);
+        log(`dropped ${label(perf)}'s measurement: its device is gone`);
+      } else if (now - perf.startedAt > PERF_LIMIT) {
+        perfs.delete(id);
+        expired.set(id, { ...perf, expired: true });
+        log(`${label(perf)}'s measurement passed ${ago(PERF_LIMIT)}; boots can go`);
+      }
+    }
+  }
+
+  // A device boots from its slot until the CPU settles after launch.
+  const booting = (lease: Lease, now: number) =>
+    !lease.settledAt &&
+    (lease.readyAt !== undefined || now - lease.grantedAt < START_LIMIT);
+
+  function measureCpu(now: number) {
+    const reading = cpuTimes();
+    const total = reading.total - cpuReading.total;
+    if (total > 0)
+      cpuBusy = Math.round(100 * (1 - (reading.idle - cpuReading.idle) / total));
+    cpuReading = reading;
+    calmTicks = cpuBusy < SETTLED_CPU ? calmTicks + 1 : 0;
+    const boot = [...leases.values()].some((lease) => booting(lease, now));
+    for (const perf of perfs.values()) {
+      perf.cpu.push(cpuBusy);
+      if (boot) perf.overlapped = true;
+    }
+    for (const lease of leases.values()) {
+      if (!lease.readyAt || lease.settledAt) continue;
+      const since = now - lease.readyAt;
+      if (since > SETTLE_LIMIT || (since >= SETTLE_MIN && calmTicks >= 2)) {
+        lease.settledAt = now;
+        log(
+          `${label(lease)} settled ${ago(since)} after launch (CPU ${cpuBusy}% busy)`,
+        );
+        save();
       }
     }
   }
@@ -405,66 +502,91 @@ function daemon() {
     }
   }
 
+  // Takes the line in order: measurements go together, devices one at a
+  // time, and nothing while a device is booting.
   function admit(now: number) {
     blocked = "";
     if (waiters.length === 0) return;
     const config = readConfig();
     const all = [...leases.values()];
-    const starting = all.find(
-      (lease) => !lease.readyAt && now - lease.grantedAt < START_LIMIT,
-    );
-    if (starting) {
-      blocked = `${label(starting)} is starting; devices start one at a time`;
+    const boot = all.find((lease) => booting(lease, now));
+    if (boot) {
+      blocked = `${label(boot)} is booting; boots and performance measurements take turns`;
       return;
     }
-    const lastChange = Math.max(
-      changedAt,
-      ...all.map((lease) => lease.readyAt ?? lease.grantedAt),
-    );
-    if (now - lastChange < SETTLE) {
-      blocked =
-        "letting memory settle after the last device started or stopped";
-      return;
-    }
-    const head = waiters.find(
+    const ready = waiters.filter(
       (waiter) => now - waiter.seenAt < ACTIVE && alive(waiter.pid),
     );
-    if (!head) return;
-    if (all.length > 0) {
-      const memory = readMemory();
-      const need =
-        ((head.kind === "ios" ? config.iosGb : config.androidGb) +
-          config.reserveGb) *
-        GB;
-      if (config.max && all.length >= config.max) {
-        blocked = `${all.length} devices are up, the configured max`;
-      } else if (memory.pressure !== "normal") {
-        blocked = `memory pressure is ${memory.pressure}`;
-      } else if (memory.free < need) {
-        blocked = `${gb(memory.free)} free; a ${head.kind} device needs ${gb(need)} with the reserve`;
+    for (const head of ready) {
+      if (head.op === "perf") {
+        waiters.splice(waiters.indexOf(head), 1);
+        perfs.set(key(head.worktree, head.kind), {
+          worktree: head.worktree,
+          kind: head.kind,
+          startedAt: now,
+          cpu: [],
+          overlapped: false,
+        });
+        log(`${label(head)} is measuring, after ${ago(now - head.since)}`);
+        continue;
       }
-      if (blocked) {
-        if (reclaimIdle(now, config))
-          blocked += "; shutting down an idle device";
+      const measuring = [...perfs.values()][0];
+      if (measuring) {
+        blocked = `${label(measuring)} is measuring performance; boots wait for it`;
         return;
       }
+      const lastChange = Math.max(
+        changedAt,
+        ...all.map((lease) => lease.readyAt ?? lease.grantedAt),
+      );
+      if (now - lastChange < SETTLE) {
+        blocked =
+          "letting memory settle after the last device started or stopped";
+        return;
+      }
+      if (all.length > 0) {
+        const memory = readMemory();
+        const need =
+          ((head.kind === "ios" ? config.iosGb : config.androidGb) +
+            config.reserveGb) *
+          GB;
+        if (all.length >= config.max) {
+          blocked = `${all.length} devices are up, the max`;
+          // A worktree holding its other platform can free its own slot.
+          const own = all.find((lease) => lease.worktree === head.worktree);
+          if (own) {
+            blocked += `; one is yours: \`scripts/sim.sh${own.kind === "android" ? " --android" : ""} down\` frees it`;
+          }
+        } else if (memory.pressure !== "normal") {
+          blocked = `memory pressure is ${memory.pressure}`;
+        } else if (memory.free < need) {
+          blocked = `${gb(memory.free)} free; a ${head.kind} device needs ${gb(need)} with the reserve`;
+        }
+        if (blocked) {
+          if (reclaimIdle(now, config))
+            blocked += "; shutting down an idle device";
+          return;
+        }
+      }
+      waiters.splice(waiters.indexOf(head), 1);
+      leases.set(key(head.worktree, head.kind), {
+        worktree: head.worktree,
+        kind: head.kind,
+        pid: head.pid,
+        queuedAt: head.since,
+        grantedAt: now,
+      });
+      log(
+        `admitted ${label(head)} after ${ago(now - head.since)} (${gb(readMemory().free)} free)`,
+      );
+      save();
+      return;
     }
-    waiters.splice(waiters.indexOf(head), 1);
-    leases.set(key(head.worktree, head.kind), {
-      worktree: head.worktree,
-      kind: head.kind,
-      pid: head.pid,
-      queuedAt: head.since,
-      grantedAt: now,
-    });
-    log(
-      `admitted ${label(head)} after ${ago(now - head.since)} (${gb(readMemory().free)} free)`,
-    );
-    save();
   }
 
   function tick() {
     const now = Date.now();
+    measureCpu(now);
     reap(now);
     admit(now);
     reclaimAbandoned(now, readConfig());
@@ -479,10 +601,13 @@ function daemon() {
       version: VERSION,
       memory: readMemory(),
       config,
+      cpu: cpuBusy,
       leases: [...leases.values()].map((lease) => ({
         ...lease,
+        booting: booting(lease, now),
         usedAt: deviceState(lease.worktree, lease.kind).usedAt,
       })),
+      perfs: [...perfs.values()].map(({ cpu: _, ...perf }) => perf),
       waiters: waiters.map((waiter, i) => ({
         ...waiter,
         reason: i === 0 ? blocked : "",
@@ -491,12 +616,36 @@ function daemon() {
     };
   }
 
+  // Joins the line, or keeps an existing place, and admits who can go.
+  function wait(op: Op, worktree: string, kind: Kind, pid: number, now: number) {
+    const id = key(worktree, kind);
+    let waiter = waiters.find(
+      (w) => w.op === op && key(w.worktree, w.kind) === id,
+    );
+    if (!waiter) {
+      waiter = { op, worktree, kind, pid, since: now, seenAt: now };
+      waiters.push(waiter);
+      log(`queued ${label(waiter)}${op === "perf" ? " measurement" : ""}`);
+    }
+    waiter.seenAt = now;
+    waiter.pid = pid;
+    admit(now);
+    if (op === "device" ? leases.has(id) : perfs.has(id))
+      return { granted: true, waited: now - waiter.since };
+    const position = waiters.indexOf(waiter) + 1;
+    return {
+      granted: false,
+      position,
+      queued: waiters.length,
+      reason: position === 1 ? blocked : `behind ${describe(waiters[0]!)}`,
+    };
+  }
+
   type Body = { worktree: string; kind: Kind; pid?: number } & Device;
   const routes: Record<string, (body: Body) => unknown> = {
     "/acquire": ({ worktree, kind, pid = 0 }) => {
       const now = Date.now();
-      const id = key(worktree, kind);
-      const lease = leases.get(id);
+      const lease = leases.get(key(worktree, kind));
       if (lease) {
         if (!alive(lease.pid)) lease.pid = pid;
         save();
@@ -507,22 +656,32 @@ function daemon() {
           waited: fresh ? lease.grantedAt - lease.queuedAt : 0,
         };
       }
-      let waiter = waiters.find((w) => key(w.worktree, w.kind) === id);
-      if (!waiter) {
-        waiter = { worktree, kind, pid, since: now, seenAt: now };
-        waiters.push(waiter);
-        log(`queued ${label(waiter)}`);
-      }
-      waiter.seenAt = now;
-      waiter.pid = pid;
-      admit(now);
-      if (leases.has(id)) return { granted: true, waited: now - waiter.since };
-      const position = waiters.indexOf(waiter) + 1;
+      return wait("device", worktree, kind, pid, now);
+    },
+    "/perf-start": ({ worktree, kind, pid = 0 }) => {
+      const now = Date.now();
+      const id = key(worktree, kind);
+      if (!leases.get(id)?.readyAt) return { granted: true, untracked: true };
+      expired.delete(id);
+      if (perfs.has(id)) return { granted: true, waited: 0 };
+      return wait("perf", worktree, kind, pid, now);
+    },
+    "/perf-stop": ({ worktree, kind }) => {
+      const id = key(worktree, kind);
+      const perf = perfs.get(id) ?? expired.get(id);
+      perfs.delete(id);
+      expired.delete(id);
+      if (!perf) return { measured: false };
+      const cpu = perf.cpu.length
+        ? Math.round(perf.cpu.reduce((a, b) => a + b, 0) / perf.cpu.length)
+        : cpuBusy;
       return {
-        granted: false,
-        position,
-        queued: waiters.length,
-        reason: position === 1 ? blocked : `behind ${label(waiters[0]!)}`,
+        measured: true,
+        seconds: Math.round((Date.now() - perf.startedAt) / SECOND),
+        cpu,
+        peak: Math.max(cpuBusy, ...perf.cpu),
+        overlapped: perf.overlapped,
+        expired: perf.expired ?? false,
       };
     },
     "/ready": ({ worktree, kind, device, serial, metroPid }) => {
@@ -665,13 +824,24 @@ async function connect(start: boolean): Promise<boolean> {
   return false;
 }
 
-async function acquire(worktree: string, kind: Kind, waitSeconds: number) {
+// Waits for a device slot (`/acquire`) or a turn to measure (`/perf-start`).
+async function waitTurn(
+  path: "/acquire" | "/perf-start",
+  worktree: string,
+  kind: Kind,
+  waitSeconds: number,
+) {
   if (!(await connect(true))) {
     console.error(
       `the simulator queue didn't start (see ${LOG}); going ahead without it`,
     );
     return 0;
   }
+  const flag = kind === "android" ? " --android" : "";
+  const retry =
+    path === "/acquire"
+      ? `scripts/sim.sh${flag} up`
+      : `scripts/sim.sh${flag} frames start`;
   const deadline = Date.now() + waitSeconds * SECOND;
   let last = "";
   for (;;) {
@@ -681,7 +851,7 @@ async function acquire(worktree: string, kind: Kind, waitSeconds: number) {
       position?: number;
       queued?: number;
       reason?: string;
-    }>("/acquire", { worktree, kind, pid: process.ppid });
+    }>(path, { worktree, kind, pid: process.ppid });
     if (answer.granted) {
       if (answer.waited && answer.waited > 5 * SECOND) {
         console.log(`simulator queue: your turn after ${ago(answer.waited)}`);
@@ -693,13 +863,36 @@ async function acquire(worktree: string, kind: Kind, waitSeconds: number) {
     last = line;
     if (Date.now() > deadline) {
       console.log(
-        `still queued. Run \`scripts/sim.sh${kind === "android" ? " --android" : ""} up\` again to keep your place; ` +
+        `still queued. Run \`${retry}\` again to keep your place; ` +
           "your turn is skipped while nobody is waiting on it, and the place lapses after 5 minutes.",
       );
       return STILL_QUEUED;
     }
-    await sleep(3 * SECOND);
+    await sleep((path === "/acquire" ? 3 : 1) * SECOND);
   }
+}
+
+async function perfStop(worktree: string, kind: Kind) {
+  if (!(await connect(false))) return;
+  const r = await call<{
+    measured: boolean;
+    seconds?: number;
+    cpu?: number;
+    peak?: number;
+    overlapped?: boolean;
+    expired?: boolean;
+  }>("/perf-stop", { worktree, kind });
+  if (!r.measured) return;
+  let line = `mac: CPU ${r.cpu}% busy on average (peak ${r.peak}%) over ${r.seconds}s`;
+  if (r.overlapped) {
+    line += `; a device booted during it${r.expired ? ` (it ran past ${ago(PERF_LIMIT)})` : ""}, so measure again`;
+  } else {
+    line += "; no device booted during it";
+  }
+  if (!r.overlapped && (r.cpu ?? 0) >= 60) {
+    line += ". The Mac was busy with something else; if the report shows slow frames, measure again";
+  }
+  console.log(line);
 }
 
 async function printStatus() {
@@ -713,30 +906,37 @@ async function printStatus() {
     version: number;
     memory: Memory;
     config: Config;
-    leases: (Lease & { usedAt: number })[];
+    cpu: number;
+    leases: (Lease & { usedAt: number; booting: boolean })[];
+    perfs: Omit<Perf, "cpu">[];
     waiters: (Waiter & { reason: string })[];
     now: number;
   };
   const s = await call<Status>("/status");
   const { memory, config, now } = s;
   console.log(
-    `memory: ${gb(memory.free)} of ${gb(memory.total)} free, ${memory.pressure} pressure; ` +
+    `cpu: ${s.cpu}% busy; memory: ${gb(memory.free)} of ${gb(memory.total)} free, ${memory.pressure} pressure; ` +
       `reserve ${config.reserveGb} GB, ios ${config.iosGb} GB, android ${config.androidGb} GB` +
-      `${config.max ? `, max ${config.max}` : ""}, idle after ${config.idleMinutes}m (${config.maxIdleMinutes}m with nobody waiting)`,
+      `, max ${config.max}, idle after ${config.idleMinutes}m (${config.maxIdleMinutes}m with nobody waiting)`,
   );
   console.log(s.leases.length ? "devices:" : "devices: none");
   for (const lease of s.leases) {
     const state = lease.reclaiming
       ? "shutting down (idle)"
-      : lease.readyAt
-        ? `up ${ago(now - lease.readyAt)}, last used ${ago(now - lease.usedAt)} ago`
-        : `starting (${ago(now - lease.grantedAt)})`;
+      : !lease.readyAt
+        ? `starting (${ago(now - lease.grantedAt)})`
+        : lease.booting
+          ? `launched ${ago(now - lease.readyAt)} ago, booting until the CPU settles`
+          : `up ${ago(now - lease.readyAt)}, last used ${ago(now - lease.usedAt)} ago`;
     console.log(`  ${label(lease)}: ${state}`);
+  }
+  for (const perf of s.perfs) {
+    console.log(`  ${label(perf)}: measuring performance (${ago(now - perf.startedAt)})`);
   }
   console.log(s.waiters.length ? "queue:" : "queue: empty");
   s.waiters.forEach((waiter, i) => {
     console.log(
-      `  ${i + 1}. ${label(waiter)}, waiting ${ago(now - waiter.since)}${waiter.reason ? `: ${waiter.reason}` : ""}`,
+      `  ${i + 1}. ${describe(waiter)}, waiting ${ago(now - waiter.since)}${waiter.reason ? `: ${waiter.reason}` : ""}`,
     );
   });
   if (s.version !== VERSION) {
@@ -765,7 +965,9 @@ async function main() {
   const kind = positional[0] as Kind;
   const needKind = () => {
     if (kind !== "ios" && kind !== "android") {
-      console.error("usage: simq.ts <acquire|ready|release> <ios|android>");
+      console.error(
+        "usage: simq.ts <acquire|ready|release|perf-start|perf-stop> <ios|android>",
+      );
       process.exit(2);
     }
   };
@@ -776,9 +978,29 @@ async function main() {
     case "acquire":
       needKind();
       process.exit(
-        await acquire(worktree(), kind, Number(flags.get("wait") ?? 540)),
+        await waitTurn(
+          "/acquire",
+          worktree(),
+          kind,
+          Number(flags.get("wait") ?? 540),
+        ),
       );
       break;
+    case "perf-start":
+      needKind();
+      process.exit(
+        await waitTurn(
+          "/perf-start",
+          worktree(),
+          kind,
+          Number(flags.get("wait") ?? 540),
+        ),
+      );
+      break;
+    case "perf-stop":
+      needKind();
+      await perfStop(worktree(), kind);
+      return;
     case "ready":
       needKind();
       if (await connect(false)) {

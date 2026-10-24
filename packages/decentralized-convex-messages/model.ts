@@ -5,8 +5,10 @@ import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { CreatedKind } from "./naming.ts";
 import type { AlertLevel, Conversation, Message } from "./protocol.ts";
 import { chosenAlerts } from "./alertChoice.ts";
+import { changedAtOf } from "./changes.ts";
 import { latestMessage, unreadCount } from "./chatMessages.ts";
 import { createdId, isCreatedId } from "./naming.ts";
+import { readPosition } from "./readStates.ts";
 
 const ADDRESS_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const MAX_NAME_LENGTH = 80;
@@ -141,7 +143,12 @@ export interface ConversationAccess {
   /** When alerts were last turned back on (0: never muted). */
   readonly alertsSince: number;
   readonly conversation: Doc<"conversations">;
-  readonly lastReadAt: number;
+  /**
+   * How far the caller had read before `readStates`, which `readPosition`
+   * falls back to. Not read there here, so most queries don't depend on
+   * the caller's read state.
+   */
+  readonly readBefore: number;
   readonly member: Doc<"members"> | null;
   /** A channel's: the caller's choice for its whole space, if any. */
   readonly spaceAlerts: AlertLevel | undefined;
@@ -169,8 +176,8 @@ export async function findAccess(
           alerts: chosenAlerts(member),
           alertsSince: member.alertsSince ?? 0,
           conversation,
-          lastReadAt: member.lastReadAt,
           member,
+          readBefore: member.lastReadAt,
           spaceAlerts: undefined,
         };
   }
@@ -196,9 +203,9 @@ async function channelAccess(
       spaceMember.alertsSince ?? 0,
     ),
     conversation,
-    // Space members start with everything before they joined marked read.
-    lastReadAt: member?.lastReadAt ?? spaceMember._creationTime,
     member,
+    // Space members start with everything before they joined marked read.
+    readBefore: member?.lastReadAt ?? spaceMember._creationTime,
     spaceAlerts: chosenAlerts(spaceMember),
   };
 }
@@ -213,18 +220,6 @@ export async function requireAccess(
   return access;
 }
 
-/**
- * Notes that what the conversation shows changed (`changedAt`), so apps
- * know a copy of it they saved is out of date.
- */
-export async function markChanged(
-  ctx: MutationCtx,
-  access: ConversationAccess,
-  at = Date.now(),
-) {
-  await ctx.db.patch(access.conversation._id, { changedAt: at });
-}
-
 /** Channel read state is stored lazily, so create the row on first write. */
 export async function upsertMember(
   ctx: MutationCtx,
@@ -233,12 +228,7 @@ export async function upsertMember(
   patch: Partial<
     Pick<
       Doc<"members">,
-      | "alerts"
-      | "alertsSince"
-      | "hiddenFromInbox"
-      | "lastReadAt"
-      | "muted"
-      | "pinnedAt"
+      "alerts" | "alertsSince" | "hiddenFromInbox" | "muted" | "pinnedAt"
     >
   >,
 ) {
@@ -253,7 +243,7 @@ export async function upsertMember(
     alertsSince: patch.alertsSince,
     conversationId: access.conversation.conversationId,
     hiddenFromInbox: patch.hiddenFromInbox,
-    lastReadAt: patch.lastReadAt ?? access.lastReadAt,
+    lastReadAt: access.readBefore,
     muted: patch.muted ?? access.alerts === "none",
     pinnedAt: patch.pinnedAt,
     role: "member",
@@ -314,17 +304,21 @@ export async function toConversation(
 ): Promise<Conversation> {
   const { conversation, member } = access;
   // Concurrent reads: an inbox converts every conversation it lists.
-  const [lastMessage, space, members, unread] = await Promise.all([
+  const [latest, space, members, unread, changedAt] = await Promise.all([
     latestMessage(ctx, conversation.conversationId),
     conversation.spaceId === undefined
       ? null
       : getSpace(ctx, conversation.spaceId),
     memberAddresses(ctx, conversation),
-    unreadCount(ctx, conversation.conversationId, accountId, access.lastReadAt),
+    readPosition(ctx, access, accountId).then((readAt) =>
+      unreadCount(ctx, conversation.conversationId, accountId, readAt),
+    ),
+    changedAtOf(ctx, conversation),
   ]);
+  const lastMessage = latest.shown;
   return {
     alerts,
-    changedAt: conversation.changedAt,
+    changedAt,
     conversationId: conversation.conversationId,
     kind: conversation.kind,
     lastMessage: lastMessage === null ? null : toMessage(lastMessage),
@@ -339,6 +333,8 @@ export async function toConversation(
     spaceId: conversation.spaceId ?? null,
     spaceName: space?.name,
     unreadCount: unread,
-    updatedAt: conversation.updatedAt,
+    // Sends don't write the conversation, so its newest message (even a
+    // deleted one) is when it was last messaged.
+    updatedAt: Math.max(conversation.updatedAt, latest.newestSentAt ?? 0),
   };
 }

@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+// eslint-disable-next-line no-restricted-imports -- `memo` for list rows, see `Row`.
+import { memo } from "react";
 import { View } from "react-native";
 import Animated, {
   useAnimatedReaction,
@@ -69,8 +71,15 @@ interface RowProps {
  * a spread makes a new object each render, so the React Compiler couldn't
  * tell the row is unchanged and every row on screen would redraw whenever
  * the list did.
+ *
+ * Memoized by hand: the list is inverted, so every new message is
+ * inserted first and moves every other row's index, and FlatList redraws
+ * each cell whose index moved by calling `renderItem` again. That call
+ * happens inside FlatList, where the React Compiler can't skip it, so
+ * without `memo` every mounted row redrew for every message (50 or more
+ * rows, many times a second in a busy group).
  */
-export function Row({
+export const Row = memo(function Row({
   row,
   self,
   layout,
@@ -120,7 +129,7 @@ export function Row({
       </RowShell>
     </RowLift>
   );
-}
+});
 
 /**
  * Moves the row with the rows above a row that grows (see `useRowLift`),
@@ -235,10 +244,23 @@ function threadReplies(message: Message, profileOf: ProfileOf) {
 function RowContent({ row, self, layout, profileOf, showAuthors }: RowProps) {
   const stacked = layout === "stacked";
   if (row.type === "day") {
-    return <DaySeparator date={row.date} stacked={stacked} />;
+    return (
+      <DaySeparator
+        date={row.date}
+        stacked={stacked}
+        opensThread={row.opensThread}
+      />
+    );
   }
   if (row.type === "time") {
-    return <TimeHeader date={row.date} stacked={stacked} />;
+    return (
+      <TimeHeader
+        date={row.date}
+        stacked={stacked}
+        opensThread={row.opensThread}
+        named={showAuthors && row.author !== undefined && row.author !== self}
+      />
+    );
   }
   if (row.type === "replies") {
     return <RepliesDivider count={row.count} />;

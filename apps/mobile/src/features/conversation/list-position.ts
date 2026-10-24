@@ -1,10 +1,23 @@
 import type { RefObject } from "react";
 import type { FlatList } from "react-native";
+import type Animated from "react-native-reanimated";
+import type { AnimatedRef, SharedValue } from "react-native-reanimated";
 import { useRef } from "react";
 import { Platform } from "react-native";
-import { useSharedValue } from "react-native-reanimated";
+import { useKeyboardHandler } from "react-native-keyboard-controller";
+import {
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useDerivedValue,
+  useScrollOffset,
+  useSharedValue,
+} from "react-native-reanimated";
+import { scheduleOnRN, scheduleOnUI } from "react-native-worklets";
 
+import type { ComposerHeight } from "./composer-height";
 import type { ListRow } from "./typing-row";
+import { useComposerRoom } from "./composer-height";
 
 // Where the conversation list is scrolled: placing it when it opens, and
 // keeping up with the newest message.
@@ -15,140 +28,280 @@ import type { ListRow } from "./typing-row";
  */
 const NEAR_LATEST = 80;
 /**
- * How far from the bottom still counts as at the bottom, so the list stays
- * pinned there: a scroll up by more than this lets go.
+ * How quickly the list glides down to the newest message: the distance
+ * left shrinks by e every this many milliseconds, so it's most of the way
+ * there in a fifth of a second and eases into place.
  */
-const PIN_SLOP = 4;
-/** Longer than the platform's slide to the newest message takes. */
-const SLIDE_MS = 450;
+const GLIDE_MS = 70;
+/**
+ * Close enough to the bottom to finish the glide there in one step: the
+ * scroll position snaps to whole pixels, so smaller steps never land.
+ */
+const GLIDE_DONE = 2;
+/** The longest a glide takes before it jumps the rest of the way. */
+const GLIDE_MAX_MS = 1000;
 /** Frames to wait for the message a conversation opens on to be measured. */
 const ANCHOR_TRIES = 30;
+/**
+ * Frames to wait, as a conversation opens at its newest message, for the
+ * list's insets to reach its scroll view (see `openAt`).
+ */
+const OPEN_TRIES = 30;
 
-interface LatestState {
-  /** The keyboard's inset (iOS), which the newest message sits above. */
-  inset: number;
-  pinned: boolean;
-  /** You're dragging the list, or it's still moving from a fling. */
-  scrolling: boolean;
-  /** Sliding to something new below, until it's at the bottom. */
-  following: boolean;
-  /** How far above the bottom the last scroll event was. */
-  scrolled: number;
-  /** The composer's height when content last changed. */
-  composer?: number;
-}
+const IOS = Platform.OS === "ios";
 
 /**
- * Keeps the list on the newest message while you're at the bottom, and
- * lets go the moment you scroll up.
+ * Keeps track of how far the list is from the newest message, and takes it
+ * there.
  *
- * The native scroll anchor (`maintainVisibleContentPosition`, see
- * `ANCHOR`) keeps the newest row on screen still, and what's above it
- * moves up as it grows. So at the bottom a new message, or someone
- * typing, opens right there, and the messages above make room (see
- * `Arrive`), with no scrolling at all; scrolled up, nothing on screen
- * moves. Only a taller composer, under the newest row, scrolls: the
- * anchor keeps the rows still as it grows, and when the list is pinned it
- * then slides the rest into view with the platform's own animated scroll.
- * Only your own drag or fling unpins it (the keyboard lifting the list
- * never does), and reaching the bottom pins it again.
+ * Nothing here keeps the list at the bottom as things change: the native
+ * scroll anchor (`maintainVisibleContentPosition`, see `ANCHOR`) keeps the
+ * newest row on screen still as rows above it are added or grow, so at the
+ * bottom a new message, or someone typing, opens right there and the
+ * messages above make room (see `Arrive`); scrolled up, nothing on screen
+ * moves. The keyboard and, on iOS, the composer under the newest row are
+ * insets (`KeyboardChatScrollView`'s, with the composer as its
+ * `extraContentPadding`) that the list moves with on the UI thread as
+ * they change. The composer used to be a row under the newest message
+ * there, and the anchor moved the list when it changed size, as when a
+ * reply was sent: it ended up that much under the composer.
  *
- * On iOS the keyboard lifts the list with a top content inset, so the
- * bottom is at minus that inset rather than 0.
+ * On Android the composer stays a row (`composerRow`). The library draws
+ * an Android inset by shifting the list's content and scrolling by as
+ * much, and the scroll events it sends don't match where the list ends
+ * up: at the bottom it reported the list a composer's height up, which
+ * showed the jump button, and the newest message ended up under a
+ * composer that grew. The anchor holds the rows still as the row grows,
+ * so at the bottom the list then glides down to show what it covers
+ * (`onContentChange`).
+ *
+ * Going to the newest message (after sending, or the jump button) glides
+ * there on the UI thread, each frame from wherever the list actually is.
+ * The platform's animated scroll stops as soon as anything else sets the
+ * scroll position, as the anchor does when a message arrives under what's
+ * on screen, which left the list short of the bottom.
+ *
+ * On iOS the insets are the scroll view's top content inset, so the bottom
+ * is at minus that inset rather than 0. On Android they're drawn in, and
+ * the bottom stays at 0.
  */
-export function useLatest(
-  listRef: RefObject<FlatList<ListRow> | null>,
-  pinnedAtStart: boolean,
-) {
-  const isNearLatest = useSharedValue(pinnedAtStart);
-  const state = useRef<LatestState>({
-    following: false,
-    inset: 0,
-    pinned: pinnedAtStart,
-    scrolled: 0,
-    scrolling: false,
-  });
+export function useLatest({
+  startsAtLatest,
+  composerHeight,
+  keyboardOffset,
+  blankSpace,
+  freeze,
+}: {
+  /** It opens on the newest message, not one further up. */
+  startsAtLatest: boolean;
+  /** The composer's height, which floats over the list's bottom. */
+  composerHeight: ComposerHeight;
+  /** What the keyboard covers that's already room (its `offset`). */
+  keyboardOffset: number;
+  /** A thread's room under its replies (see `useBlankSpace`). */
+  blankSpace: SharedValue<number> | undefined;
+  /** Freezes keyboard handling (see `useMenuKeyboard`). */
+  freeze: SharedValue<boolean>;
+}) {
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const offset = useScrollOffset(scrollRef);
+  const { live, laidOut = 0 } = composerHeight;
+  const { room: composer, moving, settled } = useComposerRoom(composerHeight);
+  const keyboard = useKeyboardInset(keyboardOffset, freeze);
+  // The inset and scroll position as last reported, for the jump button.
+  const inset = useRef(0);
+  const scrolled = useRef(0);
+  const gliding = useSharedValue(false);
+  // The composer's height when the content last changed (Android).
+  const seenComposer = useRef<number | undefined>(undefined);
+  const isNearLatest = useSharedValue(startsAtLatest);
+
+  /**
+   * Where the newest message is: the list's inset worked out as
+   * `KeyboardChatScrollView` does, on the UI thread, since its report
+   * reaches JavaScript a frame or two late.
+   */
   function bottom() {
-    return Platform.OS === "ios" ? -state.current.inset : 0;
+    "worklet";
+    if (!IOS) return 0;
+    return -Math.max(blankSpace?.get() ?? 0, keyboard.get() + composer.get());
   }
-  function scrollToNewest() {
-    listRef.current?.scrollToOffset({ animated: true, offset: bottom() });
+
+  function nearLatest() {
+    const bottom = IOS ? -inset.current : 0;
+    isNearLatest.set(scrolled.current - bottom < NEAR_LATEST);
   }
+
+  function glide() {
+    "worklet";
+    if (gliding.get()) return;
+    gliding.set(true);
+    // When it started, and the last frame it moved on.
+    const run = { last: -1, start: -1 };
+    function step(time: number) {
+      if (!gliding.get()) return;
+      if (run.start === -1) run.start = time;
+      const dt = run.last === -1 ? 16 : Math.max(0, time - run.last);
+      run.last = time;
+      const to = bottom();
+      const left = offset.get() - to;
+      // On until the room is the composer's too (see `useComposerRoom`).
+      const there = Math.abs(left) <= GLIDE_DONE && settled();
+      if (there || time - run.start > GLIDE_MAX_MS) {
+        if (left !== 0) scrollTo(scrollRef, 0, to, false);
+        gliding.set(false);
+        return;
+      }
+      scrollTo(scrollRef, 0, to + left * Math.exp(-dt / GLIDE_MS), false);
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // At the newest message (as it was: the room can already have the new
+  // height) as the composer changes height on iOS, the list glides along to
+  // stay there: `KeyboardChatScrollView` moves the scroll by each change
+  // from where the list was a frame before, so on its own it falls behind a
+  // room that changes every frame (see `useComposerRoom`).
+  useAnimatedReaction(
+    () => (IOS ? live.get() : 0),
+    (now, before) => {
+      if (before === null || now === before) return;
+      const was = -Math.max(blankSpace?.get() ?? 0, keyboard.get() + before);
+      if (offset.get() - was < NEAR_LATEST) glide();
+    },
+  );
+
   return {
+    /** For the list's scroll view, which the glide moves. */
+    scrollRef,
+    /** The composer's room on iOS, the list's `extraContentPadding`. */
+    composer,
+    /** Counts the rows' moves as they start (see `Growth`). */
+    moving,
+    /**
+     * The room for the keyboard and composer under the newest row, on iOS
+     * (see `Blank`'s `floor`). Android draws its insets in (see above).
+     */
+    floor: useDerivedValue(() => (IOS ? keyboard.get() + composer.get() : 0)),
+    /** The composer's room on Android, a row under the newest message. */
+    composerRow: IOS ? 0 : laidOut,
     isNearLatest,
-    scrollToNewest,
-    /** Scrolls down to the newest message, as after sending one. */
-    scrollToLatest: () => {
-      state.current.pinned = true;
-      scrollToNewest();
+    /** Glides down to the newest message, as after sending one. */
+    scrollToLatest: () => scheduleOnUI(glide),
+    /**
+     * Puts the list at the newest message as it opens, then calls `done`:
+     * it starts at offset 0, which on iOS leaves the newest message under
+     * the insets (see `openAt`).
+     */
+    toLatest: (done: () => void) => {
+      scheduleOnUI(() => {
+        "worklet";
+        openAt({ done, offset, scrollRef, to: bottom });
+      });
     },
     onInsetChange: (top: number) => {
-      state.current.inset = top;
+      inset.current = top;
+      // In a thread, its room under the replies shrinks as they come in,
+      // and the list scrolls with it: the scroll can be reported before
+      // the inset it went with, which showed the jump button at the bottom.
+      nearLatest();
     },
     scrollHandlers: {
+      // Your own drag takes over from a glide.
       onScrollBeginDrag: () => {
-        state.current.scrolling = true;
+        gliding.set(false);
       },
-      onMomentumScrollEnd: () => {
-        state.current.scrolling = false;
-      },
-      onScrollEndDrag: (event: {
-        nativeEvent: { velocity?: { y: number } };
-      }) => {
-        // No fling: the scroll ends with the drag.
-        if ((event.nativeEvent.velocity?.y ?? 0) === 0) {
-          state.current.scrolling = false;
-        }
-      },
-    },
-    onScroll: (offset: number) => {
-      const scrolled = offset - bottom();
-      const rose = scrolled > state.current.scrolled + 1;
-      state.current.scrolled = scrolled;
-      isNearLatest.set(scrolled < NEAR_LATEST);
-      if (scrolled <= PIN_SLOP) {
-        state.current.pinned = true;
-        state.current.following = false;
-      } else if (state.current.scrolling) {
-        state.current.pinned = false;
-        state.current.following = false;
-      } else if (state.current.following && rose) {
-        // The scroll anchor moved the list up after the slide began (as
-        // the composer grew again), which stops the slide: it starts again
-        // from there.
-        scrollToNewest();
-      }
     },
     /**
-     * The list's content changed. Pinned, room for a taller composer
-     * (`composer`) slides into view below what's there. Anything else (a
-     * message or a reaction opening its space) leaves the scroll alone:
-     * the newest row stays put and the rows above move up, and following
-     * it would restart the scroll every frame.
+     * The list's content changed. On Android, a composer that changed
+     * height (a reply bar, another line, an attachment) changed the row
+     * under the newest message, and the anchor kept the rows where they
+     * were: at the bottom, the list glides down to show what it covers.
+     * The anchor's move up has already happened, so how far up the list
+     * was is `offset` less the change.
      */
-    onContentChange: (composer: number) => {
-      const seen = state.current.composer;
-      state.current.composer = composer;
-      if (seen === undefined || composer === seen) return;
-      if (!state.current.pinned) return;
-      state.current.following = true;
-      scrollToNewest();
-      // A slide cut short (the anchor moving the list again as more
-      // arrives) starts again once it should have finished.
-      setTimeout(() => {
-        const { following, pinned, scrolled, scrolling } = state.current;
-        if (following && pinned && !scrolling && scrolled > PIN_SLOP) {
-          scrollToNewest();
-        }
-      }, SLIDE_MS);
+    onContentChange: () => {
+      if (IOS) return;
+      const seen = seenComposer.current;
+      seenComposer.current = laidOut;
+      if (seen === undefined || seen === laidOut) return;
+      if (offset.get() - (laidOut - seen) > NEAR_LATEST) return;
+      scheduleOnUI(glide);
+    },
+    onScroll: (y: number) => {
+      scrolled.current = y;
+      nearLatest();
     },
   };
 }
 
 /**
+ * Scrolls the list to `to` as it opens, again each frame until it's there,
+ * then calls `done`. The list can lay out before `KeyboardChatScrollView`
+ * has put its insets on the scroll view, and a scroll can't go past the
+ * inset the view has yet: a single scroll then stayed at 0, with the
+ * newest message under the composer.
+ */
+function openAt({
+  scrollRef,
+  offset,
+  to,
+  done,
+}: {
+  scrollRef: AnimatedRef<Animated.ScrollView>;
+  /** Where the list is, as its scroll events report it. */
+  offset: SharedValue<number>;
+  to: () => number;
+  done: () => void;
+}) {
+  "worklet";
+  let tries = 0;
+  function step() {
+    const target = to();
+    if (Math.abs(offset.get() - target) <= GLIDE_DONE || tries >= OPEN_TRIES) {
+      scheduleOnRN(done);
+      return;
+    }
+    tries += 1;
+    scrollTo(scrollRef, 0, target, false);
+    requestAnimationFrame(step);
+  }
+  step();
+}
+
+/**
+ * How much the keyboard lifts the list, as `KeyboardChatScrollView` works
+ * it out on iOS: its height less `offset`, set where it's going as it
+ * starts to move.
+ */
+function useKeyboardInset(offset: number, freeze: SharedValue<boolean>) {
+  const inset = useSharedValue(0);
+  function update(height: number) {
+    "worklet";
+    if (freeze.get()) return;
+    inset.set(Math.max(0, height - offset));
+  }
+  useKeyboardHandler(
+    {
+      onStart: (event) => {
+        "worklet";
+        update(event.height);
+      },
+      onEnd: (event) => {
+        "worklet";
+        update(event.height);
+      },
+    },
+    [offset],
+  );
+  return inset;
+}
+
+/**
  * The scroll anchor: the first row on screen, from the newest row up,
  * stays where it is when rows are added or grow below it. (The list skips
- * its header, the space for the composer, on its own, so index 0 is the
+ * its header, the gap above the composer, on its own, so index 0 is the
  * newest row, who's typing, and a new message added right above it opens
  * above the anchor.)
  */
@@ -198,12 +351,15 @@ function missedAgain(state: PlacementState) {
 export function usePlacement({
   listRef,
   anchorIndex,
+  toLatest,
   onReady,
   onLoadNewer,
   onLoadOlder,
 }: {
   listRef: RefObject<FlatList<ListRow> | null>;
   anchorIndex: number;
+  /** Puts the list at the newest message, then calls back (see `useLatest`). */
+  toLatest: (done: () => void) => void;
   onReady: () => void;
   onLoadNewer: () => void;
   onLoadOlder: () => void;
@@ -231,7 +387,7 @@ export function usePlacement({
       if (state.current.started) return;
       state.current.started = true;
       if (anchorIndex === -1) {
-        place();
+        toLatest(place);
         return;
       }
       scrollToAnchor({

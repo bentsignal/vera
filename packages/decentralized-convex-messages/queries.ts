@@ -78,13 +78,17 @@ export const queries = {
     returns: v.array(memberEvent),
   }),
   /**
-   * Reactions to the given messages, gathered from every member's PDS
-   * (each stores its own accounts' reactions).
+   * Reactions to the given messages, or with `since` instead, every
+   * reaction made after then (at most `MAX_SINCE_RESULTS`, the newest),
+   * gathered from every member's PDS (each stores its own accounts'
+   * reactions). `since` covers messages still arriving with one query
+   * that doesn't change as they do.
    */
   reactions: defineOperation({
     args: v.object({
       conversationId: v.string(),
-      messageIds: v.array(v.string()),
+      messageIds: v.optional(v.array(v.string())),
+      since: v.optional(v.number()),
     }),
     returns: v.array(reaction),
   }),
@@ -115,13 +119,16 @@ export const queries = {
     returns: threadPage,
   }),
   /**
-   * The threads of the given messages that have replies, from every
-   * member's PDS (each counts the replies it stores).
+   * The threads of the given messages that have replies, or with `since`
+   * instead, every thread replied to after then (at most
+   * `MAX_SINCE_RESULTS`, the newest), from every member's PDS (each counts
+   * the replies it stores).
    */
   threadSummaries: defineOperation({
     args: v.object({
       conversationId: v.string(),
-      messageIds: v.array(v.string()),
+      messageIds: v.optional(v.array(v.string())),
+      since: v.optional(v.number()),
     }),
     returns: v.array(threadSummary),
   }),

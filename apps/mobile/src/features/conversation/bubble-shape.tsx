@@ -2,7 +2,13 @@ import Svg, { Path } from "react-native-svg";
 
 /** How far the tail hangs below the bubble. */
 export const TAIL_DROP = 7;
-/** Bubble corner radius, a touch rounder than a capsule's for one line. */
+/**
+ * Bubble corner radius, a touch rounder than a capsule's for one line.
+ * Bubbles keep circular corners (no `borderCurve: "continuous"`): the tail
+ * is fitted to a corner that leaves the side 20 above the bottom, and a
+ * continuous corner on a tall bubble starts curving higher than that, so
+ * the tail would stick out of the bubble's side.
+ */
 export const BUBBLE_RADIUS = 20;
 
 /** The tail's box: from 20 above the bubble's bottom to the tail's tip. */
@@ -43,15 +49,21 @@ export function BubbleTail({
   isOwn: boolean;
 }) {
   return (
+    // As wide as the bubble by insets, with the tail drawn at its right
+    // edge. A box of the tail's own width at `right: 0` is rounded to
+    // pixels apart from the bubble, so on a bubble whose left edge falls
+    // between pixels it ended a pixel past the bubble's side.
     <Svg
       pointerEvents="none"
-      width={TAIL_WIDTH}
-      height={TAIL_HEIGHT}
       viewBox={`0 0 ${TAIL_WIDTH} ${TAIL_HEIGHT}`}
+      preserveAspectRatio="xMaxYMax meet"
       style={{
         bottom: -TAIL_DROP,
+        height: TAIL_HEIGHT,
+        left: 0,
         position: "absolute",
-        ...(isOwn ? { right: 0 } : { left: 0, transform: [{ scaleX: -1 }] }),
+        right: 0,
+        transform: isOwn ? undefined : [{ scaleX: -1 }],
       }}
     >
       <Path d={TAIL_PATH} fill={color} />

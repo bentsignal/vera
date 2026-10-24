@@ -4,6 +4,7 @@ import { Alert } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 
 import type { ComposerHandle } from "./composer";
+import type { ComposerReport } from "./composer-height";
 import type { MentionCandidate } from "./mention-text";
 import type { ReplyingTo } from "./reply-bar";
 import type { EditSession } from "./use-editing";
@@ -41,6 +42,31 @@ function alsoTo(
 }
 
 /**
+ * What's picked for the next message, kept in the draft `key`, and
+ * `restage` to change it. `onOpenOrClose` hears when the attachments start
+ * to show or go.
+ */
+function useStaged(key: string, onOpenOrClose: () => void) {
+  const [staged, setStaged] = useState(() => readDraft(key).files);
+  return {
+    staged,
+    /**
+     * Changes the staged files and saves them in the draft. Starts from
+     * the draft's, which are current even after awaiting a picker.
+     */
+    restage: (
+      change: (current: readonly StagedFile[]) => readonly StagedFile[],
+    ) => {
+      const current = readDraft(key).files;
+      const next = change(current);
+      if (next.length > 0 !== current.length > 0) onOpenOrClose();
+      saveDraftFiles(key, next);
+      setStaged(next);
+    },
+  };
+}
+
+/**
  * The composer floating over the bottom of a conversation or thread,
  * holding what's picked for the next message until it's sent, in its draft
  * on this device. Reports its height so messages can scroll under it.
@@ -49,7 +75,7 @@ export function FloatingComposer({
   ref,
   draftId,
   mentionable,
-  onHeight,
+  report,
   onSend,
   onChangeText,
   replyingTo,
@@ -62,8 +88,8 @@ export function FloatingComposer({
   draftId: string;
   /** Who can be @mentioned (see `Composer`). */
   mentionable?: readonly MentionCandidate[];
-  /** The bar's height, without the people to mention listed over it. */
-  onHeight: (height: number) => void;
+  /** Its height, for the list (see `useComposerHeight`). */
+  report: ComposerReport;
   onSend: (draft: OutgoingDraft) => void;
   /** Every change to the text (see `Composer`), to report typing. */
   onChangeText?: (text: string, sent: boolean) => void;
@@ -78,7 +104,7 @@ export function FloatingComposer({
   const { address } = useAccount();
   const key = draftKey(address, draftId);
   const links = useLinkPrefetch();
-  const [staged, setStaged] = useState(() => readDraft(key).files);
+  const { staged, restage } = useStaged(key, report.onAttachmentsMove);
   // One picker at a time: a second tap on the menu while one is still
   // handing over files does nothing.
   const picking = useRef(false);
@@ -90,18 +116,6 @@ export function FloatingComposer({
       `You can send up to ${MAX_ATTACHMENTS} at a time.`,
     );
     return true;
-  }
-
-  /**
-   * Changes the staged files and saves them in the draft. Starts from the
-   * draft's, which are current even after awaiting a picker.
-   */
-  function restage(
-    change: (current: readonly StagedFile[]) => readonly StagedFile[],
-  ) {
-    const next = change(readDraft(key).files);
-    saveDraftFiles(key, next);
-    setStaged(next);
   }
 
   function add(files: readonly StagedFile[]) {
@@ -141,7 +155,7 @@ export function FloatingComposer({
         bottomInset={bottomInset}
         staged={staged}
         mentionable={mentionable}
-        onHeight={onHeight}
+        report={report}
         replyingTo={replyingTo}
         onCancelReply={onCancelReply}
         edit={edit}

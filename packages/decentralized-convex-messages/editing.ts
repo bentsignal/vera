@@ -3,9 +3,10 @@ import type { OperationArgs } from "@decentralized-convex/plugin";
 import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { LinkCard, messagesProtocol, Quote } from "./protocol.ts";
+import { markChanged } from "./changes.ts";
 import { previewedUrls } from "./links.ts";
 import { recordMentions, validMentions } from "./mentions.ts";
-import { fail, markChanged, requireAccess, toMessage } from "./model.ts";
+import { fail, requireAccess, toMessage } from "./model.ts";
 import { MAX_REPLIERS } from "./protocol.ts";
 import {
   messageById,

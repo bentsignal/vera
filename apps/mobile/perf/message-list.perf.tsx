@@ -101,3 +101,21 @@ test("loading an older page renders none of the messages already shown", async (
     1,
   );
 });
+
+test("a burst of messages renders only the messages each one adds or joins", async () => {
+  // Messages arriving one after another into a long conversation, as when
+  // a group is busy.
+  const history = [...OLDER, ...PAGE];
+  const update = await mount(history);
+  let shown = history;
+  const added = new Set<string>();
+  for (let index = 50; index < 80; index += 1) {
+    const next = message(index, { authorId: OTHER });
+    added.add(next.id);
+    shown = [...shown, next];
+    await update(shown);
+  }
+  // Besides the new ones, each joins the run of the one before it, which
+  // loses its tail: the newest of the history, once.
+  expect(rerendered().filter((id) => !added.has(id))).toEqual(["m49"]);
+});

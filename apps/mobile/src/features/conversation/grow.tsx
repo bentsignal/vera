@@ -13,6 +13,8 @@ import Animated, {
 import type { Blank } from "./blank-space";
 import type { LeaveState } from "./leave";
 import type { Growth } from "./moves";
+import type { TypingDrop } from "./typing-drop";
+import { useHeldHeight } from "./held-height";
 import {
   inFrame,
   land,
@@ -43,16 +45,33 @@ export function useGrowth() {
 export function GrowthProvider({
   list,
   blank,
+  typingDrop,
+  moving,
   children,
 }: {
   list: AnimatedRef<View>;
   blank?: Blank;
+  /** Where who's typing is drawn (see `useTypingDrop`). */
+  typingDrop: TypingDrop;
+  /** Counts moves as they start (see `Growth`). */
+  moving?: SharedValue<number>;
   children: ReactNode;
 }) {
   const [moves] = useState(() => Array.from({ length: MOVES }, newMove));
   const typing = useSharedValue(0);
+  const { drop, dropped } = typingDrop;
   return (
-    <GrowthContext value={{ blank, list, moves, typing }}>
+    <GrowthContext
+      value={{
+        blank,
+        list,
+        moves,
+        moving,
+        typing,
+        typingDrop: drop,
+        typingDropped: dropped,
+      }}
+    >
       {children}
     </GrowthContext>
   );
@@ -121,19 +140,11 @@ export function useRowLift(
  * above. In one that moves with them (stacked rows, `rowMoves`), a piece
  * below the space stays put.
  */
-export function usePieceLift(
-  order: number,
-  place: number,
-  rowMoves = false,
-  /** How much it shows: what the space opens for. */
-  shown?: SharedValue<number>,
-) {
+export function usePieceLift(order: number, place: number, rowMoves = false) {
   const { moves } = useGrowth();
   return useAnimatedStyle(() => {
     const { pending, shift } = pieceShift(moves, { order, place, rowMoves });
-    const style = moved(shift, pending);
-    if (shown === undefined) return style;
-    return { ...style, opacity: shown.get() };
+    return moved(shift, pending);
   });
 }
 
@@ -198,8 +209,7 @@ function Space({
     },
     [height, animate, order, place],
   );
-  // eslint-disable-next-line vera/no-layout-animation -- Not animated: the height changes once, in the same frame as the lift, which does the moving.
-  const style = useAnimatedStyle(() => ({ height: space.get() }));
+  const style = useHeldHeight(space);
   return (
     <Animated.View ref={ref} style={style}>
       {children}

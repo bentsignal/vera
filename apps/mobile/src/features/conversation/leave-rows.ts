@@ -190,6 +190,18 @@ export function useLeavingRows(
     closing.size > 0
       ? roomKept(rows, build(messages), left, headerOf)
       : new Map<string, number>();
+  // On their own, so each stays the same function from render to render:
+  // every row takes them (see `Row`).
+  function faded(batch: number) {
+    setLeaving((now) =>
+      now.map((item) =>
+        item.batch === batch ? { ...item, closing: true } : item,
+      ),
+    );
+  }
+  function gone(batch: number) {
+    setLeaving((now) => now.filter((item) => item.batch !== batch));
+  }
   return {
     rows,
     leavingOf: (key: string): RowLeaving | undefined => {
@@ -197,16 +209,8 @@ export function useLeavingRows(
       if (batch === undefined) return undefined;
       return { batch, closing: closing.has(batch), room: room.get(key) ?? 0 };
     },
-    faded: (batch: number) => {
-      setLeaving((now) =>
-        now.map((item) =>
-          item.batch === batch ? { ...item, closing: true } : item,
-        ),
-      );
-    },
-    gone: (batch: number) => {
-      setLeaving((now) => now.filter((item) => item.batch !== batch));
-    },
+    faded,
+    gone,
   };
 }
 

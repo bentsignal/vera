@@ -9,8 +9,9 @@ const MAX_UNREAD = 99;
 const MAX_DELETED_SKIPPED = 10;
 
 /**
- * The newest message the conversation shows (not one kept in a thread,
- * nor a deleted original kept for its thread).
+ * The newest message the conversation shows (`shown`: not one kept in a
+ * thread, nor a deleted original kept for its thread), and when its newest
+ * message was sent, deleted or not.
  */
 export async function latestMessage(ctx: QueryCtx, conversationId: string) {
   const newest = await ctx.db
@@ -20,7 +21,10 @@ export async function latestMessage(ctx: QueryCtx, conversationId: string) {
     )
     .order("desc")
     .take(MAX_DELETED_SKIPPED + 1);
-  return newest.find((message) => message.deletedAt === undefined) ?? null;
+  return {
+    newestSentAt: newest[0]?.sentAt,
+    shown: newest.find((message) => message.deletedAt === undefined) ?? null,
+  };
 }
 
 export async function unreadCount(

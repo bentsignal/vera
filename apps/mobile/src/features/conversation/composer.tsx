@@ -1,7 +1,7 @@
 import type { Mention } from "@decentralized-convex/messages";
 import type { ReactNode, Ref, RefObject } from "react";
 import { useImperativeHandle, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Platform, StyleSheet, TextInput, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, {
   interpolate,
@@ -11,6 +11,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withUniwind } from "uniwind";
 
+import type { ComposerReport } from "./composer-height";
 import type { MentionCandidate } from "./mention-text";
 import type { ReplyingTo } from "./reply-bar";
 import type { EditSession } from "./use-editing";
@@ -19,12 +20,13 @@ import type {
   StagedFile,
 } from "~/features/messaging/attachments";
 import type { PastedImage } from "~/lib/paste-images";
-import { GlassSurface } from "~/components/glass-surface";
+import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { cn } from "~/lib/cn";
 import { PASTE_IMAGES_NATIVE_ID, usePastedImages } from "~/lib/paste-images";
 import { AttachMenu } from "./attach-menu";
 import { readDraft, saveDraftText } from "./drafts";
+import { GlassField, useFieldGlass } from "./field-glass";
 import { FieldTop } from "./field-top";
 import { MentionPicker } from "./mention-picker";
 import { canSendNow } from "./use-editing";
@@ -59,12 +61,20 @@ const PADDING = 8;
  * about 6pt high until the keyboard came back. A whole-point line height makes
  * both measure the same, so the text always fits. iOS puts the extra line
  * height above the text, so a point moves from the top to the bottom to
- * keep it centered. The field stays `CONTROL` tall.
+ * keep it centered. The space under the text is a margin rather than
+ * padding: once the field scrolls, iOS keeps the cursor in view but not
+ * the padding under it, which left the last line on the field's edge. The
+ * field stays `CONTROL` tall.
  */
 const TEXT_SPACING =
   Platform.OS === "ios"
-    ? { lineHeight: 22, paddingBottom: 10, paddingTop: 8 }
+    ? { lineHeight: 22, marginBottom: 10, paddingTop: 8 }
     : { paddingBottom: 9, paddingTop: 9 };
+/**
+ * The field's text: it grows to about ten lines before it scrolls, and the
+ * send button floats over its right padding, so text never jumps.
+ */
+const FIELD_TEXT = { ...TEXT_SPACING, maxHeight: 228, paddingRight: SEND + 12 };
 
 /**
  * Space to leave below the composer bar for the home indicator or the
@@ -100,11 +110,12 @@ function SendButton({
         style,
       ]}
     >
-      <Pressable
+      <GesturePressable
         accessibilityRole="button"
         accessibilityLabel={saves ? "Save" : "Send"}
         onPress={onPress}
-        className="bg-accent items-center justify-center rounded-full active:opacity-80"
+        className="bg-accent items-center justify-center rounded-full"
+        pressedClassName="opacity-80"
         style={{ height: SEND, width: SEND }}
       >
         <SymbolIcon
@@ -117,7 +128,7 @@ function SendButton({
           weight="bold"
           tintColorClassName="accent-on-accent"
         />
-      </Pressable>
+      </GesturePressable>
     </Animated.View>
   );
 }
@@ -136,6 +147,34 @@ function useSides() {
           )
         : ANDROID_EDGE,
   }));
+}
+
+/**
+ * How many lines the field measures: an empty field is one line tall,
+ * whatever it last held. React Native sizes a field by the text its native
+ * view last reported, not by `value`, so a field emptied by sending stayed
+ * as tall as the message until that report came back through JavaScript,
+ * busy then with the message just sent. Measuring a line at most while
+ * it's empty shrinks it in the same frame as its text clears, and keeps it
+ * from growing back while the keyboard puts an autocorrected message back
+ * (see `useDraft`). Only on iOS, where `numberOfLines` limits just the
+ * measuring: on Android it fixes the field's lines, and keeps one after.
+ */
+function measuredLines(draft: string) {
+  return draft === "" && Platform.OS === "ios" ? 1 : undefined;
+}
+
+/**
+ * What the composer reports of the field's changes. While editing, every
+ * change reports an empty field: an edit isn't a new message on its way,
+ * so it never shows as typing, and it stops any typing the draft started.
+ */
+function reportedChanges(
+  onChangeText: ((text: string, sent: boolean) => void) | undefined,
+  editing: boolean,
+) {
+  if (!editing || onChangeText === undefined) return onChangeText;
+  return (_text: string, sent: boolean) => onChangeText("", sent);
 }
 
 /**
@@ -218,17 +257,19 @@ export interface ComposerHandle {
  */
 function Bar({
   bottomInset,
-  onHeight,
+  report: { bar, onHeight },
   children,
 }: {
   bottomInset: number;
-  onHeight?: (height: number) => void;
+  /** Its height, for the list (see `useComposerHeight`). */
+  report: Pick<ComposerReport, "bar" | "onHeight">;
   children: ReactNode;
 }) {
   const sides = useSides();
   return (
     <Animated.View
-      onLayout={(event) => onHeight?.(event.nativeEvent.layout.height)}
+      ref={bar}
+      onLayout={(event) => onHeight(event.nativeEvent.layout.height)}
       className={cn(
         "flex-row items-end gap-2",
         // No glass on Android: a solid bar, down through the navigation
@@ -269,7 +310,7 @@ export function Composer({
   onPaste,
   onRemoveStaged,
   onChangeText,
-  onHeight,
+  report,
   bottomInset,
   replyingTo,
   onCancelReply,
@@ -288,10 +329,13 @@ export function Composer({
   /** Photos pasted into the field. */
   onPaste: (images: readonly PastedImage[]) => void;
   onRemoveStaged: (id: string) => void;
-  /** Every change to the text, including emptying it on send (`sent`). */
+  /**
+   * Every change to the text, including emptying it on send (`sent`).
+   * See `reportedChanges` for edits.
+   */
   onChangeText?: (text: string, sent: boolean) => void;
-  /** The bar's height, without the people listed above it. */
-  onHeight?: (height: number) => void;
+  /** Its height, for the list (see `useComposerHeight`). */
+  report: ComposerReport;
   /** From `useComposerBottomInset`. */
   bottomInset: number;
   /** Set while the next message is a reply. */
@@ -315,15 +359,17 @@ export function Composer({
   const { draft, change, mention, pick, sent, saved } = useDraft(
     editing === undefined || edit === undefined ? draftKey : edit.editDraftKey,
     input,
-    onChangeText,
+    reportedChanges(onChangeText, editing !== undefined),
     mentionable,
   );
+  const { field, held, settle, focus } = useFieldGlass(report);
   const canSend = canSendNow(draft, staged, editing);
   const saves = editing !== undefined;
   const hint = staged.length > 0 || saves ? "Add a message" : placeholder;
 
   function send() {
     if (!canSend) return;
+    settle();
     const text = draft.trim();
     if (editing === undefined) onSend(text, sent(text));
     else edit?.save(text, saved(text));
@@ -338,13 +384,10 @@ export function Composer({
           onPick={pick}
         />
       )}
-      <Bar bottomInset={bottomInset} onHeight={onHeight}>
+      <Bar bottomInset={bottomInset} report={report}>
         {/* An edit changes only the text. */}
         {editing === undefined && <AttachMenu onPick={onPick} />}
-        <GlassSurface
-          className="flex-1 justify-center rounded-[20px]"
-          style={{ minHeight: CONTROL }}
-        >
+        <GlassField field={field} held={held} minHeight={CONTROL}>
           <FieldTop
             edit={edit}
             replyingTo={replyingTo}
@@ -355,7 +398,9 @@ export function Composer({
           <StyledTextInput
             ref={input}
             nativeID={PASTE_IMAGES_NATIVE_ID}
+            {...focus}
             multiline
+            numberOfLines={measuredLines(draft)}
             value={draft}
             onChangeText={change}
             onSelectionChange={mention.onSelectionChange}
@@ -364,14 +409,13 @@ export function Composer({
             // A message field never needs AutoFill suggestions.
             autoComplete="off"
             textContentType="none"
-            className="text-body text-foreground max-h-32 pl-4"
-            // The send button floats over this padding, so text never jumps.
-            style={{ ...TEXT_SPACING, paddingRight: SEND + 12 }}
+            className="text-body text-foreground pl-4"
+            style={FIELD_TEXT}
             placeholderTextColorClassName="accent-muted"
             cursorColorClassName="accent-accent"
           />
           <SendButton visible={canSend} saves={saves} onPress={send} />
-        </GlassSurface>
+        </GlassField>
       </Bar>
     </View>
   );

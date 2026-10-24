@@ -5,10 +5,14 @@ description: Required before you use an iOS simulator or Android emulator in thi
 
 # Simulators and emulators
 
-Many worktrees run at once on Shawn's Mac, and each simulator with its
-Metro takes 2 to 4 GB. `scripts/sim.sh up` waits in the simulator queue
-(`scripts/simq.ts`), which starts one device at a time and only while the
-Mac has free memory. The queue only works if every agent goes through it.
+Many worktrees run at once on Shawn's Mac. `scripts/sim.sh up` waits in
+the simulator queue (`scripts/simq.ts`), which runs **up to three devices
+at once on the whole Mac**, iOS and Android alike: three can animate
+together as smoothly as one, while at four the GPU runs out and every
+device lags. Booting a device pins every core for half a minute or more,
+so boots and performance measurements (`sim.sh frames start`) wait in the
+same line and never overlap. The queue only works if every agent goes
+through it.
 
 ## Rules
 
@@ -29,7 +33,8 @@ Mac has free memory. The queue only works if every agent goes through it.
    run `up` again right away to keep your place; the place lapses after 5
    minutes. If your harness can run commands in the background and wake you
    when they finish, run `up` that way and do other work meanwhile, such as
-   validation or pushing your branch.
+   validation or pushing your branch. `frames start` can wait the same
+   way, for a device that's booting, and exits 75 the same way too.
 5. **Hold a device only while you're using it.** Bring it up when you're
    ready to verify, not while you're still writing code, and `down` as soon
    as you have your evidence, before you wait for CI or for Shawn. **Never
@@ -44,10 +49,11 @@ Mac has free memory. The queue only works if every agent goes through it.
    `device_list` first: if your device is already in `open`, reuse the
    agent-device flags you have instead of opening it again. `device_close`
    it before `sim.sh down`, and never `device_open` another worktree's
-   device.
+   device or the shared `Vera template` simulator, which every worktree's
+   is cloned from and which stays shut down.
 7. **If the queue shut your device down**, your next `sim.sh` command says
    so. Run `up` again. The queue shuts down devices that haven't had a
-   `sim.sh` command for 20 minutes when others are waiting, after 30
+   `sim.sh` command for 10 minutes when others are waiting, after 30
    minutes even if nobody is (any `sim.sh` command counts, `status`
    included), and right away if one stopped running without `sim.sh down`.
 
@@ -125,8 +131,8 @@ reason to keep one around.
 ## Troubleshooting
 
 - **`up` keeps saying you're queued:** `scripts/sim.sh queue` shows why.
-  That's working as intended; keep waiting. Tell Shawn if the line hasn't
-  moved in half an hour.
+  That's working as intended; keep waiting, and do other work meanwhile.
+  Tell Shawn if the line hasn't moved in half an hour.
 - **`up` says Metro didn't start:** read `.cache/sim/metro.log`. A port
   clash is resolved automatically. Kill only the PID in `.cache/sim/metro`,
   never by pattern (other worktrees run Metro too).

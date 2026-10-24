@@ -320,3 +320,46 @@ export const say = internalAction({
     });
   },
 });
+
+/**
+ * A busy conversation, for trying the app under load: `count` messages
+ * from the bots who are members (`usernames`, in turn), each its own send
+ * at a random moment within `seconds`, as separate people typing at once
+ * would send them. Scheduled here, so nothing on the computer running it
+ * competes with the simulator for time.
+ *
+ * `npx convex run dev:burst '{"conversationId":"…","count":300,"seconds":83}'`
+ */
+export const burst = internalAction({
+  args: {
+    conversationId: v.string(),
+    count: v.number(),
+    seconds: v.number(),
+    /** Who sends, in turn; Maya, Jonah, and Priya unless given. */
+    usernames: v.optional(v.array(v.string())),
+    /** What each message says before its number. */
+    label: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    {
+      conversationId,
+      count,
+      seconds,
+      usernames = ["maya", "jonah", "priya"],
+      label = "Burst message",
+    },
+  ) => {
+    requireDevTools();
+    const spacing = (seconds * 1000) / Math.max(1, count);
+    for (let index = 1; index <= count; index += 1) {
+      // Evenly spread, each up to half a gap early or late.
+      const at = (index - 1) * spacing + (Math.random() - 0.5) * spacing;
+      await ctx.scheduler.runAfter(Math.max(0, at), internal.dev.say, {
+        body: `${label} ${String(index)}`,
+        conversationId,
+        username: usernames[index % usernames.length] ?? "maya",
+      });
+    }
+  },
+});

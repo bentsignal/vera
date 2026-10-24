@@ -1,14 +1,8 @@
-import {
-  FlatList,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Platform, StyleSheet, Text, View } from "react-native";
 
 import type { MentionCandidate } from "./mention-text";
 import { Avatar } from "~/components/avatar";
+import { GesturePressable } from "~/components/gesture-pressable";
 import { GlassSurface } from "~/components/glass-surface";
 import { usernameOf } from "~/features/messaging/profiles";
 
@@ -26,11 +20,12 @@ function PersonRow({
   onPick: (person: MentionCandidate) => void;
 }) {
   return (
-    <Pressable
+    <GesturePressable
       accessibilityRole="button"
       accessibilityLabel={`Mention ${person.displayName}`}
       onPress={() => onPick(person)}
-      className="active:bg-fill flex-row items-center gap-3 px-3"
+      className="flex-row items-center gap-3 px-3"
+      pressedClassName="bg-fill"
       style={{ height: ROW }}
     >
       <Avatar name={person.displayName} size="row" uri={person.avatarUrl} />
@@ -45,7 +40,7 @@ function PersonRow({
           {usernameOf(person.accountId)}
         </Text>
       </View>
-    </Pressable>
+    </GesturePressable>
   );
 }
 

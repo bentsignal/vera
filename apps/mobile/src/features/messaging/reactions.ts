@@ -1,12 +1,12 @@
 import type { Reaction } from "@decentralized-convex/messages";
+import type { QueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { MAX_REACTION_MESSAGES } from "@decentralized-convex/messages";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-import { useHeldBatches } from "./held-batches";
-import { pdsResultOr } from "./results";
+import { cachedSelected, pdsResultOr } from "./results";
 
 /** The emoji offered first when reacting, in order. */
 export const QUICK_REACTIONS = ["❤️", "👍", "👎", "😂", "😮", "😢", "🔥", "🎉"];
@@ -182,42 +182,99 @@ export function reactionsQuery(
   });
 }
 
+/** Every reaction made after `since`: the newest messages' (see `windowParts`). */
+export function reactionsSinceQuery(
+  session: string,
+  conversationId: string,
+  since: number,
+) {
+  return pdsQuery({
+    args: { conversationId, since },
+    options: { select: (result) => pdsResultOr(result, [])?.flat() },
+    query: pds.messages.reactions,
+    session,
+  });
+}
+
+/** Whether the queries `sources` asks for have answers in the cache. */
+export function reactionsCached(
+  queryClient: QueryClient,
+  session: string,
+  conversationId: string,
+  { messageIds, since }: Pick<ReactionSources, "messageIds" | "since">,
+) {
+  const queries = [
+    ...messageIds
+      .flatMap(chunks)
+      .map((ids) => reactionsQuery(session, conversationId, ids)),
+    ...(since === undefined
+      ? []
+      : [reactionsSinceQuery(session, conversationId, since)]),
+  ];
+  return queries.every(
+    (query) => cachedSelected(queryClient, query) !== undefined,
+  );
+}
+
+/** Where a window's reactions come from (see `windowParts`). */
+export interface ReactionSources {
+  /** Batches of messages, each a fixed set, by page. */
+  readonly messageIds: readonly (readonly string[])[];
+  /** Everything reacted to after this, when set. */
+  readonly since: number | undefined;
+  /** The loaded messages `since` covers. */
+  readonly liveIds: readonly string[];
+}
+
 /**
- * Reactions to the loaded messages (one query per page, so paging never
- * refetches what is on screen) and a toggle that shows immediately.
+ * Reactions to the loaded messages, and a toggle that shows immediately.
+ * Each page's messages from before the window went live are asked for in
+ * fixed batches, so paging never refetches what's on screen, and newer
+ * ones by time, so a message arriving changes no query.
  */
 export function useReactions(
   session: string,
   conversationId: string,
-  pageMessageIds: readonly (readonly string[])[],
+  { liveIds, messageIds, since }: ReactionSources,
+  /**
+   * The window opening instead, if any (see `jumpToLatest`): asked for
+   * too, so they're there when it shows.
+   */
+  ahead?: Pick<ReactionSources, "messageIds" | "since">,
 ) {
   const [overrides, setOverrides] = useState<ReadonlyMap<string, boolean>>(
     new Map(),
   );
-  const batches = pageMessageIds.flatMap(chunks);
-  const held = useHeldBatches();
-  function batchQuery(messageIds: readonly string[]) {
-    return reactionsQuery(session, conversationId, messageIds);
+  const batches = messageIds.flatMap(chunks);
+  function queriesFor(ids: readonly (readonly string[])[], after?: number) {
+    return [
+      ...ids.map((batch) => reactionsQuery(session, conversationId, batch)),
+      ...(after === undefined
+        ? []
+        : [reactionsSinceQuery(session, conversationId, after)]),
+    ];
   }
-  const { loaded, ownLoaded, reactions } = useQueries({
-    queries: batches.map(batchQuery),
+  const { loaded, reactions } = useQueries({
+    queries: [
+      ...queriesFor(batches, since),
+      ...queriesFor(ahead?.messageIds.flatMap(chunks) ?? [], ahead?.since),
+    ],
     // TanStack shares this structurally with the last result, so a message
     // whose reactions didn't change keeps the same array and its row
     // doesn't redraw.
     combine: (results) => {
-      const answers = batches.map((messageIds, index) =>
-        held.answer(messageIds, results[index]?.data, batchQuery),
-      );
+      const sinceAnswer =
+        since === undefined ? undefined : results[batches.length]?.data;
       return {
-        loaded: batches.flatMap((messageIds, index) =>
-          answers[index] === undefined ? [] : messageIds,
-        ),
-        ownLoaded: batches.filter(
-          (_, index) => results[index]?.data !== undefined,
-        ),
+        loaded: [
+          ...batches.flatMap((ids, index) =>
+            results[index]?.data === undefined ? [] : ids,
+          ),
+          ...(sinceAnswer === undefined ? [] : liveIds),
+        ],
         reactions: Object.fromEntries(
           summarize(
-            answers.flatMap((answer) => answer ?? []),
+            results.flatMap((result) => result.data ?? []),
             session,
             overrides,
           ),
@@ -225,7 +282,6 @@ export function useReactions(
       };
     },
   });
-  held.remember(ownLoaded);
   const react = useMutation(
     pdsMutation({ mutation: pds.messages.react, session }),
   );
@@ -240,11 +296,14 @@ export function useReactions(
   }
 
   const loadedIds = new Set(loaded);
+  const live = new Set(liveIds);
 
   return {
     /** A message's reactions, or undefined while they are still loading. */
     reactionsOf: (messageId: string) =>
       loadedIds.has(messageId) ? (reactions[messageId] ?? NONE) : undefined,
+    /** The `since` of the query with a message's reactions, if it's by time. */
+    sinceOf: (messageId: string) => (live.has(messageId) ? since : undefined),
     toggle: (messageId: string, emoji: string, part: ReactionPart) => {
       const on = !(
         reactions[messageId]?.some(

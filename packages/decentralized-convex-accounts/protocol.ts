@@ -27,8 +27,11 @@ export const accountsProtocol = definePluginProtocol({
   mutations: {
     upsertMyProfile: defineOperation({
       args: v.object({
-        avatarUrl: v.union(v.null(), v.string()),
-        displayName: v.string(),
+        // Omitted fields keep their stored value; null explicitly removes a photo.
+        avatarUrl: v.optional(v.union(v.null(), v.string())),
+        displayName: v.optional(v.string()),
+        // Initialization must never overwrite a profile created by another request.
+        createOnly: v.optional(v.boolean()),
       }),
       returns: accountProfile,
     }),

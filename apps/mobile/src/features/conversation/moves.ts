@@ -78,12 +78,21 @@ export interface Growth {
   readonly list: AnimatedRef<View>;
   /** The space under the newest message for who's typing. */
   readonly typing: SharedValue<number>;
+  /** How far below that space the indicator is drawn (see `useTypingDrop`). */
+  readonly typingDrop: SharedValue<number>;
+  /** Whether that's down by the composer, for React. */
+  readonly typingDropped: boolean;
   /**
    * A thread's blank space, which moves the rows as it changes: it's
    * updated with the row's size at once, so the rows move once, and the
    * thread's original stays put while its replies move.
    */
   readonly blank?: Blank;
+  /**
+   * Counts moves as they start to ease, for the list's room for the
+   * composer to close with after a send (see `useComposerRoom`).
+   */
+  readonly moving?: SharedValue<number>;
 }
 
 /** No row is growing: no order is below it. No rows closing together. */
@@ -162,17 +171,23 @@ function belowScreen(growth: Growth, measured: AnimatedRef<View>) {
 
 /**
  * Updates a thread's blank space for content that changed by `delta`,
- * and returns how much it changed, which moves every row by that much.
+ * and returns how much the list's inset changed with it, which moves
+ * every row by that much. The inset is the larger of the blank space and
+ * the room for the keyboard and composer (`floor`): once a thread's blank
+ * space is less than that, a new reply moves the rows above it up as in a
+ * conversation, and counting the whole change in blank space drew them
+ * short of where they went, so they snapped the rest of the way.
  */
 function blankChange(blank: Blank | undefined, delta: number) {
   "worklet";
   if (blank === undefined) return 0;
+  const floor = blank.floor.get();
   const content = blank.content.get() + delta;
-  const before = blank.space.get();
-  const after = Math.max(0, blank.list.get() - content);
+  const before = Math.max(blank.space.get(), floor);
+  const space = Math.max(0, blank.list.get() - content);
   blank.content.set(content);
-  blank.space.set(after);
-  return after - before;
+  blank.space.set(space);
+  return Math.max(space, floor) - before;
 }
 
 /**
@@ -212,6 +227,7 @@ export function startMove(
   // ahead by as much.
   requestAnimationFrame(() => {
     const ease = { duration: GROW_MS, easing: GROW_EASING };
+    growth.moving?.set(growth.moving.get() + 1);
     move.below.set(withTiming(0, ease));
     move.offset.set(
       withTiming(0, ease, (finished) => {
@@ -303,6 +319,15 @@ export function rowShift(
     if (by !== 0 && move.pending.get()) pending = true;
   }
   return { pending, shift };
+}
+
+/** Whether any space hasn't reached the screen yet (see `Move`). */
+export function anyPending(moves: readonly Move[]) {
+  "worklet";
+  for (const move of moves) {
+    if (move.pending.get()) return true;
+  }
+  return false;
 }
 
 /** A transform to `translateY`, in the layout commit while it's `pending`. */

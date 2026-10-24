@@ -3,7 +3,11 @@ import type { View as NativeView } from "react-native";
 import type { AnimatedRef } from "react-native-reanimated";
 import { createContext, use, useState } from "react";
 import { View } from "react-native";
-import Animated, { useSharedValue } from "react-native-reanimated";
+import Animated, {
+  useAnimatedReaction,
+  useSharedValue,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import type {
   ReactionPart,
@@ -43,7 +47,12 @@ function Chips({
 /**
  * Chips that arrive while you watch, in space that opens to fit them. The
  * row moves up as it opens (see `useRowLift`), and the chips stay put:
- * they're drawn where they end up, and show as it opens.
+ * they're drawn where they end up, and pop in once the messages have
+ * started clearing the space, so they never cover what's below.
+ *
+ * They mount then rather than fading in with the space: a chip's glass
+ * that mounts under a parent with opacity below 1 can stay blank (see
+ * `GlassSurface`), as the first reaction on a message did.
  */
 function GrowingChips({
   open,
@@ -51,20 +60,34 @@ function GrowingChips({
   ...row
 }: ComponentProps<typeof ChipRow> & { open: boolean; room: Room }) {
   const [natural, setNatural] = useState(0);
-  // Shown as there's room for them, so they never cover what's below.
+  // Rises from 0 as the messages clear the space (see `showWithRoom`), and
+  // drops to 0 the moment it closes.
   const opened = useSharedValue(0);
-  const stay = usePieceLift(room.order, room.place, true, opened);
+  const [roomy, setRoomy] = useState(false);
+  useAnimatedReaction(
+    () => opened.get() > 0,
+    (now, before) => {
+      if (now !== before) scheduleOnRN(setRoomy, now);
+    },
+  );
+  const stay = usePieceLift(room.order, room.place, true);
   return (
     <View>
       <GrowingSpace height={open ? natural : 0} opened={opened} {...room} />
-      <Animated.View
-        // Laid out on its own, as wide as the row, so it has its full
-        // height whatever the space's.
-        className="absolute inset-x-0 top-0"
-        style={stay}
+      <View
+        // The chips' height, from a copy with no glass that's never drawn,
+        // laid out on its own as wide as the row so it has its full height
+        // whatever the space's.
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className="absolute inset-x-0 top-0 opacity-0"
         onLayout={(event) => setNatural(event.nativeEvent.layout.height)}
       >
-        {open && <ChipRow {...row} />}
+        {open && <ChipRow ghost {...row} />}
+      </View>
+      <Animated.View className="absolute inset-x-0 top-0" style={stay}>
+        {open && roomy && <ChipRow {...row} />}
       </Animated.View>
     </View>
   );

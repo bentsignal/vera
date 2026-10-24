@@ -1,11 +1,10 @@
+import { ofLatestTouch } from "./row-touch";
+
 /**
  * When a link in a message's text last took a tap (one tap lands at a
  * time), which then isn't the message's.
  */
-let linkTappedAt = 0;
-
-/** How long a link's tap keeps the message's tap from opening its thread. */
-const LINK_TAP_MS = 600;
+let linkTappedAt = Number.NEGATIVE_INFINITY;
 
 /**
  * Tells the message around it that a link took the tap, so the tap
@@ -15,7 +14,10 @@ export function linkTapped() {
   linkTappedAt = Date.now();
 }
 
-/** Whether a link just took the tap the message is seeing. */
+/**
+ * Whether a link took the tap the message is seeing: one since that touch
+ * began, however long what the link opened kept the message waiting.
+ */
 export function wasLinkTap() {
-  return Date.now() - linkTappedAt < LINK_TAP_MS;
+  return ofLatestTouch(linkTappedAt);
 }

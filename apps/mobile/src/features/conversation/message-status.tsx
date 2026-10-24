@@ -1,10 +1,20 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Alert, Pressable, Text } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import type { Message } from "./types";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { deleteOutgoing, retryOutgoing } from "~/features/messaging/outbox";
+import { Fading } from "./fading";
 
 function showNotSent(messageId: string) {
   Alert.alert(
@@ -39,19 +49,35 @@ export function SendingFade({
   status: Message["status"];
   children: ReactNode;
 }) {
+  const target = status === "sending" ? SENDING_OPACITY : 1;
+  // Its opacity as drawn, for glass inside it (see `useOpaque`), and as
+  // React draws it once it's there (see `useHeldHeight`).
+  const opacity = useSharedValue(target);
+  const [held, setHeld] = useState(target);
+  useAnimatedReaction(
+    () => target,
+    (now, before) => {
+      if (before === null || now === before) return;
+      opacity.set(
+        withTiming(
+          now,
+          { duration: SENT_FADE_MS, easing: Easing.out(Easing.quad) },
+          (finished) => {
+            if (finished === true) scheduleOnRN(setHeld, now);
+          },
+        ),
+      );
+    },
+  );
+  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
   return (
     <Animated.View
       // As one: Android otherwise fades each piece on its own, and the
       // bubble's tail shows darker where it overlaps the bubble.
       needsOffscreenAlphaCompositing
-      style={{
-        opacity: status === "sending" ? SENDING_OPACITY : 1,
-        transitionDuration: SENT_FADE_MS,
-        transitionProperty: "opacity",
-        transitionTimingFunction: "ease-out",
-      }}
+      style={[{ opacity: held }, style]}
     >
-      {children}
+      <Fading opacity={opacity}>{children}</Fading>
     </Animated.View>
   );
 }

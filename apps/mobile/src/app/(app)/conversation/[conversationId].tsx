@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Text, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -7,7 +7,9 @@ import type { ComposerHandle } from "~/features/conversation/composer";
 import type { MessageListHandle } from "~/features/conversation/message-list";
 import type { MessageLayout } from "~/features/preferences/store";
 import { Pending } from "~/components/pending";
+import { useAfterSend } from "~/features/conversation/after-send";
 import { useComposerBottomInset } from "~/features/conversation/composer";
+import { useComposerHeight } from "~/features/conversation/composer-height";
 import {
   CONVERSATION_HEADER_HEIGHT,
   ConversationHeader,
@@ -15,11 +17,11 @@ import {
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
 import { MessageList } from "~/features/conversation/message-list";
+import { usePacedMessages } from "~/features/conversation/paced-messages";
 import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
 import { useReplies } from "~/features/conversation/use-replies";
 import { useDevConversation } from "~/features/dev/dev-conversation";
-import { useDevTools } from "~/features/dev/dev-tools";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useMemberNotices } from "~/features/messaging/member-events";
@@ -158,17 +160,20 @@ function Conversation({
   const openInfo = useOpenInfo(conversationId);
   const composerBottomInset = useComposerBottomInset();
   const { address } = useAccount();
-  const devTools = useDevTools();
-  const viewReactions = useReactionsSheet(conversationId);
+  const afterSend = useAfterSend(conversationId);
   const messages = useMessages(conversationId, { anchor: anchorId });
+  const viewReactions = useReactionsSheet(conversationId, messages);
   const loaded = useConversation(conversationId, messages.messages);
   const { conversation, isLoading, profileOf, profilesLoaded } = loaded;
   const layout = useMessageLayout(conversation?.kind);
   const notices = useMemberNotices(conversationId, conversation, messages);
-  const typing = useConversationTyping(conversationId, messages.messages);
-  // Undefined until the composer is laid out: the list leaves room for it
-  // under the newest message, so it waits rather than shift once it knows.
-  const [composerHeight, setComposerHeight] = useState<number>();
+  // Others' new messages, paced in a busy conversation (who's typing
+  // follows what's shown, so a message grows out of its indicator).
+  const shownMessages = usePacedMessages(messages.messages, address);
+  const typing = useConversationTyping(conversationId, shownMessages);
+  // Not laid out yet: the list leaves room for it under the newest
+  // message, so it waits rather than shift once it knows.
+  const { composerHeight, report } = useComposerHeight();
   const list = useRef<MessageListHandle>(null);
   useWhileOpen(conversationId, messages);
 
@@ -181,7 +186,7 @@ function Conversation({
   });
   const shown =
     listReady([messages, notices, typing], layout, profilesLoaded) &&
-    composerHeight !== undefined;
+    composerHeight.laidOut !== undefined;
   const pending = useOpening(conversationId, messages, shown);
   if (!isLoading && conversation === undefined) {
     return (
@@ -200,7 +205,7 @@ function Conversation({
           <MessageList
             ref={list}
             key={messages.viewKey}
-            messages={messages.messages}
+            messages={shownMessages}
             notices={notices.notices}
             self={address}
             layout={layout}
@@ -234,7 +239,7 @@ function Conversation({
         ref={composer}
         draftId={conversationId}
         mentionable={mentionableIn(conversation, address, profileOf)}
-        onHeight={setComposerHeight}
+        report={report}
         onChangeText={typing.report}
         replyingTo={replies.replyingTo}
         onCancelReply={replies.cancel}
@@ -243,7 +248,7 @@ function Conversation({
           messages.sendMessage(draft, replies.replyTo);
           replies.cancel();
           list.current?.scrollToLatest();
-          devTools.replyToMe(conversationId);
+          afterSend();
         }}
       />
     </View>

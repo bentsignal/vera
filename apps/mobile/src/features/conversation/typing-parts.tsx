@@ -186,7 +186,6 @@ function TypingBubble({
         className="items-center justify-center"
         style={{
           backgroundColor: fill,
-          borderCurve: "continuous",
           borderRadius: BUBBLE_RADIUS,
           height: BUBBLE_SPACE.bubble,
           marginBottom: BUBBLE_SPACE.bottom,

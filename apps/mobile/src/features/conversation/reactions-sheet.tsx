@@ -3,15 +3,19 @@ import { useState } from "react";
 import { FlatList, Platform, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
-import { useQuery } from "@tanstack/react-query";
-import { pdsQuery } from "@decentralized-convex/tanstack-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  pdsQuery,
+  pdsSessionQueryKey,
+} from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { ReactionPart } from "~/features/messaging/reactions";
 import { Avatar } from "~/components/avatar";
 import { useAccount } from "~/features/messaging/account";
+import { loadedBatchWith } from "~/features/messaging/loaded-batch";
 import { useProfiles } from "~/features/messaging/profiles";
-import { reactionPart } from "~/features/messaging/reactions";
+import { reactionPart, reactionsQuery } from "~/features/messaging/reactions";
 import { pdsResult } from "~/features/messaging/results";
 import { cn } from "~/lib/cn";
 import { selectionTick } from "~/lib/native-extras";
@@ -149,6 +153,43 @@ function Title() {
 }
 
 /**
+ * The reactions the sheet lists, from the conversation's query that has
+ * this message's: by time for its newest messages (`since`), otherwise the
+ * one for this message's batch. Those are already loaded and live, so the
+ * sheet shows them at once. A query of its own would show an empty sheet
+ * until the PDS answered, which on a slow connection looked like nobody
+ * had reacted.
+ */
+function useMessageReactions(
+  conversationId: string,
+  messageId: string,
+  since: number | undefined,
+) {
+  const { address } = useAccount();
+  const queryClient = useQueryClient();
+  const [messageIds] = useState(
+    () =>
+      loadedBatchWith(
+        queryClient.getQueriesData({ queryKey: pdsSessionQueryKey(address) }),
+        (ids) => reactionsQuery(address, conversationId, ids).queryKey,
+        messageId,
+      ) ?? [messageId],
+  );
+  const { data } = useQuery(
+    pdsQuery({
+      args:
+        since === undefined
+          ? { conversationId, messageIds }
+          : { conversationId, since },
+      options: { select: (result) => pdsResult(result)?.flat() },
+      query: pds.messages.reactions,
+      session: address,
+    }),
+  );
+  return data;
+}
+
+/**
  * Who reacted to a part of a message (see `ReactionPart`), like Discord's sheet: a tab for everyone and
  * one per emoji with its count, and the people under the selected tab, each
  * with what they reacted with. It draws its own title, since a native
@@ -159,25 +200,26 @@ export function ReactionsSheet({
   messageId,
   part,
   emoji,
+  since,
 }: {
   conversationId: string;
   messageId: string;
   part: ReactionPart;
   /** The tab to open on, such as the reaction that was held. */
   emoji?: string;
+  /**
+   * The conversation's query by time that has this message's reactions,
+   * when it's one of the newest (see `ReactionSources`).
+   */
+  since?: number;
 }) {
-  const { address } = useAccount();
-  const { data } = useQuery(
-    pdsQuery({
-      args: { conversationId, messageIds: [messageId] },
-      options: { select: (result) => pdsResult(result)?.flat() },
-      query: pds.messages.reactions,
-      session: address,
-    }),
-  );
+  const data = useMessageReactions(conversationId, messageId, since);
   const [picked, setPicked] = useState(emoji ?? ALL);
   const reactors = byPerson(
-    (data ?? []).filter((reaction) => reactionPart(reaction) === part),
+    (data ?? []).filter(
+      (reaction) =>
+        reaction.messageId === messageId && reactionPart(reaction) === part,
+    ),
   );
   const groups = byEmoji(reactors);
   // With one emoji, everyone already used it: no tabs, just the people.

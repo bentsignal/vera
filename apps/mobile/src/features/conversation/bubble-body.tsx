@@ -40,7 +40,6 @@ export function BubbleBody({
         // One that grew draws its background in a view of its own (see
         // `BubbleBackdrop`), so this one's never changes.
         backgroundColor: grows ? undefined : fill,
-        borderCurve: "continuous",
         borderRadius: BUBBLE_RADIUS,
         // Room for the tail hanging below, so nothing under it overlaps.
         marginBottom: tail ? TAIL_DROP : 0,
@@ -58,6 +57,7 @@ export function BubbleBody({
         <LinkedText
           text={text}
           mentions={mentions}
+          onAccent={isOwn}
           className={cn(
             "text-body leading-[22px]",
             isOwn ? "text-on-accent" : "text-foreground",

@@ -138,21 +138,29 @@ export class RoutedPdsQueryObserver<
       { id: this.#home.ids[0] ?? this.#home.url, url: this.#home.url },
       ...resolved,
     ]);
-    this.#removeStaleTargets(targets);
+    const removed = this.#removeStaleTargets(targets);
+    const first = !this.#routesResolved;
     this.#routesResolved = true;
-    this.#addTargets(targets);
-    this.#publish();
+    const added = this.#addTargets(targets);
+    // Every update from home brings its routes; only a change to them
+    // changes what this shows. Publishing again otherwise would show the
+    // same result twice for every update.
+    if (first || removed || added) this.#publish();
   }
 
+  /** Stops asking PDSes no longer routed to; whether there were any. */
   #removeStaleTargets(targets: readonly { readonly url: string }[]) {
     const desiredUrls = new Set(targets.map(({ url }) => url));
+    let removed = false;
     for (const url of this.#sources.keys()) {
       if (url === this.#home.url || desiredUrls.has(url)) continue;
       this.#unsubscribes.get(url)?.();
       this.#unsubscribes.delete(url);
       this.#clearInitialResponseTimer(url);
       this.#sources.delete(url);
+      removed = true;
     }
+    return removed;
   }
 
   #addTargets(
@@ -182,6 +190,7 @@ export class RoutedPdsQueryObserver<
         ),
       );
     }
+    return added.length > 0;
   }
 
   #update(

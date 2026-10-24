@@ -6,6 +6,7 @@ import { alertsFor } from "./alerts.ts";
 import { unreadCount } from "./chatMessages.ts";
 import { inboxAccess } from "./inbox.ts";
 import { pendingInvites } from "./model.ts";
+import { readPosition } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
 import { unreadThreadCount } from "./threadLists.ts";
 
@@ -33,12 +34,12 @@ async function homeCount(
   );
   const [unread, threads] = await Promise.all([
     Promise.all(
-      listed.map((access) =>
+      listed.map(async (access) =>
         unreadCount(
           ctx,
           access.conversation.conversationId,
           accountId,
-          access.lastReadAt,
+          await readPosition(ctx, access, accountId),
         ),
       ),
     ),

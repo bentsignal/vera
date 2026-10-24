@@ -1,5 +1,5 @@
 import type { DiscoveredPds } from "@decentralized-convex/client";
-import { QueryClient } from "@tanstack/react-query";
+import { notifyManager, QueryClient } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import {
   PdsQueryClient,
@@ -28,6 +28,70 @@ import {
  */
 export const queryClient = new QueryClient({
   defaultOptions: { queries: { gcTime: 10 * 60 * 1000 } },
+});
+
+// How often screens learn of new query results: in the next frame, but at
+// most every `NOTIFY_GAP_MS`. A busy conversation sends many updates a
+// second (each message, read state, typing, the inbox behind it), each a
+// separate message on the connection, and each redrew the app on its own;
+// every redraw has a cost however little changed. While something you did
+// is on its way (a mutation), they show in the next frame, so what it
+// changes shows at once; so does a query's first result, which a screen
+// opening or a page of older messages is waiting on (the throttle held
+// each of those up by as much again).
+const NOTIFY_GAP_MS = 400;
+let notifiedAt = -Infinity;
+/** A query got its first result since screens last heard. */
+let firstResult = false;
+/** Queries that have had a result (a PDS query starts out `loading`). */
+const answered = new WeakSet<object>();
+function isLoading(data: unknown) {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "status" in data &&
+    data.status === "loading"
+  );
+}
+queryClient.getQueryCache().subscribe((event) => {
+  // Before the notification it brings reaches the scheduler: the cache
+  // tells its listeners straight away, and screens through the scheduler.
+  if (
+    event.type === "updated" &&
+    event.action.type === "success" &&
+    !answered.has(event.query) &&
+    !isLoading(event.query.state.data)
+  ) {
+    answered.add(event.query);
+    firstResult = true;
+  }
+});
+/** Whether something you did is on its way (not `background` upkeep). */
+function yoursPending() {
+  return (
+    queryClient.isMutating({
+      predicate: (mutation) => mutation.meta?.background !== true,
+    }) > 0
+  );
+}
+let notifyTimer: ReturnType<typeof setTimeout> | undefined;
+const notifies = new Array<() => void>();
+function notifyNow() {
+  clearTimeout(notifyTimer);
+  notifyTimer = undefined;
+  firstResult = false;
+  requestAnimationFrame(() => {
+    notifiedAt = performance.now();
+    for (const notify of notifies.splice(0)) notify();
+  });
+}
+notifyManager.setScheduler((notify) => {
+  notifies.push(notify);
+  const yours = firstResult || yoursPending();
+  if (notifies.length > 1 && !yours) return;
+  const wait = notifiedAt + NOTIFY_GAP_MS - performance.now();
+  if (wait <= 0 || yours) notifyNow();
+  else notifyTimer ??= setTimeout(notifyNow, wait);
 });
 
 /** Something that runs for each account session while it lasts. */

@@ -30,12 +30,17 @@ export type {
   FederationDescriptor,
   RegisterFederationRoutesOptions,
 } from "./descriptor.ts";
-export { defineComponentDispatchers, definePdsRouter } from "./dispatcher.ts";
+export { defineComponentDispatchers } from "./dispatcher.ts";
+export { definePdsRouter } from "./pds-router.ts";
 export type {
   DispatcherIdentity,
   OperationHandlerContext,
   OperationHandlers,
   QueryOperationHandlers,
 } from "./dispatcher.ts";
+export type {
+  PdsRouterMutation,
+  PdsRouterMutationRequest,
+} from "./pds-router.ts";
 export { queryResult, routedQueryResult } from "./routed-query.ts";
 export type { RoutedQueryResult } from "./routed-query.ts";

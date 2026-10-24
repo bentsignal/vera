@@ -1,153 +1,82 @@
-import type { Message as PdsMessage } from "@decentralized-convex/messages";
 import type { QueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useQueries } from "@tanstack/react-query";
-import { pdsQuery } from "@decentralized-convex/tanstack-query";
-import { pds } from "@vera/backend/pds";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 
-import { pdsResult } from "./results";
+import type { PageCursor, PageData, View } from "./window-model";
+import type { Page, WindowSource } from "./window-pages";
+import { isLive } from "./stay-live";
+import {
+  anchoredView,
+  follow,
+  latestView,
+  mergePages,
+  pageAfter,
+  pageKey,
+  reusable,
+  windowParts,
+  withPage,
+} from "./window-model";
+import { cachedPage, listPageQuery, pageQuery } from "./window-pages";
 
-type PageCursor =
-  | { readonly after: number }
-  | { readonly around: string }
-  | { readonly before: number };
+// The pages a screen shows of a conversation or a thread, and how they
+// follow new messages: see window-model.ts.
 
-interface View {
-  /** The message the window opened on, or undefined for the latest. */
-  readonly anchor: string | undefined;
-  /**
-   * The page the window opened with. Loading more never changes it, so the
-   * list only remounts when the window reopens.
-   */
-  readonly opened: PageCursor;
-  /** Oldest page first. */
-  readonly pages: readonly PageCursor[];
-  /** The pages it opened with, which must load before anything shows. */
-  readonly initial: readonly PageCursor[];
-}
+export type { WindowSource } from "./window-pages";
 
-/** A page cursor's identity, stable across renders. */
-function pageKey(cursor: PageCursor) {
-  return JSON.stringify(cursor);
-}
-
+/** The window each conversation last showed this app session, and when. */
+const lastWindows = new Map<string, { view: View; at: number }>();
 /**
- * When each conversation's latest window opened this app session. Reusing
- * it keeps query keys stable, so reopening a conversation shows cached
- * messages immediately instead of fetching from scratch.
+ * Past this, so many messages may have arrived that a fresh window is
+ * better. A window still live (see `stayLive`) is current anyway; one that
+ * isn't shows what it last had while the PDS catches it up, and opens again
+ * at the latest if it turns out to be more than a page behind.
  */
-const openedAtByConversation = new Map<string, number>();
-/** Past this, so many messages may have arrived that a fresh window is better. */
 const REUSE_WINDOW_MS = 10 * 60 * 1000;
 
-/**
- * Pages for the latest messages. The first page is frozen at the moment the
- * conversation opened, and a live tail page collects everything after it,
- * so new messages never shift the older pages.
- */
-function latestWindow(windowKey: string, reopen = false) {
-  const previous = openedAtByConversation.get(windowKey);
-  const openedAt =
-    !reopen && previous !== undefined && Date.now() - previous < REUSE_WINDOW_MS
-      ? previous
-      : Date.now();
-  openedAtByConversation.set(windowKey, openedAt);
-  return windowAt(openedAt);
+function windowKeyOf(session: string, source: WindowSource) {
+  return [session, source.conversationId, source.threadId ?? ""].join(" ");
 }
 
-/** The window over the latest messages as of `openedAt`. */
-function windowAt(openedAt: number) {
-  const opened = { before: openedAt + 1 };
-  const pages = [opened, { after: openedAt }];
-  return { anchor: undefined, initial: pages, opened, pages } satisfies View;
-}
-
-function anchoredWindow(messageId: string) {
-  const opened = { around: messageId };
-  return {
-    anchor: messageId,
-    initial: [opened],
-    opened,
-    pages: [opened],
-  } satisfies View;
-}
-
-/** What a window pages through: a conversation, or one thread in it. */
-export interface WindowSource {
-  readonly conversationId: string;
-  /** The thread's original message, for a thread's replies. */
-  readonly threadId?: string;
+/** The view a window over the latest messages opens with, remembered. */
+function openLatest(
+  queryClient: QueryClient,
+  session: string,
+  source: WindowSource,
+  now = Date.now(),
+) {
+  const windowKey = windowKeyOf(session, source);
+  const last = lastWindows.get(windowKey);
+  const lastCursor = last?.view.pages.at(-1);
+  const lastPage =
+    lastCursor === undefined
+      ? undefined
+      : cachedPage(queryClient, session, source, lastCursor);
+  if (
+    last !== undefined &&
+    reusable(last.view, lastPage, {
+      age: now - last.at,
+      maxAge: REUSE_WINDOW_MS,
+    })
+  ) {
+    // Followed again only once the PDS confirms its pages (`advance`).
+    return isLive(queryClient, session, source.conversationId)
+      ? last.view
+      : { ...last.view, followed: [] };
+  }
+  const view = latestView(now);
+  lastWindows.set(windowKey, { at: now, view });
+  return view;
 }
 
 /**
- * Combines what every PDS returned for one page cursor. A thread's page
- * also has its original, from whichever PDS stores it.
+ * Remembers the window a screen shows, to open with it again, and when it
+ * opened at the latest messages.
  */
-function mergeSources(
-  sources: readonly {
-    hasNewer: boolean;
-    hasOlder: boolean;
-    messages: PdsMessage[];
-    root?: PdsMessage | null;
-  }[],
-) {
-  return {
-    hasNewer: sources.some((source) => source.hasNewer),
-    hasOlder: sources.some((source) => source.hasOlder),
-    messages: sources.flatMap((source) => source.messages),
-    root: sources.find((source) => source.root != null)?.root ?? null,
-  };
-}
-
-/** Every loaded message once, oldest first. */
-function mergePages(pages: readonly { data?: { messages: PdsMessage[] } }[]) {
-  const byId = new Map(
-    pages
-      .flatMap((page) => page.data?.messages ?? [])
-      .map((message) => [message.messageId, message] as const),
-  );
-  return [...byId.values()].sort(
-    (left, right) =>
-      left.sentAt - right.sentAt ||
-      left.messageId.localeCompare(right.messageId),
-  );
-}
-
-function listPageQuery(
-  session: string,
-  conversationId: string,
-  cursor: PageCursor,
-) {
-  return pdsQuery({
-    args: { conversationId, ...cursor },
-    options: {
-      select: (result) => {
-        const sources = pdsResult(result);
-        return sources === undefined ? undefined : mergeSources(sources);
-      },
-    },
-    query: pds.messages.list,
-    session,
-  });
-}
-
-function threadPageQuery(
-  session: string,
-  { conversationId, threadId }: Required<WindowSource>,
-  cursor: PageCursor,
-) {
-  return pdsQuery({
-    // A thread always opens at its latest replies.
-    args: { conversationId, threadId, ...("around" in cursor ? {} : cursor) },
-    options: {
-      select: (result) => {
-        const sources = pdsResult(result);
-        return sources === undefined ? undefined : mergeSources(sources);
-      },
-    },
-    query: pds.messages.thread,
-    session,
-  });
+function remember(windowKey: string, view: View) {
+  const last = lastWindows.get(windowKey);
+  if (last?.view === view || view.anchor !== undefined) return;
+  const same = last !== undefined && last.view.liveSince === view.liveSince;
+  lastWindows.set(windowKey, { at: same ? last.at : Date.now(), view });
 }
 
 /**
@@ -159,8 +88,8 @@ export function prefetchLatestMessages(
   session: string,
   conversationId: string,
 ) {
-  const windowKey = windowKeyOf(session, { conversationId });
-  for (const cursor of latestWindow(windowKey).pages) {
+  const source = { conversationId };
+  for (const cursor of openLatest(queryClient, session, source).pages) {
     void queryClient.prefetchQuery(
       listPageQuery(session, conversationId, cursor),
     );
@@ -177,9 +106,9 @@ export function refetchLatestMessages(
   session: string,
   conversationId: string,
 ) {
-  const windowKey = windowKeyOf(session, { conversationId });
+  const source = { conversationId };
   return Promise.all(
-    latestWindow(windowKey).pages.map((cursor) =>
+    openLatest(queryClient, session, source).pages.map((cursor) =>
       queryClient.fetchQuery({
         ...listPageQuery(session, conversationId, cursor),
         staleTime: 0,
@@ -188,16 +117,13 @@ export function refetchLatestMessages(
   );
 }
 
-function windowKeyOf(session: string, source: WindowSource) {
-  return [session, source.conversationId, source.threadId ?? ""].join(" ");
-}
-
 /**
  * When the conversation's latest window opened this app session, if it
  * has: its pages are the latest messages a screen has shown.
  */
 export function latestOpenedAt(session: string, conversationId: string) {
-  return openedAtByConversation.get(windowKeyOf(session, { conversationId }));
+  return lastWindows.get(windowKeyOf(session, { conversationId }))?.view
+    .liveSince;
 }
 
 /** The pages of the conversation's latest window opened at `openedAt`. */
@@ -206,124 +132,197 @@ export function latestPageQueries(
   conversationId: string,
   openedAt: number,
 ) {
-  return windowAt(openedAt).pages.map((cursor) =>
+  return latestView(openedAt).pages.map((cursor) =>
     listPageQuery(session, conversationId, cursor),
   );
+}
+
+/** The queries the pages of a window opened at `openedAt` show with. */
+export function latestPageParts(openedAt: number, pages: readonly PageData[]) {
+  return windowParts(latestView(openedAt), pages);
+}
+
+/** The window's pages, as the list and its reactions and threads use them. */
+function pagesOf(view: View, results: readonly { data?: Page }[], offset = 0) {
+  const initial = new Set(view.initial);
+  return view.pages.map((cursor, index) => ({
+    initial: initial.has(cursor),
+    key: pageKey(cursor),
+    data: results[offset + index]?.data,
+  }));
+}
+
+type WindowState = ReturnType<typeof follow>;
+type SetWindowState = (update: (current: WindowState) => WindowState) => void;
+
+/**
+ * The window's view and the one it's opening instead, following new
+ * messages as they arrive (see `follow`), and opening again at the latest
+ * when it falls behind.
+ */
+function useWindowState(
+  session: string,
+  source: WindowSource,
+  anchor: string | undefined,
+) {
+  const queryClient = useQueryClient();
+  const [openedAt] = useState(Date.now);
+  // What's in the cache from before is current if the conversation was
+  // still live; otherwise only what the PDS has sent since opening is.
+  const [liveBefore] = useState(() =>
+    isLive(queryClient, session, source.conversationId),
+  );
+  const [state, setState] = useState<WindowState>(() => ({
+    next: undefined,
+    view:
+      anchor === undefined || source.threadId !== undefined
+        ? openLatest(queryClient, session, source, openedAt)
+        : anchoredView(anchor),
+  }));
+  const { next, view } = state;
+  remember(windowKeyOf(session, source), view);
+  const results = useQueries({
+    queries: [...view.pages, ...(next?.pages ?? [])].map((cursor) =>
+      pageQuery(session, source, cursor),
+    ),
+  });
+  function resultsOf(shown: View | undefined, offset: number) {
+    return (shown?.pages ?? []).map((_, index) => {
+      const result = results[offset + index];
+      return result?.data === undefined
+        ? undefined
+        : {
+            at: result.dataUpdatedAt,
+            data: result.data,
+            fresh: liveBefore || result.dataUpdatedAt >= openedAt,
+          };
+    });
+  }
+  const followed = follow(
+    state,
+    resultsOf(view, 0),
+    resultsOf(next, view.pages.length),
+  );
+  if (followed !== state) setState(followed);
+  return { results, setState, state };
+}
+
+/** What the screen asks of the window, besides what it shows. */
+function windowActions(
+  setState: SetWindowState,
+  windowKey: string,
+  { first, last, live, messages }: ReturnType<typeof shownPages>,
+) {
+  function addPage(cursor: PageCursor, at: "end" | "start") {
+    setState((current) => ({
+      ...current,
+      view: withPage(current.view, cursor, at),
+    }));
+  }
+  return {
+    /** Shows the window it's been opening instead. */
+    showNext: () =>
+      setState((current) =>
+        current.next === undefined
+          ? current
+          : { next: undefined, view: current.next },
+      ),
+    /**
+     * Opens at the latest messages, keeping what's shown until they've
+     * loaded.
+     */
+    jumpToLatest: () =>
+      setState((current) => ({
+        ...current,
+        next: current.next ?? latestView(Date.now()),
+      })),
+    /**
+     * Opens instead at the latest messages as they were at `openedAt`, as
+     * saved then (see `features/saved`). Messages since then join below
+     * them as they load, so nothing already showing moves.
+     */
+    openAt: (savedAt: number) => {
+      const saved = latestView(savedAt);
+      lastWindows.set(windowKey, { at: Date.now(), view: saved });
+      setState(() => ({ next: undefined, view: saved }));
+    },
+    loadNewer: () => {
+      const newest = messages.at(-1);
+      if (live || last?.hasNewer !== true || newest === undefined) return;
+      addPage(pageAfter(newest), "end");
+    },
+    loadOlder: () => {
+      const oldest = messages[0];
+      if (first?.hasOlder !== true || oldest === undefined) return;
+      addPage({ before: oldest.sentAt }, "start");
+    },
+  };
+}
+
+/** What the window's loaded pages show. */
+function shownPages(view: View, pages: readonly { data?: Page }[]) {
+  const data = pages.map((page) => page.data);
+  return {
+    first: data[0],
+    last: data.at(-1),
+    /**
+     * At the latest messages and following new ones. Its newest page can
+     * be momentarily full while the next one loads; the window is still at
+     * the latest.
+     */
+    live: view.liveSince !== undefined,
+    messages: mergePages(data),
+    parts: windowParts(view, data),
+    root: data.find((page) => page?.root != null)?.root ?? null,
+  };
 }
 
 /**
  * A scrollable window over a conversation (or a thread's replies), oldest
  * first, that can open at the latest message or around a specific one and
- * grow in either direction.
+ * grow in either direction. At the latest messages it follows new ones as
+ * they arrive (see window-model.ts).
  */
 export function useMessageWindow(
   session: string,
   source: WindowSource,
   anchor?: string,
 ) {
-  const windowKey = windowKeyOf(session, source);
-  const [view, setView] = useState<View>(() =>
-    anchor === undefined || source.threadId !== undefined
-      ? latestWindow(windowKey)
-      : anchoredWindow(anchor),
-  );
-  const { conversationId, threadId } = source;
-  const pages = useQueries({
-    queries: view.pages.map((cursor) =>
-      threadId === undefined
-        ? listPageQuery(session, conversationId, cursor)
-        : threadPageQuery(session, { conversationId, threadId }, cursor),
-    ),
-  });
-
-  const messages = mergePages(pages);
-  const initial = new Set(view.initial);
-  const first = pages[0]?.data;
-  const last = pages.at(-1)?.data;
-  const hasOlder = first?.hasOlder ?? false;
-  const hasNewer = last?.hasNewer ?? false;
-
-  /**
-   * Adds a page unless the window already has it: the list can ask twice
-   * before the first request lands.
-   */
-  function addPage(cursor: PageCursor, at: "end" | "start") {
-    const key = pageKey(cursor);
-    setView((current) => {
-      if (current.pages.some((page) => pageKey(page) === key)) return current;
-      return {
-        ...current,
-        pages:
-          at === "start"
-            ? [cursor, ...current.pages]
-            : [...current.pages, cursor],
-      };
-    });
-  }
-
-  function loadOlder() {
-    const oldest = messages[0];
-    if (!hasOlder || oldest === undefined) return;
-    addPage({ before: oldest.sentAt }, "start");
-  }
-
-  function loadNewer() {
-    const newest = messages.at(-1);
-    if (!hasNewer || newest === undefined) return;
-    addPage({ after: newest.sentAt }, "end");
-  }
-
+  const { results, setState, state } = useWindowState(session, source, anchor);
+  const { next, view } = state;
+  const shown = shownPages(view, results.slice(0, view.pages.length));
   return {
+    ...windowActions(setState, windowKeyOf(session, source), shown),
     anchor: view.anchor,
-    /** Each loaded page's message IDs, for per-page reaction queries. */
-    pageMessageIds: pages.map(
-      (page) => page.data?.messages.map((message) => message.messageId) ?? [],
-    ),
-    /**
-     * Each loaded page's threads: its messages' and its replies' (whose
-     * original may be on another page), for per-page summary queries.
-     */
-    pageThreadIds: pages.map((page) => [
-      ...new Set(
-        page.data?.messages.map(
-          (message) => message.threadId ?? message.messageId,
-        ) ?? [],
-      ),
-    ]),
+    /** Which queries the loaded pages' reactions and threads come from. */
+    parts: shown.parts,
     /** A thread's original message, once a page has it. */
-    root: pages.find((page) => page.data?.root != null)?.data?.root ?? null,
+    root: shown.root,
     /**
-     * Each page by key, oldest first, with its message IDs once it has
-     * loaded, and whether it is one the window opened with.
+     * Each page by key, oldest first, with its data once it has loaded,
+     * and whether it is one the window opened with.
      */
-    pages: view.pages.map((cursor, index) => ({
-      initial: initial.has(cursor),
-      key: pageKey(cursor),
-      messageIds: pages[index]?.data?.messages.map(
-        (message) => message.messageId,
-      ),
-      /** Its messages' threads (a reply's is its original). */
-      threadIds: pages[index]?.data?.messages.map(
-        (message) => message.threadId ?? message.messageId,
-      ),
-    })),
+    pages: pagesOf(view, results),
+    /**
+     * The window it's opening instead (see `jumpToLatest`), with its
+     * pages and parts, shown once they've loaded (`showNext`).
+     */
+    next:
+      next === undefined
+        ? undefined
+        : {
+            pages: pagesOf(next, results, view.pages.length),
+            parts: windowParts(
+              next,
+              results.slice(view.pages.length).map((page) => page.data),
+            ),
+          },
     /** Changes whenever the window reopens, so lists can remount. */
     viewKey: pageKey(view.opened),
-    hasNewer,
-    hasOlder,
-    /** Drops the loaded pages and reopens at the latest message. */
-    jumpToLatest: () => setView(latestWindow(windowKey, true)),
-    /**
-     * Opens instead at the latest messages as they were at `openedAt`, as
-     * saved then (see `features/saved`). Messages since then join below
-     * them as they load, so nothing already showing moves.
-     */
-    openAt: (openedAt: number) => {
-      openedAtByConversation.set(windowKey, openedAt);
-      setView(windowAt(openedAt));
-    },
-    loadNewer,
-    loadOlder,
-    messages,
+    live: shown.live,
+    /** There are newer messages than the window has, out of its reach. */
+    hasNewer: !shown.live && shown.last?.hasNewer === true,
+    hasOlder: shown.first?.hasOlder === true,
+    messages: shown.messages,
   };
 }

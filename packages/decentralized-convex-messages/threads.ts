@@ -5,7 +5,11 @@ import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { messagesProtocol, Quote, ThreadSummary } from "./protocol.ts";
 import { fail, memberAddresses, requireAccess, toMessage } from "./model.ts";
 import { pageOf } from "./paging.ts";
-import { MAX_REACTION_MESSAGES, MAX_REPLIERS } from "./protocol.ts";
+import {
+  MAX_REACTION_MESSAGES,
+  MAX_REPLIERS,
+  MAX_SINCE_RESULTS,
+} from "./protocol.ts";
 import { recordSighting, seeMentions, threadKey } from "./sightings.ts";
 
 // Replies and threads. A reply is a message with `threadId`, the ID of its
@@ -209,23 +213,39 @@ export async function thread(
   };
 }
 
-/** The given messages' threads that have replies stored here. */
+/** The given messages' threads, or those replied to after `since`. */
+async function threadRowsFor(
+  ctx: QueryCtx,
+  { conversationId, messageIds = [], since }: Args<"threadSummaries">,
+) {
+  if (since !== undefined) {
+    return ctx.db
+      .query("threads")
+      .withIndex("by_conversation_reply", (index) =>
+        index.eq("conversationId", conversationId).gt("lastReplyAt", since),
+      )
+      .order("desc")
+      .take(MAX_SINCE_RESULTS);
+  }
+  if (messageIds.length > MAX_REACTION_MESSAGES) fail("TOO_MANY_MESSAGES");
+  // Read concurrently, like reactions.
+  return Promise.all(
+    [...new Set(messageIds)].map((messageId) => threadRow(ctx, messageId)),
+  );
+}
+
+/**
+ * The given messages' threads that have replies stored here, or with
+ * `since`, those replied to after then.
+ */
 export async function threadSummaries(
   ctx: QueryCtx,
   self: string,
   args: Args<"threadSummaries">,
 ) {
   const { conversation } = await requireAccess(ctx, args.conversationId, self);
-  if (args.messageIds.length > MAX_REACTION_MESSAGES) {
-    fail("TOO_MANY_MESSAGES");
-  }
-  // Read concurrently, like reactions.
   const [rows, routes] = await Promise.all([
-    Promise.all(
-      [...new Set(args.messageIds)].map((messageId) =>
-        threadRow(ctx, messageId),
-      ),
-    ),
+    threadRowsFor(ctx, args),
     memberAddresses(ctx, conversation),
   ]);
   const summaries: ThreadSummary[] = rows.flatMap((row) =>

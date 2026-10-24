@@ -1,6 +1,6 @@
 import type { SharedValue } from "react-native-reanimated";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
 import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
@@ -14,6 +14,8 @@ import { cn } from "~/lib/cn";
 
 /** The jump button's size. */
 const JUMP_SIZE = 40;
+/** How far above the composer it sits. */
+const GAP = 12;
 
 function JumpChevron() {
   return (
@@ -34,14 +36,18 @@ function JumpChevron() {
  */
 export function JumpToLatest({
   visible,
-  bottom,
+  above,
   onPress,
 }: {
   visible: SharedValue<boolean>;
-  /** Distance from the bottom edge, above the floating composer. */
-  bottom: number;
+  /** The floating composer's height, which it sits `GAP` above. */
+  above: SharedValue<number>;
   onPress: () => void;
 }) {
+  // Moved, not laid out again, as the composer changes height.
+  const lift = useAnimatedStyle(() => ({
+    transform: [{ translateY: -above.get() }],
+  }));
   const [shown, setShown] = useState(false);
   useAnimatedReaction(
     () => visible.value,
@@ -56,10 +62,10 @@ export function JumpToLatest({
     ],
   }));
   return (
-    <View
+    <Animated.View
       pointerEvents={shown ? "box-none" : "none"}
       className="absolute right-4"
-      style={{ bottom }}
+      style={[{ bottom: GAP }, lift]}
     >
       <Pressable
         accessibilityRole="button"
@@ -83,6 +89,6 @@ export function JumpToLatest({
           </Animated.View>
         </GlassSurface>
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }

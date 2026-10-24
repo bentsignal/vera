@@ -2,12 +2,13 @@ import type {
   Attachment,
   Message as PdsMessage,
 } from "@decentralized-convex/messages";
-import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { OutgoingDraft, OutgoingMessage } from "./outbox";
+import type { ReactionSummary } from "./reactions";
 import type {
   Message,
   ReplyTarget,
@@ -16,9 +17,11 @@ import type {
 import { useAccount } from "./account";
 import { useMessageWindow } from "./message-window";
 import { sendOutgoing, useOutbox } from "./outbox";
-import { useReactions } from "./reactions";
+import { reactionsCached, useReactions } from "./reactions";
+import { useMarkUpTo } from "./read-marks";
 import { shownMessage, shownUnconfirmed } from "./shown-messages";
-import { useThreadSummaries } from "./threads";
+import { summariesCached, useThreadSummaries } from "./threads";
+import { unconfirmedSends } from "./unconfirmed";
 
 /**
  * The pages whose messages show. The pages the window opened with wait for
@@ -31,20 +34,13 @@ import { useThreadSummaries } from "./threads";
  */
 function useSettledPages(
   pages: ReturnType<typeof useMessageWindow>["pages"],
-  isComplete: (page: {
-    messageIds: readonly string[];
-    threadIds: readonly string[];
-  }) => boolean,
+  isComplete: (messages: readonly PdsMessage[]) => boolean,
 ) {
   const [settled, setSettled] = useState<ReadonlySet<string>>(new Set());
   const ready = pages.filter(
     (page) =>
-      page.messageIds !== undefined &&
-      (!page.initial ||
-        isComplete({
-          messageIds: page.messageIds,
-          threadIds: page.threadIds ?? [],
-        })),
+      page.data !== undefined &&
+      (!page.initial || isComplete(page.data.messages)),
   );
   const newlyReady = ready.filter((page) => !settled.has(page.key));
   if (newlyReady.length > 0) {
@@ -58,9 +54,45 @@ function useSettledPages(
   return {
     /** The window's opening pages haven't all loaded yet. */
     isLoading: pages.some((page) => page.initial && !shownKeys.has(page.key)),
-    shownIds: new Set(shownPages.flatMap((page) => page.messageIds ?? [])),
+    shownIds: new Set(
+      shownPages.flatMap(
+        (page) => page.data?.messages.map(({ messageId }) => messageId) ?? [],
+      ),
+    ),
   };
 }
+
+/**
+ * Shows the window the conversation is opening instead (see
+ * `jumpToLatest`) once its pages have loaded with their reactions and
+ * threads, which come with them, so it replaces what's shown without a
+ * blank screen in between.
+ */
+function useShowNext(
+  view: ReturnType<typeof useMessageWindow>,
+  address: string,
+  conversationId: string,
+) {
+  const queryClient = useQueryClient();
+  const { next } = view;
+  if (next === undefined) return;
+  const loaded = next.pages.every(
+    (page) => !page.initial || page.data !== undefined,
+  );
+  if (
+    loaded &&
+    reactionsCached(queryClient, address, conversationId, next.parts) &&
+    summariesCached(queryClient, address, conversationId, next.parts)
+  ) {
+    view.showNext();
+  }
+}
+
+/**
+ * No reactions, the same array each time, so a send not yet confirmed is
+ * the same message from render to render (see `shownUnconfirmed`).
+ */
+const NO_REACTIONS = Object.freeze<ReactionSummary[]>([]);
 
 /** What a reply quotes of the message it answers. */
 export function quoteOf(message: {
@@ -120,7 +152,10 @@ function useThreads({
   const summaries = useThreadSummaries(
     address,
     conversationId,
-    threadId === undefined ? view.pageThreadIds : [[threadId]],
+    threadId === undefined
+      ? view.parts
+      : { liveThreadIds: [], since: undefined, threadIds: [[threadId]] },
+    threadId === undefined ? view.next?.parts : undefined,
   );
   const sending = sendingReplies(outbox);
   function threadOf(id: string) {
@@ -181,7 +216,7 @@ function isShown(message: Message) {
 
 /** The newest message's time, when it's the newest there is. */
 function newestSentAt(view: ReturnType<typeof useMessageWindow>) {
-  return view.hasNewer ? undefined : view.messages.at(-1)?.sentAt;
+  return view.live ? view.messages.at(-1)?.sentAt : undefined;
 }
 
 /**
@@ -196,10 +231,14 @@ export function useMessages(
   const { address, session } = useAccount();
   const inThread = threadId !== undefined;
   const view = useMessageWindow(address, { conversationId, threadId }, anchor);
-  const { reactionsOf, toggle } = useReactions(
+  const { parts } = view;
+  const { reactionsOf, sinceOf, toggle } = useReactions(
     address,
     conversationId,
-    inThread ? [[threadId], ...view.pageMessageIds] : view.pageMessageIds,
+    inThread
+      ? { ...parts, messageIds: [[threadId], ...parts.messageIds] }
+      : parts,
+    view.next?.parts,
   );
   const outbox = useOutbox(address, conversationId);
   const threads = useThreads({
@@ -209,15 +248,15 @@ export function useMessages(
     threadId,
     view,
   });
-  const settled = useSettledPages(
-    view.pages,
-    ({ messageIds, threadIds }) =>
-      messageIds.every((id) => reactionsOf(id) !== undefined) &&
-      threadIds.every(threads.isLoaded),
+  const settled = useSettledPages(view.pages, (messages) =>
+    messages.every(
+      (message) =>
+        reactionsOf(message.messageId) !== undefined &&
+        threads.isLoaded(message.threadId ?? message.messageId),
+    ),
   );
+  useShowNext(view, address, conversationId);
   const sentById = new Map(outbox.map((item) => [item.messageId, item]));
-  const confirmed = new Set(view.messages.map((message) => message.messageId));
-  const atLatest = !view.hasNewer;
   function how(message: { threadId?: string; messageId: string }) {
     return {
       inThread,
@@ -226,9 +265,8 @@ export function useMessages(
       thread: threads.threadOf(message.threadId ?? message.messageId),
     };
   }
-  const unconfirmed = (atLatest ? outboxFor(outbox, threadId) : [])
-    .filter((message) => !confirmed.has(message.messageId))
-    .map((message) =>
+  const unconfirmed = unconfirmedSends(outboxFor(outbox, threadId), view).map(
+    (message) =>
       shownUnconfirmed(message, {
         ...how({
           messageId: message.messageId,
@@ -236,9 +274,9 @@ export function useMessages(
         }),
         address,
         conversationId,
-        reactions: [],
+        reactions: NO_REACTIONS,
       }),
-    );
+  );
   const { root } = view;
   // A thread waits for its original's reactions too. (Its original is
   // missing once its pages have loaded without it.)
@@ -261,6 +299,8 @@ export function useMessages(
     replyCount: replyCountOf(threads.threadOf, threadId),
     /** Adds or removes your reaction, showing it right away. */
     toggleReaction: toggle,
+    /** Which query by time has a message's reactions, if one does. */
+    reactionsSince: sinceOf,
     /** Only set when the newest loaded message is the newest there is. */
     newestSentAt: newestSentAt(view),
     /**
@@ -269,7 +309,7 @@ export function useMessages(
      * thread, it's always a reply, kept there.
      */
     sendMessage: (draft: OutgoingDraft, replyTo?: ReplyTarget) => {
-      if (!atLatest) view.jumpToLatest();
+      if (!view.live) view.jumpToLatest();
       sendOutgoing(session, conversationId, {
         ...draft,
         reply: replyFor(root, replyTo),
@@ -278,19 +318,17 @@ export function useMessages(
   };
 }
 
-/** Marks the conversation read up to the newest message while it is open. */
+/**
+ * Marks the conversation read up to the newest message while it is open,
+ * at most every couple of seconds (see `useMarkUpTo`).
+ */
 export function useMarkRead(conversationId: string, newestSentAt?: number) {
   const { address } = useAccount();
-  const { mutate } = useMutation(
-    pdsMutation({ mutation: pds.messages.markRead, session: address }),
-  );
-  const lastMarked = useRef(0);
-  // eslint-disable-next-line no-restricted-syntax -- Read state lives on the server and must follow messages arriving while the screen is open.
-  useEffect(() => {
-    if (newestSentAt === undefined || newestSentAt <= lastMarked.current) {
-      return;
-    }
-    lastMarked.current = newestSentAt;
-    mutate({ conversationId, readAt: newestSentAt });
-  }, [conversationId, mutate, newestSentAt]);
+  const { mutate } = useMutation({
+    ...pdsMutation({ mutation: pds.messages.markRead, session: address }),
+    // Not something you did: it doesn't hurry query updates along (see
+    // `NOTIFY_GAP_MS`).
+    meta: { background: true },
+  });
+  useMarkUpTo(newestSentAt, (readAt) => mutate({ conversationId, readAt }));
 }

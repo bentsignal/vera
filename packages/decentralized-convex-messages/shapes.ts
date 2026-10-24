@@ -426,6 +426,9 @@ export type Typist = Infer<typeof typist>;
 /** At most this many messages per `reactions` query. */
 export const MAX_REACTION_MESSAGES = 100;
 
+/** At most this many results from a `since` query (`reactions`, `threadSummaries`). */
+export const MAX_SINCE_RESULTS = 1000;
+
 /** Oldest first. `hasOlder`/`hasNewer` say whether more exist beyond it. */
 export const messagePage = v.object({
   hasNewer: v.boolean(),
