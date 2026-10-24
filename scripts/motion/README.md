@@ -71,6 +71,28 @@ can't hold those off. Anything past that is something the list did.
 firehose. The analyzer tells moves apart by what rows show, so the check
 posts a few different messages before each scenario.
 
+## Round 2 scenarios (run only when named)
+
+A full run is the same 18 scenarios as before, so its results compare. These
+two run only when named:
+
+```sh
+# Your 👍 on a three-photo message's first photo (the deck's front card at
+# rest; a carousel's first item in stacked).
+scripts/motion/check.sh react-front-media
+
+# The real composer: five lines typed into the field, then Send pressed.
+# MOTION_AD runs agent-device on this worktree's device, for example a
+# wrapper script holding its --platform, --udid, --config and --session.
+MOTION_AD=.cache/round2/ad-ios scripts/motion/check.sh composer-send
+```
+
+Without `MOTION_AD`, `composer-send` is skipped, not failed. agent-device
+reads the screen as it taps, which can stall the app for a moment, so look at
+the recording as well as the flags. Typing to the first arrival is
+`typing-reply` (`--android` for Android). Whether the new row fades in is
+judged from the frames: the analyzer follows positions, not opacity.
+
 ## Why the moves land together
 
 See the comments on `IN_COMMIT`, `afterCommit`, `ease`, and `land` in

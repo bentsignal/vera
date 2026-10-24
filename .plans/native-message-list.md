@@ -2020,6 +2020,29 @@ Source findings only; nothing here is checked on a device.
   A unit test of them would restate the code, so they're left to runtime
   QA. Nothing is runtime-verified yet.
 
+### Measurement tooling (batch 3), not runtime-verified
+
+- **Photo open (item 7):** `veraDev.photoTiming` (`features/dev/photo-timing.ts`,
+  `photo-timing-log.ts`) marks the native list's photo press, the viewer's
+  layout, and the pressed page's layout, image load start, load and
+  display. It's in development and profile bundles only, keeps the newest
+  200 marks in memory, uses no React state, and adds no native fields. Read it
+  with `scripts/sim.sh eval "JSON.stringify(globalThis.veraDev.photoTiming.report())"`,
+  and clear it with `.reset()`. The marks are JavaScript-thread times (upper
+  bounds). The native owner's `Perf.swift` signposts cover touch to press,
+  including the double-tap wait.
+- **Motion:** `scripts/motion/check.sh` adds `react-front-media` and
+  `composer-send`, which run only when named, so a full run stays the same 18. `composer-send` drives the real composer through agent-device
+  (`MOTION_AD`). Typing to the first arrival is `typing-reply`, and its fade
+  needs a frame review. The dev screen's toggle now reacts on the first
+  photo with an exact-part key (Android's inherited hunk, corrected).
+- **Video fixture:** the dead Google sample is replaced with MDN's CC0
+  `flower.mp4` and a first-frame poster. The parts are unchanged. Fresh
+  seeds need the isolated backend pushed.
+
+Commands and limits are in
+`.cache/claude-integration-polish/20261023-163203/round2-measurement-handoff.md`.
+
 ### Reaction stand-ins (item 12), review of the shared side
 
 Asked by Android: does a toggle's stand-in last until the query shows the

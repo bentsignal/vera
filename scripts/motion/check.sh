@@ -7,6 +7,21 @@
 #   scripts/motion/check.sh react-remove    # scenarios whose name matches
 #   MOTION_LIST=rn scripts/motion/check.sh  # the React Native list instead
 #
+# Round 2 adds two scenarios that run only when named, so a full run is
+# the same 18 as before:
+#   react-front-media  your 👍 on a three-photo message's first photo (the
+#                      deck's front card at rest, a carousel's first item)
+#   composer-send      five lines typed into the real composer, then its
+#                      Send pressed: the send shrink, through the draft and
+#                      send pipeline, not `conversation.send`. Needs
+#                      MOTION_AD, a command that runs agent-device on this
+#                      worktree's device (its --udid, --config and
+#                      --session), such as a one-line wrapper script.
+#                      agent-device reads the screen as it taps, which can
+#                      stall the app for a moment: look at the video too.
+# Typing to the first arrival is `typing-reply`. Whether a row fades in
+# is a look at the frames: the analyzer follows positions, not opacity.
+#
 # Needs this worktree's simulator up and signed in (scripts/sim.sh up,
 # signin, seed once). MOTION_GROUP picks the group (else the inbox's
 # newest). MOTION_LIST picks the list: `native` (the default; the binary
@@ -54,6 +69,11 @@ if [[ $GROUP != group:* ]]; then
 fi
 
 say() { convex dev:say "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"body\":\"$2\"}"; }
+# A photo for `dev:say`, in one of a deck's shapes.
+photo() { echo "{\"kind\":\"image\",\"mimeType\":\"image/jpeg\",\"name\":\"$1.jpg\",\"size\":400000,\"url\":\"https://picsum.photos/seed/vera-motion-$1/$2/$3\",\"width\":$2,\"height\":$3}"; }
+say_photos() {
+  convex dev:say "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"body\":\"$2\",\"attachments\":[$(photo tall 1200 1600),$(photo wide 1600 1200),$(photo square 1080 1080)]}"
+}
 typing() { convex dev:type "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\"typing\":$2}"; }
 
 ready() {
@@ -94,6 +114,8 @@ scenario_first_reply() {
   sleep 3
 }
 scenario_send() { js 'veraDev.conversation().send("On my way")' >/dev/null; sleep 3; }
+scenario_react_front_media() { js 'veraDev.conversation().react(veraDev.motionTarget, "\u{1F44D}", 0)' >/dev/null; sleep 3; }
+scenario_composer_send() { ${=MOTION_AD} press 'label="Send"' >/dev/null 2>&1; sleep 3; }
 scenario_edit() { js 'veraDev.conversation().edit(veraDev.motionMine, "Running ten minutes late, sorry")' >/dev/null; sleep 3; }
 scenario_delete() { js 'veraDev.conversation().remove(veraDev.motionMine)' >/dev/null; sleep 3; }
 scenario_firehose() {
@@ -113,6 +135,14 @@ SCENARIOS=(
   "delete:scenario_delete:mine:"
   "firehose:scenario_firehose::--allow-snaps"
 )
+# Run only when named (see the top).
+NAMED_ONLY=(
+  "react-front-media:scenario_react_front_media:media-target:"
+  "composer-send:scenario_composer_send:composer:"
+)
+for entry in $NAMED_ONLY; do
+  [[ -n $FILTER && ${entry%%:*} == *$FILTER* ]] && SCENARIOS+=("$entry")
+done
 
 failed=0
 summary=()
@@ -150,6 +180,18 @@ for layout in bubbles stacked; do
       mine)
         js "veraDev.conversation().send(\"Mine $label\")" >/dev/null; sleep 3
         js "veraDev.motionMine = \"Mine $label\"" >/dev/null
+        ;;
+      media-target)
+        say_photos maya "Motion photos $label"; sleep 4
+        js "veraDev.motionTarget = \"Motion photos $label\"" >/dev/null
+        ;;
+      composer)
+        if [[ -z ${MOTION_AD:-} ]]; then
+          summary+=("SKIP $label (set MOTION_AD to run agent-device on this device)")
+          continue
+        fi
+        ${=MOTION_AD} fill 'label="Message"' $'Line one\nLine two\nLine three\nLine four\nLine five' >/dev/null 2>&1
+        sleep 2
         ;;
     esac
     sim record "motion-$label"; sleep 0.5

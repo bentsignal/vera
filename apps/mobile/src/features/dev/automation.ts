@@ -18,6 +18,7 @@ import { devConversation } from "./dev-conversation";
 import { devList, startStalls, stopStalls } from "./dev-list";
 import { devSignInPath } from "./dev-sign-in-path";
 import { frameReport, startFrames, stopFrames } from "./frames";
+import { photoTiming } from "./photo-timing";
 
 function isAppPath(path: string): path is Href & string {
   return path.startsWith("/");
@@ -55,6 +56,8 @@ export function installDevAutomation() {
       stalls: { start: startStalls, stop: stopStalls },
       /** `scripts/sim.sh frames start` and `stop`: see frames.ts. */
       frames: { report: frameReport, start: startFrames, stop: stopFrames },
+      /** Opening a photo from the list, timed: see photo-timing.ts. */
+      photoTiming,
       /**
        * Turns the native message list on or off, and says which list
        * conversations show: "native", or "rn" (off, or not in this binary).

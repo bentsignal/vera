@@ -2,17 +2,20 @@
 // Convex action so the app's tests can check that every reaction lands on
 // the part it's meant for, as the app maps parts.
 
+// MDN's CC0 sample clip (H.264 and AAC, 960 × 540, 5.055 s), with a
+// poster made from its first frame. The earlier Google sample answered
+// 403, and iOS showed it as unsupported.
 const VIDEO = {
-  durationMs: 15_000,
-  height: 720,
+  durationMs: 5055,
+  height: 540,
   kind: "video" as const,
   mimeType: "video/mp4",
-  name: "blazes.mp4",
-  size: 2_498_125,
+  name: "flower.mp4",
+  size: 1_128_375,
   thumbnailUrl:
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerBlazes.jpg",
-  url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  width: 1280,
+    "https://vera-evidence.b-cdn.net/pr/t3-native-message-list-integration/20261024-123519-398fa974/r2-flower-poster.jpg",
+  url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+  width: 960,
 };
 
 const FILE = {
@@ -73,7 +76,7 @@ export const LINES: readonly Line[] = [
   { body: "The lake one is unreal", from: 0 },
   {
     attachments: [VIDEO],
-    body: "Sunset timelapse",
+    body: "Flowers by the trail",
     from: 3,
     reactions: [{ by: 1, emoji: "🔥", on: 0 }],
   },

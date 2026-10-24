@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 
-import type { Block, ListEvent, Row } from "./contract";
+import type { Block, ListEvent, Reaction, Row } from "./contract";
 import type { DevHold } from "./dev-menu-layout";
 import { devMessage, devRows, devTyping, PEOPLE } from "./dev-fixtures";
+import { reactionKey } from "./map-blocks";
 import { nativeSupport } from "./native";
 
 /** Binaries that lift the held message into the menu themselves. */
@@ -126,17 +127,40 @@ export function useDevRows() {
   };
 }
 
-/** The newest message with your 👍 added, or taken away. */
+/** Your 👍 on a part (`reactionKey`), so a tap on it toggles that part. */
+function thumbsUp(part: string) {
+  return {
+    content: { emoji: "👍" },
+    count: 1,
+    key: reactionKey(part, "👍"),
+    mine: true,
+  } satisfies Reaction;
+}
+
+/**
+ * The newest message with your 👍 added, or taken away: on its first photo
+ * when it has photos (a deck's front card at rest, a carousel's first
+ * item), as the app puts a photo's reactions on the photo, so the dev
+ * screen exercises photo reactions; otherwise on the message.
+ */
 function withReactionToggled(rows: Row[]) {
   return rows.map((row, index) => {
     if (index !== 0 || row.kind !== "message") return row;
+    const media = row.blocks.findIndex((block) => block.type === "media");
+    const block = row.blocks[media];
+    const first = block?.type === "media" ? block.items[0] : undefined;
+    if (block?.type === "media" && first !== undefined) {
+      const has = first.reactions.some((reaction) => reaction.mine);
+      const item = { ...first, reactions: has ? [] : [thumbsUp(first.part)] };
+      const blocks = row.blocks.map((each, at) =>
+        at === media
+          ? { ...block, items: [item, ...block.items.slice(1)] }
+          : each,
+      );
+      return { ...row, blocks };
+    }
     const has = row.reactions.some((reaction) => reaction.mine);
-    return {
-      ...row,
-      reactions: has
-        ? []
-        : [{ content: { emoji: "👍" }, count: 1, key: "👍", mine: true }],
-    };
+    return { ...row, reactions: has ? [] : [thumbsUp("message")] };
   });
 }
 

@@ -1,4 +1,6 @@
+import type { ImageLoadEventData } from "expo-image";
 import type { ReactNode } from "react";
+import type { LayoutChangeEvent } from "react-native";
 import { StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -10,6 +12,7 @@ import { Image } from "expo-image";
 
 import type { Size } from "./photo-transform";
 import type { Pager } from "./photo-viewer-state";
+import { markPhoto } from "~/features/dev/photo-timing";
 import { touchGesture } from "./photo-gestures";
 import { dismissTransform } from "./photo-transform";
 import {
@@ -18,6 +21,34 @@ import {
   fadeOut,
   useViewer,
 } from "./photo-viewer-state";
+
+/**
+ * The photo's frame and image events: they size the zoom, and mark when
+ * the photo laid out, loaded and showed (`markPhoto`, dev and profile
+ * bundles only).
+ */
+function usePhotoEvents(viewer: ReturnType<typeof useViewer>, url: string) {
+  return {
+    onLayout: (event: LayoutChangeEvent) => {
+      markPhoto("pageLayout", { url });
+      viewer.frame.set({
+        height: event.nativeEvent.layout.height,
+        width: event.nativeEvent.layout.width,
+      });
+    },
+    image: {
+      onDisplay: () => markPhoto("display", { url }),
+      onLoad: (event: ImageLoadEventData) => {
+        markPhoto("load", { url });
+        viewer.photo.set({
+          height: event.source.height,
+          width: event.source.width,
+        });
+      },
+      onLoadStart: () => markPhoto("loadStart", { url }),
+    },
+  };
+}
 
 /**
  * A full-screen photo you can pinch or double-tap to zoom, drag around once
@@ -53,6 +84,7 @@ export function PhotoViewer({
   current?: boolean;
 }) {
   const viewer = useViewer(size);
+  const events = usePhotoEvents(viewer, url);
   const gesture = Gesture.Simultaneous(
     touchGesture(viewer, onClose, pager),
     doubleTapGesture(viewer),
@@ -109,26 +141,13 @@ export function PhotoViewer({
       {/* Touches land on a frame that doesn't move, so their positions are
           in screen terms however the photo is zoomed. */}
       <GestureDetector gesture={gesture}>
-        <View
-          style={StyleSheet.absoluteFill}
-          onLayout={(event) =>
-            viewer.frame.set({
-              height: event.nativeEvent.layout.height,
-              width: event.nativeEvent.layout.width,
-            })
-          }
-        >
+        <View style={StyleSheet.absoluteFill} onLayout={events.onLayout}>
           <Animated.View style={[StyleSheet.absoluteFill, photoStyle]}>
             <Image
               source={{ uri: url }}
               contentFit="contain"
               transition={150}
-              onLoad={(event) =>
-                viewer.photo.set({
-                  height: event.source.height,
-                  width: event.source.width,
-                })
-              }
+              {...events.image}
               style={{ flex: 1 }}
             />
           </Animated.View>

@@ -15,6 +15,7 @@ import { groupParam } from "~/features/conversation/media-group";
 import { linkCardsOf, visibleBody } from "~/features/conversation/message-text";
 import { showNotSent } from "~/features/conversation/not-sent";
 import { showUploadProblem } from "~/features/conversation/upload-problem";
+import { markPhoto } from "~/features/dev/photo-timing";
 import { useOpenProfile } from "~/features/profile/use-open-profile";
 import { impact } from "~/lib/native-extras";
 import { openLink } from "~/lib/open-link";
@@ -192,6 +193,8 @@ function useOpenMedia() {
       });
       return;
     }
+    // Timing for opening a photo (dev and profile bundles only).
+    markPhoto("press", { index, url: attachment.localUrl ?? attachment.url });
     router.push({
       params: { group: groupParam(viewerItems(message)), index: String(index) },
       pathname: "/media",

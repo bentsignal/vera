@@ -8,6 +8,7 @@ import { MediaGroupViewer } from "~/features/conversation/media-group-viewer";
 import { PhotoViewer } from "~/features/conversation/photo-viewer";
 import { VideoViewer } from "~/features/conversation/video-viewer";
 import { ViewerCloseButton } from "~/features/conversation/viewer-close-button";
+import { markPhoto } from "~/features/dev/photo-timing";
 
 /** The route has no animation of its own; the screen fades itself in. */
 const FADE_IN = FadeIn.duration(200);
@@ -46,7 +47,11 @@ export default function MediaScreen() {
     router.back();
   }
   return (
-    <Animated.View entering={FADE_IN} style={StyleSheet.absoluteFill}>
+    <Animated.View
+      entering={FADE_IN}
+      style={StyleSheet.absoluteFill}
+      onLayout={() => markPhoto("viewerLayout")}
+    >
       {items !== undefined ? (
         <MediaGroupViewer
           items={items}
