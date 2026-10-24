@@ -3,6 +3,8 @@
   "include": [
     "./assistant-limits.ts",
     "./assistant-limits.test.ts",
+    "./assistant-models.ts",
+    "./assistant-models.test.ts",
     "./bug-reports.ts",
     "./bug-reports.test.ts",
     "./issue-closures.ts",
