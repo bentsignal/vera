@@ -2326,3 +2326,27 @@ old/new rows through motion and verify the newest frame remains 8 pt above
 the composer afterward. Preserve formal analyzer results separately from
 manual row-identity review. No phone readiness follows from source tests
 or the twelve baseline probe samples alone.
+
+**Combined ACK checkpoint, Sol.** Shared `eaad985c` passed ordered checks
+and merged native iOS `0a10b924` and Android `e2990c67`. The combined iOS
+Debug arm64 simulator build passed, fingerprint
+`2bbfd9ea96b9a55096e1d09698b0be625522d65f`, with the new 21st Swift source.
+The build log and artifact identity are in
+`.cache/round2/ios-ack-{combined-build.log,build-proof.json}`. No runtime
+acceptance follows from that compile.
+
+Both native owners' source review found the same retained-store remount
+edge. Initialization now holds an unpublished sequence even after ACK,
+until exact-row/navigation/freeze requirements pass. Two pure state cases
+cover ACK-before-row/arm remount and published remount. iOS also found
+that a lift could cancel native latest navigation, then JS could re-arm
+it on thaw. Opening the menu now clears only shared navigation intent,
+preserving the send, ACK and held geometry; a regression verifies thaw
+cannot revive it. The physical native command invocation is the generic
+navigation boundary, including the interval before its Promise resolves.
+Cancellation in that interval is not guaranteed to suppress navigation.
+The focused shared suite passes 31 cases. Formatter-expanded helpers were
+extracted without changing their behavior, and a stale ESLint cached
+consumer diagnostic was checked uncached before clearing the mobile lint
+cache and repeating ordered validation. Actual clean send/landing replay
+and Android combined compile remain pending.

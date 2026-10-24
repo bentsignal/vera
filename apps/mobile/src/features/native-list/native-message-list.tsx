@@ -23,7 +23,6 @@ import {
   useMessageActions,
 } from "~/features/conversation/message-actions";
 import { useDevNativeFling } from "./dev-native-fling";
-import { LiftedPreview } from "./lifted-preview";
 import { nativeRows } from "./map-rows";
 import { useMenuKeyboardHold } from "./menu-keyboard-hold";
 import {
@@ -33,6 +32,7 @@ import {
   V1_BLOCK_TYPES,
   V1_ROW_KINDS,
 } from "./native";
+import { nativeMenu } from "./native-menu";
 import { useComposerInset } from "./send-inset";
 import { BEHAVIOR, useNativeTheme } from "./theme";
 import {
@@ -234,22 +234,15 @@ function NativeRows({
   const { lift, change: changeLift } = useLift(view);
 
   const onEvent = useListEvents({
-    menu: {
+    menu: nativeMenu({
       layout,
-      preview: (message, held) => (
-        <LiftedPreview
-          message={message}
-          held={held}
-          layout={layout}
-          isOwn={message.authorId === self}
-        />
-      ),
       self,
       lift: LIFTS ? changeLift : undefined,
-    },
+    }),
     messageOf,
     // Frozen in the render the menu opens in, before it takes the keyboard.
     openMenu: (target) => {
+      composerHeight.sendCommit.interruptLatest();
       onHold();
       open(target);
     },

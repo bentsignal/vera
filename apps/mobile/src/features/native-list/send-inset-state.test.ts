@@ -6,6 +6,8 @@ import type { InsetState } from "./send-inset-state.ts";
 import {
   acknowledged,
   heldMessages,
+  initialInset,
+  insetFor,
   rendered,
   withHeight,
 } from "./send-inset-state.ts";
@@ -179,4 +181,38 @@ void test("ready own row and height remain held until generic command is armed",
     pair(state, { ...requested, cancelled: true }).pending,
     undefined,
   );
+});
+
+void test("same-store remount after ACK still waits for exact row and navigation", () => {
+  const send = {
+    ...ACK,
+    layout: { height: 76, frozen: false },
+    latestRequested: true,
+  };
+  const mounted = initialInset(send, ROWS, 162);
+  assert.notEqual(mounted.pending, undefined);
+  assert.equal(insetFor(mounted, send, ROWS, false), mounted);
+  assert.equal(
+    insetFor(mounted, { ...send, latestArmed: true }, REST.visible, false),
+    mounted,
+  );
+  assert.equal(
+    insetFor(mounted, { ...send, latestArmed: true }, ROWS, true),
+    mounted,
+  );
+  const released = insetFor(
+    mounted,
+    { ...send, latestArmed: true },
+    ROWS,
+    false,
+  );
+  assert.equal(released.pending, undefined);
+  assert.equal(released.height, 76);
+  assert.deepEqual(released.visible, ROWS);
+});
+
+void test("a published store remount starts from current rows without rearming", () => {
+  const state = initialInset({ ...ACK, published: true }, ROWS, 76);
+  assert.equal(state.pending, undefined);
+  assert.deepEqual(state.visible, ROWS);
 });

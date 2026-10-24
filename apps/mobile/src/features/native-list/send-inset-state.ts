@@ -112,7 +112,7 @@ export function initialInset(
   ids: readonly string[],
   height: number,
 ) {
-  const waiting = send.sequence > 0 && send.height === undefined;
+  const waiting = send.sequence > 0 && send.published !== true;
   return {
     height,
     visible: waiting ? [] : ids,

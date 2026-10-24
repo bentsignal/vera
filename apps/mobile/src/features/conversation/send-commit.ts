@@ -106,9 +106,10 @@ export function clearIsCommitted(
 ) {
   if (send.sequence === 0 || send.height !== undefined) return false;
   if (send.cancelled) return true;
+  const removedFiles = new Set(send.files);
   return (
     send.messageId !== undefined &&
     clear >= send.clear &&
-    !files.some((id) => send.files.includes(id))
+    !files.some((id) => removedFiles.has(id))
   );
 }

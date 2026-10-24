@@ -24,6 +24,15 @@ export function sendNavigation(
   publish: (step: string, value: SendCommit) => void,
 ) {
   return {
+    interruptLatest: () => {
+      const current = read();
+      if (!current.latestRequested) return;
+      publish("latest interrupted", {
+        ...current,
+        latestRequested: false,
+        latestArmed: false,
+      });
+    },
     requestLatest: () => {
       const current = read();
       if (current.sequence === 0 || current.published || current.cancelled)

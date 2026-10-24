@@ -133,3 +133,20 @@ void test("failed native invocation removes navigation gate without erasing ACK"
   assert.equal(send.read().height, 76);
   assert.equal(send.read().messageId, "own-row");
 });
+
+void test("a lift interruption clears only pending navigation and thaw cannot revive it", () => {
+  const send = createSendCommit();
+  const id = send.begin(1, []);
+  send.expect(id, "own-row");
+  send.acknowledge(id, 76);
+  send.requestLatest();
+  send.armLatest(id);
+  send.interruptLatest();
+  send.observeLayout(104, true);
+  send.observeLayout(104, false);
+  assert.equal(send.read().latestRequested, false);
+  assert.equal(send.read().latestArmed, false);
+  assert.equal(send.read().cancelled, false);
+  assert.equal(send.read().height, 76);
+  assert.equal(send.read().messageId, "own-row");
+});
