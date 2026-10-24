@@ -242,3 +242,27 @@ and native pair applies, plus the existing shared identity/ACK timeline, keeping
 clocks separate. Include autocorrection rejection clear, coalesced rapid sends,
 release-only cancel/same-height, remount/missing-host fallback and900 ms deliberate
 actual-UI stall. Source feasibility and unit tests alone do not clear growth.
+
+### Shared source checkpoint
+
+Both native owners accepted the exact frozen revision3. Parent authorized its
+bounded implementation. Contract/view exports are9affdc9e. Shared now mounts
+ComposerLayout only for native-list selection and binaries with composerLayout;
+legacy binaries and RN fallback retain the original Bar. useComposerCommit
+returns its CURRENT external-store snapshot to Composer. Both native host
+sequence and the empty-attachment-strip key use that snapshot, covering a
+child-local clear even when parent report.sends is stale. The original inner
+bar ref supplies the existing ACK as before.
+
+InsetState now keeps persistent released authority, unchanged through a newer
+held send or ordinary geometry. Published remount replays authority; unpublished
+ACK does not. The same COMPOSER_GAP constant supplies React bottom and the
+explicit bound gap. The opt-in JS trace records release separately from send
+sequence without supplying any product height.
+
+Shared ordered lint/typecheck/test/React Doctor against PR base and format pass.
+Nineteen inset-state tests pass; actual compiled UI/hook tests include fallback,
+explicit gap, stale-parent child-local clear, navigation and generic-observation
+send guards. Root Jest totals23 tests across7 suites, all pass. These prove
+shared state/render behavior, not physical mounted ordering or same-frame growth.
+Native source, real combined compile and trajectory/send/lift evidence remain.

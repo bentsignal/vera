@@ -9,6 +9,7 @@ import type { InsetState } from "./send-inset-state";
 import type { ComposerHeight } from "~/features/conversation/composer-height";
 import { markSendState } from "~/features/dev/send-timing";
 import { outgoingExists } from "~/features/messaging/outbox";
+import { composerBinding } from "./composer-layout";
 import {
   heldMessages,
   initialInset,
@@ -89,6 +90,7 @@ export function useComposerInset<T extends { readonly id: string }>(
         ...send,
         height: next.height,
       },
+      next.released,
     );
     if (next.pending === undefined && send.height !== undefined) {
       sendCommit.published(send.sequence);
@@ -97,6 +99,7 @@ export function useComposerInset<T extends { readonly id: string }>(
 
   return {
     inset: next.height,
+    binding: composerBinding(sendCommit.owner, next.released),
     messages: heldMessages(next, messages),
     waiting: next.pending !== undefined,
     ready,

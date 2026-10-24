@@ -22,6 +22,7 @@ import {
   useLiftedMessageId,
   useMessageActions,
 } from "~/features/conversation/message-actions";
+import { COMPOSER_GAP } from "./composer-layout";
 import { useDevNativeFling } from "./dev-native-fling";
 import { nativeRows } from "./map-rows";
 import { useMenuKeyboardHold } from "./menu-keyboard-hold";
@@ -50,8 +51,6 @@ import { useListEvents } from "./use-list-events";
 /** The binary lifts the held message into the menu itself (`lift`). */
 const LIFTS = nativeSupport?.features?.includes("lift") === true;
 
-/** The gap between the newest row and the composer (`COMPOSER_GAP`). */
-const COMPOSER_GAP = 8;
 /** Room above the oldest row, under the header. */
 const HEADER_GAP = 8;
 /** How long the conversation takes to fade in (`FADE_MS`). */
@@ -269,6 +268,7 @@ function NativeRows({
             keyboardOverlap: bottomInset,
             top: safeTop + topInset + HEADER_GAP,
           }}
+          composer={composer.binding}
           keyboard
           keyboardFrozen={keyboardFrozen}
           alignTop={shown.thread !== undefined}

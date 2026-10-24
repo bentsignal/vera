@@ -10,6 +10,8 @@ export interface InsetState {
   readonly height: number;
   readonly visible: readonly string[];
   readonly sends: number;
+  /** Persistent release authority, retained while a newer send is held. */
+  readonly released: number;
   readonly pending: Pending | undefined;
 }
 
@@ -88,6 +90,7 @@ export function acknowledged(
     height,
     visible: ids,
     sends: state.sends,
+    released: send.sequence,
     pending: undefined,
   } satisfies InsetState;
 }
@@ -118,6 +121,7 @@ export function initialInset(
     visible: waiting ? [] : ids,
     pending: waiting ? { sends: send.sequence, before: [] } : undefined,
     sends: send.sequence,
+    released: send.published === true ? send.sequence : 0,
   } satisfies InsetState;
 }
 

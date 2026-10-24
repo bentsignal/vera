@@ -16,6 +16,7 @@ import type { MentionCandidate } from "./mention-text";
 import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { useSendProbe } from "~/features/dev/send-timing";
+import { ComposerLayout } from "~/features/native-list/composer-layout";
 import { cn } from "~/lib/cn";
 import { PASTE_IMAGES_NATIVE_ID } from "~/lib/paste-images";
 import { AttachMenu } from "./attach-menu";
@@ -290,7 +291,7 @@ export function Composer({
     mentionable,
   );
   const { glass, settle, focus } = useFieldGlass(report);
-  useComposerCommit(
+  const submission = useComposerCommit(
     report,
     clear,
     staged.map((file) => file.id),
@@ -317,39 +318,45 @@ export function Composer({
           onPick={pick}
         />
       )}
-      <Bar bottomInset={bottomInset} report={probe.report}>
-        {/* An edit changes only the text. */}
-        {editing === undefined && <AttachMenu onPick={onPick} />}
-        <GlassField {...glass} minHeight={CONTROL}>
-          <FieldTop
-            edit={edit}
-            replyingTo={replyingTo}
-            onCancelReply={() => onCancelReply?.()}
-            staged={staged}
-            onRemoveStaged={onRemoveStaged}
-            send={report.sends}
-          />
-          <StyledTextInput
-            ref={input}
-            nativeID={PASTE_IMAGES_NATIVE_ID}
-            {...focus}
-            multiline
-            value={draft}
-            onChangeText={change}
-            onSelectionChange={mention.onSelectionChange}
-            placeholder={hint}
-            accessibilityLabel="Message"
-            // A message field never needs AutoFill suggestions.
-            autoComplete="off"
-            textContentType="none"
-            className="text-body text-foreground pl-4"
-            {...fieldText}
-            placeholderTextColorClassName="accent-muted"
-            cursorColorClassName="accent-accent"
-          />
-          <SendButton visible={canSend} saves={saves} onPress={send} />
-        </GlassField>
-      </Bar>
+      <ComposerLayout
+        enabled={!report.roomCloses}
+        owner={report.sendCommit.owner}
+        sequence={submission.sequence}
+      >
+        <Bar bottomInset={bottomInset} report={probe.report}>
+          {/* An edit changes only the text. */}
+          {editing === undefined && <AttachMenu onPick={onPick} />}
+          <GlassField {...glass} minHeight={CONTROL}>
+            <FieldTop
+              edit={edit}
+              replyingTo={replyingTo}
+              onCancelReply={() => onCancelReply?.()}
+              staged={staged}
+              onRemoveStaged={onRemoveStaged}
+              send={submission.sequence}
+            />
+            <StyledTextInput
+              ref={input}
+              nativeID={PASTE_IMAGES_NATIVE_ID}
+              {...focus}
+              multiline
+              value={draft}
+              onChangeText={change}
+              onSelectionChange={mention.onSelectionChange}
+              placeholder={hint}
+              accessibilityLabel="Message"
+              // A message field never needs AutoFill suggestions.
+              autoComplete="off"
+              textContentType="none"
+              className="text-body text-foreground pl-4"
+              {...fieldText}
+              placeholderTextColorClassName="accent-muted"
+              cursorColorClassName="accent-accent"
+            />
+            <SendButton visible={canSend} saves={saves} onPress={send} />
+          </GlassField>
+        </Bar>
+      </ComposerLayout>
     </View>
   );
 }

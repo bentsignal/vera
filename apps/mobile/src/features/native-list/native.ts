@@ -58,6 +58,11 @@ export const MessageListRow =
 export const MessageListComposer =
   nativeSupport?.features?.includes("composerLayout") === true
     ? requireNativeView<
-        ComposerHost & { style?: StyleProp<ViewStyle>; children?: ReactNode }
+        ComposerHost & {
+          style?: StyleProp<ViewStyle>;
+          children?: ReactNode;
+          collapsable?: boolean;
+          accessible?: boolean;
+        }
       >("MessageList", "MessageListComposer")
     : null;

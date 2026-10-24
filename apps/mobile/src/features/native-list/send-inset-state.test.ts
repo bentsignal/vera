@@ -16,6 +16,7 @@ const REST = {
   height: 162,
   visible: ["old0", "old1"],
   sends: 0,
+  released: 0,
   pending: undefined,
 } satisfies InsetState;
 const ACK = {
@@ -215,4 +216,43 @@ void test("a published store remount starts from current rows without rearming",
   const state = initialInset({ ...ACK, published: true }, ROWS, 76);
   assert.equal(state.pending, undefined);
   assert.deepEqual(state.visible, ROWS);
+});
+
+void test("release authority persists through ordinary geometry and a newer held send", () => {
+  const first = pair(sending());
+  assert.equal(first.released, 1);
+  const typed = withHeight(first, 120);
+  assert.equal(typed.released, 1);
+  const second = rendered(typed, { sends: 2, ids: [...ROWS, "mine2"] });
+  assert.equal(second.released, 1);
+  assert.equal(withHeight(second, 76).released, 1);
+  assert.equal(pair(second), second);
+  const next = pair(second, { ...ACK, sequence: 2, messageId: "mine2" }, [
+    ...ROWS,
+    "mine2",
+  ]);
+  assert.equal(next.released, 2);
+  assert.equal(next.pending, undefined);
+});
+
+void test("unchanged-row cancellation still publishes a new explicit release", () => {
+  const pending = rendered(REST, { sends: 1, ids: REST.visible });
+  const cancelled = { ...ACK, cancelled: true, messageId: undefined };
+  const released = pair(pending, cancelled, REST.visible, {
+    height: REST.height,
+  });
+  assert.deepEqual(released.visible, REST.visible);
+  assert.equal(released.height, REST.height);
+  assert.equal(released.released, 1);
+});
+
+void test("a remount replays published authority but never authorizes an unpublished ACK", () => {
+  const send = { ...ACK, sequence: 7, published: true };
+  const replay = initialInset(send, ROWS, 76);
+  assert.equal(replay.released, 7);
+  assert.equal(replay.pending, undefined);
+  const waiting = initialInset({ ...send, published: false }, ROWS, 76);
+  assert.equal(waiting.released, 0);
+  assert.equal(waiting.pending?.sends, 7);
+  assert.equal(withHeight(waiting, 120).released, 0);
 });

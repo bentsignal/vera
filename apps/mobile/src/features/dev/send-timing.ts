@@ -40,12 +40,24 @@ const states = new Array<{
   owner: string;
   step: string;
   send: SendCommit;
+  release?: number;
 }>();
 
 /** Shared send/ACK transitions, on the JS clock, separate from native apply. */
-export function markSendState(step: string, owner: string, send: SendCommit) {
+export function markSendState(
+  step: string,
+  owner: string,
+  send: SendCommit,
+  release?: number,
+) {
   if (!active) return;
-  states.push({ at: performance.now(), owner, step, send });
+  states.push({
+    at: performance.now(),
+    owner,
+    step,
+    send,
+    ...(release === undefined ? {} : { release }),
+  });
   if (states.length > 200) states.splice(0, states.length - 200);
 }
 
