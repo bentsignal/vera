@@ -152,6 +152,53 @@ Android run's cache (`round2-20261024/use-dev-rows.inherited.patch` and
 `.md`), and the file is back at HEAD. Integration decides whether to
 adopt it.
 
+## Photos and videos open on the first tap (round 2 item 7, approved)
+
+Approved by Shawn on 2026-10-24: an inline photo or video opens on its
+first single-tap release; double tapping it no longer opens its menu.
+Holding it still opens the menu with the real view lifted. Text keeps its
+double tap to menu, and reactions and stopping a scroll are unchanged. No
+new fields; iOS is making the same change.
+
+Cause, from source: `Target.immediate` excluded `media`, so a photo tap
+waited the 200 ms double-tap window (`DOUBLE_TAP_MS`) after release before
+the press went to JavaScript, and a second tap held it instead. That 200 ms
+is read from source; Android's latency hasn't been measured. (iOS's
+351.7 ms is iOS's own trace.)
+
+Change: `immediate` is now everything but `message`. The double-tap
+bookkeeping moved from `MessageListView.Touch` into `Taps` (Taps.kt),
+unchanged for messages, with two rules for media: a touch on a photo or
+video is never the second of a double tap (a message's waiting press is
+dropped rather than turned into a hold, so two things don't open), and a
+second tap that ends on a photo opens it. Every media release is a press,
+with no native cooldown: integration's shared guard in JavaScript keeps
+rapid presses from opening the viewer twice (as on iOS). The hold timer,
+the press shrink, and cancelling on movement or on stopping a scroll stay
+in `Touch`, so a held photo opens only its menu and a dragged or stopped
+one opens nothing.
+
+`TapsTest` (9): a photo opens on its first release; a second tap that ends on a photo opens it; a quick second tap on
+it is another press, not a hold; a message still waits and a double tap
+still holds it; a single message tap after its wait; a photo tapped right
+after a message opens instead of holding; a second tap on a reaction is a
+tap; too far or too late is a new tap; a double tap off a message holds
+nothing. The hold and cancel paths live in `Touch`, which needs an Expo
+`AppContext`; they aren't unit tested and are unchanged.
+
+Checks after the release guard: `:message-list:testDebugUnitTest` passed,
+65 tests, 0 failures, 0 errors, 0 skipped; then `lint`, `typecheck`,
+`test` and `react-doctor --base origin/t3/native-message-list` passed. The
+cooldown's removal came after those checks, and they passed again on it:
+65 tests, 0 failures, then the ordered checks.
+Unit tests only; no Android latency is measured yet.
+
+Device checks (root, combined client), all still open: first-tap open latency on the A16
+and the emulator, for a lone photo, a carousel card, a deck's front card,
+and a video; double tap a photo (no menu; the viewer opens once through the shared guard); hold a photo (menu,
+real lift, no open); drag or stop a scroll on a photo (nothing opens);
+text double tap and hold (menu).
+
 ## Validation run (source, 2026-10-24)
 
 - `./gradlew :message-list:testDebugUnitTest` (from `apps/mobile/android`,

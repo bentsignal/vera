@@ -771,9 +771,10 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   /**
    * Taps, double taps, and holds, with the React Native list's timings (a
    * double tap within 200 ms, a hold at 320 ms), plus dragging the list
-   * left to bring times in (bubbles). Links, mentions, chips and the like
-   * fire on the first tap; a tap on a message or photo waits 200 ms to be
-   * sure it isn't the first of a double tap, which holds it instead.
+   * left to bring times in (bubbles). Photos, videos, links, mentions,
+   * chips and the like fire on the first release; a tap on a message waits
+   * 200 ms to be sure it isn't the first of a double tap, which holds it
+   * instead (see `Taps`). Holding anything holds it.
    */
   private inner class Touch : RecyclerView.OnItemTouchListener {
     private val shrink = PressShrink(main)
@@ -786,14 +787,11 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     /** Still a tap: not moved past the slop, not held, not a fling being stopped. */
     private var tapping = false
 
-    /** A tap's press, waiting to see if a second tap makes it a double tap. */
-    private var pendingTap: Runnable? = null
-    private var lastTapUp = 0L
-    private var lastTapX = 0f
-    private var lastTapY = 0f
+    /** Which taps are double taps, and what each release does. */
+    private val taps = Taps(DOUBLE_TAP_MS, slop.toFloat())
 
-    /** This touch is the second of a double tap. */
-    private var second = false
+    /** A message's press, waiting to see if a second tap makes it a double tap. */
+    private var pendingTap: Runnable? = null
 
     /**
      * Began with the keyboard up and the list at its newest row: dragging
@@ -841,14 +839,12 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           revealAnimator?.cancel()
           val stoppedScroll = rv.scrollState != RecyclerView.SCROLL_STATE_IDLE
           tapping = !stoppedScroll
-          second = pendingTap != null &&
-            e.eventTime - lastTapUp <= DOUBLE_TAP_MS &&
-            abs(e.x - lastTapX) < slop * 2 && abs(e.y - lastTapY) < slop * 2
-          if (second) {
+          val hit = under(e.x, e.y)
+          if (taps.down(e.eventTime, e.x, e.y, hit?.second?.press)) {
             pendingTap?.let { main.removeCallbacks(it) }
             pendingTap = null
           }
-          val hit = under(e.x, e.y)
+          val second = taps.second
           horizontalTaken = hit?.second?.horizontal == true
           // A touch that stops a moving carousel only stops it.
           if (hit != null && inMovingScroller(hit.second.pressView ?: hit.second.holdView, hit.first.itemView)) tapping = false
@@ -894,33 +890,21 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     private fun tapped(e: MotionEvent) {
       val found = under(e.x, e.y) ?: return
       val (holder, hit) = found
-      val target = hit.press
-      if (second) {
-        second = false
-        // A second tap on a reaction is another tap on it, never the menu.
-        if (target?.type != "reaction") {
-          if (holder.row is MessageRow) hold(holder, hit)
-          return
+      when (val action = taps.release(e.eventTime, e.x, e.y, hit.press, holder.row is MessageRow)) {
+        is TapAction.Press ->
+          if (action.target.type == "reaction") reactionTapped(holder, hit, action.target) else press(action.target)
+        is TapAction.PressLater -> {
+          val fire = Runnable {
+            pendingTap = null
+            taps.fired()
+            press(action.target)
+          }
+          pendingTap = fire
+          main.postDelayed(fire, DOUBLE_TAP_MS)
         }
+        TapAction.Hold -> hold(holder, hit)
+        TapAction.None -> Unit
       }
-      if (target == null) return
-      if (target.type == "reaction") {
-        reactionTapped(holder, hit, target)
-        return
-      }
-      if (target.immediate) {
-        press(target)
-        return
-      }
-      lastTapUp = e.eventTime
-      lastTapX = e.x
-      lastTapY = e.y
-      val fire = Runnable {
-        pendingTap = null
-        press(target)
-      }
-      pendingTap = fire
-      main.postDelayed(fire, DOUBLE_TAP_MS)
     }
 
     override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {
