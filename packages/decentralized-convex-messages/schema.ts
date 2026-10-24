@@ -108,8 +108,14 @@ export default defineSchema({
     // What the conversation shows: `threadOnly` undefined.
     .index("by_chat_sent", ["conversationId", "threadOnly", "sentAt"])
     .index("by_thread_sent", ["threadId", "sentAt"])
-    // Replies to an account's messages, so their activity finds them.
-    .index("by_quote_author_sent", ["quote.authorId", "sentAt"]),
+    // Replies to an account's messages, so their activity finds them,
+    // and reading a conversation sees those in it.
+    .index("by_quote_author_sent", ["quote.authorId", "sentAt"])
+    .index("by_quote_author_conversation_sent", [
+      "quote.authorId",
+      "conversationId",
+      "sentAt",
+    ]),
   // One per account a message @mentions, so their activity finds it.
   mentions: defineTable({
     accountId: v.string(),
@@ -187,6 +193,13 @@ export default defineSchema({
     .index("by_message", ["messageId"])
     .index("by_message_account", ["messageId", "accountId"])
     .index("by_author_reacted", ["messageAuthorId", "reactedAt"])
+    // Reactions to an account's messages in one conversation, which
+    // reading it sees (see `seeConversationActivity`).
+    .index("by_author_conversation_reacted", [
+      "messageAuthorId",
+      "conversationId",
+      "reactedAt",
+    ])
     // Reactions since a time, for the newest messages (see `reactions`).
     .index("by_conversation_reacted", ["conversationId", "reactedAt"]),
   // Who among this PDS's accounts is typing, one row per account and

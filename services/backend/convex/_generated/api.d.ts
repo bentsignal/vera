@@ -21,6 +21,7 @@ import type * as bunny from "../bunny.js";
 import type * as crons from "../crons.js";
 import type * as dev from "../dev.js";
 import type * as devBots from "../devBots.js";
+import type * as devBusy from "../devBusy.js";
 import type * as devChanges from "../devChanges.js";
 import type * as devFullSeed from "../devFullSeed.js";
 import type * as devReleaseTest from "../devReleaseTest.js";
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dev: typeof dev;
   devBots: typeof devBots;
+  devBusy: typeof devBusy;
   devChanges: typeof devChanges;
   devFullSeed: typeof devFullSeed;
   devReleaseTest: typeof devReleaseTest;

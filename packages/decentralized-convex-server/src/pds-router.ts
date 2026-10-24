@@ -28,6 +28,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
   components,
   mutation,
   query,
+  trace,
 }: {
   /**
    * Runs in the same transaction before each plugin write a client asks
@@ -50,6 +51,13 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
   readonly components: unknown;
   readonly mutation: MutationBuilder<DataModel, "public">;
   readonly query: QueryBuilder<DataModel, "public">;
+  /**
+   * Whether to log each request's operation, so the function logs show
+   * what each run of the router was for (its cost is in the same log
+   * entry). Logs the operation's type and the shape of its arguments,
+   * never their values.
+   */
+  readonly trace?: () => boolean;
 }) {
   const installed = readDispatcherComponents(components);
   return {
@@ -63,6 +71,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       returns: v.any(),
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
+        if (trace?.() === true) logOperation("mutation", request);
         const identity = await resolveIdentity(ctx);
         await beforeMutation?.(ctx, {
           identity,
@@ -95,6 +104,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       returns: v.any(),
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
+        if (trace?.() === true) logOperation("query", request);
         const identity = await resolveIdentity(ctx);
         const response = await ctx.runQuery(component.query, {
           identity,
@@ -117,6 +127,28 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       },
     }),
   } as const;
+}
+
+/**
+ * Logs which operation a request is for, with its arguments' shape: each
+ * argument's name, and an array's length, but no values.
+ */
+function logOperation(
+  kind: "mutation" | "query",
+  request: { readonly operation: unknown; readonly plugin: string },
+) {
+  const { operation, plugin } = request;
+  const type: unknown = Reflect.get(Object(operation), "type");
+  const args: unknown = Reflect.get(Object(operation), "args");
+  const shape = Object.fromEntries(
+    Object.entries(typeof args === "object" && args !== null ? args : {}).map(
+      ([name, value]: [string, unknown]) => [
+        name,
+        Array.isArray(value) ? value.length : typeof value,
+      ],
+    ),
+  );
+  console.log("pds", kind, plugin, String(type), JSON.stringify(shape));
 }
 
 function readDispatcherComponents(components: unknown): DispatcherComponents {
