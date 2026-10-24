@@ -43,6 +43,7 @@ export function useComposerInset<T extends { readonly id: string }>(
   useSendLatest({
     view,
     commit: sendCommit,
+    send,
     ready,
     waiting: next.pending !== undefined,
     freeze,

@@ -2350,3 +2350,19 @@ extracted without changing their behavior, and a stale ESLint cached
 consumer diagnostic was checked uncached before clearing the mobile lint
 cache and repeating ordered validation. Actual clean send/landing replay
 and Android combined compile remain pending.
+
+**First combined ACK replay found a shared stall, fixed in source.**
+The first stacked eight-line recording cleared the composer and emitted
+ACK 76 with exact outgoing ID `918e5349-2808-4444-b1b3-9745fe34601d`,
+but kept inset 230 and hid the sent row. This is a failed runtime case,
+not a motion pass. `.cache/round2/ios-ack-stacked-eight-state.json` and
+`r2-ios-ack-stacked-eight.mp4` retain it. Mac CPU was 17% average/19% peak;
+one slow frame was 35.5 ms. A bounded hook trace then showed subscribed
+store `latestRequested=true` while the hook's local value remained its
+initial `undefined`. The React Compiler cached `commit.read()` for the
+stable store identity. `useSendLatest` now receives the actual subscribed
+snapshot. A real compiled-hook regression reproduced zero calls before
+and one animated call with successful arming afterward. Raw traces/logs:
+`ios-ack-gate-flags-before.json` and `send-latest-hook-{before,after}.log`.
+Ordered repository checks passed after this correction. Runtime replay is
+still required; pure state checks alone did not catch this lifecycle bug.
