@@ -2814,3 +2814,34 @@ are not opacity proof, and these clips have substantial software-emulator
 slow frames. No further arrival/seeding loop is added before the phone
 artifact. Shawn should check first incoming arrival opacity explicitly in
 both layouts on the Galaxy A16.
+
+The new growth investigation first extends the existing opt-in DEV probe
+with a layout-only recording mode. Existing send recording requires a real
+send, so it cannot describe newline or attachment growth beforehand. The
+new mode records the same committed bar/field/input rectangles, delayed
+live reports and explicit samples without a send. It adds no React state,
+frames, height control or release decision. Video remains the physical
+bar/newest-row evidence; shadow rectangles are not presentation ACKs.
+Use it only for the finite before/after newline and attachment clips,
+with the keyboard stationary. Preserve each clock domain and turn it off
+after capture. This is measurement preparation, not a chosen product fix.
+
+**Fresh round2 Android delivered, October24 at17:48 EDT.**
+`phone.sh --android up` built from0392c5e3 under the heavy lock, fingerprint
+92fe8d35e166e03c3e2f664eec5cb5465575b982. APK package chat.vera.app.dev
+and embedded assets/fingerprint match; apksigner verification passes with
+the prior Vera Dev certificate4efc689e…ee793b. Hosted page/APK return200,
+hosted/local286,643,154 bytes match, SHA256
+d400ec8c97d22f0216bd495bb7c34738fc7da238aa35b0c873b0dae8978eaeee.
+Raw verification is `.cache/round2/phone-android-round2-verification.json`.
+Install page:
+https://vera-evidence.b-cdn.net/dev-client/android/92fe8d35e166e03c3e2f664eec5cb5465575b982-c06112bbdd12/index.html
+
+The exact phone.sh open/server block, Android install link, sign-in,
+preservation/rollback/switch facts and13-item test script were delivered
+to the parent immediately. Install over Vera Dev keeps its data and leaves
+production Vera alone. Both devices are down and the heavy lock is released;
+normal8492 stays serving. All required ordered checks and format pass,
+including the later DEV-only growth probe. Formal motion/opacity/sparse
+frame limits above remain, not an all-pass claim. New iPhone follow-ups
+continue independently. No private production build, merge or release.

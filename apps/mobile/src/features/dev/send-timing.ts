@@ -17,6 +17,7 @@ interface Mark {
   wall: number;
   owner: string;
   send: number;
+  mode: "send" | "layout";
   step: Step;
   bar: { height: number; y: number } | null;
   field: { height: number; y: number } | null;
@@ -31,6 +32,7 @@ interface Mark {
 
 const available = (__DEV__ || env.profileBundle) && env.devTools;
 let active = false;
+let layoutOnly = false;
 let marks = new Array<Mark>();
 const samplers = new Map<string, () => void>();
 const states = new Array<{
@@ -57,10 +59,21 @@ function rect(host: Host | null) {
 export const sendTiming = {
   start: () => {
     active = available;
+    layoutOnly = false;
     marks = [];
     states.length = 0;
     sendUIFault.reset();
     return { active };
+  },
+  /** Ordinary typing/attachment geometry, without starting a real send. */
+  startLayout: () => {
+    active = available;
+    layoutOnly = true;
+    marks = [];
+    states.length = 0;
+    sendUIFault.reset();
+    if (active) for (const sample of samplers.values()) sample();
+    return { active, mode: "layout" };
   },
   stop: () => {
     active = false;
@@ -93,12 +106,13 @@ export function useSendProbe(
   const send = useRef(0);
 
   function mark(step: Step, reported?: number) {
-    if (!active || send.current === 0) return;
+    if (!active || (!layoutOnly && send.current === 0)) return;
     marks.push({
       at: performance.now(),
       wall: Date.now(),
       owner,
       send: send.current,
+      mode: layoutOnly ? "layout" : "send",
       step,
       bar: rect(bar.current),
       field: rect(field.current),
