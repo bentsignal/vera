@@ -310,7 +310,7 @@ export function useMessages(
      */
     sendMessage: (draft: OutgoingDraft, replyTo?: ReplyTarget) => {
       if (!view.live) view.jumpToLatest();
-      sendOutgoing(session, conversationId, {
+      return sendOutgoing(session, conversationId, {
         ...draft,
         reply: replyFor(root, replyTo),
       });

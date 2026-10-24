@@ -256,9 +256,10 @@ function Thread({
           report={report}
           onChangeText={typing.report}
           onSend={(draft) => {
-            thread.sendMessage(draft);
+            const messageId = thread.sendMessage(draft);
             list.current?.scrollToLatest();
             devTools.replyToMe(conversationId, threadId);
+            return messageId;
           }}
         />
       )}

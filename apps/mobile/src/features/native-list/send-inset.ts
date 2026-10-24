@@ -1,75 +1,103 @@
-import { useEffect, useState } from "react";
+import type { RefObject } from "react";
+import type { SharedValue } from "react-native-reanimated";
+import { useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { useAnimatedReaction } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import type { MessageListViewMethods } from "./native";
 import type { InsetState } from "./send-inset-state";
 import type { ComposerHeight } from "~/features/conversation/composer-height";
-import { heldMessages, rendered, waited, withHeight } from "./send-inset-state";
+import { markSendState } from "~/features/dev/send-timing";
+import { outgoingExists } from "~/features/messaging/outbox";
+import {
+  heldMessages,
+  initialInset,
+  insetFor,
+  sendReady,
+} from "./send-inset-state";
+import { useSendLatest } from "./send-latest";
 
-/**
- * How long a send waits for the composer's new height at most, so its
- * message never waits for good. It only waits when its field will get
- * shorter (`holdsForSend`), and the height reaches JavaScript a few frames
- * after the send's render. At this point it goes with the height on the UI
- * thread (`waited`). Known limit: if the composer hasn't got shorter even
- * there by then, its height goes in alone afterwards, up then down as
- * before this wait existed.
- */
-const SEND_GUARD_MS = 500;
-
-/**
- * The composer's height for the native list's `insets.bottom`, and the
- * messages it shows. Sending empties the field in the same render that
- * brings the message sent, and the composer's new height is only measured
- * after that render is on screen. Taken in two updates, the list rose by
- * the message, then dropped by the height the composer gave back. So a
- * send whose composer will get shorter keeps the messages newer than the
- * ones native has out of its rows until that height is measured
- * (`onSentShorter` or `onHeight`, whichever comes first), then gives
- * native both in one update, which it applies as one move (the contract's
- * `insets.bottom`). Every other change goes at once.
- */
+/** Per-send committed layout, never a timer or a network acknowledgement. */
 export function useComposerInset<T extends { readonly id: string }>(
-  { live, sent, sends, stepsUntil, laidOut }: ComposerHeight,
+  { bar, live, sendCommit, laidOut }: ComposerHeight,
   messages: readonly T[],
+  {
+    frozen,
+    view,
+    freeze,
+  }: {
+    frozen: boolean;
+    view: RefObject<MessageListViewMethods | null>;
+    freeze: SharedValue<boolean>;
+  },
 ) {
-  const newest = messages.at(-1)?.id;
-  const [state, setState] = useState<InsetState>({
-    height: laidOut ?? 0,
-    newest,
-    pending: undefined,
-    sends,
-  });
-  const next = rendered(state, { newest, sends });
+  const send = useSyncExternalStore(sendCommit.subscribe, sendCommit.read);
+  const ids = messages.map((message) => message.id);
+  const [state, setState] = useState<InsetState>(() =>
+    initialInset(send, ids, laidOut ?? 0),
+  );
+  const paused = frozen || send.layout?.frozen === true;
+  const next = insetFor(state, send, ids, frozen);
   if (next !== state) setState(next);
+  const ready = !paused && sendReady(send, ids);
+  useSendLatest({
+    view,
+    commit: sendCommit,
+    ready,
+    waiting: next.pending !== undefined,
+    freeze,
+  });
 
-  function onHeight(now: number) {
-    const stepping = Date.now() < stepsUntil.get();
-    setState((current) => withHeight(current, now, stepping));
+  function committedHeight() {
+    const host = bar.current;
+    return host === null ? undefined : host.getBoundingClientRect().height;
+  }
+  function onHeight() {
+    const height = committedHeight();
+    if (height === undefined) return;
+    sendCommit.observeLayout(height);
   }
   useAnimatedReaction(
     () => live.get(),
     (now, before) => {
-      if (before === null || now === before) return;
-      if (sent.get()) sent.set(false);
-      scheduleOnRN(onHeight, now);
+      if (before !== null && now !== before) scheduleOnRN(onHeight);
     },
   );
 
-  const waiting = next.pending?.sends;
-  const known = next.pending?.known === true;
-  // eslint-disable-next-line no-restricted-syntax -- A send's wait ends on a height report, but attachments still closing, or a height that never comes, are marked by no data change.
-  useEffect(() => {
-    if (waiting === undefined) return undefined;
-    const delay = known
-      ? Math.max(0, stepsUntil.get() - Date.now())
-      : SEND_GUARD_MS;
-    const timer = setTimeout(() => {
-      const measured = live.get();
-      setState((current) => waited(current, waiting, measured));
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [waiting, known, live, stepsUntil]);
+  useLayoutEffect(() => {
+    if (
+      next.pending !== undefined &&
+      send.messageId !== undefined &&
+      !ids.includes(send.messageId) &&
+      !outgoingExists(send.messageId)
+    ) {
+      sendCommit.cancel(send.sequence);
+    }
+    const height = committedHeight();
+    if (height === undefined) return;
+    sendCommit.observeLayout(height, frozen);
+  });
+  useLayoutEffect(() => {
+    if (send.sequence === 0) return;
+    markSendState(
+      next.pending === undefined
+        ? "rows/inset props released"
+        : "rows/inset held",
+      sendCommit.owner,
+      {
+        ...send,
+        height: next.height,
+      },
+    );
+    if (next.pending === undefined && send.height !== undefined) {
+      sendCommit.published(send.sequence);
+    }
+  });
 
-  return { inset: next.height, messages: heldMessages(next, messages) };
+  return {
+    inset: next.height,
+    messages: heldMessages(next, messages),
+    waiting: next.pending !== undefined,
+    ready,
+  };
 }

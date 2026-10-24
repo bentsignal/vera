@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Lift, MessageListViewMethods } from "./native";
 import type { TypingHold } from "./typing-hold";
 import type { MessageListProps } from "~/features/conversation/message-list";
+import type { SendCommitStore } from "~/features/conversation/send-commit";
 import type { Message } from "~/features/conversation/types";
 import { newestFirst } from "~/features/conversation/build-rows";
 import { JumpToLatest } from "~/features/conversation/jump-to-latest";
@@ -178,6 +179,21 @@ function useLift(view: RefObject<MessageListViewMethods | null>) {
   return { change, lift };
 }
 
+/** Manual jumps remain smooth; a local send records its deferred request. */
+function useNativeHandle(
+  handle: RowsProps["handle"],
+  view: RefObject<MessageListViewMethods | null>,
+  commit: SendCommitStore,
+) {
+  useDevNativeFling(view);
+  function scrollToLatest() {
+    if (commit.requestLatest()) return;
+    void view.current?.scrollToLatest(true);
+  }
+  useImperativeHandle(handle, () => ({ scrollToLatest }));
+  return scrollToLatest;
+}
+
 function NativeRows({
   handle,
   onJumpToLatest,
@@ -195,24 +211,27 @@ function NativeRows({
   ...shown
 }: RowsProps) {
   const view = useRef<MessageListViewMethods>(null);
-  useDevNativeFling(view);
+  const scrollToLatest = useNativeHandle(
+    handle,
+    view,
+    composerHeight.sendCommit,
+  );
   const { open, viewReactions } = useMessageActions();
   const { layout, self } = shown;
   const place = usePlace(shown.anchorId === undefined, hasNewer);
   const theme = useNativeTheme(layout);
   const safeTop = useSafeAreaInsets().top;
   // A send's message waits for the composer's new height (`useComposerInset`).
-  const composer = useComposerInset(composerHeight, shown.messages);
+  const composer = useComposerInset(composerHeight, shown.messages, {
+    frozen: keyboardFrozen,
+    view,
+    freeze: keyboardFreeze,
+  });
   const { messageOf, rows } = useRows({
     ...shown,
     messages: composer.messages,
   });
   const { lift, change: changeLift } = useLift(view);
-
-  function scrollToLatest() {
-    void view.current?.scrollToLatest(true);
-  }
-  useImperativeHandle(handle, () => ({ scrollToLatest }));
 
   const onEvent = useListEvents({
     menu: {

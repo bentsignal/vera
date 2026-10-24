@@ -1,6 +1,6 @@
 import type { Mention } from "@decentralized-convex/messages";
 import type { ReactNode, Ref, RefObject } from "react";
-import { useImperativeHandle, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Platform, StyleSheet, TextInput, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, {
@@ -24,11 +24,11 @@ import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { useSendProbe } from "~/features/dev/send-timing";
 import { cn } from "~/lib/cn";
-import {
-  PASTE_IMAGES_NATIVE_ID,
-  useFocusedPastedImages,
-} from "~/lib/paste-images";
+import { PASTE_IMAGES_NATIVE_ID } from "~/lib/paste-images";
 import { AttachMenu } from "./attach-menu";
+import { useComposerCommit } from "./composer-commit";
+import { useComposerInput } from "./composer-input";
+import { composerSubmission } from "./composer-submission";
 import { readDraft, saveDraftText } from "./drafts";
 import { GlassField, useFieldGlass } from "./field-glass";
 import { SEND, useFieldText } from "./field-text";
@@ -154,18 +154,22 @@ function useDraft(
   onChangeText: ((text: string, sent: boolean) => void) | undefined,
   mentionable: readonly MentionCandidate[] | undefined,
 ) {
-  const [draft, setDraft] = useState(() => readDraft(draftKey).text);
+  const [written, setDraft] = useState(() => ({
+    text: readDraft(draftKey).text,
+    clear: 0,
+  }));
+  const { text: draft, clear } = written;
   const [shownKey, setShownKey] = useState(draftKey);
   if (shownKey !== draftKey) {
     setShownKey(draftKey);
-    setDraft(readDraft(draftKey).text);
+    setDraft({ text: readDraft(draftKey).text, clear });
   }
   const mention = useMentions(draft, mentionable, draftKey, input);
   /** When the field was last emptied by sending, until something is typed. */
   const sentAt = useRef<number | null>(null);
 
   function show(text: string, sent = false) {
-    setDraft(text);
+    setDraft((current) => ({ text, clear: current.clear + (sent ? 1 : 0) }));
     saveDraftText(draftKey, text);
     onChangeText?.(text, sent);
   }
@@ -189,6 +193,7 @@ function useDraft(
   }
 
   return {
+    clear,
     change,
     draft,
     mention,
@@ -290,7 +295,7 @@ export function Composer({
   /** Who can be @mentioned; undefined where nobody can. */
   mentionable?: readonly MentionCandidate[];
   /** Sends the text (possibly empty) and who it mentions, with everything staged. */
-  onSend: (text: string, mentions: readonly Mention[]) => void;
+  onSend: (text: string, mentions: readonly Mention[]) => string;
   onPick: (source: AttachmentSource) => void;
   /** Photos pasted into the field. */
   onPaste: (images: readonly PastedImage[]) => void;
@@ -314,33 +319,32 @@ export function Composer({
   edit?: EditSession;
   placeholder?: string;
 }) {
-  const input = useRef<TextInput>(null);
-  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }));
-  // Only the field being pasted into is focused; another conversation's
-  // composer can be mounted beneath this one.
-  useFocusedPastedImages(input, onPaste);
+  const input = useComposerInput(ref, onPaste);
   const editing = edit?.editing;
-  const { draft, change, mention, pick, sent, saved } = useDraft(
+  const { draft, clear, change, mention, pick, sent, saved } = useDraft(
     editing === undefined || edit === undefined ? draftKey : edit.editDraftKey,
     input,
     reportedChanges(onChangeText, editing !== undefined),
     mentionable,
   );
-  const { glass, settle, focus } = useFieldGlass(report, CONTROL);
+  const { glass, settle, focus } = useFieldGlass(report);
+  useComposerCommit(
+    report,
+    clear,
+    staged.map((file) => file.id),
+  );
   const fieldText = useFieldText(draft);
   const canSend = canSendNow(draft, staged, editing);
   const saves = editing !== undefined;
   const hint = staged.length > 0 || saves ? "Add a message" : placeholder;
   const probe = useSendProbe(report, glass.field, input, { draft, hint });
 
-  function send() {
-    if (!canSend) return;
-    probe.begin();
-    settle(editing === undefined);
-    const text = draft.trim();
-    if (editing === undefined) onSend(text, sent(text));
-    else edit?.save(text, saved(text));
-  }
+  const send = composerSubmission(
+    { canSend, edit, onSend },
+    { draft, clear, sent, saved },
+    report.sendCommit,
+    { settle, staged, begin: probe.begin },
+  );
 
   return (
     <View>
@@ -361,6 +365,7 @@ export function Composer({
             onCancelReply={() => onCancelReply?.()}
             staged={staged}
             onRemoveStaged={onRemoveStaged}
+            send={report.sends}
           />
           <StyledTextInput
             ref={input}

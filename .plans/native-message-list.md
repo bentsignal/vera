@@ -2163,8 +2163,24 @@ Raw evidence: `.cache/round2/probe-ios-normal-settled.json`,
 and `probe-ios-final.json`. Text-entry automation returned
 `TEXT_ENTRY_MISMATCH` with visually identical multiline strings; snapshots
 and the sent message bodies were checked rather than counting the failed
-command as success. Android measurements are pending; no acknowledgement
-implementation or native contract change is selected yet.
+command as success.
+
+Android Debug emulator (native `8d312353`, fingerprint
+`6025cf1c2994941af3586d8c1d01988e9e10c319`) repeated the six cases:
+at scale 1, first-empty bar/field were 80.381/40 dp and settled `live`
+80.381; at scale 1.3, they were 86.476/46.095 dp and settled `live`
+86.476. Multiline, one-line, Message and Reply cases matched. The normal
+one-line send had no height callback. The source-predicted later Android
+large-font shrink did not reproduce, so no minimum-height patch is
+justified by this probe. Raw case files are
+`.cache/round2/probe-android-*-{first,settled}.json`; manifests
+`send-probe-ios-manifest.json` and `send-probe-android-manifest.json`
+associate owner/send sequence with each file. `probe-group-message-identities.json`
+and `probe-thread-message-identities.json` retain the test message IDs.
+Both system font settings were restored and both devices/panels closed.
+All twelve cases matched; these are bounded observations, not universal
+height finality or a send-motion pass. The normal Metro metadata remains
+port 8492/PID 90177. The separate unused 8493 profiler Metro was stopped.
 
 The separate approved fast-media change is integrated from iOS `7176370b`
 and Android `8d312353`. Same-photo iOS signposts measured finger-up to
@@ -2175,3 +2191,138 @@ Raw trace: `.cache/round2/profile/photo-open-fast.trace` and
 `photo-fast-native-spans.json`. This does not clear the composer blocker
 or the remaining round-2 runtime gates. The phone Metro on 8492 stays
 unchanged; no fresh physical phone build has started.
+
+### Chosen shared send revision: committed-height acknowledgement
+
+Written before implementation, after the parent's authorization to replace
+the rejected timer. This is shared JavaScript only; the native rows/inset
+contract stays unchanged. The twelve-case probe supports the chosen text
+measurement, not a universal completion guarantee.
+
+**State and acknowledgement.** Each actual new-message send raises a
+monotonic sequence in the same React batch as clearing the draft and
+inserting the optimistic message. All sends participate, including an
+unchanged one-line field. The native list keeps its previous rows and
+inset until that sequence's composer layout effect reads the committed
+bar height. The acknowledgement contains the sequence and measured height.
+The synchronous acknowledgement render gives native both the held rows
+and that height together. No elapsed time, frame budget, `live` value, or
+height callback can release a pending send. Remove the 500 ms release.
+
+**Attachments.** For native-list sends, reset the staged-strip React key
+with the send sequence. The cleared strip therefore mounts empty at zero
+height in the clearing commit; it does not run its old 220 ms close while
+the row waits. This intentionally makes attachment clearing immediate on
+send, alongside text clearing. Ordinary picking/removing still uses its
+existing animation. The React Native list's existing send/glass behavior
+is retained. This avoids calling an animation deadline a completion event
+or waiting indefinitely for a cancelled animation.
+
+**Release and stale data.** Native height observations outside a pending
+send follow the current committed bar geometry, so an old queued height
+callback cannot restore the pre-send inset. The acknowledgement is
+accepted only for the current sequence. Superseding rapid sends retain
+the original held boundary and acknowledge the latest clearing commit;
+concurrent incoming messages release with the same height. Deleting a
+held message or a mutation rolling back changes the current source rows,
+not an obsolete captured array.
+
+**Freeze.** While `keyboardFrozen`, keep the rows held even if the
+acknowledgement arrived. On thaw, read the current committed height and
+release rows/inset together. This covers a composer change underneath
+the menu and avoids iOS applying rows while retaining only the inset.
+
+**Edits, cancellation and lifetime.** Edit saves arm no arrival hold; their
+height follows the committed bar normally. A rejected/no-op submission
+still clears its sequence through the commit without inventing a row.
+An unmount discards only that list instance's pending state and observer;
+the outbox is unaffected and a remount starts from all current messages.
+Old acknowledgements cannot release a later send. A missing or invalid
+host measurement must be surfaced and investigated, not replaced by a
+timer or treated as a valid old height. The installed RN host API worked
+on both platforms in every probe sample; no new native fallback is chosen
+without a concrete failure and proposal.
+
+**Exact row readiness.** Return the outbox's existing generated message
+ID through the shared send call; associate it with the pending sequence.
+An acknowledgement before that specific optimistic row is present keeps
+both rows and inset held. A concurrent incoming row is not a substitute.
+The ID is returned synchronously; no network response enters this path.
+The send also names the draft's next clear revision and the staged file
+IDs being removed. A clearing revision is stored with the draft text in
+React state, so an acknowledgement cannot read an early render that only
+raised the send sequence. The bar acknowledges only after that clear
+revision is rendered and none of those old staged IDs remain. New typing
+or newly staged files after the clear are distinct actions and do not
+strand the old send. A synchronous submission exception marks the sequence
+cancelled; it still takes the next committed geometry but waits for no
+nonexistent message or attachment removal.
+
+The sequence/expected ID/acknowledgement are a small per-composer local
+store with `useSyncExternalStore` subscriptions. The conversation observes
+only the sequence; the bar/list observe completion details. Acknowledging
+does not re-render the whole conversation, preserving the reason iOS
+`live` height updates were kept outside its React state.
+
+**Scrolled-up option, NOT accepted yet.** The deterministic shared-only
+option is to snap to the old bottom while rows/inset remain held, using
+the existing
+`await scrollToLatest(false)`, then recheck sequence/view/freeze and
+publish the pair. Both native source reviews confirm the subsequent
+apply sees the old bottom and pins to the new one. This would replace the
+old smooth send-from-scrolled-up travel with an immediate jump, which is
+an observable product tradeoff, not animation parity. Manual jump behavior
+would stay unchanged. The parent is reviewing this option; it has not been
+accepted or implemented. Existing `scrollToLatest(true)` resolves after
+starting the animation, not after reaching its target, and neither native
+implementation retains a follow-newest intent through a later row apply.
+A release layout effect or RAF has no worker-completion barrier. Therefore
+simply moving that smooth call does not establish deterministic placement.
+Preserving smooth travel with a guarantee may instead require a small
+native-internal pending latest-target policy using the existing method;
+that needs an authored proposal before changing native behavior. The
+shared acknowledgement can be implemented independently, but scrolled-up
+runtime remains blocked until this ordering is resolved. The eager call
+must not run in addition to any chosen deferred policy. Final acceptance
+is the new bottom/8 pt gap, with intentional short-thread top alignment.
+
+**Selected navigation policy after source review.** The parent rejected
+snap and agreed the bounded native-internal generic follow-latest policy.
+Shared records the screen's eager send request as intent, then issues the
+existing animated command only when ACK and the exact own row are ready,
+immediately before publishing the pair. It is generic latest navigation,
+not a native exact-send acknowledgement. Before arm, cancellation or a
+superseding sequence prevents the old command. After arm, send failure or
+cancellation does not revoke generic navigation. User touch/drag/stop,
+other navigation, lift/detach and a superseding command cancel/replace it
+through the native policy; stale worker/posted starts must not restart it.
+No target-ID field or timer is introduced. Both platform owners implement
+their bounded internal policy; Android keeps its FIFO chained diffs.
+Shared records a command failure explicitly, releases the valid geometry
+pair rather than hiding the sent row forever, and reports the navigation
+failure; that is not successful bottom-placement acceptance. A freeze
+before shared publication keeps the pair held and re-arms after thaw.
+
+**Native freeze correction, source-ready, runtime pending.** iOS can begin a freeze after JS
+releases but before the worker applies its measured rows. Existing
+`InsetsGate` then holds only the inset while applying rows. A shared
+release-time `!frozen` check cannot prove that race safe. The iOS owner
+implemented the bounded internal atomic barrier in `0a10b924`: retain the
+latest full measured rows/inset/keyboard geometry until a current thaw
+apply, and begin any pending borrowed-view landing after that layout.
+The delayed landing start is an explicit behavior cost to verify.
+Android's generic smooth latest policy is source-ready in `e2990c67`;
+its carried rows/inset apply remains atomic with FIFO diffs preserved.
+Both source checkpoints passed their focused native and ordered repository
+checks. Neither is a combined runtime pass. Do not call this interleaving
+covered by shared checks alone.
+
+**Required proof before readiness.** Keep raw send/ack/release identity
+and geometry. Test eight-line, short and tall sent rows in both layouts
+on both platforms, same-height sends with no callback, delayed actual
+layout beyond the old deadline, rapid supersession, a concurrent arrival,
+send while scrolled up, attachments and keyboard freeze. Track the same
+old/new rows through motion and verify the newest frame remains 8 pt above
+the composer afterward. Preserve formal analyzer results separately from
+manual row-identity review. No phone readiness follows from source tests
+or the twelve baseline probe samples alone.

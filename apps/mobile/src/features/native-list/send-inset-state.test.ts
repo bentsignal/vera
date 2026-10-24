@@ -1,201 +1,182 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { Newest } from "../conversation/typing-change.ts";
+import type { SendCommit } from "../conversation/send-commit.ts";
 import type { InsetState } from "./send-inset-state.ts";
 import {
+  acknowledged,
   heldMessages,
-  holdsForSend,
   rendered,
-  waited,
   withHeight,
 } from "./send-inset-state.ts";
-import { holdTypists } from "./typing-hold.ts";
 
-// A five-line send: the composer goes from 162 to 76 tall. Native has "m1"
-// as its newest message; the message sent is "m2". Sending empties the
-// field in the same render that brings "m2" (the draft and the outbox
-// update together), and the new height is measured only after that.
-function m(id: string, authorId = "me") {
-  return { authorId, id };
-}
-const AT_REST = {
+const REST = {
   height: 162,
-  newest: "m1",
-  pending: undefined,
+  visible: ["old0", "old1"],
   sends: 0,
+  pending: undefined,
 } satisfies InsetState;
-function ids(state: InsetState, messages: { id: string }[]) {
-  return heldMessages(state, messages).map((message) => message.id);
-}
-/** The render the send's message arrives in, with send 1. */
+const ACK = {
+  sequence: 1,
+  clear: 1,
+  files: [],
+  messageId: "mine",
+  height: 76,
+  cancelled: false,
+} satisfies SendCommit;
+const ROWS = ["old0", "old1", "mine"];
 function sending() {
-  return rendered(AT_REST, { newest: "m2", sends: 1 });
+  return rendered(REST, { sends: 1, ids: ROWS });
+}
+function pair(
+  state: InsetState,
+  send: SendCommit = ACK,
+  ids = ROWS,
+  options: { frozen?: boolean; height?: number } = {},
+) {
+  return acknowledged(state, {
+    send,
+    ids,
+    frozen: options.frozen ?? false,
+    height: options.height ?? 76,
+  });
+}
+function visible(state: InsetState, ids = ROWS) {
+  return heldMessages(
+    state,
+    ids.map((id) => ({ id })),
+  ).map((m) => m.id);
 }
 
-void test("the send's render keeps the message sent and the old height", () => {
+void test("the submit render holds rows and old inset before the ACK", () => {
   const state = sending();
-  assert.deepEqual(ids(state, [m("m0"), m("m1"), m("m2")]), ["m0", "m1"]);
   assert.equal(state.height, 162);
+  assert.deepEqual(visible(state), ["old0", "old1"]);
 });
 
-void test("the measured height lets the message go with it, in one update", () => {
-  const state = withHeight(sending(), 76, false);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 76);
+void test("generic height reports never release a pending send", () => {
+  const state = sending();
+  for (const height of [76, 162, 84, 230])
+    assert.equal(withHeight(state, height), state);
+  assert.equal(pair(state, { ...ACK, height: undefined }), state);
 });
 
-void test("onHeight first or onSentShorter first lets go the same way", () => {
-  // Both report through the composer's `live` height: whichever is first
-  // lets go, and the other, the same height, changes nothing.
-  const released = withHeight(sending(), 76, false);
-  assert.equal(withHeight(released, 76, false), released);
-});
-
-void test("a late height still goes with the message, however late", () => {
-  // No timer lets go before the height is known while one is coming: many
-  // renders later, the message still waits.
+void test("delayed actual layout beyond the old deadline still releases only one pair", () => {
   let state = sending();
-  for (const newest of ["m2", "m2", "m2"]) {
-    state = rendered(state, { newest, sends: 1 });
+  const observed = [[visible(state), state.height]];
+  for (let frame = 0; frame < 180; frame++) {
+    state = rendered(state, { sends: 1, ids: ROWS });
+    state = withHeight(state, 162);
   }
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1"]);
-  state = withHeight(state, 76, false);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 76);
-});
-
-void test("a one-line send waits for nothing", () => {
-  assert.equal(holdsForSend({ editing: false, field: 40, least: 40 }), false);
-  assert.equal(holdsForSend({ editing: false, field: 40.3, least: 40 }), false);
-  // No send counted: the message goes in the render that brings it.
-  const state = rendered(AT_REST, { newest: "m2", sends: 0 });
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
   assert.equal(state.height, 162);
+  state = pair(state);
+  observed.push([visible(state), state.height]);
+  assert.deepEqual(observed, [
+    [["old0", "old1"], 162],
+    [ROWS, 76],
+  ]);
 });
 
-void test("a taller field waits, and an edit never does", () => {
-  assert.equal(holdsForSend({ editing: false, field: 128, least: 40 }), true);
-  assert.equal(holdsForSend({ editing: true, field: 128, least: 40 }), false);
-});
-
-void test("someone else's message while waiting waits too, and goes with the height", () => {
-  let state = sending();
-  state = rendered(state, { newest: "t1", sends: 1 });
-  const all = [m("m1"), m("m2"), m("t1", "maya")];
-  assert.deepEqual(ids(state, all), ["m1"]);
-  state = withHeight(state, 76, false);
-  assert.deepEqual(ids(state, all), ["m1", "m2", "t1"]);
-});
-
-void test("a typist whose message arrives while waiting stays until it goes in", () => {
-  // Maya was typing and has stopped; her message comes in during the wait.
-  // The typing row is worked out from the messages native gets, so she
-  // stays in it until her message is let go, then leaves in that same
-  // update: native grows her message out of her typing bubble.
-  function recent(state: InsetState, messages: ReturnType<typeof m>[]) {
-    return [...heldMessages(state, messages)]
-      .reverse()
-      .map(({ authorId, id }) => ({ authorId, key: id })) satisfies Newest[];
-  }
-  const all = [m("m1"), m("m2"), m("t1", "maya")];
-  const typing = { leaving: [], newestKey: "m1", shown: ["maya"] };
-
-  let state = rendered(sending(), { newest: "t1", sends: 1 });
-  const waiting = holdTypists(typing, [], recent(state, all));
-  assert.deepEqual(waiting.shown, ["maya"]);
-  assert.deepEqual(waiting.leaving, ["maya"]);
-
-  state = withHeight(state, 76, false);
-  const released = holdTypists(waiting, [], recent(state, all));
-  assert.deepEqual(released.shown, []);
-  assert.deepEqual(ids(state, all), ["m1", "m2", "t1"]);
-});
-
-void test("attachments closing in steps: the messages go with their last height", () => {
-  let state = sending();
-  state = withHeight(state, 120, true);
-  state = withHeight(state, 90, true);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1"]);
-  assert.equal(state.height, 162);
-  // Done closing: the UI thread has the last step's height.
-  state = waited(state, 1, 90);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 90);
-  // The last step's report afterwards, the same height: nothing new.
-  assert.equal(withHeight(state, 90, false), state);
-});
-
-// The guard's boundary. Updates to native are compared as (messages,
-// inset) pairs: one pair changing both is one move; the inset changing
-// alone after the messages went is the up-then-down.
-
-void test("boundary: a height reported just before the guard is one update", () => {
-  const state = withHeight(sending(), 76, false);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 76);
-  // The guard then finds nothing waiting.
-  assert.equal(waited(state, 1, 76), state);
-});
-
-void test("boundary: the guard after the UI thread saw the shrink, its report still queued, is one update", () => {
-  // JavaScript was late, the UI thread wasn't: the guard goes with the
-  // height on the UI thread, and the late report changes nothing.
-  const state = waited(sending(), 1, 76);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 76);
-  const late = withHeight(state, 76, false);
-  assert.equal(late, state);
-});
-
-void test("boundary, known limit: the guard before the composer got shorter at all is two updates", () => {
-  // Not one move, and not what agreed A allows: the messages go with the
-  // old height, then the new height goes alone, up then down. Only when
-  // the composer's own shrink is later than the guard even on the UI
-  // thread. Kept here so a change that widens it shows.
-  let state = waited(sending(), 1, 162);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 162);
-  state = withHeight(state, 76, false);
-  assert.equal(state.height, 76);
-});
-
-void test("the guard with no shrink coming lets the message go, nothing after", () => {
-  // The field didn't get shorter after all: the message goes, and no
-  // height follows.
-  const state = waited(sending(), 1, 162);
-  assert.deepEqual(ids(state, [m("m1"), m("m2")]), ["m1", "m2"]);
-  assert.equal(state.height, 162);
-});
-
-void test("an earlier send's guard doesn't end a later send's wait", () => {
-  let state = withHeight(sending(), 76, false);
-  state = rendered(state, { newest: "m2", sends: 1 });
-  state = rendered(state, { newest: "m3", sends: 2 });
-  assert.equal(waited(state, 1, 76), state);
-  assert.deepEqual(ids(state, [m("m2"), m("m3")]), ["m2"]);
-});
-
-void test("if the message it waits under is gone, every message goes", () => {
+void test("ACK before exact own row holds even if another person arrives", () => {
   const state = sending();
-  assert.deepEqual(ids(state, [m("x1"), m("x2")]), ["x1", "x2"]);
+  const other = ["old0", "old1", "someone-else"];
+  assert.equal(pair(state, ACK, other), state);
+  const all = [...other, "mine"];
+  const released = pair(state, ACK, all);
+  assert.deepEqual(visible(released, all), all);
+  assert.equal(released.height, 76);
 });
 
-void test("a send into an empty conversation waits with no messages", () => {
-  const empty = { ...AT_REST, newest: undefined };
-  const state = rendered(empty, { newest: "m1", sends: 1 });
-  assert.deepEqual(ids(state, [m("m1")]), []);
+void test("same-height send releases without a height callback", () => {
+  const state = { ...sending(), height: 76 };
+  assert.equal(pair(state).pending, undefined);
+  assert.equal(pair(state).height, 76);
 });
 
-void test("a render with nothing new keeps the same state", () => {
-  assert.equal(rendered(AT_REST, { newest: "m1", sends: 0 }), AT_REST);
+void test("rapid supersession keeps the original held boundary and rejects old ACK", () => {
+  const state = rendered(sending(), { sends: 2, ids: [...ROWS, "mine2"] });
+  assert.deepEqual(visible(state, [...ROWS, "mine2"]), ["old0", "old1"]);
+  assert.equal(pair(state), state);
+  const released = pair(state, { ...ACK, sequence: 2, messageId: "mine2" }, [
+    ...ROWS,
+    "mine2",
+  ]);
+  assert.equal(released.pending, undefined);
+  assert.deepEqual(released.visible, [...ROWS, "mine2"]);
+});
+
+void test("freeze keeps both rows and height, thaw uses fresh committed geometry", () => {
   const state = sending();
-  assert.equal(rendered(state, { newest: "m2", sends: 1 }), state);
-  assert.equal(withHeight(AT_REST, 162.2, false), AT_REST);
+  assert.equal(pair(state, ACK, ROWS, { frozen: true }), state);
+  assert.equal(withHeight(state, 104), state);
+  const thawed = pair(state, ACK, ROWS, { height: 104 });
+  assert.equal(thawed.height, 104);
+  assert.equal(thawed.pending, undefined);
 });
 
-void test("other height changes go at once", () => {
-  const state = withHeight(AT_REST, 184, false);
-  assert.equal(state.height, 184);
-  assert.equal(state.pending, undefined);
+void test("cancelled submission waits for geometry but no nonexistent row", () => {
+  const state = sending();
+  const cancelled = { ...ACK, messageId: undefined, cancelled: true };
+  assert.equal(
+    pair(state, { ...cancelled, height: undefined }, REST.visible),
+    state,
+  );
+  const released = pair(state, cancelled, REST.visible);
+  assert.equal(released.pending, undefined);
+  assert.deepEqual(released.visible, REST.visible);
+});
+
+void test("deleting the old boundary does not expose held concurrent arrivals", () => {
+  const state = sending();
+  assert.deepEqual(visible(state, ["old0", "other", "mine"]), ["old0"]);
+  assert.deepEqual(
+    visible(pair(state, ACK, ["old0", "other", "mine"]), [
+      "old0",
+      "other",
+      "mine",
+    ]),
+    ["old0", "other", "mine"],
+  );
+});
+
+void test("a send into an empty chat holds no old rows", () => {
+  const state = rendered({ ...REST, visible: [] }, { sends: 1, ids: ["mine"] });
+  assert.deepEqual(visible(state, ["mine"]), []);
+  assert.deepEqual(pair(state, ACK, ["mine"]).visible, ["mine"]);
+});
+
+void test("stable renders, duplicate heights and stale sequences do not restart state", () => {
+  assert.equal(rendered(REST, { sends: 0, ids: REST.visible }), REST);
+  assert.equal(withHeight(REST, 162.2), REST);
+  const released = pair(sending());
+  assert.equal(rendered(released, { sends: 0, ids: ROWS }), released);
+  assert.equal(pair(released), released);
+});
+
+void test("an invalid release measurement is an error, not an old-height fallback", () => {
+  assert.throws(
+    () => pair(sending(), ACK, ROWS, { height: NaN }),
+    /committed composer geometry/,
+  );
+});
+
+void test("non-send edits, pagination and ordinary composer growth stay live", () => {
+  assert.equal(withHeight(REST, 184).height, 184);
+  const paged = rendered(REST, { sends: 0, ids: ["older", ...REST.visible] });
+  assert.equal(paged.pending, undefined);
+  assert.deepEqual(paged.visible, ["older", ...REST.visible]);
+});
+
+void test("ready own row and height remain held until generic command is armed", () => {
+  const requested = { ...ACK, latestRequested: true };
+  const state = sending();
+  assert.equal(pair(state, requested), state);
+  assert.equal(
+    pair(state, { ...requested, latestArmed: true }).pending,
+    undefined,
+  );
+  assert.equal(
+    pair(state, { ...requested, cancelled: true }).pending,
+    undefined,
+  );
 });

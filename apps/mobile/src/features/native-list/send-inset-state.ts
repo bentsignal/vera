@@ -1,121 +1,132 @@
-// The composer inset, and which messages the native list gets, around a
-// send (see `useComposerInset`), as plain steps, so the order of renders,
-// height reports and timers is tested on its own.
+import type { SendCommit } from "../conversation/send-commit.ts";
 
-/** A send whose message waits for the composer's new height. */
+/** Rows native already has, until one specific send's clear is acknowledged. */
 export interface Pending {
-  /** Which send (`ComposerHeight.sends`). */
   readonly sends: number;
-  /**
-   * The newest message native had when it was sent: newer ones wait,
-   * undefined when it had none.
-   */
-  readonly after: string | undefined;
-  /**
-   * Whether a height came while attachments still close a step at a time:
-   * the messages then go once they're done.
-   */
-  readonly known: boolean;
+  readonly before: readonly string[];
 }
 
 export interface InsetState {
-  /** The composer's height as native has it. */
   readonly height: number;
-  /** The newest message native has, while nothing waits. */
-  readonly newest: string | undefined;
-  /** The latest send seen. */
+  readonly visible: readonly string[];
   readonly sends: number;
   readonly pending: Pending | undefined;
 }
 
-/**
- * Whether a send waits for the composer to get shorter: only when its
- * field (text, reply, attachments) is taller than its least, since sending
- * empties all of them. A one-line send has nothing to wait for, and an edit
- * adds no message.
- */
-export function holdsForSend({
-  editing,
-  field,
-  least,
-}: {
-  editing: boolean;
-  field: number;
-  least: number;
-}) {
-  return !editing && field > least + 0.5;
+function sameIds(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length && left.every((id, at) => id === right[at])
+  );
 }
 
-/**
- * A render: a new send starts waiting under the newest message native has;
- * otherwise that's the newest message there is. The same state when
- * nothing changed, so setting it in render settles.
- */
+/** All sends hold, including one-line fields with no subsequent onLayout. */
 export function rendered(
   state: InsetState,
-  { sends, newest }: { sends: number; newest: string | undefined },
+  { sends, ids }: { sends: number; ids: readonly string[] },
 ) {
-  if (sends !== state.sends) {
+  if (sends > state.sends) {
     return {
       ...state,
       sends,
-      pending: { after: state.newest, known: false, sends },
+      pending: { sends, before: state.pending?.before ?? state.visible },
     } satisfies InsetState;
   }
-  if (state.pending === undefined && newest !== state.newest) {
-    return { ...state, newest } satisfies InsetState;
+  if (state.pending === undefined && !sameIds(state.visible, ids)) {
+    return { ...state, visible: ids } satisfies InsetState;
   }
   return state;
 }
 
-/**
- * The composer reported its height (`onSentShorter` or `onHeight`): taken
- * at once, letting a waiting send's messages go with it, unless
- * attachments are still closing (`stepping`), whose last height they wait
- * for. A height native already has changes nothing.
- */
-export function withHeight(state: InsetState, now: number, stepping: boolean) {
-  const { pending } = state;
-  if (pending === undefined) {
-    if (Math.abs(now - state.height) < 0.5) return state;
-    return { ...state, height: now } satisfies InsetState;
+/** Generic or late height observations cannot release a pending submission. */
+export function withHeight(state: InsetState, height: number) {
+  if (state.pending !== undefined || Math.abs(state.height - height) < 0.5) {
+    return state;
   }
-  if (stepping) {
-    return {
-      ...state,
-      pending: { ...pending, known: true },
-    } satisfies InsetState;
-  }
-  return { ...state, height: now, pending: undefined } satisfies InsetState;
+  return { ...state, height } satisfies InsetState;
 }
 
-/**
- * `sends`' wait is over (attachments done closing, or the guard): its
- * messages go with `measured`, the composer's height on the UI thread now,
- * which has the shrink as soon as it happens, even while its report to
- * JavaScript is still queued (that report then changes nothing). A later
- * send's wait isn't this one's to end.
- */
-export function waited(state: InsetState, sends: number, measured: number) {
-  if (state.pending?.sends !== sends) return state;
+/** A known local row, never another person's concurrent arrival. */
+export function sendReady(send: SendCommit, ids: readonly string[]) {
+  return (
+    send.height !== undefined &&
+    (send.cancelled || ids.includes(send.messageId ?? ""))
+  );
+}
+
+function navigationReady(send: SendCommit) {
+  return send.cancelled || !send.latestRequested || send.latestArmed === true;
+}
+
+/** Only a matching clear ACK and the specific optimistic row release a pair. */
+export function acknowledged(
+  state: InsetState,
+  {
+    send,
+    height,
+    ids,
+    frozen,
+  }: {
+    send: SendCommit;
+    height: number;
+    ids: readonly string[];
+    frozen: boolean;
+  },
+) {
+  if (
+    frozen ||
+    state.pending?.sends !== send.sequence ||
+    !sendReady(send, ids) ||
+    !navigationReady(send)
+  )
+    return state;
+  if (!Number.isFinite(height) || height <= 0) {
+    throw new Error(
+      "Cannot release a send without committed composer geometry",
+    );
+  }
   return {
-    ...state,
-    height: measured,
+    height,
+    visible: ids,
+    sends: state.sends,
     pending: undefined,
   } satisfies InsetState;
 }
 
-/**
- * The messages for native: while a send waits, none newer than the one it
- * waits under. If that one is gone (the list reloaded), all of them.
- */
+/** Render-derived pair state; measurement and freeze observations arrive separately. */
+export function insetFor(
+  state: InsetState,
+  send: SendCommit,
+  ids: readonly string[],
+  frozen: boolean,
+) {
+  const next = rendered(state, { sends: send.sequence, ids });
+  const layout = send.layout;
+  if (layout === undefined || frozen || layout.frozen) return next;
+  return next.pending === undefined
+    ? withHeight(next, layout.height)
+    : acknowledged(next, { send, height: layout.height, ids, frozen });
+}
+
+export function initialInset(
+  send: SendCommit,
+  ids: readonly string[],
+  height: number,
+) {
+  const waiting = send.sequence > 0 && send.height === undefined;
+  return {
+    height,
+    visible: waiting ? [] : ids,
+    pending: waiting ? { sends: send.sequence, before: [] } : undefined,
+    sends: send.sequence,
+  } satisfies InsetState;
+}
+
+/** Keep current versions of old rows, even if the old newest was deleted. */
 export function heldMessages<T extends { readonly id: string }>(
   state: InsetState,
   messages: readonly T[],
 ) {
-  const { pending } = state;
-  if (pending === undefined) return messages;
-  if (pending.after === undefined) return [];
-  const at = messages.findIndex((message) => message.id === pending.after);
-  return at === -1 ? messages : messages.slice(0, at + 1);
+  if (state.pending === undefined) return messages;
+  const before = new Set(state.pending.before);
+  return messages.filter((message) => before.has(message.id));
 }

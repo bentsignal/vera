@@ -1,9 +1,10 @@
 import type { RefObject } from "react";
 import type { TextInput, View } from "react-native";
-import { useId, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { PixelRatio, Platform } from "react-native";
 
 import type { ComposerReport } from "~/features/conversation/composer-height";
+import type { SendCommit } from "~/features/conversation/send-commit";
 import { env } from "~/env";
 
 interface Host {
@@ -31,6 +32,19 @@ const available = (__DEV__ || env.profileBundle) && env.devTools;
 let active = false;
 let marks = new Array<Mark>();
 const samplers = new Map<string, () => void>();
+const states = new Array<{
+  at: number;
+  owner: string;
+  step: string;
+  send: SendCommit;
+}>();
+
+/** Shared send/ACK transitions, on the JS clock, separate from native apply. */
+export function markSendState(step: string, owner: string, send: SendCommit) {
+  if (!active) return;
+  states.push({ at: performance.now(), owner, step, send });
+  if (states.length > 200) states.splice(0, states.length - 200);
+}
 
 function rect(host: Host | null) {
   if (host?.getBoundingClientRect === undefined) return null;
@@ -43,12 +57,14 @@ export const sendTiming = {
   start: () => {
     active = available;
     marks = [];
+    states.length = 0;
     return { active };
   },
   stop: () => {
     active = false;
   },
   report: () => marks.slice(),
+  stateReport: () => states.slice(),
   sample: () => {
     if (active) for (const sample of samplers.values()) sample();
     return marks.slice();
@@ -67,7 +83,7 @@ export function useSendProbe(
   { draft, hint }: { draft: string; hint: string },
 ) {
   const { bar, live } = report;
-  const owner = useId();
+  const owner = report.sendCommit.owner;
   const send = useRef(0);
 
   function mark(step: Step, reported?: number) {

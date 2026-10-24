@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { useRef } from "react";
 import { Text, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
@@ -5,6 +6,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import type { ComposerHandle } from "~/features/conversation/composer";
 import type { MessageListHandle } from "~/features/conversation/message-list";
+import type { OutgoingDraft } from "~/features/messaging/outbox";
 import type { MessageLayout } from "~/features/preferences/store";
 import { Pending } from "~/components/pending";
 import { useAfterSend } from "~/features/conversation/after-send";
@@ -150,6 +152,22 @@ function useOpening(
   return useAccountPending(!shown);
 }
 
+/** Enqueue locally, then perform the conversation's existing send actions. */
+function useConversationSubmission(
+  messages: ReturnType<typeof useMessages>,
+  replies: ReturnType<typeof useReplies>,
+  list: RefObject<MessageListHandle | null>,
+  afterSend: () => void,
+) {
+  return (draft: OutgoingDraft) => {
+    const messageId = messages.sendMessage(draft, replies.replyTo);
+    replies.cancel();
+    list.current?.scrollToLatest();
+    afterSend();
+    return messageId;
+  };
+}
+
 function Conversation({
   conversationId,
   anchorId,
@@ -190,6 +208,7 @@ function Conversation({
     listReady([messages, notices, typing], layout, profilesLoaded) &&
     composerHeight.laidOut !== undefined;
   const pending = useOpening(conversationId, messages, shown);
+  const submit = useConversationSubmission(messages, replies, list, afterSend);
   if (!isLoading && conversation === undefined) {
     return (
       <MissingConversation
@@ -246,12 +265,7 @@ function Conversation({
         replyingTo={replies.replyingTo}
         onCancelReply={replies.cancel}
         edit={editing}
-        onSend={(draft) => {
-          messages.sendMessage(draft, replies.replyTo);
-          replies.cancel();
-          list.current?.scrollToLatest();
-          afterSend();
-        }}
+        onSend={submit}
       />
     </View>
   );
