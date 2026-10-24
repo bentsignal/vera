@@ -9,6 +9,6 @@ out=$(mktemp -d)/message-list-tests
 xcrun swiftc -O -target "$(uname -m)-apple-ios17.0-macabi" -sdk "$sdk" \
   -Fsystem "$sdk/System/iOSSupport/System/Library/Frameworks" \
   -I "$sdk/System/iOSSupport/usr/include" -L "$sdk/System/iOSSupport/usr/lib" \
-  "$src/Models.swift" "$src/Theme.swift" "$src/Measure.swift" "$src/ListLayout.swift" "$src/ListDiff.swift" "$src/Insets.swift" "$src/TapRoute.swift" \
+  "$src/Models.swift" "$src/Theme.swift" "$src/Measure.swift" "$src/ListLayout.swift" "$src/ListDiff.swift" "$src/Insets.swift" "$src/TapRoute.swift" "$src/ApplyCoordination.swift" \
   "$here/main.swift" -o "$out"
 "$out"

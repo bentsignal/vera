@@ -55,6 +55,11 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private let measurer = MeasureQueue()
   private var measuring = false
   private var measureAgain = false
+  private var applyOrder = RowApplyOrder()
+  private var deferredMeasurement: (result: MeasureQueue.Output, version: Int, generation: Int)?
+  private var detached = false
+  private var wasAttached = false
+  private var requestedWidth: CGFloat = 0
   private var measuredWidth: CGFloat = 0
   /// The theme the rows on screen were drawn with.
   private var drawnTheme = -1
@@ -82,6 +87,10 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   private let lifter = Lifter()
   private var liftRequest: LiftRequest?
   private var liftChanged = false
+  private var pendingLanding = false
+  private var latestIntent = LatestIntent()
+  private var latestScrollRunning = false
+  private var stoppedLatestTouch: (id: ObjectIdentifier, time: TimeInterval)?
   // Reactions answer a tap at once: their own recognizer, which doesn't
   // wait for a double tap, a light haptic, and the chip drawn toggled.
   private lazy var reactionTap = UITapGestureRecognizer(target: self, action: #selector(reactionTapped(_:)))
@@ -158,6 +167,23 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   // MARK: Props
 
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window != nil {
+      let returning = detached
+      detached = false
+      wasAttached = true
+      if returning { measure() }
+    } else if wasAttached {
+      detached = true
+      cancelLatest()
+      applyOrder.detached()
+      deferredMeasurement = nil
+      pendingLanding = false
+      lifter.land(into: nil)
+    }
+  }
+
   func setRows(_ rows: [JSON]) {
     rawRows = rows
     rowsChanged = true
@@ -227,6 +253,11 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   func setKeyboardFrozen(_ frozen: Bool) {
     guard frozen != keyboardFrozen else { return }
     keyboardFrozen = frozen
+    if frozen, latestScrollRunning {
+      collectionView.setContentOffset(collectionView.contentOffset, animated: false)
+      latestScrollRunning = false
+    }
+    if frozen, insetsGate.carriesInsets(forRows: rowsVersion) { applyOrder.hold() }
     if !frozen {
       keyboardThawed = true
       insetsGate.thawed()
@@ -237,7 +268,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   func setAlignTop(_ top: Bool) {
     guard top != alignTop else { return }
     alignTop = top
-    applyInsets(keepDistance: true)
+    if !keyboardFrozen, !applyOrder.held { applyInsets(keepDistance: true) }
   }
 
   func setKeyboard(_ follows: Bool) {
@@ -257,6 +288,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   func setLift(_ json: JSON?) {
     let request = LiftRequest(json)
     guard request != liftRequest else { return }
+    if request != nil { cancelLatest() }
     liftRequest = request
     liftChanged = true
   }
@@ -264,9 +296,18 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   /// Lifts the held part into the menu, or plays it back into place.
   private func applyLift() {
     if let request = liftRequest, let window {
+      pendingLanding = false
       guard let cell = cell(for: request.rowId) as? MessageCell else { return }
       lifter.lift(request, cell: cell, in: window)
     } else if let rowId = lifter.rowId {
+      // Landing captures a destination once. While its paired layout is
+      // held, keep the actual borrowed views up; start only after that
+      // final layout, rather than landing at a position about to move.
+      if applyOrder.held {
+        pendingLanding = true
+        return
+      }
+      pendingLanding = false
       lifter.land(into: cell(for: rowId) as? MessageCell)
     }
     // Lifter captures the press's presentation scale before resetting it.
@@ -294,7 +335,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       backgroundColor = .clear
       rowsChanged = true
     }
-    switch insetsGate.batchEnded(rowsChanged: rowsChanged, placed: placed, frozen: keyboardFrozen, rowsVersion: rowsVersion) {
+    switch insetsGate.batchEnded(rowsChanged: rowsChanged, placed: placed, frozen: keyboardFrozen, rowsVersion: rowsVersion, holdingRows: applyOrder.held) {
     case .none:
       break
     case let .now(_, eased):
@@ -304,9 +345,16 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       // and applied, nothing changed on screen included.
       break
     }
+    if keyboardFrozen, insetsGate.carriesInsets(forRows: rowsVersion) { applyOrder.hold() }
     if rowsChanged {
       rowsChanged = false
       measure()
+    } else if applyOrder.held, !keyboardFrozen {
+      if let deferred = deferredMeasurement, applyOrder.accepts(deferred.generation), !measuring {
+        complete(deferred.result, version: deferred.version, generation: deferred.generation)
+      } else if !measuring {
+        measure()
+      }
     }
     if liftChanged {
       liftChanged = false
@@ -334,19 +382,18 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   override func layoutSubviews() {
     super.layoutSubviews()
     fitCollectionView()
-    if bounds.width > 0, bounds.width != measuredWidth {
+    if bounds.width > 0, bounds.width != requestedWidth {
       measure()
     }
     // The keyboard covers part of `insets.bottom` (the composer's own
     // bottom inset, `keyboardOverlap`): the list adds the rest, which is
     // how far the composer rises. Before iOS 17 the guide stops at the safe
     // area when the keyboard is down.
-    var raw = followsKeyboard ? max(0, bounds.height - keyboardTracker.frame.minY) : 0
-    if raw <= safeAreaInsets.bottom + 0.5 { raw = 0 }
-    let keyboard = max(0, raw - (keyboardOverlap ?? safeAreaInsets.bottom))
+    let keyboard = currentKeyboardHeight
     // While the menu's modal has the keyboard down, nothing moves.
-    if keyboardFrozen { return }
-    if abs(keyboard - keyboardHeight) > 0.5 {
+    if keyboardFrozen || applyOrder.held { return }
+    let keyboardChanged = abs(keyboard - keyboardHeight) > 0.5
+    if keyboardChanged {
       keyboardHeight = keyboard
       if keyboardThawed {
         // Back from the menu with the keyboard elsewhere: ease there over
@@ -361,7 +408,16 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
         applyInsets(keepDistance: !collectionView.isTracking || keyboardSwipe)
       }
     }
+    if keyboardChanged || keyboardThawed {
+      followLatest(version: rowsVersion, generation: latestIntent.generation)
+    }
     keyboardThawed = false
+  }
+
+  private var currentKeyboardHeight: CGFloat {
+    var raw = followsKeyboard ? max(0, bounds.height - keyboardTracker.frame.minY) : 0
+    if raw <= safeAreaInsets.bottom + 0.5 { raw = 0 }
+    return max(0, raw - (keyboardOverlap ?? safeAreaInsets.bottom))
   }
 
   /// Sizes the list to the view. Props can arrive before the first layout,
@@ -406,7 +462,9 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   private func measure() {
     let width = bounds.width
-    guard width > 0 else { return }
+    guard width > 0, !detached else { return }
+    requestedWidth = width
+    let generation = applyOrder.request()
     if measuring {
       measureAgain = true
       return
@@ -420,29 +478,69 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       let interval = Perf.begin("measure now", "\(input.rows.count) rows")
       let result = measurer.measureNow(input)
       Perf.end(interval)
-      finish(result, version: version)
+      finish(result, version: version, generation: generation)
       return
     }
     measurer.measure(input) { [weak self] result in
-      self?.finish(result, version: version)
+      self?.finish(result, version: version, generation: generation)
     }
   }
 
-  private func finish(_ result: MeasureQueue.Output, version: Int) {
+  private func finish(_ result: MeasureQueue.Output, version: Int, generation: Int) {
     measuring = false
+    guard !detached else { return }
+    guard applyOrder.accepts(generation), version == rowsVersion,
+          result.width == bounds.width, result.themeVersion == state.theme.version else {
+      measure()
+      return
+    }
+    complete(result, version: version, generation: generation)
+    if measureAgain || result.width != bounds.width { measure() }
+  }
+
+  private func complete(_ result: MeasureQueue.Output, version: Int, generation: Int) {
+    guard applyOrder.accepts(generation), version == rowsVersion,
+          result.width == bounds.width, result.themeVersion == state.theme.version else {
+      if !measuring { measure() }
+      return
+    }
+    if keyboardFrozen, applyOrder.held || insetsGate.carriesInsets(forRows: version) {
+      applyOrder.hold()
+      deferredMeasurement = (result, version, generation)
+      return
+    }
+    let wasHeld = applyOrder.held
+    if wasHeld {
+      // Keep the old on-screen offset until apply captures it. Its one
+      // move then includes the current keyboard and the paired inset.
+      keyboardHeight = currentKeyboardHeight
+    }
+    deferredMeasurement = nil
     if result.width != measuredWidth { drawnTheme = -1 }
     measuredWidth = result.width
     let interval = Perf.begin("apply", "\(result.rows.count) rows")
     apply(result.rows, result.layouts, themeVersion: result.themeVersion, version: version)
     Perf.end(interval)
-    if measureAgain || result.width != bounds.width {
-      measure()
+    if wasHeld, applyOrder.accepts(generation) {
+      applyOrder.applied()
+      keyboardThawed = false
+      if pendingLanding { applyLift() }
     }
   }
 
   private func apply(_ newRows: [Row], _ newLayouts: [RowLayout], themeVersion: Int, version: Int) {
     let started = CACurrentMediaTime()
     defer { Slow.check("apply \(newRows.count) rows", since: started) }
+    let latestGeneration = latestIntent.generation
+    defer { followLatest(version: version, generation: latestGeneration) }
+    let following = latestIntent.follows(rowsVersion: version, generation: latestGeneration)
+      && !keyboardFrozen && distanceFromLatest > 2
+    if following {
+      // Stop at the current scroll position, not the bottom. Rebase the
+      // visible anchor for the new rows, then smoothly target their end.
+      collectionView.setContentOffset(collectionView.contentOffset, animated: false)
+      latestScrollRunning = false
+    }
     // Insets that came with these rows go in with them, below.
     // (`take` applies them to `insets` already.)
     let nextInsets = insetsGate.take(forRows: version, frozen: keyboardFrozen)
@@ -467,7 +565,10 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     if diff.isEmpty {
       rows = newRows
       layouts = newLayouts
-      if nextInsets != nil { applyInsets(keepDistance: true) }
+      if nextInsets != nil || applyOrder.held {
+        if applyOrder.held, keyboardThawed, !following { applyNewInsets(eased: true) }
+        else { applyInsets(keepDistance: !following) }
+      }
       return
     }
     let removed = diff.removed
@@ -483,10 +584,10 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     noteArrivals(arrived.count)
 
     let visible = Set(collectionView.indexPathsForVisibleItems.compactMap { $0.item < oldIds.count ? oldIds[$0.item] : nil })
-    let pinned = distanceFromLatest <= 2 || !collectionView.isDragging && distanceFromLatest <= min(24, state.behavior.nearLatestPoints)
+    let pinned = distanceFromLatest <= 2 || !following && !collectionView.isDragging && distanceFromLatest <= min(24, state.behavior.nearLatestPoints)
     let typingChanged = atBottom.contains { newRows[$0].isTyping } || removed.contains { oldRows[$0].isTyping }
     let visibleChange = !changed.isDisjoint(with: visible) || removed.contains { visible.contains(oldIds[$0]) }
-    let animated = window != nil && !firehose && !reordered && !redraw
+    let animated = window != nil && !following && !firehose && !reordered && !redraw
       && (pinned ? (!atBottom.isEmpty || typingChanged || visibleChange) : visibleChange && atBottom.isEmpty)
 
     // Keep the reader's place when scrolled up: the lowest row on screen
@@ -566,7 +667,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       // The new insets after the old positions were taken (`oldOffset`,
       // the anchor): the rows slide from where they were drawn to where
       // the insets and the new rows put them, in one move.
-      if nextInsets != nil || alignTop {
+      if nextInsets != nil || alignTop || applyOrder.held {
         applyInsets(keepDistance: pinned)
       }
       if pinned {
@@ -737,13 +838,38 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   // MARK: Methods
 
   func scrollToLatest(animated: Bool) {
+    if animated { latestIntent.begin(rowsVersion: rowsVersion) }
+    else { cancelLatest() }
+    if animated, keyboardFrozen || applyOrder.held {
+      latestScrollRunning = false
+      return
+    }
+    latestScrollRunning = animated && abs(collectionView.contentOffset.y - latestOffset) > 0.5
     collectionView.setContentOffset(CGPoint(x: 0, y: latestOffset), animated: animated)
+  }
+
+  private func cancelLatest() {
+    latestIntent.cancel()
+    if latestScrollRunning {
+      collectionView.setContentOffset(collectionView.contentOffset, animated: false)
+    }
+    latestScrollRunning = false
+  }
+
+  private func followLatest(version: Int, generation: Int) {
+    guard !detached, window != nil, !keyboardFrozen,
+          latestIntent.follows(rowsVersion: version, generation: generation) else { return }
+    latestScrollRunning = abs(collectionView.contentOffset.y - latestOffset) > 0.5
+    if latestScrollRunning {
+      collectionView.setContentOffset(CGPoint(x: 0, y: latestOffset), animated: true)
+    }
   }
 
   private var bench: BenchFling?
 
   /// For benchmarks (contract: `benchFling`; Bench.swift).
   func benchFling(speed: Double, ms: Double, done: @escaping ([String: Any]) -> Void) {
+    cancelLatest()
     bench?.stop()
     let run = BenchFling(speed: CGFloat(speed), ms: ms, list: collectionView, oldest: { [weak self] in
       self?.maxOffset ?? 0
@@ -753,6 +879,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   }
 
   func scrollToRow(_ id: String, animated: Bool) {
+    cancelLatest()
     guard let frame = listLayout.frame(of: id) else { return }
     collectionView.setContentOffset(CGPoint(x: 0, y: centeredOffset(frame)), animated: animated)
   }
@@ -850,6 +977,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   }
 
   func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+    cancelLatest()
     shrink.release()
     // #165: at the newest message with the keyboard up, a swipe down is
     // for the keyboard. It goes down, and the list stays on the newest
@@ -885,6 +1013,10 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
     scheduleVisible()
+  }
+
+  func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+    latestScrollRunning = false
   }
 
   private func afterChange() {
@@ -947,6 +1079,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   /// VoiceOver's three-finger swipes: a page older (down) or newer (up).
   private func accessibilityPage(_ direction: UIAccessibilityScrollDirection) -> Bool {
+    cancelLatest()
     let inset = collectionView.adjustedContentInset
     let page = (collectionView.bounds.height - inset.top - inset.bottom) * 0.9
     let older = direction == .down || direction == .previous
@@ -1153,6 +1286,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
     // reactions included.
     if gesture is UITapGestureRecognizer, !route(at: gesture.location(in: collectionView)).receives(.doubleTap) { return }
     guard let (hit, cell) = hit(gesture, hold: true) else { return }
+    cancelLatest()
     var event = hit.event
     event["frame"] = windowFrame(hit, in: cell)
     send(event)
@@ -1173,6 +1307,14 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
 
   /// A tap that stops a fling (the list's or a carousel's) only stops it.
   func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    let id = ObjectIdentifier(touch)
+    if let stopped = stoppedLatestTouch, stopped.id == id, stopped.time == touch.timestamp { return false }
+    if latestIntent.floor != nil {
+      let stoppingScroll = latestScrollRunning
+      if stoppingScroll { stoppedLatestTouch = (id, touch.timestamp) }
+      cancelLatest()
+      if stoppingScroll { return false }
+    }
     guard gesture !== revealPan else { return true }
     if collectionView.isDecelerating { return false }
     var view = touch.view

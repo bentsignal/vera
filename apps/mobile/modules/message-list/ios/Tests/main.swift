@@ -534,5 +534,81 @@ check(!TapRoute(onReaction: false, element: "media").receives(.doubleTap), "text
 check(!TapRoute(onReaction: true, element: nil).receives(.tap), "text down, up on a chip: no reaction press from the message's tap")
 check(TapRoute(onReaction: false, element: "message").receives(.doubleTap), "a text double tap ending on text: the menu, as before")
 
+// MARK: A freeze starts between the paired props and their worker result
+
+var pair = InsetsGate(applied: tall)
+var work = RowApplyOrder()
+let released = work.request()
+pair.received(short)
+_ = pair.batchEnded(rowsChanged: true, placed: true, frozen: false, rowsVersion: 10)
+check(pair.carriesInsets(forRows: 10), "released rows carry their shorter composer")
+check(!pair.carriesInsets(forRows: 9), "a pre-release worker result does not carry it")
+// The freeze begins before the result. Neither side of the pair commits.
+work.hold()
+check(work.held && work.accepts(released), "the current measured pair stays held through freeze")
+equal(pair.take(forRows: 10, frozen: true), nil, "the frozen pair cannot commit its inset")
+equal(pair.applied, tall, "visible geometry is still the pre-send geometry")
+pair.thawed()
+equal(pair.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 10, holdingRows: work.held), .withRows(version: 10),
+      "thaw resumes the pair, never a standalone inset first")
+equal(pair.applied, tall, "even thaw waits for the held row apply")
+equal(pair.take(forRows: 10, frozen: false), short, "the resumed row apply commits its inset once")
+work.applied()
+check(!work.held, "landing may start after the paired apply")
+
+// A pair first received while already frozen must also have a row identity.
+pair = InsetsGate(applied: tall)
+pair.received(short)
+equal(pair.batchEnded(rowsChanged: true, placed: true, frozen: true, rowsVersion: 11), .none, "already frozen: no immediate commit")
+check(pair.carriesInsets(forRows: 11), "already frozen still records the paired rows")
+pair.received(medium)
+_ = pair.batchEnded(rowsChanged: true, placed: true, frozen: true, rowsVersion: 12, holdingRows: true)
+check(!pair.carriesInsets(forRows: 11), "newer paired props supersede the held row version")
+pair.thawed()
+_ = pair.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 12, holdingRows: true)
+equal(pair.take(forRows: 11, frozen: false), nil, "old completion cannot take the replacement inset")
+equal(pair.take(forRows: 12, frozen: true), nil, "refreeze before completion keeps the replacement paired")
+equal(pair.take(forRows: 12, frozen: false), medium, "only latest rows take latest inset after thaw")
+
+pair = InsetsGate(applied: tall)
+pair.received(short)
+_ = pair.batchEnded(rowsChanged: true, placed: true, frozen: true, rowsVersion: 13)
+pair.received(tall)
+_ = pair.batchEnded(rowsChanged: false, placed: true, frozen: true, rowsVersion: 13, holdingRows: true)
+pair.thawed()
+equal(pair.batchEnded(rowsChanged: false, placed: true, frozen: false, rowsVersion: 13, holdingRows: true), .none,
+      "reverting to applied cancels an inset even while its rows are held")
+equal(pair.take(forRows: 13, frozen: false), nil, "thaw never resurrects that canceled inset")
+equal(pair.applied, tall, "canceled pair resumes rows with the geometry already applied")
+
+work = RowApplyOrder()
+let oldWork = work.request()
+work.hold()
+let resizedWork = work.request()
+check(!work.accepts(oldWork), "new width/theme/custom measurement supersedes a result even with the same rows version")
+check(work.accepts(resizedWork) && work.held, "fresh measurement preserves the landing/keyboard barrier")
+work.detached()
+check(!work.accepts(resizedWork) && !work.held, "detach invalidates callbacks and discards the local barrier")
+let reattachedWork = work.request()
+check(work.accepts(reattachedWork), "reattach accepts only fresh work")
+
+// Generic latest intent is not consumed by a row apply or a scroll-end.
+var latest = LatestIntent()
+latest.begin(rowsVersion: 20)
+let firstNavigation = latest.generation
+check(!latest.follows(rowsVersion: 19, generation: firstNavigation), "pre-command rows cannot retarget latest")
+check(latest.follows(rowsVersion: 20, generation: firstNavigation), "current layout may follow the generic command")
+check(latest.follows(rowsVersion: 21, generation: firstNavigation), "the released send retargets the same smooth intent")
+check(latest.follows(rowsVersion: 22, generation: firstNavigation), "later applies don't consume the generic intent")
+latest.begin(rowsVersion: 23)
+let secondNavigation = latest.generation
+check(!latest.follows(rowsVersion: 24, generation: firstNavigation), "an older retarget callback cannot override a newer true command")
+check(!latest.follows(rowsVersion: 22, generation: secondNavigation), "new command's floor rejects older measured rows")
+check(latest.follows(rowsVersion: 23, generation: secondNavigation), "newest command follows its own layout")
+latest.cancel()
+check(!latest.follows(rowsVersion: 24, generation: secondNavigation), "drag, stop-touch, lift, explicit navigation or detach cancels follow")
+latest.begin(rowsVersion: 25)
+check(latest.follows(rowsVersion: 25, generation: latest.generation), "a new explicit command works after user interruption")
+
 print("\(checks - failures) of \(checks) checks passed")
 exit(failures == 0 ? 0 : 1)
