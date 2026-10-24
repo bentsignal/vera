@@ -266,3 +266,43 @@ explicit gap, stale-parent child-local clear, navigation and generic-observation
 send guards. Root Jest totals23 tests across7 suites, all pass. These prove
 shared state/render behavior, not physical mounted ordering or same-frame growth.
 Native source, real combined compile and trajectory/send/lift evidence remain.
+
+### Newly found paired-close cycle: policy proposal before code
+
+Android landLift keeps the Modal until the actual source frame handback. A
+released pair can become frozen before worker finish. Deferring its landing
+until thaw then creates a cycle: shared onClosed requests keyboard return only
+AFTER landLift resolves, while land waits for that return/thaw. iOS does not
+await landLift, so it has no matching Promise cycle, but retains delayed land.
+Moving focus to onClosing alone is not a source guarantee: Android's underlying
+EditText lacks window focus while the Dialog remains focusable. No early-focus,
+window flag, timer or native force-thaw change is selected or implemented.
+
+Preferred bounded proposal for parent/native review: once a CLOSE is explicitly
+requested, allow ONLY an already-authorized released pair to complete against
+the STILL-FROZEN keyboard geometry, then capture destination/start real land.
+If its worker result is not ready, retain pending land and perform the same
+flush when it finishes. Do not set keyboardFrozen=false, follow the currently
+hidden keyboard, restore source-window focus, or unhold an unauthorized newer
+host sequence. Normal frozen/no-pair land remains immediate as before. The
+existing shared onClosed then restores the keyboard after actual handback; its
+return to the held height should leave no keyboard-down intermediate home.
+
+This is an explicit narrow exception to revision3's strict frozen-pair barrier
+at closing, not a silent reinterpretation of it. It keeps the existing IME/window
+ownership and avoids adding a Dialog focus policy. Both platform owners and
+parent must agree before code. Tests must cover close before/after worker,
+post-mount seal, olderS/newerT, stale release, refreeze/new lift/detach, and no
+pair/unreleased-host close. Runtime must retain raised home, continuous landing,
+keyboard return and final8pt. No contract field or timer is proposed.
+
+Parent and BOTH native owners now accept the closing-only exception above.
+Implementation is authorized within the same bounded native scope. Apply uses
+APPLIED frozen keyboard offset at both completion and paired layout, never the
+hidden root's current keyboard height. Capture owner/release/result generation
+and close token when close begins; a later callback cannot widen authority.
+Invalidate obsolete close/landing work on new lift, refreeze, owner change or
+detach, resolving canceled handoffs so a Modal cannot remain indefinitely. No
+ordinary geometry flush, native thaw, latest restart or new field is authorized.
+State/source checks are necessary; actual Modal/worker/raised-home/8pt runtime
+checks remain required before delivery, including normal unpaired close.
