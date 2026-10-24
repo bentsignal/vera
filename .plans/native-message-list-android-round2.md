@@ -218,6 +218,40 @@ playback, profiling, and Shawn's phone checks below.
 
 ## Still needs a device
 
+### Opt-in keyboard drag trace, 2026-10-24
+
+The slow adb swipe still failed to dismiss the keyboard in integration's
+combined client. The later endpoint retest did not run because the
+emulator disappeared. No dismissal behavior has been changed from that
+evidence. The screen's KeyboardGestureArea is native on Android API 30+
+and requests interactive IME control before forwarding MOVE to its
+children, so it can overlap the list's independent hide request. That
+overlap is a candidate, not a confirmed cause.
+
+The diagnostic is enabled only in a debuggable binary, sampled at each
+gesture's DOWN with the Android log property:
+
+```sh
+adb -s "$serial" shell setprop log.tag.VeraKeyboardDrag DEBUG
+adb -s "$serial" logcat -v threadtime VeraKeyboardDrag:D ImeTracker:I InsetsController:D '*:S'
+# After the capture, disable before the next gesture:
+adb -s "$serial" shell setprop log.tag.VeraKeyboardDrag INFO
+```
+
+Each gesture carries its MotionEvent downTime and logs uptime/eventTime
+for correlation with system IME logs. Records include DOWN gate values,
+native keyboard lift, latest distance/threshold, scroll state, root/window
+IME visibility, the first MOVE, recognition, hide request/return or missing
+activity window, interception-disallow requests and UP/CANCEL. It logs
+no message content or row identifiers. The opt-in is held constant until
+the next DOWN; no diagnostic state is collected while disabled. Return
+from hide and the visibility sampled at UP are not final dismissal ACKs.
+
+No dependency patch or wrapper probe was added. Integration owns the
+diagnostic APK and runtime capture. Unit coverage verifies lazy disabled
+collection, per-gesture sampling, one first-MOVE record and terminal
+shutdown. The trace does not change touch recognition or keyboard policy.
+
 ### Smooth scrolled-up sends, 2026-10-24
 
 Sol implements the approved generic latest-navigation policy. Shared code

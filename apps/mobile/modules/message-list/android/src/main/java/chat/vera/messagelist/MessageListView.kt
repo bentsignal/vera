@@ -518,14 +518,32 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   /**
    * Closes the keyboard, as dragging down at the newest message does
-   * (#165). Nothing on Android does it otherwise: the list isn't in a
-   * keyboard gesture area, and RecyclerView has no dismiss mode. The list
+   * (#165). RecyclerView has no dismiss mode. The screen also wraps this
+   * list in KeyboardGestureArea on Android 30+, which can request its own
+   * interactive IME control before forwarding MOVE to this list. The list
    * then follows the keyboard down through its insets and stays at the
    * bottom. The composer keeps focus, as with the system's back gesture.
    */
-  private fun hideKeyboard() {
-    val window = appContext.currentActivity?.window ?: return
+  private fun hideKeyboard(trace: KeyboardDragTrace) {
+    val window = appContext.currentActivity?.window
+    if (window == null) {
+      trace.event("hide:skipped") { "noActivityWindow ${keyboardTraceState()}" }
+      return
+    }
+    trace.event("hide:request") { keyboardTraceState() }
     WindowCompat.getInsetsController(window, this).hide(WindowInsetsCompat.Type.ime())
+    // Returning from hide() is not an acknowledgement of IME dismissal.
+    trace.event("hide:returned") { keyboardTraceState() }
+  }
+
+  private fun keyboardTraceState(): String {
+    val root = ViewCompat.getRootWindowInsets(this)
+    val windowRoot = appContext.currentActivity?.window?.decorView?.let { ViewCompat.getRootWindowInsets(it) }
+    return "uptime=${SystemClock.uptimeMillis()} keyboardPx=$keyboard keyboardFrozen=$keyboardFrozen " +
+      "rootIme=${root?.isVisible(WindowInsetsCompat.Type.ime())} rootImePx=${root?.getInsets(WindowInsetsCompat.Type.ime())?.bottom} " +
+      "windowIme=${windowRoot?.isVisible(WindowInsetsCompat.Type.ime())} rvState=${recycler.scrollState} " +
+      "distancePx=${distanceFromLatest()} nearPx=${units.pxf(behavior.nearLatestPoints)} " +
+      "rvHeight=${recycler.height} bottomPadding=${recycler.paddingBottom} rows=${rows.itemCount}"
   }
 
   // MARK: Where the reader is
@@ -832,6 +850,13 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
    * instead (see `Taps`). Holding anything holds it.
    */
   private inner class Touch : RecyclerView.OnItemTouchListener {
+    private val keyboardTrace = KeyboardDragTrace(
+      enabled = {
+        context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0 &&
+          android.util.Log.isLoggable("VeraKeyboardDrag", android.util.Log.DEBUG)
+      },
+      write = { android.util.Log.d("VeraKeyboardDrag", it) },
+    )
     private val shrink = PressShrink(main)
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private var downX = 0f
@@ -894,6 +919,9 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           keyboardDrag = keyboard > 0 && rv.scrollState == RecyclerView.SCROLL_STATE_IDLE &&
             distanceFromLatest()?.let { it <= units.pxf(behavior.nearLatestPoints) } == true
           closingKeyboard = false
+          keyboardTrace.down(e.downTime) {
+            "eventTime=${e.eventTime} x=${e.x} y=${e.y} keyboardDrag=$keyboardDrag slop=$slop ${keyboardTraceState()}"
+          }
           revealAnimator?.cancel()
           val stoppedScroll = rv.scrollState != RecyclerView.SCROLL_STATE_IDLE
           tapping = !stoppedScroll
@@ -914,13 +942,19 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           }
         }
         MotionEvent.ACTION_MOVE -> {
+          if (keyboardTrace.active) keyboardTrace.firstMove {
+            "eventTime=${e.eventTime} dx=${e.x - downX} dy=${e.y - downY} keyboardDrag=$keyboardDrag ${keyboardTraceState()}"
+          }
           if (tapping && (abs(e.x - downX) > slop || abs(e.y - downY) > slop)) cancelTap()
           if (closingKeyboard) return true
           if (keyboardDrag && e.y - downY > slop && abs(e.y - downY) > abs(e.x - downX)) {
+            keyboardTrace.event("MOVE:recognized") {
+              "eventTime=${e.eventTime} dx=${e.x - downX} dy=${e.y - downY} ${keyboardTraceState()}"
+            }
             closingKeyboard = true
             cancelTap()
             rv.stopScroll()
-            hideKeyboard()
+            hideKeyboard(keyboardTrace)
             return true
           }
           if (revealing || horizontalTaken || !hasBubbles || rv.scrollState == RecyclerView.SCROLL_STATE_DRAGGING) return revealing
@@ -935,12 +969,20 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           }
         }
         MotionEvent.ACTION_UP -> {
+          keyboardTrace.end("UP:intercept") {
+            "eventTime=${e.eventTime} keyboardDrag=$keyboardDrag closingKeyboard=$closingKeyboard ${keyboardTraceState()}"
+          }
           shrink.release()
           main.removeCallbacks(holdRunnable)
           if (tapping) tapped(e)
           tapping = false
         }
-        MotionEvent.ACTION_CANCEL -> cancelTap()
+        MotionEvent.ACTION_CANCEL -> {
+          keyboardTrace.end("CANCEL:intercept") {
+            "eventTime=${e.eventTime} keyboardDrag=$keyboardDrag closingKeyboard=$closingKeyboard ${keyboardTraceState()}"
+          }
+          cancelTap()
+        }
       }
       return false
     }
@@ -968,7 +1010,12 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {
       // Taken to close the keyboard: the list itself stays where it is.
       if (closingKeyboard) {
-        if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) closingKeyboard = false
+        if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) {
+          keyboardTrace.end(if (e.actionMasked == MotionEvent.ACTION_UP) "UP:consumed" else "CANCEL:consumed") {
+            "eventTime=${e.eventTime} keyboardDrag=$keyboardDrag closingKeyboard=$closingKeyboard ${keyboardTraceState()}"
+          }
+          closingKeyboard = false
+        }
         return
       }
       if (!revealing) return
@@ -989,6 +1036,9 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     }
 
     override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {
+      if (keyboardTrace.active) keyboardTrace.event("disallowIntercept") {
+        "value=$disallowIntercept keyboardDrag=$keyboardDrag ${keyboardTraceState()}"
+      }
       if (disallowIntercept) cancelTap()
     }
   }
