@@ -54,7 +54,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           };
           lastChanged: "0.1.0";
           operation: {
-            args: { avatarUrl: null | string; displayName: string };
+            args: {
+              avatarUrl?: null | string;
+              createOnly?: boolean;
+              displayName?: string;
+            };
             type: "upsertMyProfile";
           };
           version: string;
