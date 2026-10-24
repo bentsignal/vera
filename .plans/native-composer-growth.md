@@ -338,3 +338,47 @@ These checks do not establish actual mounted ordering, native adapter callback
 delivery, continuous landing or synchronized growth. The first actual iOS
 CocoaPods/client build is running with log
 `.cache/round2/composer-ui-ios-build.log`; no new phone artifact is ready.
+
+### First combined runtime evidence
+
+Both real client builds completed with exit0. iOS fingerprint
+`aebbd615d603d6543be59090a9aeec9d7db8a874` includes the actual Pod/Swift/ObjC++
+bridge link. Android fingerprint is
+`187f34f39a789855e9de423a45346a57aeaaf524`. Xcode printed unusual third-party
+Swift "failed with exit code0" diagnostics but ultimately completed successfully.
+The first iOS loopback launcher retry timed out; selecting LAN8492 connected.
+That discarded launcher attempt is not motion evidence. Normal phone8492 stays up.
+
+Actual iOS Fabric callbacks validate the host as the sole equal-sized Bar child,
+report `legacy=false`, and co-apply measured height plus exactly8. Real stacked
+newline capture moves the SAME Jonah "Warm stacked arrival after typing" copy
+from y455 to433,411,389 as field border497 becomes475,453,431. All three changes
+occur in the same original recorded frames. The diagnostic-off repeat agrees at
+PTS2.416667,4.055,5.723333 with template error below0.20. Before this change,
+the corresponding captured steps trailed20–43ms. This is sample-bounded geometry
+evidence, not a universal timing guarantee or smoothness pass.
+
+Frame qualifications are retained: first diagnostic capture9slow/worst68.9ms,
+CPU17%avg/24%peak; quiet repeat3slow/worst49ms, CPU24%avg/48%peak. No boot occurred.
+The earlier before clip had6slow/worst49.3ms. These are not all-zero motion results.
+Bubbles newline plus backspace shows all six22pt changes in the same recorded
+frames, template error below0.44, but11slow/worst56.3ms, CPU16%avg/19%peak.
+
+Picked `IMG_0111.heic` from the existing simulator library. Native mounted heights
+progress from76 to148 with bottom height+8; no new seeded media was added. Picker
+dismissal and file preparation overlap add, so its7slow/worst134.5ms and visible
+geometry do not establish isolated asset-ready/add latency or a like-for-like
+speed comparison. Stationary removal captures the full72pt collapse. Original
+frames28,30,32,34,36,38,40 show named bubble text359→360→366→380→399→416→427→431;
+the independently tracked glass border424→425→432→445→465→482→492→496 moves in
+those SAME frames, within1px displacement. Full clip2slow/worst33.3ms,
+CPU10%avg/peak, no boot. The original broad gray-band detector selected other
+bubble edges mid-animation; its output remains saved. A finite original-PTS
+contact confirms the same named copy, and the separate local glass-gradient
+trace is preserved. No formal motion analyzer threshold or verdict changed.
+
+Raw clips, trajectories, frame reports and mount logs are under
+`.cache/round2/ios-ui-*` and `.cache/evidence/r2-ios-ui-*`. Pending are Android
+trajectories, send900ms/rapid/supersession/fallback cases, actual paired-close
+Modal/worker landing and remaining touched gesture checks. No fresh phone
+artifact, delivery, private-production test or runtime-ready claim follows yet.
