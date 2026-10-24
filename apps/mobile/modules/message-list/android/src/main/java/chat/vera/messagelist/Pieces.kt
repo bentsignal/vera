@@ -65,6 +65,22 @@ open class FixedImageView(context: Context) : ImageView(context) {
   }
 }
 
+/**
+ * The initials' size for an avatar's diameter, as the React Native
+ * `Avatar`'s sizes have them (xs 18 → 8, sm 28 → caption, row 36 →
+ * footnote, list 46 → 19, md 48 → headline), in points before the font
+ * scale. Other diameters keep the same proportion as the nearest.
+ */
+internal fun initialsSize(diameter: Float): Float =
+  when {
+    diameter <= 18f -> 8f * diameter / 18f
+    diameter <= 28f -> 12f
+    diameter <= 36f -> 13f
+    diameter <= 46f -> 19f
+    diameter <= 48f -> 17f
+    else -> diameter * 0.4f
+  }
+
 /** A round photo, or initials on the theme's gray gradient when there's none. */
 class AvatarView(context: Context, private val units: Units) : FixedImageView(context) {
   private var person: Person? = null
@@ -113,7 +129,7 @@ class AvatarView(context: Context, private val units: Units) : FixedImageView(co
       }
       canvas.drawCircle(size / 2f, size / 2f, size / 2f, fill)
       val initials = person?.initials ?: ""
-      text.textSize = size * 0.4f
+      text.textSize = units.sp(initialsSize(sizeDp))
       val y = size / 2f - (text.descent() + text.ascent()) / 2f
       canvas.drawText(initials, size / 2f, y, text)
       return
@@ -149,17 +165,37 @@ class MediaView(context: Context, private val units: Units) : FixedImageView(con
     clipToOutline = true
     outlineProvider = object : ViewOutlineProvider() {
       override fun getOutline(view: View, outline: Outline) {
-        outline.setRoundRect(0, 0, view.width, view.height, radiusPx)
+        outline.setRoundRect(edgeInset, edgeInset, view.width - edgeInset, view.height - edgeInset, radiusPx)
       }
     }
     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
   }
 
-  fun setSize(width: Int, height: Int, radiusDp: Float = 16f) {
+  /**
+   * Room for smooth edges while turned (a deck's cards): a clear pixel
+   * around the photo, so when the card is drawn turned from a layer (see
+   * `DeckView.edgeLayer`), the layer's edge, not the photo's, is where
+   * sampling cuts off, and its sides come out smooth.
+   */
+  fun smoothEdges() {
+    val inset = 1
+    setPadding(inset, inset, inset, inset)
+    cropToPadding = true
+    edgeInset = inset
+    invalidateOutline()
+  }
+
+  private var edgeInset = 0
+
+  /**
+   * `relayout` false: the parent measures and places this view itself (a
+   * deck's cards), so a new size doesn't ask the whole list to lay out again.
+   */
+  fun setSize(width: Int, height: Int, radiusDp: Float = 16f, relayout: Boolean = true) {
     if (width != widthPx || height != heightPx) {
       widthPx = width
       heightPx = height
-      requestLayout()
+      if (relayout) requestLayout()
     }
     radiusPx = units.pxf(radiusDp)
     invalidateOutline()
@@ -498,17 +534,45 @@ class FacesView(context: Context, private val units: Units) : android.view.ViewG
   private var oldPositions = emptyMap<AvatarView, Float>()
   private var entering = emptySet<AvatarView>()
 
+  /** People past the photos shown: a "+N" pill after them. */
+  private var more = 0
+  private val pill = Paint(Paint.ANTI_ALIAS_FLAG)
+  private val moreText = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+    typeface = Fonts.semibold
+    textAlign = Paint.Align.CENTER
+  }
+  private var pillWidth = 0f
+
   init {
     setWillNotDraw(false)
     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
   }
 
-  fun bind(people: List<Person>, theme: Theme, images: Images, sizeDp: Float, overlapDp: Float, ringDp: Float, max: Int, animate: Boolean = false) {
+  /**
+   * `overflow`: as React Native's `typingFaces`, up to one more than `max`
+   * shows every photo, and past that `max` photos and a "+N" pill. Without
+   * it (a reply line's photos), at most `max`, as `reply-card.tsx`.
+   */
+  fun bind(
+    people: List<Person>,
+    theme: Theme,
+    images: Images,
+    sizeDp: Float,
+    overlapDp: Float,
+    ringDp: Float,
+    max: Int,
+    animate: Boolean = false,
+    overflow: Boolean = false,
+  ) {
     this.sizeDp = sizeDp
     this.overlapDp = overlapDp
     this.ringDp = ringDp
     ring.color = theme.background
-    val shown = people.take(max)
+    val shown = if (overflow && people.size <= max + 1) people else people.take(max)
+    more = if (overflow) people.size - shown.size else 0
+    pill.color = theme.bubbleIncoming
+    moreText.color = theme.muted
+    moreText.textSize = units.sp(if (sizeDp <= 18f) 10f else theme.caption.size)
     if (animate) {
       val previous = ids.zip(avatars).toMap()
       oldPositions = avatars.associateWith { it.x }
@@ -547,7 +611,13 @@ class FacesView(context: Context, private val units: Units) : android.view.ViewG
     avatars.forEach { if (it.visibility == VISIBLE) it.measure(0, 0) }
     val n = count
     val box = sizeDp + ringDp * 2
-    val width = if (n == 0) 0f else box + (n - 1) * (box - overlapDp - ringDp * 2)
+    var width = if (n == 0) 0f else box + (n - 1) * (box - overlapDp - ringDp * 2)
+    pillWidth = 0f
+    if (more > 0) {
+      // RN: as tall as a photo with its ring, at least as wide, 4 padding each side.
+      pillWidth = maxOf(units.pxf(box), moreText.measureText("+$more") + units.pxf(8f + ringDp * 2))
+      width += units.dp(pillWidth) - overlapDp - ringDp * 2
+    }
     setMeasuredDimension(units.px(width), if (n == 0) 0 else units.px(box))
   }
 
@@ -571,6 +641,19 @@ class FacesView(context: Context, private val units: Units) : android.view.ViewG
   }
 
   override fun dispatchDraw(canvas: Canvas) {
+    // The "+N" pill first: under the photos, which React Native lifts with
+    // `zIndex` and the pill doesn't have.
+    if (more > 0 && pillWidth > 0f) {
+      val r = units.pxf(ringDp)
+      val right = width.toFloat()
+      val rect = RectF(right - pillWidth, 0f, right, height.toFloat())
+      ring.alpha = 255
+      canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, ring)
+      rect.inset(r, r)
+      canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, pill)
+      val y = rect.centerY() - (moreText.descent() + moreText.ascent()) / 2f
+      canvas.drawText("+$more", rect.centerX(), y, moreText)
+    }
     // Rings under each photo, drawn in reverse so the first is on top.
     val n = count
     val visible = avatars.filter { it.visibility == VISIBLE }
@@ -583,4 +666,8 @@ class FacesView(context: Context, private val units: Units) : android.view.ViewG
       drawChild(canvas, view, drawingTime)
     }
   }
+
+  /** The "+N" pill's label, if it shows. */
+  val moreLabel: String?
+    get() = if (more > 0) "+$more" else null
 }

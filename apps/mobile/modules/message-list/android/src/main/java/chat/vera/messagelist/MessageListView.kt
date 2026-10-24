@@ -14,6 +14,7 @@ import android.view.ViewConfiguration
 import android.view.ViewTreeObserver
 import android.view.animation.DecelerateInterpolator
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.DiffUtil
@@ -65,8 +66,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   private var rowsChanged = false
 
   private var behavior = Behavior.DEFAULT
-  private var insetTop = 0f
-  private var insetBottom = 0f
+  /** `insets.top` and `insets.bottom`, and when they apply (see `InsetHold`). */
+  private val insets = InsetHold()
   private var followKeyboard = false
   private var keyboard = 0
 
@@ -164,10 +165,10 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   fun setInsets(map: ReadableMap?) {
-    insetTop = map?.num("top")?.toFloat() ?: 0f
-    insetBottom = map?.num("bottom")?.toFloat() ?: 0f
     keyboardOverlap = map?.num("keyboardOverlap")?.let { units.px(it.toFloat()) }
-    applyPadding()
+    // Applied in `commit`, once the update's other props are in: with the
+    // rows of the same update, or at once.
+    insets.receive(Inset(map?.num("top")?.toFloat() ?: 0f, map?.num("bottom")?.toFloat() ?: 0f))
   }
 
   fun setKeyboardFrozen(frozen: Boolean) {
@@ -197,7 +198,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   fun setKeyboard(enabled: Boolean) {
     followKeyboard = enabled
     if (!enabled) keyboard = 0 else keyboard = keyboardLift(ViewCompat.getRootWindowInsets(this))
-    applyPadding()
+    padApplied()
   }
 
   fun setLiftedRowId(id: String?) {
@@ -239,24 +240,34 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   /** Applies the props that changed together, once they're all in. */
   fun commit() {
-    if (!rowsChanged) return
+    val inset = insets.take()
+    if (!rowsChanged) {
+      if (inset != null) applyPadding()
+      return
+    }
     rowsChanged = false
+    // An inset change that comes with rows (a send: the composer shrinks as
+    // the message arrives) applies with them, in the same layout pass, so
+    // the rows above make one move. Until then the list keeps the old inset.
     val array = pendingRows
     work.execute {
       val next = decodeRows(array)
       val before = workerRows
       workerRows = next
       val diff = if (before.isEmpty()) null else DiffUtil.calculateDiff(RowsDiff(before, next), false)
-      main.post { timed({ "apply ${next.size} rows" }) { apply(next, diff) } }
+      main.post { timed({ "apply ${next.size} rows" }) { apply(next, diff, inset) } }
     }
   }
 
   // MARK: Applying rows
 
-  private fun apply(next: List<Row>, diff: DiffUtil.DiffResult?) {
+  private fun apply(next: List<Row>, diff: DiffUtil.DiffResult?, padding: Inset? = null) {
+    // A newer inset than the one these rows came with has applied already.
+    val inset = insets.withRows(padding)
     val before = rows.rows
     hasBubbles = next.any { it is MessageRow && !it.stacked }
     if (!shown || before.isEmpty()) {
+      inset?.let { setPaddingOnly(it) }
       animator.animate = false
       rows.apply(next, null)
       animator.animate = true
@@ -265,38 +276,20 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
       }
       return
     }
+    // Measured before the composer's inset changes.
     val wasAtBottom = distanceFromLatest()?.let { it <= units.pxf(behavior.nearLatestPoints) } == true
-    val beforeIds = HashSet<String>(before.size * 2)
-    before.forEach { beforeIds.add(it.id) }
-    // Rows kept from before: new ones under the first are at the bottom
-    // (arrivals, who's typing); new ones past the last are an older page.
-    val firstKept = next.indexOfFirst { it.id in beforeIds }.let { if (it < 0) next.size else it }
-    val lastKept = next.indexOfLast { it.id in beforeIds }
-    var insertedCount = 0
-    val shownIn = HashSet<String>()
-    val arrivals = HashSet<String>()
-    val rising = HashSet<String>()
-    for ((index, row) in next.withIndex()) {
-      if (row.id in beforeIds) continue
-      insertedCount++
-      if (index > lastKept) continue
-      if (index < firstKept) {
-        if (!wasAtBottom) continue
-        if (row is MessageRow && row.arrived) arrivals.add(row.id)
-        if (row !is TypingRow) rising.add(row.id)
-      }
-      shownIn.add(row.id)
-    }
-    val changed = insertedCount + (before.size - (next.size - insertedCount))
-    countArrivals(next.take(firstKept).count { it is MessageRow && it.arrived && it.id !in beforeIds })
+    val changes = rowChanges(before, next, wasAtBottom)
+    countArrivals(changes.bottomArrivals)
     // A firehose or a big change: everything takes its place at once.
-    animator.animate = !firehose && changed <= BIG_CHANGE
-    animator.inserted = shownIn
-    animator.rising = rising
-    animator.handoff = handoff(before, next, arrivals)
+    animator.animate = !firehose && changes.changed <= BIG_CHANGE
+    animator.inserted = changes.shownIn
+    animator.rising = changes.rising
+    animator.handoff = handoff(before, next, changes.arrivals)
+    // The composer's change lands in this same layout pass as the rows.
+    inset?.let { setPaddingOnly(it) }
     rows.apply(next, diff)
-    val newestInserted = firstKept > 0
-    if (wasAtBottom && newestInserted) manager.scrollToPositionWithOffset(0, 0)
+    if (wasAtBottom && changes.newestInserted) manager.scrollToPositionWithOffset(0, 0)
+    // In this pass, while the animator knows what's new (see `layoutNow`).
     layoutNow()
     animator.inserted = emptySet()
     animator.rising = emptySet()
@@ -375,18 +368,25 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
    */
   private fun layoutNow() {
     if (width == 0 || height == 0) return
-    recycler.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY))
-    recycler.layout(0, 0, width, height)
+    recycler.layoutInPlace(width, height)
   }
 
   // MARK: Insets and the keyboard
 
   private fun applyPadding() {
-    val top = units.px(insetTop)
-    val bottom = units.px(insetBottom) + keyboard
+    val inset = insets.latest
+    insets.markApplied(inset)
+    val top = units.px(inset.top)
+    val bottom = units.px(inset.bottom) + keyboard
     if (recycler.paddingTop == top && recycler.paddingBottom == bottom) return
     recycler.setPadding(0, top, 0, bottom)
     layoutNow()
+  }
+
+  /** Sets the insets without laying out: the rows' apply that follows lays out once, with both. */
+  private fun setPaddingOnly(inset: Inset) {
+    insets.markApplied(inset)
+    recycler.setPadding(0, units.px(inset.top), 0, units.px(inset.bottom) + keyboard)
   }
 
   /** How far the keyboard lifts the list: its height, less the inset JavaScript already leaves under the composer. */
@@ -407,7 +407,16 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   private fun setKeyboardLift(lift: Int) {
     if (lift == keyboard) return
     keyboard = lift
-    applyPadding()
+    padApplied()
+  }
+
+  /** The keyboard on top of the insets the list has, not ones still waiting for their rows. */
+  private fun padApplied() {
+    val top = units.px(insets.applied.top)
+    val bottom = units.px(insets.applied.bottom) + keyboard
+    if (recycler.paddingTop == top && recycler.paddingBottom == bottom) return
+    recycler.setPadding(0, top, 0, bottom)
+    layoutNow()
   }
 
   /** Follows the keyboard frame by frame as it opens, closes, or is dragged down. */
@@ -439,7 +448,8 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    setKeyboardLift(keyboardLift(ViewCompat.getRootWindowInsets(this)))
+    // Frozen under the menu, the list keeps the keyboard it had.
+    if (!keyboardFrozen) setKeyboardLift(keyboardLift(ViewCompat.getRootWindowInsets(this)))
   }
 
   override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -464,6 +474,18 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     lifter.finish()
     super.onDetachedFromWindow()
     revealAnimator?.cancel()
+  }
+
+  /**
+   * Closes the keyboard, as dragging down at the newest message does
+   * (#165). Nothing on Android does it otherwise: the list isn't in a
+   * keyboard gesture area, and RecyclerView has no dismiss mode. The list
+   * then follows the keyboard down through its insets and stays at the
+   * bottom. The composer keeps focus, as with the system's back gesture.
+   */
+  private fun hideKeyboard() {
+    val window = appContext.currentActivity?.window ?: return
+    WindowCompat.getInsetsController(window, this).hide(WindowInsetsCompat.Type.ime())
   }
 
   // MARK: Where the reader is
@@ -773,6 +795,14 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     /** This touch is the second of a double tap. */
     private var second = false
 
+    /**
+     * Began with the keyboard up and the list at its newest row: dragging
+     * down closes the keyboard (`hideKeyboard`) and doesn't also scroll the
+     * list, which rides down with the keyboard and stays at the bottom (#165).
+     */
+    private var closingKeyboard = false
+    private var keyboardDrag = false
+
     private val holdRunnable = Runnable {
       tapping = false
       val (holder, hit) = under(downX, downY) ?: return@Runnable
@@ -805,6 +835,9 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
           downX = e.x
           downY = e.y
           revealing = false
+          keyboardDrag = keyboard > 0 && rv.scrollState == RecyclerView.SCROLL_STATE_IDLE &&
+            distanceFromLatest()?.let { it <= units.pxf(behavior.nearLatestPoints) } == true
+          closingKeyboard = false
           revealAnimator?.cancel()
           val stoppedScroll = rv.scrollState != RecyclerView.SCROLL_STATE_IDLE
           tapping = !stoppedScroll
@@ -828,6 +861,14 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
         }
         MotionEvent.ACTION_MOVE -> {
           if (tapping && (abs(e.x - downX) > slop || abs(e.y - downY) > slop)) cancelTap()
+          if (closingKeyboard) return true
+          if (keyboardDrag && e.y - downY > slop && abs(e.y - downY) > abs(e.x - downX)) {
+            closingKeyboard = true
+            cancelTap()
+            rv.stopScroll()
+            hideKeyboard()
+            return true
+          }
           if (revealing || horizontalTaken || !hasBubbles || rv.scrollState == RecyclerView.SCROLL_STATE_DRAGGING) return revealing
           val dx = e.x - downX
           val dy = e.y - downY
@@ -883,6 +924,11 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     }
 
     override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {
+      // Taken to close the keyboard: the list itself stays where it is.
+      if (closingKeyboard) {
+        if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) closingKeyboard = false
+        return
+      }
       if (!revealing) return
       when (e.actionMasked) {
         MotionEvent.ACTION_MOVE -> setReveal((downX - e.x).coerceIn(0f, units.pxf(MessageCell.REVEAL_WIDTH)))

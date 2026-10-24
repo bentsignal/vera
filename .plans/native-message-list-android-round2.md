@@ -1,0 +1,198 @@
+# Native message list: Android, phone feedback round 2
+
+Shawn tested the round 1 Vera Dev clients on 2026-10-24. The full list and
+owners are in the integration branch's `.plans/native-message-list.md`
+("Phone feedback round 2, 2026-10-24"). This note covers what Android
+changed natively, the cause behind each fix, and what still needs a
+device. Paths are under
+`apps/mobile/modules/message-list/android/src/main/java/chat/vera/messagelist/`.
+
+## Batch 1: arrivals, reaction height, send inset, keyboard
+
+### Arrivals didn't rise and fade in (item 13)
+
+- The list has `setHasFixedSize(true)`, so RecyclerView posts adapter
+  changes to the next frame instead of asking for layout. `layoutNow()`'s
+  measure and layout then did nothing, and the insert landed a frame later,
+  after `apply()` had cleared which rows were new: the row just appeared.
+  It only animated when `scrollToPositionWithOffset(0, 0)` happened to
+  request layout (the newest row new, at the bottom). `layoutInPlace`
+  (ListChanges.kt) now forces the layout, so the change and its animation
+  share the pass that knows what's new.
+- A reply under a typing row that stays at the bottom wasn't treated as an
+  arrival: the typing row was the first kept row. `rowChanges` now measures
+  the bottom from the newest kept row that isn't typing.
+
+### Reaction height moved twice (item 12)
+
+`growsAtTop` compared only the message's own reactions. A photo's reaction
+(a deck or a lone photo in bubbles) left it false, so the row's top stayed
+anchored while the bottom-up layout moved it: on removal the photo jumped
+up by the tapbacks' room and slid back down. `reactionsGrowAtTop` now
+includes photos' reactions, so the row's bottom stays and only the rows
+above move. Integration audited the optimistic override and found no early
+clearing (`round2-reaction-handoff.md` in its cache): the query updates
+before the mutation settles. Native doesn't guess counts.
+
+### Multiline send went down, then up (item 1)
+
+JavaScript (`send-inset.ts`, integration 5920a109) now sends the shorter
+composer in the same props update as the sent message. On Android the
+shorter-composer callback was never called, which was the actual cause on
+JavaScript's side; integration's 1c543fb9 arms it, with ordering tests. Native holds an
+inset that comes with rows (`InsetHold`) and applies it in `apply()`, after
+measuring whether the reader is at the bottom and in the same layout pass
+as the rows. An inset that comes alone applies at once; an older carried
+inset is dropped if a newer one came since. The keyboard moves on top of
+the inset the list actually has.
+
+### Long press with the keyboard up (item 2)
+
+Native already followed the agreed freeze (`menu-keyboard-hold.ts`): while
+`keyboardFrozen`, keyboard progress and insets are ignored, the lift lands
+where the cell is (still raised), and the thaw moves nothing if the
+keyboard came back to the same height. Fixed one gap: reattaching to the
+window no longer applies the keyboard while frozen.
+
+### Swiping down at the bottom scrolled the chat (item 3, #165)
+
+Nothing closed the keyboard on Android: the list isn't in a keyboard
+gesture area, and RecyclerView has no dismiss mode, so the drag only
+scrolled. Now a downward drag that starts at the newest message with the
+keyboard up is taken by the list's touch handler, which hides the IME and
+keeps the list still. The list rides down with the keyboard through its
+insets and stays at the bottom. Scrolled away, a drag scrolls as before.
+The composer keeps focus, as agreed with integration: no blur, no new
+event or field; tapping the composer brings the keyboard back.
+
+### Tests
+
+`ListChangesTest`: a reply above someone still typing rises in; the first
+reply after typing; scrolled away; an older page; the typing row itself;
+a send's inset applying with its rows; an inset alone; two queued row
+updates. `ListMotionTest` (Robolectric): an insert above a kept typing row
+is animated in the same pass that knows it's new (fails without the forced
+layout); a photo reaction taken back moves only the rows above;
+`reactionsGrowAtTop` for photos, reply lines, stacked, and a first bind.
+
+Batch 1 passed `:message-list:testDebugUnitTest` (48 tests, 0 failures).
+
+## Batch 2: the deck, its lift, stacked typing
+
+### Deck speed and the card coming back under (item 11)
+
+Out to the side in 90 to 140 ms and back under in 160 ms (iOS: about 120
+and 160). The drawing order switches when the thrown card is its width +
+12 out, so nothing overlaps it. The flicker came from the order itself:
+`getChildDrawingOrder` is only read when the deck redraws, and moving the
+cards only updates their own layers, so the thrown card stayed on top
+until the tuck ended. The deck now invalidates when the order changes.
+
+### Aspect ratios and edges (item 10)
+
+Each card is its own photo's height, centered in the tallest photo's
+height, so the pile never changes height; it turns about its own bottom
+middle. The deck sizes and places its cards itself, without asking the
+list to lay out again on each swipe. For smooth turned edges each card
+keeps a clear pixel around its photo and is drawn from a layer only while
+it's turned and not blurred (a blurred card on API 31+ is already drawn
+offscreen). The front card at rest has no layer.
+
+### Deck lift (item 9)
+
+A hold lifts only the front card (`DeckView.frontCard`), the real view.
+The deck draws without it (its drawing order skips a card that's out) and
+it returns to its index and frame. Tapbacks hide while the menu is up and
+fade back in over 260 ms after landing, so nothing of the list draws over
+the menu.
+
+The deck's tapbacks were anchored at the pile's top as if the front photo
+were the tallest; a shorter photo is centered lower, so they floated above
+it (57 dp for a landscape photo in a pile with a portrait). They now sit
+on the front photo's actual top (`DeckView.frontTop`, from its photo's
+shape, so it holds while the card is lifted), and move with it when
+another photo comes forward. The row's height and the room above it don't
+change.
+
+### Stacked typing (item 4)
+
+As React Native's `Faces`: 18 photos with a 1.5 ring in the page color,
+overlapping by 4, initials at 8 semibold (`initialsSize`, from `Avatar`'s
+sizes); four people show four photos, more show three and a "+N" pill
+under them. The overflow rule is the typing indicator's only: reply lines
+still show at most three photos and no pill, as `reply-card.tsx`. Native
+honors `showFaces` in both layouts (integration sends true for stacked
+one-on-one chats, as React Native's stacked line shows them).
+
+### Video badge after the viewer (item 6)
+
+No native cause found: `MediaView` draws the badge whenever its item is a
+video, with no state tied to transitions, and doesn't reload on reattach.
+The likeliest cause was the viewer's own play button, which integration's
+5162d2c3 now fades with the backdrop. Needs a frame-by-frame recording of a
+swipe-down dismiss in the combined client.
+
+### Tests
+
+`DeckAndFacesTest` (Robolectric, API 30): a deck's tapbacks on a short
+front photo's corner in a real bubbles cell; `frontTop` for short and tall
+front photos with the pile's height unchanged; four typists show four photos,
+six show three and "+3"; the pill's size; a reply line caps at three with
+no pill; photos are round, initials RN's sizes; deck cards centered in the
+tallest height and turned about their own bottom; only turned cards get a
+layer; the front card lifts alone, the deck draws without it, and it comes
+back to its index and frame.
+
+### Dev harness
+
+The interrupted direct-provider run had changed the shared
+`use-dev-rows.ts` (the dev toggle puts 👍 on the newest message's first
+photo). It's saved as a patch with its provenance and caveats in the
+Android run's cache (`round2-20261024/use-dev-rows.inherited.patch` and
+`.md`), and the file is back at HEAD. Integration decides whether to
+adopt it.
+
+## Validation run (source, 2026-10-24)
+
+- `./gradlew :message-list:testDebugUnitTest` (from `apps/mobile/android`,
+  under the shared heavy lock): compiled and passed, 56 tests, 0 failures,
+  0 errors, 0 skipped, in 13 s. That's the 37 from round 1, 11 from batch 1
+  (`ListChangesTest`, `ListMotionTest`) and 8 in `DeckAndFacesTest`.
+- Then, in order: `pnpm run lint`, `pnpm run typecheck`, `pnpm run test`,
+  `pnpm run react-doctor --base origin/t3/native-message-list`, all
+  passing; `pnpm run format:fix` after.
+
+None of this exercises motion, touch, the keyboard or video on a device,
+so no fix in this note counts as verified on a device yet. The only
+recording is `before-arrivals-bubbles.mp4` in `.cache/evidence`, a before
+baseline the interrupted run made; there's no after recording from this
+thread. Integration owns the combined client: the recordings, real video
+playback, profiling, and Shawn's phone checks below.
+
+## Still needs a device
+
+### Batch 2 device checks
+
+- [ ] Deck: quick swipes both ways, chained flicks, the thrown card sliding
+  under the pile with no flicker; mixed aspect ratios centered; edges on
+  the A16 and the emulator; frames during swipes (layers while turned).
+- [ ] Deck hold: only the front card lifts, no tapbacks over the menu,
+  tapbacks fade back after landing, the card returns exactly.
+- [ ] Deck tapbacks on the front photo's corner for landscape, square and
+  portrait photos, following each swipe.
+- [ ] Stacked typing in a group with 1, 4 and 6 typists, and in a DM; a
+  reply line with 5 repliers.
+- [ ] Video: swipe-down dismiss from a list video, frame by frame.
+
+### Batch 1 device checks
+
+- [ ] Arrivals rise and fade in, both layouts, at the bottom, including the
+  first reply after typing and a reply while someone else still types.
+- [ ] Deck and lone-photo reaction add and remove: one move.
+- [ ] Multiline send: one move up, never down first (emulator and A16).
+- [ ] Long press with the keyboard up: stays raised, lands above the
+  returning keyboard, no move on thaw.
+- [ ] Swipe down at the bottom with the keyboard up: keyboard closes, list
+  stays at the bottom, no scroll; scrolled away: scrolls.
+- [ ] `sim.sh frames` around arrivals and sends (the forced layout runs
+  once per rows update).

@@ -33,6 +33,13 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
   var restingAlpha: (RecyclerView.ViewHolder) -> Float = { 1f }
 
   /**
+   * Whether a changed row keeps its bottom still (its room opened or
+   * closed at the top: tapbacks) rather than its top (see
+   * `MessageCell.growsAtTop`).
+   */
+  var growsAtTop: (RecyclerView.ViewHolder) -> Boolean = { (it.itemView as? MessageCell)?.growsAtTop == true }
+
+  /**
    * Rows inserted by the coming pass, and those of them new at the bottom
    * (an arrival, the header over it), which rise together from below with
    * the rows above them, as on iOS.
@@ -121,10 +128,9 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
       dispatchChangeFinished(newHolder, false)
       return false
     }
-    val cell = newHolder.itemView as? MessageCell
     // The edge that stays: the bottom when the row grows at its top
     // (tapbacks), else the top, so what's under it opens below.
-    return if (cell?.growsAtTop == true) {
+    return if (growsAtTop(newHolder)) {
       move(newHolder, preLayoutInfo.bottom, postLayoutInfo.bottom, clip = false, change = true)
     } else {
       move(newHolder, preLayoutInfo.top, postLayoutInfo.top, clip = true, change = true)

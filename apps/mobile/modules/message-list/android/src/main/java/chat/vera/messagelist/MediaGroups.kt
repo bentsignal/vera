@@ -427,15 +427,26 @@ class DeckView(
     setWillNotDraw(false)
     clipChildren = false
     isChildrenDrawingOrderEnabled = true
-    cards.forEach { addView(it) }
+    cards.forEach {
+      it.smoothEdges()
+      addView(it)
+    }
     takesHorizontal = true
   }
+
+  /** The card in front, which a hold lifts on its own. */
+  val frontCard: View
+    get() = front
 
   val currentItem: MediaItem?
     get() = items.getOrNull(current)
 
-  override fun getChildDrawingOrder(childCount: Int, drawingPosition: Int): Int =
-    indexOfChild(order.getOrElse(drawingPosition) { cards[drawingPosition] })
+  override fun getChildDrawingOrder(childCount: Int, drawingPosition: Int): Int {
+    // While the front card is lifted out, only the cards still here are drawn.
+    val here = if (childCount == order.size) order else order.filter { it.parent === this }
+    val index = here.getOrNull(drawingPosition)?.let { indexOfChild(it) } ?: -1
+    return if (index in 0 until childCount) index else drawingPosition
+  }
 
   /** `key` names this pile among the list's (its row and block), for `fronts`. */
   fun bind(rowId: String, key: String, items: List<MediaItem>, theme: Theme, maxWidth: Int) {
@@ -452,8 +463,9 @@ class DeckView(
     this.items = items
     this.theme = theme
     cardWidth = minOf(units.px(DeckSizes.CARD_WIDTH), maxWidth)
+    // The pile is as tall as the tallest photo of all, so its height never
+    // changes as they cycle; each card is its own photo's shape, centered in it.
     cardHeight = units.px(items.maxOf { DeckSizes.cardHeight(it) })
-    cards.forEach { it.setSize(cardWidth, cardHeight) }
     if (same && (dragging || animation != null)) {
       // Mid-swipe, the same pile keeps moving: only what's on the cards updates.
       for ((card, index) in shown) items.getOrNull(index)?.let { card.bind(it, theme, images) }
@@ -488,8 +500,33 @@ class DeckView(
 
   private fun show(card: MediaView, index: Int) {
     val item = items[index]
+    // Placed here (`place`), so a new shape doesn't relayout the list.
+    card.setSize(cardWidth, heightOf(item), relayout = false)
     if (shown[card] != index || card.item != item) card.bind(item, theme, images)
     shown[card] = index
+    if (card.isLaidOut) place(card)
+  }
+
+  private fun heightOf(item: MediaItem) = minOf(cardHeight, units.px(DeckSizes.cardHeight(item)))
+
+  /** Where a card this tall starts in the pile: centered in the tallest photo's height. */
+  private fun topFor(height: Int) = units.px(DeckSizes.PEEK) + (cardHeight - height) / 2
+
+  /**
+   * Where the front photo's top is in the pile, from its photo's shape, so
+   * it holds while the card is lifted out: its tapbacks sit on this corner.
+   */
+  val frontTop: Int
+    get() = topFor(currentItem?.let { heightOf(it) } ?: cardHeight)
+
+  /** A card centered in the pile's height, turned about its own bottom middle. */
+  private fun place(card: MediaView) {
+    val height = card.item?.let { heightOf(it) } ?: cardHeight
+    val top = topFor(height)
+    card.measure(0, 0)
+    card.layout(0, top, cardWidth, top + height)
+    card.pivotX = cardWidth / 2f
+    card.pivotY = height.toFloat()
   }
 
   /** The side a card behind sits on. */
@@ -502,13 +539,26 @@ class DeckView(
 
   private fun pose(card: MediaView, pose: CardPose, step: Int) {
     card.pivotX = cardWidth / 2f
-    card.pivotY = cardHeight.toFloat()
+    card.pivotY = card.height.takeIf { it > 0 }?.toFloat() ?: cardHeight.toFloat()
     card.translationX = pose.x
     card.translationY = pose.y
     card.rotation = pose.rotation
     card.scaleX = pose.scale
     card.scaleY = pose.scale
     blur(card, step)
+    edgeLayer(card)
+  }
+
+  /**
+   * A turned card is drawn from a layer, so its edges, with the clear pixel
+   * around the photo (`MediaView.smoothEdges`), are filtered rather than
+   * aliased. Only while turned, and not while blurred on API 31+, where the
+   * blur already draws it offscreen: the front card at rest has no layer.
+   */
+  private fun edgeLayer(card: MediaView) {
+    val blurred = android.os.Build.VERSION.SDK_INT >= 31 && (steps[card] ?: 0) < DeckSizes.BLUR_STEPS.size - 1
+    val wanted = if (card.rotation != 0f && !blurred) LAYER_TYPE_HARDWARE else LAYER_TYPE_NONE
+    if (card.layerType != wanted) card.setLayerType(wanted, null)
   }
 
   private fun poseOf(card: MediaView) = CardPose(card.translationX, card.translationY, card.rotation, card.scaleX)
@@ -548,6 +598,7 @@ class DeckView(
     drag = dx
     front.translationX = dx
     front.rotation = (dx / units.pxf(200f) * 12f).coerceIn(-12f, 12f)
+    edgeLayer(front)
     if (count < 2) return
     val rising = rising(dx)
     val resting = if (count > 2) (if (rising === next) previous else next) else null
@@ -692,8 +743,12 @@ class DeckView(
         previous = other!!
       }
       pose(front, CardPose.FRONT, DeckSizes.BLUR_STEPS.size - 1)
+      // Fully beside the pile: it goes behind now, and comes back under it.
       order.clear()
       order.addAll(listOfNotNull(thrown, other ?: previous.takeIf { it !== thrown && it !== front }, front))
+      // A new drawing order needs this view redrawn: moving the cards alone
+      // only moves their layers, and the old order would show until the tuck ends.
+      invalidate()
       targets()
       performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
       onCurrent?.invoke(current)
@@ -728,12 +783,7 @@ class DeckView(
   }
 
   override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-    val top = units.px(DeckSizes.PEEK)
-    for (card in cards) {
-      card.layout(0, top, cardWidth, top + cardHeight)
-      card.pivotX = cardWidth / 2f
-      card.pivotY = cardHeight.toFloat()
-    }
+    for (card in cards) if (card.parent === this) place(card)
   }
 
   override fun onDraw(canvas: Canvas) {
@@ -758,8 +808,10 @@ class DeckView(
 
   companion object {
     private const val SPRING_MS = 500L
-    private const val THROW_MIN_MS = 140L
-    private const val THROW_MAX_MS = 240L
-    private const val TUCK_MS = 260L
+    // Out to the side about 120 ms, back under the pile 160 ms: quick flicks
+    // chain (a touch finishes the last one at once). Agreed with iOS.
+    private const val THROW_MIN_MS = 90L
+    private const val THROW_MAX_MS = 140L
+    private const val TUCK_MS = 160L
   }
 }

@@ -63,6 +63,19 @@ internal fun tapbackReactions(block: Block, front: Int?, own: List<Reaction>): L
   return (item?.reactions ?: emptyList()) + own
 }
 
+/** Every reaction a message shows: its own, and each photo's. */
+internal fun allReactions(row: MessageRow): List<Reaction> =
+  row.reactions + row.blocks.flatMap { block -> if (block is MediaBlock) block.items.flatMap { it.reactions } else emptyList() }
+
+/**
+ * Whether a change to a bubbles row opens or closes its room at the top:
+ * its reactions changed (the message's own or a photo's, both drawn as
+ * tapbacks over a part) and its lines under it didn't. The row's bottom
+ * then stays put and only the rows above move, once.
+ */
+internal fun reactionsGrowAtTop(before: MessageRow?, row: MessageRow): Boolean =
+  !row.stacked && before != null && before.id == row.id && allReactions(before) != allReactions(row) && before.footer == row.footer
+
 /**
  * Whether a message can grow out of the typing bubble, as the React
  * Native list's `morphs()`: bubbles, and only text (no photos, quote, link
@@ -178,7 +191,7 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
     val before = this.row
     this.row = row
     val theme = env.theme
-    growsAtTop = !stacked && before != null && before.reactions != row.reactions && before.footer == row.footer
+    growsAtTop = reactionsGrowAtTop(before, row)
     if (before?.id != row.id) {
       tintAnimator?.cancel()
       tint = 0f
@@ -588,8 +601,9 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
         if (taps.visibility != VISIBLE) return@let
         val reach = units.px(TapbacksView.SIZE / 2f - TapbacksView.CENTER_INSET)
         val tx = if (row.isOwn) view.left - reach else view.right + reach - taps.measuredWidth
-        // A deck's go on its front photo's corner, below the room for the cards behind.
-        val anchor = blockTops[slot] + if (view is DeckView) units.px(DeckSizes.PEEK) else 0
+        // A deck's go on its front photo's corner: below the room for the
+        // cards behind, and lower still for a photo shorter than the pile.
+        val anchor = blockTops[slot] + if (view is DeckView) view.frontTop else 0
         place(taps, tx, anchor - units.px(TapbacksView.SPACE))
       }
     }
@@ -714,18 +728,30 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
     val row = row ?: return null
     val slot = liftBlockSlot(row.blocks, blockIndex, part) ?: return null
     val view = blockViews.getOrNull(slot) ?: return null
-    // A carousel lifts only the held media tile, not the whole lane.
-    val held = if (view is CarouselView) view.heldMedia(part, index) ?: return null else view
+    // A carousel lifts only the held media tile, not the whole lane; a deck only its front card.
+    val held = when (view) {
+      is CarouselView -> view.heldMedia(part, index) ?: return null
+      is DeckView -> view.frontCard
+      else -> view
+    }
+    // Tapbacks never lift: they hide while it's up (the menu shows its own), as React Native's do.
     val pieces = mutableListOf(held)
-    tapbacks.getOrNull(slot)?.takeIf { it.visibility == VISIBLE && it.shownCount > 0 }?.let { pieces.add(it) }
     val plain = held is TextView && held !is BubbleTextView
     return LiftPieces(holdRect(held), pieces, if (plain) env.theme.backgroundElevated else null)
   }
 
-  fun beginLift() { isLifted = true }
+  fun beginLift() {
+    isLifted = true
+    for (taps in tapbacks) taps?.let {
+      it.animate().cancel()
+      it.alpha = 0f
+    }
+  }
 
   fun endLift() {
     isLifted = false
+    // Back in place: the tapbacks fade back in (React Native's RETURN_MS).
+    for (taps in tapbacks) taps?.animate()?.alpha(1f)?.setDuration(TAPBACKS_RETURN_MS)?.start()
     val pending = pendingBind
     pendingBind = null
     pending?.let { bind(it.first, it.second) }
@@ -840,6 +866,9 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
 
     /** How far a bubble reply sits in from its quote (RN's `REPLY_INDENT`). */
     const val REPLY_INDENT = 22f
+
+    /** How long tapbacks take to fade back in after the menu closes. */
+    const val TAPBACKS_RETURN_MS = 260L
   }
 }
 
@@ -1025,7 +1054,7 @@ class TypingCell(context: Context, private val env: CellEnv) : ViewGroup(context
     // One-on-one: no photos, only who's typing (they still say whose message grows out of it).
     val shownPeople = if (showFaces) row.people else emptyList()
     if (stacked) {
-      faces.bind(shownPeople, theme, env.images, 18f, 4f, 1.5f, 3, changed)
+      faces.bind(shownPeople, theme, env.images, 18f, 4f, 1.5f, 3, changed, overflow = true)
       dots.bind(theme.muted, 4f, 2f)
       label.style(units, theme.footnote, theme.muted)
       if (changed && label.text.toString() != row.label) {
@@ -1044,7 +1073,7 @@ class TypingCell(context: Context, private val env: CellEnv) : ViewGroup(context
       label.visibility = VISIBLE
       bubble.visibility = GONE
     } else {
-      faces.bind(shownPeople, theme, env.images, 28f, 6f, BUBBLE_RING, 3, changed)
+      faces.bind(shownPeople, theme, env.images, 28f, 6f, BUBBLE_RING, 3, changed, overflow = true)
       dots.bind(theme.muted, 8f, 4f)
       bubble.paint.color = theme.bubbleIncoming
       bubble.visibility = VISIBLE
