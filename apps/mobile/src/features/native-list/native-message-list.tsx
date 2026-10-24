@@ -22,7 +22,7 @@ import {
   useLiftedMessageId,
   useMessageActions,
 } from "~/features/conversation/message-actions";
-import { COMPOSER_GAP } from "./composer-layout";
+import { COMPOSER_GAP } from "./composer-binding";
 import { useDevNativeFling } from "./dev-native-fling";
 import { nativeRows } from "./map-rows";
 import { useMenuKeyboardHold } from "./menu-keyboard-hold";

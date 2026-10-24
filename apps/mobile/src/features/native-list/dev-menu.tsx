@@ -1,5 +1,12 @@
-import type { ComponentProps } from "react";
-import { Modal, Pressable, Text, useWindowDimensions } from "react-native";
+import type { ComponentProps, ReactNode } from "react";
+import { useRef } from "react";
+import {
+  Modal,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import Animated, {
   clamp,
   Easing,
@@ -41,15 +48,18 @@ export function DevMenu({
   hold,
   onClosing,
   onClosed,
+  controls,
 }: {
   hold: DevHold;
   onClosing: () => void | Promise<void>;
   onClosed: () => void;
+  controls?: (close: () => void) => ReactNode;
 }) {
   const screen = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { layout } = devLift(hold, screen, insets);
   const progress = useSharedValue(0);
+  const closing = useRef(false);
   useAnimatedReaction(
     () => true,
     (_, previous) => {
@@ -57,6 +67,8 @@ export function DevMenu({
     },
   );
   function close() {
+    if (closing.current) return;
+    closing.current = true;
     const landing = onClosing();
     function closed() {
       void Promise.resolve(landing).then(onClosed);
@@ -110,16 +122,7 @@ export function DevMenu({
           pop,
         ]}
       >
-        {EMOJI.map((emoji) => (
-          <Pressable
-            key={emoji}
-            accessibilityLabel={emoji}
-            accessibilityRole="button"
-            onPress={close}
-          >
-            <Text className="text-title">{emoji}</Text>
-          </Pressable>
-        ))}
+        <DevReactions close={close} />
       </Animated.View>
       <DevActions
         style={[
@@ -128,8 +131,42 @@ export function DevMenu({
         ]}
         onPick={close}
       />
+      <DevMenuControls
+        controls={controls}
+        close={close}
+        bottom={insets.bottom + 12}
+      />
     </Modal>
   );
+}
+
+function DevReactions({ close }: { close: () => void }) {
+  return EMOJI.map((emoji) => (
+    <Pressable
+      key={emoji}
+      accessibilityLabel={emoji}
+      accessibilityRole="button"
+      onPress={close}
+    >
+      <Text className="text-title">{emoji}</Text>
+    </Pressable>
+  ));
+}
+
+function DevMenuControls({
+  controls,
+  close,
+  bottom,
+}: {
+  controls?: (close: () => void) => ReactNode;
+  close: () => void;
+  bottom: number;
+}) {
+  return controls ? (
+    <View style={{ position: "absolute", bottom, left: 12 }}>
+      {controls(close)}
+    </View>
+  ) : null;
 }
 
 function DevActions({

@@ -1,17 +1,7 @@
 import type { ReactNode } from "react";
 
-import type { ComposerBinding, ComposerHost } from "./contract";
+import type { ComposerHost } from "./contract";
 import { MessageListComposer } from "./native";
-
-/** Shared legacy and bound paths transport this same gap exactly once. */
-export const COMPOSER_GAP = 8;
-
-/** The paired prop is absent on binaries that cannot mount its host. */
-export function composerBinding(owner: string, release: number) {
-  return MessageListComposer === null
-    ? undefined
-    : ({ owner, release, gap: COMPOSER_GAP } satisfies ComposerBinding);
-}
 
 /**
  * No drawing or sizing of its own. Native observes this mounted host after

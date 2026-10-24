@@ -6,10 +6,8 @@ import { fireEvent, render } from "@testing-library/react-native";
 import type { ComposerHost } from "~/features/native-list/contract";
 import { useComposerCommit } from "~/features/conversation/composer-commit";
 import { createSendCommit } from "~/features/conversation/send-commit";
-import {
-  composerBinding,
-  ComposerLayout,
-} from "~/features/native-list/composer-layout";
+import { composerBinding } from "~/features/native-list/composer-binding";
+import { ComposerLayout } from "~/features/native-list/composer-layout";
 
 const mockHost = jest.fn((props: ComposerHost & { children: ReactNode }) => (
   <View testID="native-composer">{props.children}</View>

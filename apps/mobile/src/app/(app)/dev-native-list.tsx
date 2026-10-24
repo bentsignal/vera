@@ -9,8 +9,10 @@ import {
 } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 
 import type { MessageListViewMethods } from "~/features/native-list/native";
+import { DevComposerLayout } from "~/features/native-list/dev-composer-layout";
 import { DEV_THEME_DARK } from "~/features/native-list/dev-fixtures";
 import { DevMenu } from "~/features/native-list/dev-menu";
 import { devLift } from "~/features/native-list/dev-menu-layout";
@@ -34,6 +36,11 @@ import { useDevRows } from "~/features/native-list/use-dev-rows";
  * mode for flinging. Taps and holds show in the bar at the top.
  */
 export default function DevNativeList() {
+  const { composer } = useLocalSearchParams<{ composer?: string }>();
+  return composer === "1" ? <DevComposerLayout /> : <NativeListFixture />;
+}
+
+function NativeListFixture() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const list = useRef<MessageListViewMethods>(null);

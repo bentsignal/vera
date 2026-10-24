@@ -9,7 +9,7 @@ import type { InsetState } from "./send-inset-state";
 import type { ComposerHeight } from "~/features/conversation/composer-height";
 import { markSendState } from "~/features/dev/send-timing";
 import { outgoingExists } from "~/features/messaging/outbox";
-import { composerBinding } from "./composer-layout";
+import { composerBinding } from "./composer-binding";
 import {
   heldMessages,
   initialInset,

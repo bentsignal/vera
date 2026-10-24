@@ -1,7 +1,10 @@
 # Ordinary composer growth: ownership proposal, October24
 
-Status: source proposal for review, not an implemented fix. Send ACK and both
-native freeze/latest paths already pass Shawn's phones and remain constraints.
+Status: agreed source is integrated; combined client compilation and mounted
+runtime evidence are pending. Send ACK and both native freeze/latest paths
+already pass Shawn's phones and remain constraints. Historical proposals below
+record the decisions and objections; revision3 and the closing exception govern
+the implementation.
 
 ## Evidence and failed smaller candidates
 
@@ -306,3 +309,32 @@ detach, resolving canceled handoffs so a Modal cannot remain indefinitely. No
 ordinary geometry flush, native thaw, latest restart or new field is authorized.
 State/source checks are necessary; actual Modal/worker/raised-home/8pt runtime
 checks remain required before delivery, including normal unpaired close.
+
+### Bounded paired-close runtime fixture
+
+Use the existing `/dev-native-list?composer=1` screen with made-up local rows,
+the same native host/binding props and the actual RN Modal. One action releases
+a changed row and shorter bar while frozen and removes the lift in that SAME
+props batch. Native commit requests landing before submitting that batch's
+worker, so traces can establish the close-before-worker case without a worker
+timer or new native diagnostic command. A second action releases the pair while
+the menu stays open, then closes only after the trace shows its retained result.
+The Modal waits for the actual landLift handback; the existing keyboard-hold
+hook requests keyboard return afterward. Native traces must establish which
+ordering occurred, with no source-only runtime claim.
+
+This fixture supplements normal real-app holds, source-frame handback and the
+final8pt gap. It does not send a message, seed the backend, alter production
+release behavior or replace ordinary newline/attachment trajectory checks.
+
+Native checkpoints5c4f9ba4 iOS and14f57836 Android are merged into integration.
+Their314 compiled iOS host checks,23 Swift installed-SDK typecheck and ObjC++
+syntax check, and113 Android native compile/tests passed. Shared ordered lint,
+typecheck, test, React Doctor against PR base and format pass after integration.
+Jest totals25 tests across8 suites, including two compiled fixture-render checks
+for the same-batch pair/close and release-while-open paths. The binding helper
+is separated from the component file to satisfy React Doctor without suppressions.
+These checks do not establish actual mounted ordering, native adapter callback
+delivery, continuous landing or synchronized growth. The first actual iOS
+CocoaPods/client build is running with log
+`.cache/round2/composer-ui-ios-build.log`; no new phone artifact is ready.
