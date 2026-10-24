@@ -2496,3 +2496,141 @@ DM/group typing visuals, frame-exact video dismissal/repeat-open routing,
 and a release-like cold busy-chat first-open profile. No fresh physical
 phone build has started; historical round-one install links are not this
 round's artifacts. Normal phone Metro8492 remains available.
+
+**Further iOS composer captures and setup limits.** Three named composer
+attempts failed before sending: XCTest fill reported a mismatch, then a
+slower retry hit its main-thread watchdog. Independent raw AX inspection
+found repeated text, so no motion result is accepted from those runs.
+A later clipboard driver initially assumed the Simulator AX role names;
+XCTest's fallback tree uses different roles and menu item types. Those
+attempts also remain setup failures. No product code changed to make the
+driver pass. A layout-specific named filter selected zero cases and is
+not a passing result either.
+
+Native keyboard Paste then produced an independently verified exact draft.
+The actual stacked send is `r2-ios-pasted-composer-send.mp4`, outgoing
+ID `59a8e2af-059c-42ab-8195-991ca2728aa2`. ACK76, invocation resolution,
+arm and pair publication are recorded in its raw state. Two slow frames,
+both33.3 ms, Mac15% average/18% peak. The analyzer retains12 blank flags
+at1.392..1.537 s. The contact shows the existing rows moving once upward
+while the incoming row fades/rises from below; it does not show the old
+whole-list reversal. Native's existing arrival translation is the inserted
+row height, so the briefly faint new row leaves visible empty space. This
+is a manual observation, not a relabelled analyzer pass.
+
+The short-message/tall-composer case uses native Paste of one line plus
+eight blank lines. XCTest AX trims trailing whitespace from its value,
+but its measured physical field is206 pt before Send and the body is the
+expected single line. In `r2-ios-short-net-down-stacked.mp4`, the same
+Priya row moves monotonically241→352 from1.568..1.943 s, template error
+at most2.68. It stays there until a distinct bot reaction at4.60 s.
+This covers the accepted single net-down send rather than promising
+literal never-down. Three33.3 ms slow frames, Mac14% average/18% peak.
+The analyzer's20 flags remain, including blank space during the entry
+fade and7/11/6 pt snap correlations during the large easing. Raw state,
+before/after geometry and identity coordinates retain that distinction.
+
+Android diagnostic-only SHA `b3e0a43c` is merged at `2a8df626`. It samples
+an opt-in loggable tag once per gesture in DEBUGGABLE apps, with DOWN
+gate values, first/recognized MOVE, hide request/return and UP/CANCEL.
+There is no behavior, dependency or contract change. Combined diagnostic
+APK and actual gate logs are pending after the targeted iPhone captures.
+
+**Cold-open profiling protocol.** Build a local arm64 iOS Simulator
+Release configuration from the combined source, with an embedded production
+JavaScript bundle, APP_VARIANT=development, the existing isolated domain
+and EXPO_PUBLIC_PROFILE_BUNDLE=1 for read-only diagnostics. This is a local
+simulator artifact, not a phone release, store upload or OTA. Preserve
+normal phone Metro8492 and its metadata. Keep the signed-in test app's
+data, terminate/relaunch to clear process memory, and record the first
+busy-chat open on this fresh simulator installation, then the second.
+Report disk-cache/inbox warm-up limits rather than calling it a clean
+device-cache measurement. Capture Time Profiler and existing native
+measure/apply/place/cell signposts with physical recording; distinguish
+network waiting, JS preparation, native measurement/layout and image work
+only as the actual traces support. No optimization is chosen in advance.
+
+**Finite iOS close-out, October 24.** Current-source reaction scenarios at
+`.cache/motion/20261024-160150` pass all four named front-media reaction
+add/remove cases across bubbles and stacked, with no major analyzer flags
+or Metro errors. The earlier full-suite result remains 17/18. None of the
+later targeted results converts that full suite into an all-pass result.
+
+The attachment send `r2-ios-attachment-paired-send.mp4` records exact own ID
+`73ac897d-2dba-4e2f-94d8-754895b781d4`, matching height ACK76 and paired
+publication. The emptied strip is absent, the field is empty and the bar
+is76. Four slow frames, worst55.2 ms. Its16 blank flags and one minor
+flicker remain formal findings. Same-height scrolled-up send
+`r2-ios-scrolled-up-paired-send.mp4`, ID
+`0ba14fc1-2855-4f6b-892b-4910fe95d90e`, ACKs76 without a height callback,
+then invokes animated latest, arms and publishes. Final actual newest
+TypingRow bottom482/bar490 gives8 pt. Five slow frames, worst40 ms; six
+analyzer failures and one minor remain. A queue wait occurred before this
+capture while the heavy lock was held, unnecessarily blocking other work;
+future captures reserve the simulator performance slot before heavy lock.
+
+Clean current deck keyboard capture `r2-ios-current-deck-keyboard-hold.mp4`
+shows only the real front card above blur, all held-row tapbacks hidden,
+and return to x54/y97/220x280 while the keyboard returns. The sampled
+landing contact shows no bottom dip. Seven slow frames, worst118.9 ms,
+include AX work. `r2-ios-deck-menu-reactors.mp4` proves View Reactions is
+hittable and shows only front-card thumbs-up reactor wt690210, excluding
+rear-card heart/fire. Six rapid deck gestures L,R,L,L,R,R return to the
+original bank photo and thumbs-up in
+`r2-ios-current-deck-reversible-swipes.mp4`. Nine slow frames, worst37.6 ms.
+These recordings do not establish zero-jank behavior.
+
+`r2-ios-current-carousel-keyboard-hold.mp4` lifts only the held bank tile;
+neighbor tile and the held tile's stacked chip stay blurred at home.
+After close and keyboard return its actual frame is unchanged at
+x64/y91.6667/150x200. The sampled landing contact shows no bottom dip.
+Seven slow frames, worst143.5 ms, include snapshot/screenshot work;
+Mac19% average/31% peak, no boot. This is the first visible carousel card
+at offset0, not a claim of every edge/offset permutation.
+
+Live static typing screenshots show stacked DM photo, bubbles DM without
+photo and group stacked initials with18x18 face frames and21x21 rings.
+They were captured during a build and are geometry evidence only.
+
+**Bounded Release cold/reopen result, no optimization selected.** Combined
+source2a8df626 built arm64 Simulator Release with embedded Hermes bytecode,
+development bundle ID and the existing isolated backend. The build exited0.
+Normal phone Metro8492 stayed available. The Release app was installed,
+then the cached Debug client was restored afterward. Artifact and proof
+are under `.cache/round2/ios-release-derived/` and
+`.cache/round2/ios-release-profile-build-proof.json`.
+
+A fresh Release process opening Mixed media measures initial51 rows in
+3.692 ms, apply20.009 ms, place19.445 ms, first cell4.932 ms and slowest
+cell6.165 ms. Immediate reopen in the same process measures2.354/2.769/
+2.376/0.302/0.368 ms respectively. Time Profiler's fixed1.5..5 s window
+samples main581 ms/JS127 ms on first open and main464 ms/JS56 ms on
+reopen. Swift conformance leaf samples total203 ms then50 ms across all
+threads, with SwiftUI/AttributeGraph stacks. These are sampled CPU totals,
+not wall-clock latency or a same-trigger speedup comparison.
+
+The earlier Busy text-tail first-open sample has initial measure2.540 ms,
+first cell4.114 ms and main586 ms/JS218 ms sampled CPU in the same fixed
+window. Neither viewport is a screenful of photos. Mixed media's initial
+page contains mixed models but its visible tail is bot replies and a link
+card. Process memory was cold; disk/inbox caches were warm. These samples
+identify a20 ms first native apply and cold framework work, not the cause
+of Shawn's reported one-second physical-phone lag or a worst-case photo
+stress result. Trace exports preserve native/JS/video clock separation.
+No further profiling, seeding or optimization is justified from these
+bounded samples before delivering the iPhone dev client.
+
+The final bubbles boundary capture is
+`r2-ios-bubbles-short-ui-boundary.mp4`, exact sent ID
+`2d881cb8-d49f-45c8-b762-9c72b9330e6e`. Native Paste is independently
+verified before send, including eight trailing newlines and a physical
+206 pt field. This deliberately injects a one-shot900 ms UI stall; it is
+not an FPS comparison. The same Priya row stays at225 through the stall,
+then moves monotonically225→342 from2.530..2.912 s, template error at most
+1.095. Matching ACK76 precedes command resolution, arm and paired
+publication. Bar252 becomes76, live76, with no old-inset restoration.
+The recorded910.5 ms slow frame is the intentional fault. Fifteen formal
+blank flags during entry fade remain, not an all-pass motion claim.
+Raw geometry, identity coordinates, fault markers and contact are in
+`.cache/round2/ios-bubbles-short-ui-boundary-*`. The UI marker clock,
+JS delivery clock and video timestamps remain separate.
