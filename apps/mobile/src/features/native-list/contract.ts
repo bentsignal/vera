@@ -100,10 +100,15 @@ export interface MessageRow extends RowBase {
   readonly accessibilityLabel: string;
 }
 
-/** A time header (bubbles, after a pause) or day separator (stacked). */
+/**
+ * A time header (bubbles, after a pause), a day separator (stacked), or a
+ * thread's divider under its original (`replies`: the label at the start
+ * in semibold footnote, then a hairline rule to the edge, as Slack draws
+ * it). A binary that doesn't know a style draws it as `day`.
+ */
 export interface HeaderRow extends RowBase {
   readonly kind: "header";
-  readonly style: "time" | "day";
+  readonly style: "time" | "day" | "replies";
   /** The text, already formatted: "Today 9:41 AM". */
   readonly label: string;
 }
@@ -124,9 +129,14 @@ export interface TypingRow extends RowBase {
 }
 
 /**
- * Something this binary has no native kind for yet. Version 1 draws its
- * `fallbackText`; a later version may host a React view here (the escape
- * hatch for rare row kinds).
+ * Something this binary has no native kind for yet: the escape hatch for
+ * rare row kinds (a poll, a custom card). Binaries with the `customRows`
+ * feature draw it with React: JavaScript renders the component inside a
+ * `MessageListRow` (native.ts) with this row's `rowId`, as a child of the
+ * list, laid out at the list's width (`position: "absolute"`, `left` and
+ * `right` 0); native puts it in the row's cell and makes the row as tall
+ * as React lays it out. Until then, and on other binaries, native draws
+ * its `fallbackText`. Slower than a native row: for rare rows only.
  */
 export interface CustomRow extends RowBase {
   readonly kind: "custom";
@@ -266,6 +276,11 @@ export interface FooterLine {
 export interface Theme {
   readonly colors: {
     readonly background: string;
+    /**
+     * Cards over the background (link previews). Optional: older
+     * JavaScript doesn't send it, and native uses `background` then.
+     */
+    readonly backgroundElevated?: string;
     readonly foreground: string;
     readonly muted: string;
     readonly subtle: string;
@@ -323,8 +338,19 @@ export interface Behavior {
 export interface Insets {
   /** Under the header. */
   readonly top: number;
-  /** Over the composer (the keyboard is added natively, see `keyboard`). */
+  /**
+   * Over the composer, including the bottom safe area it sits on. Native
+   * adds the keyboard (see `keyboard`): its height above that safe area,
+   * which the keyboard covers.
+   */
   readonly bottom: number;
+  /**
+   * How much of `bottom` the keyboard covers when it's up. Native adds
+   * `max(0, keyboard height - keyboardOverlap)`, which is how far the
+   * composer rises (`KeyboardStickyView`'s opened offset). Optional: a
+   * binary or JavaScript without it uses the bottom safe area.
+   */
+  readonly keyboardOverlap?: number;
 }
 
 export interface MessageListViewProps {
@@ -338,11 +364,53 @@ export interface MessageListViewProps {
    * dismissal by dragging the list), adding its height to `insets.bottom`.
    */
   readonly keyboard: boolean;
+  /**
+   * While true, native holds the keyboard height it has and ignores the
+   * keyboard moving, so nothing moves while a modal over the list (the
+   * long-press menu) takes the keyboard down and brings it back. When it
+   * turns false, native follows the keyboard again, easing to where it is
+   * now over the keyboard's own duration if that's somewhere else.
+   */
+  readonly keyboardFrozen?: boolean;
+  /**
+   * A thread: while the rows don't fill the list, they sit at the top,
+   * under `insets.top`, rather than at the bottom. The space below them is
+   * what the keyboard opens into, so opening it moves nothing until it
+   * would cover the rows. Once the rows fill the list it behaves as
+   * without it.
+   */
+  readonly alignTop?: boolean;
   /** A row lifted into the menu: hidden in the list while it's up. */
   readonly liftedRowId?: string;
+  /**
+   * Binaries with the `lift` feature: the held message itself lifts into
+   * the menu, above its blur, instead of a copy (don't set `liftedRowId`
+   * then, or render a copy). Set it as the menu opens; clear it as the
+   * menu starts closing, and the message plays back into place over the
+   * menu's 240 ms close.
+   */
+  readonly lift?: Lift;
   /** Opens on this row (a search or notification) instead of the newest. */
   readonly initialRowId?: string;
   readonly onEvent: (event: { nativeEvent: ListEvent }) => void;
+}
+
+/**
+ * Where the held part goes while the menu is open, as the menu laid it
+ * out (`menuLayout` in features/conversation/menu-layout.ts): moved by
+ * `shift` and scaled by `scale` from its top corner on its side
+ * (`origin`), or from its top middle. Native springs it there with the
+ * menu's open spring.
+ */
+export interface Lift {
+  readonly rowId: string;
+  /** As the `hold` event reported it. */
+  readonly part?: string;
+  readonly index?: number;
+  /** Points down; negative moves it up. */
+  readonly shift: number;
+  readonly scale: number;
+  readonly origin: "start" | "end" | "middle";
 }
 
 /** What happened in the list, for JavaScript to act on. */
@@ -350,7 +418,11 @@ export type ListEvent =
   | {
       readonly type: "press";
       readonly rowId: string;
-      readonly target:
+      /**
+       * What was pressed. Not `target`: React Native sets `target` on every
+       * native event to the view's tag, overwriting whatever native sent.
+       */
+      readonly element:
         | "message"
         | "media"
         | "reaction"
@@ -394,8 +466,30 @@ export type ListEvent =
 
 /** Imperative calls on the view (through its ref). */
 export interface MessageListViewMethods {
+  /**
+   * Binaries with `liftHandoff`: plays the real part back over 240 ms and
+   * resolves after the conversation window has drawn it. Keep the menu's
+   * transparent Modal mounted until this resolves, even if its close
+   * animation finished, so Android's independent windows never show a gap.
+   */
+  landLift?(): Promise<void>;
   scrollToLatest(animated: boolean): Promise<void>;
   scrollToRow(rowId: string, animated: boolean): Promise<void>;
+  /**
+   * For benchmarks only (`veraDev.list.fling`; binaries with the
+   * `benchFling` feature): scrolls toward older messages at a constant
+   * `speed` (points a second) for `ms`, moved on the display link each
+   * frame on from wherever the list is, with no deceleration. The React
+   * Native list's benchmark drives it the same way (Reanimated's
+   * `scrollTo` in a frame callback), so the two compare fairly, free of a
+   * test driver's injected touches. At the oldest row it waits there while
+   * older rows load. Resolves when done with how far it went and how long
+   * it spent stuck at the oldest row.
+   */
+  benchFling?(
+    speed: number,
+    ms: number,
+  ): Promise<{ travelled: number; edgeMs: number }>;
 }
 
 /** What the installed binary reports (the module's constants). */
@@ -403,4 +497,13 @@ export interface NativeSupport {
   readonly contractVersion: number;
   readonly rowKinds: readonly string[];
   readonly blockTypes: readonly string[];
+  /**
+   * What the binary does beyond version 1's basics, so an over-the-air
+   * update knows what it can use. Missing in the first binaries.
+   * - `lift`: the `lift` prop (the real message lifts into the menu).
+   * - `customRows`: custom rows drawn by React (`MessageListRow`).
+   * - `benchFling`: the `benchFling` method, for benchmarks.
+   * - `liftHandoff`: await `landLift` before removing the menu's Modal.
+   */
+  readonly features?: readonly string[];
 }

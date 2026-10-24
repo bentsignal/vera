@@ -107,6 +107,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       : "./google-services.json",
   },
   plugins: [
+    "./plugins/with-android-websocket-policy.cjs",
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
     ["./plugins/with-alternate-icons.cjs", { icons: ALTERNATE_ICONS }],
