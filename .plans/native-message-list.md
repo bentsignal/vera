@@ -2663,3 +2663,59 @@ store upload or data pass is approved or performed.
 Android diagnostic combined build succeeded with fingerprint
 `8c59c0782ba264289f174c1e99c0e2bb76d1789a`; heavy lock released before
 queueing emulator startup. No gesture behavior changed in this APK.
+
+**Android #165 concrete controller evidence and bounded correction plan.**
+The first diagnostic sample was accidentally in a thread and the emulator
+was reclaimed after collection; it is partial evidence only. In the verified
+root Mixed media retry,51 rows, the same450 ms adb swipe reproduces the
+failure. DOWN gate is true, keyboard820 px/root IME883 px, RVidle and
+distance0. MOVE37.89 exceeds slop21 and is consumed. Parent requested
+visibility changes before native hide, which is canceled ALREADY_HIDDEN.
+Parent requests shown again before UP. UP temporarily reports hidden, but
+settled dumpsys has mInputShown=true/mImeWindowVis3 and screenshot shows
+the full keyboard. Newest Priya stays1195..1372 and Message1415 before/after.
+Raw final state was captured before recording/frames stop this time.
+
+The narrow shared candidate gives native lists sole dismissal ownership:
+Conversation and Thread use one wrapper whose KeyboardGestureArea
+`enableSwipeToDismiss` is false only when `useNativeList()` resolves true.
+The actual installed prop is enableSwipeToDismiss, not enabled. The false
+path prevents controller acquisition; default showOnSwipeUp is already
+false. RN fallback keeps its existing interactive wrapper. The installed iOS
+binding is also native; its wrapper must stay unchanged. No dependency patch, native field, timer or blur.
+Native owner confirmed the source ownership boundary. The adopted variant
+uses a plain flex View only for Android with actual native-list support
+and selection; the RN fallback and iOS retain the original wrapper. This
+removes the competing controller entirely for fresh native-list gestures. Acceptance is
+the identical real root swipe now ending IMEhidden with newest8dp gap,
+second swipe scrolling normally, composer tap reopening, both layouts and
+thread, plus RN fallback control. Source reasoning alone is not acceptance.
+
+**Adopted Android single-owner fix and runtime result.**
+`ConversationGestureArea` chooses a plain flex View only for Android when
+actual `useNativeList()` is true, including binary compatibility. Both
+Conversation and Thread use it. All iOS and RN fallback paths keep the
+original KeyboardGestureArea/interpolator/offset. The installed iOS binding
+is native too; earlier children-only wording was wrong and is corrected.
+No native controller/contract/dependency/timing change was needed.
+
+Identical450 ms root swipe now hides IME at rest. Native hide is no longer
+canceled as already hidden, and the parent no longer requests shown again.
+Settled raw root/window insets are hidden, mInputShown=false and screenshot
+has no keyboard; the Android service's mImeWindowVis3 alone is stale and
+not used as final visibility proof. Newest Priya bottom2192/composer top2213
+is21 px,8 dp at2.625 density. Source-before root video/log and fixed-after
+video/log are preserved. Eight slow frames/worst66.7 ms, not zero-jank.
+Bubbles repeat also hides at rest, ten slow frames/worst50 ms. A thread
+repeat hides too, seven slow frames/worst50 ms; short empty threads remain
+top-aligned, so no fabricated bottom-gap assertion there.
+
+The next downward swipe scrolls to older rows and shows Jump to latest;
+tapping the still-focused composer reopens IME. Fourteen slow frames,
+worst100 ms, include AX work. RN fallback was actually selected and its
+registered list kind was rn. Its original interactive gesture to y1550
+hides the IME without native keyboard-drag logs. The postgesture snapshot
+hit a transient adb-offline error; final raw/screenshot succeeded on retry,
+so preserve that collection failure separately from the mInputShown=false
+outcome. Native mode is restored. Midgesture preference switching is not
+claimed tested. No phone Android artifact is ready yet.

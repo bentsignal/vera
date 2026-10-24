@@ -1,7 +1,6 @@
 import type { RefObject } from "react";
 import { useRef } from "react";
 import { Text, View } from "react-native";
-import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import type { ComposerHandle } from "~/features/conversation/composer";
@@ -28,6 +27,7 @@ import { useMemberNotices } from "~/features/messaging/member-events";
 import { useMarkRead, useMessages } from "~/features/messaging/messages";
 import { useStayLive } from "~/features/messaging/stay-live";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
+import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
 import {
   ConversationList,
   useConversationComposerHeight,
@@ -220,7 +220,7 @@ function Conversation({
   return (
     <View className="bg-background flex-1">
       <Stack.Title>{heading}</Stack.Title>
-      <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
+      <ConversationGestureArea>
         <Pending phase={pending} />
         {shown && pending === "ready" && (
           <ConversationList
@@ -248,7 +248,7 @@ function Conversation({
             onViewReactions={viewReactions}
           />
         )}
-      </KeyboardGestureArea>
+      </ConversationGestureArea>
       <ConversationHeader
         title={heading}
         kind={loaded.kind}

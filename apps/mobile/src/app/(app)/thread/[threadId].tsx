@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import { Text, View } from "react-native";
-import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import {
   Stack,
   useLocalSearchParams,
@@ -33,6 +32,7 @@ import {
   useThreadState,
 } from "~/features/messaging/threads";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
+import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
 import {
   ConversationList,
   useConversationComposerHeight,
@@ -214,7 +214,7 @@ function Thread({
           </Text>
         </View>
       )}
-      <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
+      <ConversationGestureArea>
         <Pending phase={pending} />
         {shown !== null && pending === "ready" && (
           <ConversationList
@@ -239,7 +239,7 @@ function Thread({
             onViewReactions={viewReactions}
           />
         )}
-      </KeyboardGestureArea>
+      </ConversationGestureArea>
       <ThreadHeader
         title={heading}
         following={state.following}
