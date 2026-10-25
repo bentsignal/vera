@@ -820,6 +820,7 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
 
   private var tint = 0f
   private var tintAnimator: android.animation.ValueAnimator? = null
+  private val tintPaint = android.graphics.Paint()
 
   private val curvePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
     style = android.graphics.Paint.Style.STROKE
@@ -827,7 +828,10 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
   private val curve = android.graphics.Path()
 
   override fun onDraw(canvas: Canvas) {
-    if (tint > 0f) canvas.drawColor(withAlpha(env.theme.highlight, tint))
+    if (tint > 0f) {
+      tintPaint.color = withAlpha(env.theme.highlight, tint)
+      canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), tintPaint)
+    }
     drawReplyCurve(canvas)
   }
 

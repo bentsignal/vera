@@ -174,3 +174,27 @@ https://vera-evidence.b-cdn.net/pr/t3-native-message-list-integration/20261025-1
 It includes root target before/after, both Settings screens, both current-keyboard
 command samples, the actual thread target, and short real Activity-tap clips on
 each platform. Raw metadata and checks are in `.cache/private-feedback-20261025/`.
+
+## Android target highlight follow-up
+
+Shawn reports that Android Activity navigation tints the whole visible list,
+while iOS correctly fades only the target. Shared mapping sets highlighted
+only on the anchor row. Android MessageCell.onDraw uses Canvas.drawColor with
+an inherited clip while cells allow overflow for media/tapbacks, so the fill
+can cover neighboring rows. The bounded correction uses a reused Paint and
+an explicit rectangle from zero to the cell width/height. Keep overflow,
+800 ms delay, 1600 ms fade and target/centering behavior unchanged.
+
+This native Android edit requires one new Android Vera Dev client, including
+its already-tested stacked body-chip placement correction. iPhone stays on
+its existing client. Validation is one actual bitmap regression with a clip
+larger than the cell, one Activity-target before/after visual on the queued
+Android emulator, and required ordered checks. No broad motion/performance
+matrix, iOS/private build, backend change, merge or release is authorized.
+
+The real native bitmap test first failed on the old implementation: the pixel
+above the target expected transparent0 but contained788516096. The identical
+test passes with the row-bounded rectangle, including above/below/left/right
+checks. Raw RED/GREEN XML and logs are in
+.cache/android-target-highlight-20261025/. The first short UI recording ended
+before loaded rows appeared and is retained as incomplete, not visual proof.
