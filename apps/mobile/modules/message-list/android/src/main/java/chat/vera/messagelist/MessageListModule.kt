@@ -26,12 +26,7 @@ class MessageListModule : Module() {
       )
     }
 
-    View(MessageListComposer::class) {
-      Name("MessageListComposer")
-      Prop("owner") { view: MessageListComposer, owner: String? -> view.owner = owner ?: "" }
-      Prop("sequence") { view: MessageListComposer, sequence: Double? -> view.sequence = sequence?.takeIf { it.isFinite() && it >= 0 }?.toLong() ?: 0L }
-    }
-
+    // Expo aliases its FIRST View as the module default. Keep the list first.
     View(MessageListView::class) {
       Events("onEvent")
 
@@ -66,6 +61,12 @@ class MessageListModule : Module() {
       AsyncFunction("scrollToRow") { view: MessageListView, rowId: String, animated: Boolean? ->
         view.scrollToRow(rowId, animated != false)
       }.runOnQueue(Queues.MAIN)
+    }
+
+    View(MessageListComposer::class) {
+      Name("MessageListComposer")
+      Prop("owner") { view: MessageListComposer, owner: String? -> view.owner = owner ?: "" }
+      Prop("sequence") { view: MessageListComposer, sequence: Double? -> view.sequence = sequence?.takeIf { it.isFinite() && it >= 0 }?.toLong() ?: 0L }
     }
   }
 }
