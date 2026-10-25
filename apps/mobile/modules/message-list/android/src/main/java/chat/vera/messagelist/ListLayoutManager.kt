@@ -17,6 +17,21 @@ class ListLayoutManager(context: Context) : LinearLayoutManager(context, Recycle
 
   internal data class ScrollAnchor(val id: Long, val bottom: Int)
 
+  /**
+   * A paired padding/row change must keep an exactly-bottom row at the
+   * new padded bottom. Without an explicit anchor, predictive PRE layout
+   * and POST layout can each add the same total-space change to the row.
+   * This is not the arrival's near-latest policy: a reader even a few
+   * pixels above latest keeps their existing anchor.
+   */
+  internal fun pinLatestForPadding(recycler: RecyclerView, bottom: Int): Boolean {
+    if (bottom == recycler.paddingBottom) return false
+    val latest = findViewByPosition(0) ?: return false
+    if (kotlin.math.abs(latest.bottom - (recycler.height - recycler.paddingBottom)) > 1) return false
+    scrollToPositionWithOffset(0, 0)
+    return true
+  }
+
   /** Keep the visible row's screen position while a smooth target changes. */
   internal fun captureScrollAnchor(recycler: RecyclerView): ScrollAnchor? {
     val view = findViewByPosition(findFirstVisibleItemPosition()) ?: return null

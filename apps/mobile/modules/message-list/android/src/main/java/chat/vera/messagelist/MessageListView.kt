@@ -423,6 +423,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
       workerRows = next
       val diff = if (!changed || before.isEmpty()) null else DiffUtil.calculateDiff(RowsDiff(before, next), false)
       main.post {
+        composerTrace(this) { "result:ready version=$version generation=${authority?.generation}" }
         applies.addLast(ApplyResult(next, diff, carried, version, authority, changed))
         drainApplies()
       }
@@ -459,7 +460,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
         timed({ "apply ${result.next.size} rows" }) {
           if (result.changed) apply(result.next, result.diff, padding, result.version, resumeLatest = !pendingLand && !holdingCloseKeyboard)
           else if (padding != null) {
-            setPaddingOnly(padding)
+            setPairedPadding(padding)
             layoutNow()
           }
         }
@@ -534,7 +535,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
     animator.rising = changes.rising
     animator.handoff = handoff(before, next, changes.arrivals)
     // The composer's change lands in this same layout pass as the rows.
-    inset?.let { setPaddingOnly(it) }
+    inset?.let { setPairedPadding(it) }
     rows.apply(next, diff)
     if (anchor != null) manager.restoreScrollAnchor(recycler, anchor)
     else if (wasAtBottom && changes.newestInserted) manager.scrollToPositionWithOffset(0, 0)
@@ -642,6 +643,11 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
   private fun setPaddingOnly(inset: Inset) {
     insets.markApplied(inset)
     recycler.setPadding(0, units.px(inset.top), 0, units.px(inset.bottom) + keyboard)
+  }
+
+  private fun setPairedPadding(inset: Inset) {
+    manager.pinLatestForPadding(recycler, units.px(inset.bottom) + keyboard)
+    setPaddingOnly(inset)
   }
 
   /** How far the keyboard lifts the list: its height, less the inset JavaScript already leaves under the composer. */

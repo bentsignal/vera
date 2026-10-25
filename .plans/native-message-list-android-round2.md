@@ -504,3 +504,63 @@ the combined client rebuild and actual first-row verification.
 The corrected registration passes native compilation and all 114 focused tests.
 The actual emulator class dump confirmed the original cause; the corrected client's
 runtime list/host classes and first rows still need integration verification.
+
+### Paired Modal close applies a padding delta twice
+
+Integration verified the corrected default view and real mounted composer height
+in APK 9307, then found a separate final-geometry defect in both close-before-worker
+and close-after-wait fixtures. The newest row started at bottom 1163 px with the
+keyboard up. The bar shrank from 160 to 96 dp at density 2.625, moving its top
+168 px down. Expected row bottom was 1331 px, but its actual final layout bounds
+ended at 1499 px. This is exactly two padding deltas. Fresh reset had the correct
+8 dp gap; the failure was not initial placement or only accessibility translation.
+
+A real RecyclerView regression reproduces expected 1331, actual 1499 using the
+production reverse layout manager and item animator with FLIP movement disabled.
+The stable newest row changes only its label, so the existing new-arrival bottom
+pin does not run. RecyclerView 1.4.0 runs predictive PRE and POST layout for the
+changed row. LinearLayoutManager.AnchorInfo.assignFromView adds totalSpaceChange
+to the end anchor in both passes. PRE resets its anchor without committing the
+OrientationHelper total-space baseline, so POST can add 168 again to the already
+moved child. A control with predictive layout absent applies the delta once.
+Exact dependency source was read from Google's RecyclerView 1.4.0 sources JAR;
+the source and RED XML/log are preserved under ignored `.cache/`.
+
+The paired-padding path now sets an explicit position-0/bottom-0 anchor only if
+the current row is exactly at the padded bottom, within one physical pixel, and
+the bottom padding changes. Release-only results use the same path. It does not
+use the 80 dp arrival threshold or disable predictive animations. Existing
+off-bottom generic-follow anchor restoration, FIFO authority, frozen close
+keyboard geometry and real-view landing remain unchanged.
+
+Eight real RecyclerView checks cover the exact failure and predictive control,
+growth/shrink, a true insertion, no-change release, a reader only 40 px above
+latest, generic-follow anchor preservation and a short alignTop thread. The
+combined native target passes 123 tests including the separate diagnostic gate
+check. Integration still owns the new APK's actual Modal close-before/after-worker
+geometry, raised landing, keyboard return and final 8 dp verification. Host checks
+are not a runtime or frame-performance pass.
+
+### Bounded upload lifetime diagnostic
+
+The old binary control reproduced the high emulator CPU/slow-frame window with
+the same current JavaScript and static JPEG. The new composer coordinator is
+therefore not required for that cost. JavaScript upload completion does not
+prove when a particular native MediaView stopped pulsing. A detached, rebound
+uploading holder is a source possibility, not an established runtime fault.
+
+The authorized diagnostic keeps pulse behavior unchanged. Only a debuggable app
+with `adb shell setprop log.tag.VeraMediaUpload DEBUG` writes START/STOP,
+rebind and attach/detach lifetime events. Each includes monotonic uptime, native
+view identity, upload/pulse state, attachment/visibility, local bounds, drawable
+type and hardware/layer state. It logs no content, message ID, URL or frame
+updates, adds no polling and constructs diagnostic details only when enabled.
+The gate regression verifies both opt-in and debuggable are required before
+details are evaluated. Set the tag to INFO to stop collection.
+
+The existing opt-in VeraComposerLayout trace also reports one `result:ready`
+with rows version and captured authority generation when the main thread receives
+each worker result. This distinguishes actual worker completion from elapsed
+fixture wait time. Integration owns the single diagnostic APK/CPU collection and
+any subsequent attribution. No pulse disable, lifecycle fix or new benchmark loop
+was selected.
