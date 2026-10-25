@@ -3155,3 +3155,27 @@ public query responses, backend diff, channel and live association/passkey publi
 certificate records are retained under `.cache/stacked-body-chips-20261025/`.
 The new built binaries still need their actual Release/domain/channel/signature
 verification before distribution; source compatibility is not phone acceptance.
+
+Bounded actual-client check complete at combined0b92cf12. Old cached iOS and
+Android clients reproduce Testing→photo→photo❤️→message👍/👎 on the same isolated
+fixture message50d0f26b. Both updated clients compile: iOSd03ad8a3, Android1b2864f1.
+After screenshots show Testing→message👍/👎→photo→photo❤️. In one brief recorded
+interaction per platform, text-chip tap changes only part:"message", while the
+photo-heart tap changes only part0. Cached reaction arrays before/after each
+actual tap prove that separation; reactions are restored for comparison. Native
+carousel/no-text/hold-target coverage comes from the focused330/130 checks,
+not a newly invented runtime matrix. No benchmark, firehose, cold profile,
+frame analyzer or burst seed was run. Both own devices/panels are down before
+private artifact work; Dev8492 remains available.
+
+Configured-home verification will distinguish generic dev-domain classifier
+literals from the selected home. Parent explicitly accepts existing classifier
+strings; no env-module rewrite or dependency change. Private build wrapper
+clears inherited APP_VARIANT, EXPO_PUBLIC_PROFILE_BUNDLE and VERA_METRO_PROFILE,
+sets EXPO_PUBLIC_VERA_DOMAIN=vera.chat and EXPO_NO_DOTENV=1, and records only those
+public build flags. Actual Release ID/channel/runtime/bundle selection and zero
+isolated hostname/account domain remain verification gates. Production store9's
+archived application-identifier39K6A9FP99.chat.vera.app and implicit keychain
+group are re-read for the new IPA comparison. Live production association and
+passkey origins include EAS productionE6:A1…44:5F and Google Play69:B5…BB:EE;
+the actual new APK signer must still be checked before installation claims.
