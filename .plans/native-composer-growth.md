@@ -690,3 +690,94 @@ The common-path emulator limit remains explicit, with photo-send responsiveness
 and pulse completion on BOTH next phones as acceptance. No additional media
 profile, benchmark loop or speculative animation disable is planned. The actual
 paired-land double presentation remains a separate functional gate.
+
+### Targeted held-row destination correction, source checkpoint
+
+Android owner `b82c6f53` is combined in `b4fbb770`. Four real production-animator
+regressions establish the old destination capture at final home minus168px for
+pending and running MOVE/CHANGE. The correction calls `endAnimation` only for
+the lifted holder before reading its window destination. Neighbor420ms motion,
+landing240ms, predictive layout, S/T authority and real restoration remain.
+The unborrowed name/avatar of that holder reaches final layout at capture.
+127 native checks and ordered owner checks pass. This is source proof, not
+acceptance of the original-frame landing; the combined simulator rebuild began
+at2026-10-25T01:51:54Z, fingerprint197d64596b7b06e26d2611ef06593e8b9aa7a97c.
+
+The prepared short-from-tall scrolled-up send on the preceding combined client
+is `1f5a4647-1817-4579-b03c-3e61ebee90ae`. The draft has one short line plus seven
+newlines. Committed clear80.38, matching exact ID, generic latest command resolve,
+arm and pair publication are recorded. The resulting text row1217..1372 ends
+21 physical pixels above bar1393, exactly8dp at density2.625, keyboard focused.
+The capture retains11 slow frames/worst83.3ms and Mac28%average/48%peak. This
+establishes the final geometry and readiness sequence, not every-frame motion.
+Files `r2-android-short-scrolled*` and settled raw/state are retained locally.
+
+### Corrected handback original-frame checks
+
+Combined197d645 builds successfully fromb4fbb770 at01:54:56Z. Before-worker
+release1 readyv2/127891 applies104 with frozen keyboard820 at127892, land begins
+127904 and restores128405. Final Pair1 row1202..1331/bar1352 is8dp with focused
+keyboard. ALL42 original frames1.702044..3.559033 show one question through
+handback and no replacement by its neighbor. After-worker release2 was readyv3
+before recorded close; apply168/244254, land244266, restore244754. Final Pair2
+1034..1163/bar1184 is8dp. ALL34 original frames1.846333..3.763656 show one held
+question. Retain21slow/worst100ms and24slow/worst150ms, respectively.
+
+An earlier after-worker readiness monitor exited before observing readiness;
+that attempt released2 but did not close. The subsequent native buffer proves
+v3 ready before the separately recorded close. Do not call the monitor attempt
+a completed close or a product failure.
+
+Authorized S3 was readyv4 before mounted T4/release3/height160. Close applies
+S3 captured104 at301467, lands301469/restores301960, without releasingT4. ALL40
+original frames1.669544..3.453089 show one question through handback. Explicit
+T4 afterward applies168; Pair4 row1034..1163/bar1184 ends8dp. Contacts and full
+original PTS logs are `android-settled-holder-{before,after,newer}-contact*`;
+recordings are `r2-android-settled-holder-*`. These are finite frame observations,
+not every-refresh or zero-slow-frame guarantees.
+
+A real-app first-release tap opens Priya's "hmm let me think about it" thread
+with that exact root row and no menu; Back returns to Mixed media. During the
+next RN/native-remount send setup, the emulator process exits and the queue
+reclaims it at02:02:01Z. Agent fill reports device offline, then device not found.
+No send result or app-crash attribution is claimed for that interrupted setup;
+completed recordings/raw evidence above remain valid. Cached-client recovery
+uses the normal simulator queue.
+
+### Final Android real-app cases and build handoff
+
+The new combined client passes the real-app first-release route check: Priya's
+root text opens its thread on one release, and Back returns to Mixed media.
+The normal keyboard-up hold opens the reaction/menu overlay rather than a
+thread. Closing returns the borrowed row with the keyboard focused; the newest
+Priya row ends at1372 and the bar starts at1393, exactly21px/8dp.
+Recordings are `r2-android-message-first-release`,
+`r2-android-normal-keyboard-hold` and `r2-android-normal-keyboard-land`.
+
+After an RN→native remount, send `9b27f254-76b7-4b4d-a21f-b0d2793ef597`,
+"Android rebound", records matching clear ACK, exact optimistic ID, latest arm
+and paired release. The one-line bar is81.52dp before send and80.38dp empty,
+so this is a short-line/remount runtime check, NOT proof of literally unchanged
+height or no callback. Those release-only cases remain in the focused state
+and native tests. Capture `r2-android-same-height-rebound` retains its historical
+filename with this explicit qualification,40 slow frames/worst83.3ms.
+
+A first stop-touch recording opens a thread, without evidence of RecyclerView
+state at the tap; do not count it as a stop-touch pass or assert a late-tap cause.
+The bounded retry uses the existing opt-in native DOWN trace. Actual second
+DOWN at uptime288277 reports rvState=2, SETTLING, and the subsequent UP is
+consumed without navigation. The post-state remains Mixed media. This proves
+an actual moving-list stop touch for this sequence. Files are
+`r2-android-stop-touch-traced`, its post-snapshot and
+`android-stop-touch-native.log`. The tag is disabled afterward. No product code
+or diagnostic field was added for this check.
+
+The current ordered integration checks pass: lint, typecheck,27 Jest tests in
+8 suites, React Doctor against origin/t3/native-message-list, then format.
+All9 PR284 checks were green on combined sourceb4fbb770. No zero-slow-frame,
+universal-load or physical-phone completion claim follows. Common photo-send
+emulator load and the retained formal analyzer flags remain qualified above.
+Physical photo-send responsiveness/pulse completion belongs in BOTH next phone
+scripts. The separate Android camera crash/preview rounding remains the required
+private-production retest in docs/next-release.md. No private production build,
+release, merge, OTA or data pass is authorized here.

@@ -3042,3 +3042,24 @@ Add explicit next JOINT DEV PHONE acceptance: send one small photo plus multilin
 text on BOTH phones, observe staged clear, upload pulse completion, responsive
 scroll/taps and final newest8pt gap; report sustained jank or a continuing pulse.
 Physical A16 camera/private-production retest remains separately required.
+
+### Joint Dev rebuild checkpoint, October 24 evening
+
+Sol combined Android held-holder landing correction b82c6f53 in b4fbb770. The
+corrected combined Android client197d645 builds and the finite original-frame
+before-worker, after-worker and S-after-mounted-T checks show one held question
+through real handback. Final authorized geometry remains8dp with the keyboard
+returned. Detailed clocks, all42/34/40 original frames, slow-frame limits,
+interrupted setup attempts and new real-app checks are recorded in
+`.plans/native-composer-growth.md`. Current integration checks pass27 Jest tests
+and all required ordered validation; CI is9/9 green on b4fbb770. Android owner
+native suite is127/127; iOS remains314/314 plus actual SDK/link validation.
+
+Common photo-send emulator load remains explicitly qualified, with the one
+native pulse sample STOP at1,119ms and no permanent-pulse behavior patch. BOTH
+next phones must check responsiveness and pulse completion. Camera private
+production acceptance remains in docs/next-release.md. No more profiling or
+refinement is selected. Own devices and panels are down; normal8492 serves the
+phones. Fresh physical Dev clients will build in sequence, then signatures,
+packages, fingerprints and hosted payloads will be verified before joint link
+delivery. Private production, merge, release, OTA and data pass remain held.
