@@ -482,3 +482,25 @@ unreleased-host close and stale/canceled tokens. Weak host tests cover duplicate
 invalidation, idempotent registration and detach/removal. Existing RecyclerView,
 lift, gesture, deck and pagination suites remain included. These checks do not
 exercise a real Fabric mount, Modal window or IME; integration owns that proof.
+
+### Default view registration regression
+
+Integration's actual Android activity dump showed MessageListComposer occupying
+the full default-list region as well as the intended bar region. Installed Expo
+ModuleDefinitionBuilder.registerViewDefinition aliases the first declared View
+under DEFAULT_MODULE_VIEW. The composer batch put the named host first, so
+requireNativeView("MessageList") created an empty host instead of the list.
+That explains the blank list and absent list trace without attributing them to
+sealing or shared send readiness.
+
+MessageListView now precedes the named MessageListComposer registration. The
+regression builds the real Expo ModuleDefinition and checks DEFAULT's actual
+viewType, its identity with the list export, and the named host's distinct type.
+It fails on the previous order with expected MessageListView, actual
+MessageListComposer. No view factory/runtime construction, guessed source-text
+check, lifecycle, fallback, field or policy change is involved. Integration owns
+the combined client rebuild and actual first-row verification.
+
+The corrected registration passes native compilation and all 114 focused tests.
+The actual emulator class dump confirmed the original cause; the corrected client's
+runtime list/host classes and first rows still need integration verification.
