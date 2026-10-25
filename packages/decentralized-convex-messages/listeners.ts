@@ -2,7 +2,7 @@ import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
 import type { AlertLevel } from "./protocol.ts";
 import type { AccountSettings } from "./settings.ts";
-import { alerts, alertsFor } from "./alerts.ts";
+import { alerts, alertsFor, mentionedBy } from "./alerts.ts";
 import { findAccess } from "./model.ts";
 import { notificationSettings } from "./settings.ts";
 import { threadMember, threadMembers } from "./threads.ts";
@@ -118,9 +118,9 @@ async function threadListeners(
       member,
     ]),
   );
-  const mentioned = (message.mentions ?? [])
-    .map(({ accountId }) => accountId)
-    .filter((accountId) => members.includes(accountId));
+  const mentioned = mentionedBy(message).filter((accountId) =>
+    members.includes(accountId),
+  );
   const heard = new Array<Listener>();
   for (const accountId of new Set([...inThread.keys(), ...mentioned])) {
     if (accountId === message.authorId) continue;
