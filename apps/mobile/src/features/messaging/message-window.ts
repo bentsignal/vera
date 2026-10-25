@@ -13,6 +13,7 @@ import {
   pageAfter,
   pageKey,
   reusable,
+  threadAnchoredView,
   windowParts,
   withPage,
 } from "./window-model";
@@ -164,6 +165,7 @@ function useWindowState(
   session: string,
   source: WindowSource,
   anchor: string | undefined,
+  anchorSentAt: number | undefined,
 ) {
   const queryClient = useQueryClient();
   const [openedAt] = useState(Date.now);
@@ -175,9 +177,12 @@ function useWindowState(
   const [state, setState] = useState<WindowState>(() => ({
     next: undefined,
     view:
-      anchor === undefined || source.threadId !== undefined
-        ? openLatest(queryClient, session, source, openedAt)
-        : anchoredView(anchor),
+      (anchor === undefined
+        ? undefined
+        : source.threadId === undefined
+          ? anchoredView(anchor)
+          : threadAnchoredView(anchor, anchorSentAt)) ??
+      openLatest(queryClient, session, source, openedAt),
   }));
   const { next, view } = state;
   remember(windowKeyOf(session, source), view);
@@ -287,8 +292,14 @@ export function useMessageWindow(
   session: string,
   source: WindowSource,
   anchor?: string,
+  anchorSentAt?: number,
 ) {
-  const { results, setState, state } = useWindowState(session, source, anchor);
+  const { results, setState, state } = useWindowState(
+    session,
+    source,
+    anchor,
+    anchorSentAt,
+  );
   const { next, view } = state;
   const shown = shownPages(view, results.slice(0, view.pages.length));
   return {

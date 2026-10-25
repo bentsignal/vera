@@ -302,12 +302,14 @@ brought over unchanged) on an isolated backend.
 
 ### The switch
 
-- On by default in dev builds (`NATIVE_LIST.byDefault = env.devTools`),
-  off in production until Shawn turns it on over the air.
-- A "Testing" section on a conversation's info page (tap the header) has
-  the switch in dev builds and for `NATIVE_LIST.testers`, so the two
-  lists can be compared in the same chat: flip it, go back. It's also in
-  Developer settings (dev builds) and More → About (testers, production).
+- Current October25 policy, explicitly requested after private phone testing:
+  on by default in every build, with a persisted explicit opt-out using the
+  existing `vera.nativeList` key. Unsupported/older binaries keep the RN list
+  through the unchanged `nativeListInstalled` check.
+- The production-visible switch is Settings → Experimental → Native Message
+  List, at the bottom of Settings. About, conversation Testing and Developer
+  duplicates are removed. Dated test scripts below describe historical UI;
+  this location supersedes those switch instructions.
 - Scripts: `veraDev.nativeList(true|false)` flips it and returns which
   list conversations show (`"native"` or `"rn"`).
 
@@ -3190,3 +3192,14 @@ This later report does not change either artifact's source. Normal Dev8492
 stays available; all devices are down. No public distribution, merge, backend
 deploy, OTA or data pass was performed. Actual cold first-open and Android
 camera acceptance remain Shawn's phone checks.
+
+### Private production feedback follow-up, October25
+
+The next three requested changes are shared-only: foreground same-conversation
+reaction presentation, Activity target centering including thread replies, and
+Settings → Experimental with a default-on persisted native-list opt-out. See
+[the scoped report](native-message-list-feedback-20261025.md) for concrete
+source causes, finite actual-client evidence, timestamp limits and phone checks.
+Prior phone passes are retained; no new numbered pass or physical remote-push
+proof is invented. The existing Dev clients can test these changes through8492;
+no new private/native/store build or backend deploy is performed.

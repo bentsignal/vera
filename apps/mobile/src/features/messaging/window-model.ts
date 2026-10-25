@@ -106,6 +106,22 @@ export function anchoredView(messageId: string) {
   });
 }
 
+/** A thread target using its existing time cursors, with overlap for ties. */
+export function threadAnchoredView(
+  messageId: string,
+  sentAt: number | undefined,
+) {
+  if (
+    sentAt === undefined ||
+    !Number.isSafeInteger(sentAt) ||
+    sentAt < 0 ||
+    sentAt >= Number.MAX_SAFE_INTEGER
+  )
+    return undefined;
+  const pages = [{ before: sentAt + 1 }, { after: sentAt - 1 }];
+  return asView({ ...anchoredView(messageId), initial: pages, pages });
+}
+
 /** Every loaded message once, oldest first. */
 export function mergePages<Message extends WindowMessage>(
   pages: readonly (PageData<Message> | undefined)[],

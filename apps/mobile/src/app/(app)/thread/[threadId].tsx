@@ -128,7 +128,7 @@ function useWhileOpen(
   thread: ReturnType<typeof useMessages>,
 ) {
   useMarkThreadRead(conversationId, threadId, thread.newestSentAt);
-  useActiveThread(threadId);
+  useActiveThread(threadId, conversationId);
   useStayLive(conversationId, threadId);
   useDevConversation(conversationId, thread, threadId);
 }
@@ -163,19 +163,23 @@ function useThreadTyping(
  * comments, and a composer for the next reply. Its bell turns its
  * notifications off or back on.
  */
+interface ThreadProps {
+  conversationId: string;
+  threadId: string;
+  initialTitle?: string;
+  target: { readonly anchor?: string; readonly anchorSentAt?: number };
+}
+
 function Thread({
   conversationId,
   threadId,
   initialTitle,
-}: {
-  conversationId: string;
-  threadId: string;
-  initialTitle?: string;
-}) {
+  target,
+}: ThreadProps) {
   const composerBottomInset = useComposerBottomInset();
   const { address } = useAccount();
   const devTools = useDevTools();
-  const thread = useMessages(conversationId, { threadId });
+  const thread = useMessages(conversationId, { ...target, threadId });
   const viewReactions = useReactionsSheet(conversationId, thread);
   const { conversation, profileOf, profilesLoaded, title } = useConversation(
     conversationId,
@@ -220,6 +224,7 @@ function Thread({
           <ConversationList
             ref={list}
             key={thread.viewKey}
+            anchorId={thread.anchor}
             thread={{ replyCount: thread.replyCount, root: shown.root }}
             messages={replies}
             self={address}
@@ -268,21 +273,29 @@ function Thread({
 }
 
 export default function ThreadScreen() {
-  const { account, conversationId, threadId, title } = useLocalSearchParams<{
-    /** The signed-in account this thread is opened as. */
-    account?: string;
-    conversationId: string;
-    threadId: string;
-    /** The conversation's name, shown until it loads. */
-    title?: string;
-  }>();
+  const { account, conversationId, threadId, title, messageId, targetSentAt } =
+    useLocalSearchParams<{
+      /** The signed-in account this thread is opened as. */
+      account?: string;
+      conversationId: string;
+      threadId: string;
+      /** The conversation's name, shown until it loads. */
+      title?: string;
+      messageId?: string;
+      targetSentAt?: string;
+    }>();
   return (
     <AccountScope address={account}>
       <Thread
-        key={`${account ?? ""}:${conversationId}:${threadId}`}
+        key={`${account ?? ""}:${conversationId}:${threadId}:${messageId ?? ""}:${targetSentAt ?? ""}`}
         conversationId={conversationId}
         threadId={threadId}
         initialTitle={title}
+        target={{
+          anchor: messageId,
+          anchorSentAt:
+            targetSentAt === undefined ? undefined : Number(targetSentAt),
+        }}
       />
     </AccountScope>
   );

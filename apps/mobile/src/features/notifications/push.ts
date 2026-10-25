@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -7,12 +7,19 @@ import { useMutation } from "@tanstack/react-query";
 import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
+import type { ConversationOnScreen } from "./presentation";
 import { env } from "~/env";
 import { useAccount } from "~/features/messaging/account";
 import { usePreference } from "~/features/preferences/store";
+import { notificationIsNews } from "./presentation";
 import { stringField } from "./presented";
 
 let activeConversationId: string | undefined;
+let conversationOnScreen: ConversationOnScreen | undefined;
+let reactionSheetOnScreen: ConversationOnScreen | undefined;
+let threadOnScreen:
+  | (ConversationOnScreen & { readonly threadId: string })
+  | undefined;
 /** The thread on screen, whose replies' banners stay quiet. */
 let activeThreadId: string | undefined;
 /** Whether the Inbox is on screen, where new messages show in the list. */
@@ -25,10 +32,14 @@ let activityOnScreen = false;
  * and lets a tap on its notification reuse the screen.
  */
 export function useActiveConversation(conversationId: string) {
+  const { address } = useAccount();
   useFocusEffect(() => {
+    const shown = { accountId: address, conversationId };
+    conversationOnScreen = shown;
     activeConversationId = conversationId;
     return () => {
-      if (activeConversationId === conversationId) {
+      if (conversationOnScreen === shown) {
+        conversationOnScreen = undefined;
         activeConversationId = undefined;
       }
     };
@@ -39,11 +50,29 @@ export function useActiveConversation(conversationId: string) {
  * Marks the thread as the one on screen, which suppresses its replies'
  * banners and lets a tap on one reuse the screen.
  */
-export function useActiveThread(threadId: string) {
+export function useActiveThread(threadId: string, conversationId: string) {
+  const { address } = useAccount();
   useFocusEffect(() => {
+    const shown = { accountId: address, conversationId, threadId };
+    threadOnScreen = shown;
     activeThreadId = threadId;
     return () => {
-      if (activeThreadId === threadId) activeThreadId = undefined;
+      if (threadOnScreen === shown) {
+        threadOnScreen = undefined;
+        activeThreadId = undefined;
+      }
+    };
+  });
+}
+
+/** The reaction sheet still belongs to its chat, but isn't a routing root. */
+export function useReactionConversation(conversationId: string) {
+  const { address } = useAccount();
+  useFocusEffect(() => {
+    const shown = { accountId: address, conversationId };
+    reactionSheetOnScreen = shown;
+    return () => {
+      if (reactionSheetOnScreen === shown) reactionSheetOnScreen = undefined;
     };
   });
 }
@@ -80,15 +109,22 @@ export function useActivityOnScreen() {
  * and a reply kept in its thread in that thread and on Activity.
  */
 function isNews(data: unknown) {
-  const conversationId = stringField(data, "conversationId");
-  if (conversationId === undefined) return true;
-  const threadId = stringField(data, "threadId");
-  if (threadId !== undefined) {
-    return threadId !== activeThreadId && !activityOnScreen;
-  }
-  const listed =
-    stringField(data, "kind") === "reaction" ? activityOnScreen : inboxOnScreen;
-  return conversationId !== activeConversationId && !listed;
+  return notificationIsNews(
+    {
+      accountId: stringField(data, "accountId"),
+      conversationId: stringField(data, "conversationId"),
+      threadId: stringField(data, "threadId"),
+      kind: stringField(data, "kind"),
+    },
+    {
+      foreground: AppState.currentState === "active",
+      conversation: conversationOnScreen,
+      reactionSheet: reactionSheetOnScreen,
+      thread: threadOnScreen,
+      inbox: inboxOnScreen,
+      activity: activityOnScreen,
+    },
+  );
 }
 
 Notifications.setNotificationHandler({

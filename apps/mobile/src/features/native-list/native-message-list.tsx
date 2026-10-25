@@ -2,12 +2,7 @@ import type { RefObject } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { Lift, MessageListViewMethods } from "./native";
@@ -46,6 +41,7 @@ import {
   sameHold,
   timerChanges,
 } from "./typing-hold";
+import { useAnchorPlacement } from "./use-anchor-placement";
 import { useListEvents } from "./use-list-events";
 
 /** The binary lifts the held message into the menu itself (`lift`). */
@@ -53,8 +49,6 @@ const LIFTS = nativeSupport?.features?.includes("lift") === true;
 
 /** Room above the oldest row, under the header. */
 const HEADER_GAP = 8;
-/** How long the conversation takes to fade in (`FADE_MS`). */
-const FADE_MS = 220;
 
 type RowsProps = Omit<
   MessageListProps,
@@ -149,21 +143,6 @@ function useRows({
   return { messageOf: (rowId: string) => byId.get(rowId), rows };
 }
 
-/**
- * Where the list is: near the newest message (for the jump button), and
- * placed and faded in, covered until then like the React Native list.
- */
-function usePlace(startsAtLatest: boolean, hasNewer: boolean) {
-  const near = useSharedValue(startsAtLatest);
-  const loaded = useSharedValue(0);
-  return {
-    cover: useAnimatedStyle(() => ({ opacity: 1 - loaded.value })),
-    onNearLatest: (value: boolean) => near.set(value),
-    onReady: () => loaded.set(withTiming(1, { duration: FADE_MS })),
-    showJump: useDerivedValue(() => hasNewer || !near.value),
-  };
-}
-
 function useLift(view: RefObject<MessageListViewMethods | null>) {
   const [lift, setLift] = useState<Lift>();
   function change(next: Lift | undefined) {
@@ -193,6 +172,18 @@ function useNativeHandle(
   return scrollToLatest;
 }
 
+function useNativeActions(commit: SendCommitStore, onHold: () => void) {
+  const { open, viewReactions } = useMessageActions();
+  return {
+    viewReactions,
+    open: (target: Parameters<typeof open>[0]) => {
+      commit.interruptLatest();
+      onHold();
+      open(target);
+    },
+  };
+}
+
 function NativeRows({
   handle,
   onJumpToLatest,
@@ -209,15 +200,17 @@ function NativeRows({
   onHold,
   ...shown
 }: RowsProps) {
-  const view = useRef<MessageListViewMethods>(null);
+  const { view, attach, ...place } = useAnchorPlacement(shown, hasNewer);
   const scrollToLatest = useNativeHandle(
     handle,
     view,
     composerHeight.sendCommit,
   );
-  const { open, viewReactions } = useMessageActions();
+  const { open, viewReactions } = useNativeActions(
+    composerHeight.sendCommit,
+    onHold,
+  );
   const { layout, self } = shown;
-  const place = usePlace(shown.anchorId === undefined, hasNewer);
   const theme = useNativeTheme(layout);
   const safeTop = useSafeAreaInsets().top;
   // A send's message waits for the composer's new height (`useComposerInset`).
@@ -240,13 +233,13 @@ function NativeRows({
     }),
     messageOf,
     // Frozen in the render the menu opens in, before it takes the keyboard.
-    openMenu: (target) => {
-      composerHeight.sendCommit.interruptLatest();
-      onHold();
-      open(target);
-    },
+    openMenu: open,
     openThread: onOpenThread,
-    pages: { ...place, onLoadNewer, onLoadOlder },
+    pages: {
+      ...place,
+      onLoadNewer,
+      onLoadOlder,
+    },
     toggleReaction: onToggleReaction,
     viewReactions,
   });
@@ -257,7 +250,7 @@ function NativeRows({
     <>
       <View style={{ flex: 1 }}>
         <MessageListView
-          ref={view}
+          ref={attach}
           style={{ flex: 1 }}
           contractVersion={CONTRACT_VERSION}
           rows={rows}

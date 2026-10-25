@@ -27,6 +27,16 @@ established. Neither a simulator result nor a Dev-only pass replaces this
 physical production-config check. No build, upload or release is authorized by
 this checklist.
 
+## Native list: production default and persisted opt-out
+
+The October25 private-phone feedback requests native lists on by default,
+with Settings → Experimental → Native Message List visible in production.
+Before distributing that change, check that an existing explicit off choice
+remains off after update/relaunch and that switching off uses the RN fallback.
+Older binaries without compatible native support must continue using RN even
+when the unchosen preference defaults on. About/Testing is no longer the switch
+location. This check does not authorize a build or public distribution.
+
 ## Native message list: the store-update gate for older binaries
 
 From the native message list (#284 into `t3/native-message-list`, then
