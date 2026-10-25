@@ -32,8 +32,6 @@ final class MediaTileView: UIView {
     play.addSubview(playGlyph)
     addSubview(play)
     durationBack.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-    durationBack.layer.cornerRadius = 10
-    duration.font = .systemFont(ofSize: 12, weight: .semibold)
     duration.textColor = .white
     duration.textAlignment = .center
     addSubview(durationBack)
@@ -54,6 +52,8 @@ final class MediaTileView: UIView {
     let video = item.kind == .video && badges
     play.isHidden = !video
     if video, let seconds = item.durationSeconds {
+      let font = UIFont.systemFont(ofSize: theme.text(12), weight: .semibold)
+      if duration.font != font { duration.font = font }
       duration.isHidden = false
       durationBack.isHidden = false
       let total = Int(seconds.rounded())
@@ -85,8 +85,11 @@ final class MediaTileView: UIView {
     image.frame = bounds
     play.frame = CGRect(x: (bounds.width - 48) / 2, y: (bounds.height - 48) / 2, width: 48, height: 48)
     playGlyph.frame = play.bounds
-    let size = duration.sizeThatFits(CGSize(width: 80, height: 20))
-    durationBack.frame = CGRect(x: 8, y: bounds.height - 8 - 20, width: size.width + 16, height: 20)
+    // 20 tall at the default text size, and taller with larger text.
+    let height = max(20, ceil(duration.font.lineHeight) + 6)
+    let size = duration.sizeThatFits(CGSize(width: bounds.width, height: height))
+    durationBack.frame = CGRect(x: 8, y: bounds.height - 8 - height, width: size.width + 16, height: height)
+    durationBack.layer.cornerRadius = height / 2
     duration.frame = durationBack.frame
   }
 }

@@ -96,6 +96,38 @@ if case let .message(layout) = measurer.layout(Row(message("a", own: true))) {
   equal(layout.parts[0].frame.maxX, width - 16, "your bubble's right edge")
 }
 
+// MARK: The system text size
+
+// React Native's multipliers, so the list's text matches the app's.
+equal(Theme.textScale(.extraSmall), 0.823, "the smallest text size")
+equal(Theme.textScale(.large), 1, "the default text size")
+equal(Theme.textScale(.accessibilityExtraExtraExtraLarge), 3.571, "the largest text size")
+equal(Theme.textScale(.unspecified), 1, "an unknown text size is the default")
+
+let small = Theme([:], textScale: 0.823)
+equal(small.body.size, 17 * 0.823, "body text scales")
+equal(small.body.lineHeight, 22 * 0.823, "and so does its line height")
+let smallMeasurer = Measurer(theme: small, width: width)
+equal(smallMeasurer.layout(Row(message("a"))).height, 14 + ceil(22 * 0.823 + 16) + 7, "a one-line bubble at the smallest size")
+
+let file: JSON = ["type": "file", "name": "notes.pdf", "sizeLabel": "2 MB", "url": "https://example.com/n.pdf", "part": "attachment:f"]
+let link: JSON = ["type": "linkCard", "url": "https://example.com", "site": "example.com", "part": "link"]
+func partHeight(_ measurer: Measurer, _ block: JSON) -> CGFloat {
+  guard case let .message(layout) = measurer.layout(Row(message("a", blocks: [block]))) else { return 0 }
+  return layout.parts.first?.frame.height ?? 0
+}
+equal(partHeight(measurer, file), 64, "a file card at the default size")
+equal(partHeight(measurer, link), 60, "a link without a preview at the default size")
+equal(partHeight(smallMeasurer, file), 64, "a file card keeps its icon's height with smaller text")
+let largeMeasurer = Measurer(theme: Theme([:], textScale: 2.143), width: width)
+equal(partHeight(largeMeasurer, file), 24 + (20 + 18) * 2.143, "a file card grows with larger text")
+check(partHeight(largeMeasurer, link) > 60, "a link card grows with larger text")
+if case let .message(layout) = largeMeasurer.layout(Row(message("a", layout: "stacked", reactions: [thumbs]))) {
+  equal(layout.chips.first?.frame.height, 18 * 2.143 + 8, "a chip is a line of its text and 4 above and below")
+  equal(layout.chips.first?.text.frame.height, ceil(18 * 2.143), "its text fills that line")
+} else { check(false, "a stacked message with a reaction") }
+equal(measurer.chipHeight, 26, "a chip at the default size")
+
 // MARK: Decoding never crashes, and draws what it can't as fallback text
 
 let strange: [JSON] = [

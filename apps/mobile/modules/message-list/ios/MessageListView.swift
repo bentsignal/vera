@@ -117,6 +117,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   required init(appContext: AppContext? = nil) {
     super.init(appContext: appContext)
     ComposerMounts.register(list: self)
+    NotificationCenter.default.addObserver(self, selector: #selector(textSizeChanged), name: UIContentSizeCategory.didChangeNotification, object: nil)
     lifter.onRestored = { [weak self] in self?.composerRestored() }
     clipsToBounds = true
     collectionView.backgroundColor = .clear
@@ -422,9 +423,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   func propsDidUpdate() {
     if themeChanged {
       themeChanged = false
-      var theme = themeJSON.map(Theme.init) ?? Theme()
-      theme.version = state.theme.version + 1
-      state.theme = theme
+      rebuildTheme()
       backgroundColor = .clear
       rowsChanged = true
     }
@@ -467,6 +466,22 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
       liftChanged = false
       applyLift()
     }
+  }
+
+  /// The theme from JavaScript's, with its text at the system text size.
+  private func rebuildTheme() {
+    let scale = Theme.textScale(UIApplication.shared.preferredContentSizeCategory)
+    var theme = Theme(themeJSON ?? [:], textScale: scale)
+    theme.version = state.theme.version + 1
+    state.theme = theme
+  }
+
+  /// The system text size changed (Settings, or Control Center while the
+  /// app is open): measure every row again at the new size.
+  @objc private func textSizeChanged() {
+    guard themeJSON != nil else { return }
+    rebuildTheme()
+    measure()
   }
 
   /// Lays the list out with insets just applied: at once, or, back from
@@ -1480,7 +1495,7 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   @objc private func revealDragged(_ pan: UIPanGestureRecognizer) {
     switch pan.state {
     case .changed:
-      setReveal(min(Metrics.revealWidth, max(0, -pan.translation(in: collectionView).x)))
+      setReveal(min(Metrics.revealWidth(state.theme), max(0, -pan.translation(in: collectionView).x)))
     case .ended, .cancelled, .failed:
       UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
         self.setReveal(0)

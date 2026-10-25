@@ -126,14 +126,14 @@ final class ChipView: UIView, ReactionView {
   func set(_ layout: ChipLayout, theme: Theme) {
     self.layout = layout
     reactionId = layout.id
-    layer.cornerRadius = Metrics.chipHeight / 2
+    layer.cornerRadius = layout.frame.height / 2
     let tint = layout.reaction.mine ? theme.accent.withAlphaComponent(0.2) : theme.fill
     switch ChipMaterial.current {
     case .fill:
       backgroundColor = tint
     case .sheen:
       backgroundColor = nil
-      material.image = Sheen.image(tint: tint, background: theme.background)
+      material.image = Sheen.image(tint: tint, background: theme.background, height: layout.frame.height)
     case .glass:
       backgroundColor = nil
       setGlass(tint: layout.reaction.mine ? theme.accent.withAlphaComponent(0.25) : nil)
@@ -142,7 +142,7 @@ final class ChipView: UIView, ReactionView {
     text.frame = layout.text.frame
     if let url = layout.reaction.imageUrl {
       image.isHidden = false
-      image.frame = CGRect(x: 8, y: (Metrics.chipHeight - 16) / 2, width: 16, height: 16)
+      image.frame = CGRect(x: 8, y: (layout.frame.height - 16) / 2, width: 16, height: 16)
       Images.load(image, url, size: CGSize(width: 16, height: 16))
     } else {
       image.isHidden = true
@@ -158,7 +158,6 @@ final class ChipView: UIView, ReactionView {
       view = UIVisualEffectView(effect: nil)
       view.isUserInteractionEnabled = false
       view.clipsToBounds = true
-      view.layer.cornerRadius = Metrics.chipHeight / 2
       insertSubview(view, at: 0)
       glass = view
     }
@@ -176,6 +175,7 @@ final class ChipView: UIView, ReactionView {
     super.layoutSubviews()
     material.frame = bounds.insetBy(dx: -Sheen.pad, dy: -Sheen.pad)
     glass?.frame = bounds
+    glass?.layer.cornerRadius = bounds.height / 2
   }
 }
 
@@ -187,11 +187,10 @@ enum Sheen {
   static let pad: CGFloat = 4
   private static let cache = NSCache<NSString, UIImage>()
 
-  static func image(tint: UIColor, background: UIColor) -> UIImage {
+  static func image(tint: UIColor, background: UIColor, height: CGFloat) -> UIImage {
     let dark = background.luminance < 0.5
-    let key = "\(tint.hashValue)|\(dark)|\(UIScreen.main.scale)" as NSString
+    let key = "\(tint.hashValue)|\(dark)|\(UIScreen.main.scale)|\(height)" as NSString
     if let image = cache.object(forKey: key) { return image }
-    let height = Metrics.chipHeight
     let capsule = CGRect(x: pad, y: pad, width: height + 2, height: height)
     let size = CGSize(width: capsule.width + pad * 2, height: height + pad * 2)
     let drawn = UIGraphicsImageRenderer(size: size).image { context in

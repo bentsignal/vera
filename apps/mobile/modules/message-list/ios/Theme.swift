@@ -39,13 +39,19 @@ struct Theme {
   var runGap: CGFloat = 14
   var rowGap: CGFloat = 4
 
+  /// How much the system text size setting scales text. JavaScript sends
+  /// sizes at the default size; the text styles here are already scaled,
+  /// and `text(_:)` scales the list's other text, as Android's `Units.sp`
+  /// does.
+  var textScale: CGFloat = 1
+
   /// Bumped on every change, so measurements cached for an older theme are
   /// thrown away.
   var version = 0
 
   init() {}
 
-  init(_ json: JSON) {
+  init(_ json: JSON, textScale: CGFloat = 1) {
     let colors = json.object("colors") ?? [:]
     func color(_ key: String, _ fallback: UIColor) -> UIColor {
       colors.string(key).flatMap(UIColor.init(css:)) ?? fallback
@@ -73,11 +79,15 @@ struct Theme {
       guard let value = type.object(key) else { return fallback }
       return TextStyle(size: value.cg("size", fallback.size), lineHeight: value.cg("lineHeight", fallback.lineHeight))
     }
-    body = style("body", body)
-    name = style("name", name)
-    caption = style("caption", caption)
-    footnote = style("footnote", footnote)
-    jumbo = style("jumbo", jumbo)
+    func scaled(_ style: TextStyle) -> TextStyle {
+      TextStyle(size: style.size * textScale, lineHeight: style.lineHeight * textScale)
+    }
+    self.textScale = textScale
+    body = scaled(style("body", body))
+    name = scaled(style("name", name))
+    caption = scaled(style("caption", caption))
+    footnote = scaled(style("footnote", footnote))
+    jumbo = scaled(style("jumbo", jumbo))
 
     let metrics = json.object("metrics") ?? [:]
     bubbleRadius = metrics.cg("bubbleRadius", bubbleRadius)
@@ -86,6 +96,32 @@ struct Theme {
     horizontalPadding = metrics.cg("horizontalPadding", horizontalPadding)
     runGap = metrics.cg("runGap", runGap)
     rowGap = metrics.cg("rowGap", rowGap)
+  }
+
+  /// A text size or line height in points at the default text size, scaled
+  /// to the system's.
+  func text(_ points: CGFloat) -> CGFloat {
+    points * textScale
+  }
+
+  /// The system text size as a scale, as React Native's text has it
+  /// (`RCTFontSizeMultiplier`), so the list's text matches the composer's
+  /// and the rest of the app's at every setting.
+  static func textScale(_ category: UIContentSizeCategory) -> CGFloat {
+    switch category {
+    case .extraSmall: return 0.823
+    case .small: return 0.882
+    case .medium: return 0.941
+    case .extraLarge: return 1.118
+    case .extraExtraLarge: return 1.235
+    case .extraExtraExtraLarge: return 1.353
+    case .accessibilityMedium: return 1.786
+    case .accessibilityLarge: return 2.143
+    case .accessibilityExtraLarge: return 2.643
+    case .accessibilityExtraExtraLarge: return 3.143
+    case .accessibilityExtraExtraExtraLarge: return 3.571
+    default: return 1
+    }
   }
 }
 
