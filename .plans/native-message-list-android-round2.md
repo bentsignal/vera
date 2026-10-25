@@ -564,3 +564,43 @@ each worker result. This distinguishes actual worker completion from elapsed
 fixture wait time. Integration owns the single diagnostic APK/CPU collection and
 any subsequent attribution. No pulse disable, lifecycle fix or new benchmark loop
 was selected.
+
+Integration's one diagnostic window observed native view 123956979 START on a
+detached bind, then attach at uptime 1059882. Its uploading-false rebind stopped
+the pulse at 1061001, 1119 ms later; subsequent rebinds still reported pulse=false.
+Slow frames and high guest CPU continued after STOP. That sample does not show
+a permanent pulse, and no pulse behavior or lifecycle patch was selected.
+
+### Real-view landing while the holder still animates
+
+The corrected paired padding restores the final 8 dp gap, but integration's
+38-original-frame contact at PTS 1.736 through 3.400 shows a separate transient
+duplicate. During frames 9 through 14, the same question appears in an upper
+overlay and lower returned row; the upper location reveals its neighbor once
+handback completes. Final geometry alone is not continuous-landing evidence.
+
+Paired row apply installs a pending MOVE/CHANGE translation on the held holder.
+Lifter captures getLocationOnScreen once, including that presentation transform,
+then lands for 240 ms while the holder's FLIP can continue for 420 ms. At restore,
+the real part returns to that moving cell while the landing-only drawing remains
+at the previously captured destination until source frame commits. The two
+drawing sites can therefore disagree despite the correct final layout.
+
+Four actual ListItemAnimator regressions reproduce pending and running MOVE and
+CHANGE capture at 2127 px when final home is 2295 px, exactly 168 px apart. The
+production capture now calls the parent RecyclerView's endAnimation on only the
+lifted holder before reading its location. This removes that holder's pending or
+running transform. Its real borrowed content still lands over 240 ms; neighbors
+keep their 420 ms motion and predictive layout remains enabled. The explicit
+cost is that any unborrowed name/avatar in this single held holder reaches its
+final layout immediately at destination capture. No other animation is disabled.
+
+The four green checks verify final destination/home agreement, a neighbor's real
+ValueAnimator still running at an explicit 100 ms seek, and no further held-row
+translation writes when queued/running callbacks drain. Robolectric idleFor can
+advance farther than requested during traversal/vsync, so these tests do not
+claim real-time pacing or frame-commit continuity. The full native target passes
+127 tests. The existing real-view restoration/token, S/T authority, frozen
+keyboard geometry and no-field/no-timer policy are unchanged. Integration owns
+the new combined APK's original-frame continuous-land check, pending/running
+pair paths, neighbor motion, keyboard return and final 8 dp gap.
