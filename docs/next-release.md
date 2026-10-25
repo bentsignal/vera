@@ -14,22 +14,9 @@ the heading and intro so the file stays in place for the next release).
 Adding steps: any PR whose release needs something beyond `pnpm release`
 adds a section here in that PR (see AGENTS.md → Releases).
 
-## Native list: physical Android camera acceptance before release
-
-Before releasing the combined native-list work, test the private production
-APK on Shawn's Galaxy A16 after the current Dev bug round passes on both phones.
-From a conversation, open composer Camera, take a selfie, accept with OK, and
-verify the staged preview has rounded corners. Send it, reopen the conversation
-and image, and verify the app survives throughout. Retain crash logs if it fails.
-Shawn observed an unrounded preview in current production and a crash in the
-new Vera Dev client on October24. The cause, including memory pressure, is not
-established. Neither a simulator result nor a Dev-only pass replaces this
-physical production-config check. No build, upload or release is authorized by
-this checklist.
-
 ## Native list: production default and persisted opt-out
 
-The October25 private-phone feedback requests native lists on by default,
+The October 25 private-phone feedback requests native lists on by default,
 with Settings → Experimental → Native Message List visible in production.
 Before distributing that change, check that an existing explicit off choice
 remains off after update/relaunch and that switching off uses the RN fallback.
@@ -37,130 +24,57 @@ Older binaries without compatible native support must continue using RN even
 when the unchosen preference defaults on. About/Testing is no longer the switch
 location. This check does not authorize a build or public distribution.
 
-## Native message list: the store-update gate for older binaries
+## Native message list: voluntary store updates and old-client continuity
 
-From the native message list (#284 into `t3/native-message-list`, then
-main). The native list needs a store build. Binaries already installed
-(iOS build 9, runtime `f54bfcd2…`; Android production, runtime
-`46edd031…`) never get it over the air, and an OTA reaches a binary only
-when their runtimes match (docs/releasing.md → Binaries, channels, and
-runtimes). So the prompt that sends them to TestFlight or Play has to be in
-JavaScript they already run. It must stay off until the new store build is
-actually available on that platform, and never block anyone before then.
+Shawn approved the tested native list on October 25 and explicitly requires
+installed clients to keep working until users choose to update. This policy
+supersedes the earlier mandatory old-runtime prelude and deny-list activation
+sequence. The release is native-only. Data-pass PRs #267–274, #276, #278–283 remain
+open for a separate test/release; unrelated contacts/privacy PR #155 stays open.
 
-**How it works (built, off).** The backend serves
-`release.outdatedRuntimes`, the list in
-`services/backend/outdated-runtimes.ts`, which is empty now. Store builds
-watch it from the home PDS (`WatchOutdatedRuntimes`); dev, internal and
-preview builds don't subscribe. A production-channel binary whose own
-`Updates.runtimeVersion` is listed for its platform shows "Update Vera"
-with one button to TestFlight or Play (`StoreUpdateCover`). It doesn't
-depend on the native-list switch. It's a deny list, so a newer store build
-can't be trapped by someone forgetting to add its runtime. A PDS without
-the query answers with an error, which lists nothing. Once a binary is
-running the gate's JavaScript, turning the gate on for it is just a
-backend deploy.
+### Required for this release
 
-### Which installed binaries the gate can reach
+- Keep services/backend/outdated-runtimes.ts OUTDATED_RUNTIMES empty for both
+  platforms. Do not list any old runtime, activate StoreUpdateCover, raise
+  BREAKING_VERSION, or publish an old-runtime gate prelude for this release.
+- Preserve current main's production APIs while merging the tested native
+  integration. The native changes add a public release.outdatedRuntimes query
+  and development-only fixtures; they remove no existing production operation
+  or argument. The query may be deployed with empty lists. Missing-query errors
+  are also treated as empty, so an older PDS does not block the app.
+- Verify production release.breakingVersion remains 3 and any deployed
+  release.outdatedRuntimes returns { android: [], ios: [] }. Until that additive
+  query is deployed, its absence is the expected fail-open state, not a reason
+  to deploy or enable the gate early.
+- New native binaries need store builds. The installed iOS build 9 runtime
+  f54bfcd2eab4e8cc9688d3e124cb3bad26f8b845 and Android build 6 runtime
+  46edd03177eed9f46c4a9a1cb1e32607cf2248bd continue running their existing
+  React Native list and compatible production backend. They cannot load the
+  new native runtime's JavaScript over the air. Do not send them a new native
+  bundle under an old runtime.
+- Native lists default on in compatible new binaries, with the persisted
+  Settings → Experimental → Native Message List opt-out. Explicit off and
+  older-binary RN fallback stay intact. No later activation OTA or tester-only
+  switch is required. The previous section records the validation of that
+  behavior.
 
-An OTA reaches only binaries whose runtime matches, and
-`pnpm release ota production` publishes only for the latest production
-binary's runtime. From the release tags:
+Production's latest release at this audit is
+mobile/ota/production/20261025T010504 and backend/deploy/20261025T010443,
+both from 6a699907. The live breaking version is 3. The outdated-runtimes query
+is not deployed there. Keep these compatibility facts current before deploying;
+none of this checklist authorizes a production mutation on its own.
 
-| Binary           | Runtime     | Last production OTA            | Gets the gate                      |
-| ---------------- | ----------- | ------------------------------ | ---------------------------------- |
-| iOS build 9      | `f54bfcd2…` | 2026-10-23 (`20261023T003538`) | yes, from the prelude OTA (step 1) |
-| iOS build 8      | `b5f3142d…` | none                           | no                                 |
-| iOS build 7      | `0efd5512…` | 2026-10-04                     | no                                 |
-| Android build 6  | `46edd031…` | 2026-10-23                     | yes, from the prelude OTA          |
-| Android build 5  | `c04064f3…` | none                           | no                                 |
-| Android build 4  | `cd762f30…` | 2026-10-04                     | no                                 |
-| Android, earlier | `9e1c4f51…` | 2026-10-04                     | no                                 |
+### Optional future gate prelude, deferred
 
-**Rollout limit.** With current tooling, builds older than iOS 9 and
-Android 6 can't receive the gate, so they can't be forced to update.
-`pnpm release ota` publishes only for the latest production runtime. Their
-last JavaScript also predates the breaking-version watcher (added
-2026-10-16), so not even raising `BREAKING_VERSION` would prompt them.
-They keep the React Native list and keep working as long as the backend
-stays compatible with them. What reaches them:
+The gate implementation remains available but off. Backporting its JavaScript
+to an old runtime and later populating a deny list would be a separate policy
+change requiring explicit approval. Neither is a prerequisite for this voluntary
+store release. Current OTA tooling targets only the latest production binary's
+runtime, so any future old-runtime backport needs its own source/runtime review.
+Normal TestFlight expiration and users' TestFlight/Play automatic-update
+settings remain platform behavior; Vera adds no forced-update requirement.
 
-- TestFlight tells testers about new builds, and testers who turned on
-  automatic updates get them installed
-  ([TestFlight](https://testflight.apple.com/): "you can turn on automatic
-  updates to have the latest beta builds install automatically").
-  Each TestFlight build also expires 90 days after upload, which ends
-  builds 7 and 8 by early January.
-- Play updates installed apps on its own schedule, under each user's
-  auto-update setting.
-- To force them anyway, each old runtime would need a backport OTA built
-  from its own build commit plus the gate, which `pnpm release ota` can't
-  do (latest runtime only, from a clean main). That's a tooling change,
-  with per-runtime checks against today's backend. It isn't planned, but
-  it's the way to reach them if it's ever needed.
-
-Not used: Android Play in-app updates
-([In-app updates](https://developer.android.com/guide/playcore/in-app-updates),
-[Kotlin or Java](https://developer.android.com/guide/playcore/in-app-updates/kotlin-java)).
-They need the Play app-update library in the binary, so they can't help
-binaries already installed. The immediate flow installs only after the
-user accepts it, and only for Play installs, not the private APK. iOS has
-no silent install.
-
-### Why the order matters
-
-- Today main (5268ceac) has the production runtimes, and the last
-  production OTA (`mobile/ota/production/20261023T003538`, from 5268ceac)
-  reached iOS build 9 and Android build 6. So an OTA from main can reach
-  them now.
-- Once the native list merges into main, main's runtime changes (the
-  preview builds' runtimes were iOS `6e60a1ac…` and Android `23784f5a…`).
-  From then on `pnpm release ota production` publishes only for the new
-  binaries, and the old ones get no more JavaScript.
-- So the gate's JavaScript has to reach iOS build 9 and Android build 6 in
-  a production OTA from main **before** the native list merges into
-  main. The gate's files import nothing from the native list and no API a
-  newer binary adds, so they can go to main on their own.
-
-### Steps, in order
-
-1. **Before the native list merges into main:** open a PR to main with
-   only the gate: `services/backend/outdated-runtimes.ts`, `outdatedRuntimes`
-   in `services/backend/convex/release.ts`,
-   `apps/mobile/src/features/updates/{store-gate.ts,store-gate.test.ts,watch-outdated-runtimes.ts,store-update-cover.tsx,store-link.ts}` (main has none of them; `update-cover.tsx` there has its own `STORE_URL`, which `store-link.ts` replaced),
-   and the `WatchOutdatedRuntimes`/`StoreUpdateCover` lines in
-   `apps/mobile/src/app/_layout.tsx`. Check its fingerprint matches the
-   production binaries (`pnpm release plan` says "ota" for both). After
-   it merges, deploy and publish with the list empty:
-   `pnpm release backend production`, then
-   `pnpm release ota production "<notes>"`.
-   Verify: the OTA output says `ios: publishing` and `android: publishing`
-   against `f54bfcd2…` and `46edd031…`;
-   `npx convex run --prod release:outdatedRuntimes` (from
-   services/backend) returns `{ android: [], ios: [] }`; a TestFlight phone
-   shows the new update ID in Settings → About and no prompt.
-2. Merge the native list into main. Make the store builds:
-   `pnpm release build production` (iOS, uploaded to TestFlight) and
-   `pnpm release build production --android` (submitted to Play internal
-   testing), then `pnpm release testflight <build> <notes.md>`. Wait until
-   the iOS build is processed and available to the Team and Friends
-   TestFlight groups, and the Android build is live in Play internal
-   testing. Verify: install from TestFlight and Play on a test phone, and
-   the native list shows (Testing in conversation info).
-3. Only then, per platform as its build becomes available, add every
-   runtime it replaces to `OUTDATED_RUNTIMES` in a PR: iOS
-   `f54bfcd2eab4e8cc9688d3e124cb3bad26f8b845` (build 9), Android
-   `46edd03177eed9f46c4a9a1cb1e32607cf2248bd` (build 6). The older
-   runtimes in the table can be listed too; it's harmless, but they never
-   read the list. Deploy it:
-   `pnpm release backend production`. Never list the runtime of a build
-   that's still current. Verify: on a phone still on iOS build 9 (or the
-   old Android build), "Update Vera" covers the app with one button that
-   opens TestFlight (or Play). After updating, the app opens normally on
-   the native list. A phone on the new build never sees it.
-4. Turn the native list on for everyone (`NATIVE_LIST.byDefault` in
-   production, an OTA to the new runtime) after Shawn approves.
-
-If a store build is pulled or broken, take its platform's runtimes out of
-the list first (a backend deploy), so nobody is sent to a build that isn't
-there.
+The Galaxy A16 private-production camera no-crash result and Shawn's explicit
+waiver of rounded-preview cosmetics are recorded in
+[the release scope](../.plans/native-list-release-20261025.md). That cosmetic
+follow-up is deferred and is not a blocker for this release.

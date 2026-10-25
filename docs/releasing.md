@@ -45,8 +45,9 @@ page names Vera and explains the replacement. This profile inherits
 production configuration,
 uses an empty, separate preview update channel, and submits to no store.
 It can build the integration branch before Shawn approves merging it.
-The native-list switch defaults on in that channel and is available under
-Testing in conversation info and More → About.
+Native lists default on in compatible new binaries. The persisted opt-out is
+Settings → Experimental → Native Message List; unsupported older binaries
+continue using the React Native list.
 
 The iOS preview uses the production bundle ID and signing team. Install it
 over TestFlight without deleting Vera to keep its app data and keychain;
