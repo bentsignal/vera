@@ -124,6 +124,11 @@ recall questions correctly, including saying it didn't know things that
 were never said. Passages of 10 and 4 messages matched worse, and larger
 embedding models didn't do better.
 
+Photo-only messages skip the automatic memory lookup because there is no
+text to embed. The model still sees the photo and the recent conversation.
+Empty or whitespace-only memory searches return no matches without calling
+the embedding provider.
+
 `npx convex run usage:summary '{"bot":"vera"}'` totals what replies cost
 (tokens, dollars, searches), from the gateway's own numbers.
 
@@ -156,7 +161,14 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   arrive during a reply get the next one.
 - Models run through the Convex AI Gateway (`@convex-dev/ai-sdk-provider`
   and the AI SDK), billed on the Convex bill, with zero-data-retention
-  routing: Grok 4.7, which sees the newest few images in the conversation.
+  routing (`assistant-models.ts`). Grok 4.7 answers, and Gemini 4 Argon
+  takes over when it fails: each model gets two tries, or one when the
+  error says retrying won't help (a rejected request), before the next.
+  The model sees the newest few images in the conversation, in the formats
+  it reads. Grok can't read HEIC (how iPhones save photos) or GIF, so
+  Gemini answers first while one of those is among them; a format neither
+  reads shows as a note. One image a model can't read fails the whole
+  request, which is what took both assistants down on 2026-10-23.
 - The app sends the device's time zone after a message to an assistant
   (`timeZones:report`), so they know the person's date and time.
 - Each person gets at most 300 replies an hour from Vera and another 300

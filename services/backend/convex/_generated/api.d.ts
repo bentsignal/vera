@@ -11,6 +11,7 @@
 import type * as affiliations from "../affiliations.js";
 import type * as agent from "../agent.js";
 import type * as agentHistory from "../agentHistory.js";
+import type * as agentModels from "../agentModels.js";
 import type * as agentTools from "../agentTools.js";
 import type * as appAssociation from "../appAssociation.js";
 import type * as assistantHook from "../assistantHook.js";
@@ -68,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   affiliations: typeof affiliations;
   agent: typeof agent;
   agentHistory: typeof agentHistory;
+  agentModels: typeof agentModels;
   agentTools: typeof agentTools;
   appAssociation: typeof appAssociation;
   assistantHook: typeof assistantHook;

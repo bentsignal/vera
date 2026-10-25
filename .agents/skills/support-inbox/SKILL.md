@@ -7,8 +7,9 @@ description: Read and answer the Vera Support account's messages, triage bug rep
 
 `support@<account domain>` is a verified account on each PDS. It welcomes
 every new account with a DM inviting bug reports, so people report problems
-by replying there. A model answers them (Grok 4.7 through the Convex AI
-Gateway, `services/backend/convex/supportAgent.ts`): it asks for what's
+by replying there. A model answers them (Grok 4.7, or Gemini 4 Argon when
+Grok fails, through the Convex AI Gateway,
+`services/backend/convex/supportAgent.ts`): it asks for what's
 missing, warns that reports are public, files each one as an anonymized
 GitHub issue labeled "user report", and messages the reporter as the issue
 is picked up, worked on, fixed, and released (`supportReports.ts`). You

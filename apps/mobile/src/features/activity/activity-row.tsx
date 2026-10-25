@@ -51,9 +51,15 @@ function Headline({
   const { item, title } = entry;
   const who = names(actorsOf(item), profileOf);
   if (item.kind === "mention") {
+    const what =
+      item.said === undefined
+        ? "mentioned you"
+        : item.said.kind === "name"
+          ? "said your name"
+          : `said “${item.said.keyword}”`;
     return (
       <>
-        <Bold>{who}</Bold> mentioned you in <Bold>{title}</Bold>
+        <Bold>{who}</Bold> {what} in <Bold>{title}</Bold>
       </>
     );
   }

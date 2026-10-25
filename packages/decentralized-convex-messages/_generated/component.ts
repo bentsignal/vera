@@ -163,9 +163,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   groupAlerts?: "all" | "mentions" | "none";
                   groups?: boolean;
                   invites?: boolean;
+                  keywords?: Array<string>;
                   reactions?: boolean;
                   replies?: boolean;
                   threadReplies?: boolean;
+                  yourName?: boolean;
                 };
                 type: "setNotificationSettings";
               }
@@ -850,6 +852,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                       threadId?: string;
                       threadOnly?: boolean;
                     };
+                    said?:
+                      | { kind: "name" }
+                      | { keyword: string; kind: "keyword" };
                     seenAt?: number;
                     seenThrough?: number;
                   }
@@ -1115,9 +1120,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 groupAlerts?: "all" | "mentions" | "none";
                 groups: boolean;
                 invites: boolean;
+                keywords?: Array<string>;
                 reactions: boolean;
                 replies?: boolean;
                 threadReplies?: boolean;
+                yourName?: boolean;
               };
             }
           | {
@@ -2384,6 +2391,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                     threadId?: string;
                     threadOnly?: boolean;
                   };
+                  said?:
+                    | { kind: "name" }
+                    | { keyword: string; kind: "keyword" };
                   seenAt?: number;
                   seenThrough?: number;
                 }
@@ -2649,9 +2659,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               groupAlerts?: "all" | "mentions" | "none";
               groups: boolean;
               invites: boolean;
+              keywords?: Array<string>;
               reactions: boolean;
               replies?: boolean;
               threadReplies?: boolean;
+              yourName?: boolean;
             };
           }
         | {

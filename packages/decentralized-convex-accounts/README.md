@@ -31,3 +31,26 @@ the Component's `affiliations.setAffiliated` mutation (never callable by
 clients); the host must accept only addresses on its own domain. Apps should
 describe the check as an affiliation with the account's domain, which is all
 the PDS can vouch for.
+
+## Safe profile updates
+
+Profiles belong to their account's home PDS. `getMyProfile` requires an
+authenticated identity. A missing identity throws rather than returning
+`null`, so a client reconnecting cannot mistake lost authentication for a
+missing profile. `null` means the authenticated account has no profile.
+
+`upsertMyProfile` changes only supplied fields. Omit `avatarUrl` to keep the
+photo, or pass `null` to remove it. Omit `displayName` to keep the name.
+A first write without a name uses the account's username. Older clients can
+still supply both fields.
+
+Automatic initialization passes `createOnly: true`. The existence check and
+write run in one mutation. If the profile already exists, the mutation
+returns it without changing anything. Do not initialize with an ordinary
+upsert after a client-side read: the read can be stale by the time the write
+arrives, including when another device has just changed the profile.
+
+Vera's editor saves name and photo edits separately. Upload completion and
+name debounce callbacks can run after another edit, so neither sends the
+other field's earlier value. Regression tests cover these overwrite paths
+for [#289](https://github.com/bentsignal/vera/issues/289).
