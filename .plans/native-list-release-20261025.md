@@ -136,3 +136,45 @@ fb703bdcb01aa364f82a9ecd7f0c236f5c7a2ee9 is cached. After merging, a plain iOS
 phone.sh down could therefore trigger an unnecessary Dev build through
 main_client. Parent must stop safely without that build, or explicitly defer
 main Dev restoration. Existing files/cache fingerprints were not altered.
+
+## Shipped October 25
+
+Shawn approved release without another phone-test round and explicitly limited
+redundant simulator work. Main's Settings Experimental section and existing
+Activity list were checked briefly on iOS. The queued Android repeat was
+canceled, both devices were shut down, and no further performance or animation
+pass was run. The earlier phone acceptance, including the final Android
+highlight fix, remains the release acceptance.
+
+- #284 merged once as `b9161cbd3a9a084011a549b463901fbb4fc51121`.
+  Exact component heads for #266, #275 and #277 are ancestors of that merge;
+  those PRs closed as contained. #258 closed unmerged as superseded. Their
+  remote native/prototype branches were retired. All 15 data-pass PRs and
+  contacts/privacy #155 remain open as explicitly requested.
+- Both phones signed out before the isolated backend was removed. Its DNS
+  record and deployment were removed, and the integration worktree reset to
+  shared dev. Main's backend was pushed to shared dev immediately afterward.
+- Production backend tag `backend/deploy/20261025T183548` points to b9161cbd.
+  Post-deploy live checks returned breaking version 3 and empty iOS/Android
+  runtime lists. No old-runtime OTA or forced-update gate was activated.
+- iOS store build 12 uploaded successfully and is tagged `mobile/build/12`,
+  source b9161cbd, runtime `251eec9a9649c31d0eec62ca3696fc6e76ee8b26`.
+  App Store Connect reports processing VALID and beta review APPROVED.
+  What to Test is set, and the build is assigned to Friends; Team distribution
+  remains automatic.
+- Google Play internal build 9 submitted successfully with release status
+  COMPLETED, tagged `mobile/android/build/9`, source b9161cbd, runtime
+  `d6cd0d4b0106d90b8ca76a5aa5327d7432ff2bca`. EAS submission ID is
+  `48fab943-0866-47ff-8697-786d90792529`.
+- Production builds used the production channel and explicit `vera.chat`, with
+  development/profile flags cleared and dotenv loading disabled. Runtime checks
+  passed before either upload. Neither store build includes the data pass.
+- Feature request #205 is implemented by the grouped media UI and linked to
+  #284; its issue was closed after both store submissions. Release support
+  tracking was invoked through the standard release workflow.
+
+The store artifacts are the tagged b9161cbd source. This later documentation
+closeout records delivery and clears completed one-off checks; it does not
+change or rebuild either artifact. Current iPhone Dev-client restoration can
+be built by the next `phone.sh up` when needed; no extra Dev build was added to
+this release after Shawn asked to proceed directly to the stores.
