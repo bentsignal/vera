@@ -24,17 +24,50 @@ import { MessageListView, nativeSupport } from "./native";
  * `/dev-native-list?composer=1`: local pairs through a real Modal. No sends,
  * native timers or worker hooks. Native traces decide before/after-worker order.
  */
+function useDevPairState() {
+  const [pair, setPair] = useState(() => ({
+    height: 160,
+    sequence: 0,
+    release: 0,
+    rows: devRows(60, 0, "bubbles"),
+  }));
+  function releasePair(staged = false) {
+    setPair((now) => {
+      const sequence = staged ? now.sequence : now.sequence + 1;
+      return {
+        height: staged ? now.height : now.height === 160 ? 96 : 160,
+        sequence,
+        release: sequence,
+        rows: now.rows.map((row, index) =>
+          index === 0 && row.kind === "message"
+            ? { ...row, accessibilityLabel: `Pair ${sequence}`, arrived: false }
+            : row,
+        ),
+      };
+    });
+  }
+  function stageNext() {
+    setPair((now) => ({
+      ...now,
+      sequence: now.sequence + 1,
+      height: now.height === 160 ? 96 : 160,
+    }));
+  }
+  return { pair, setPair, releasePair, stageNext };
+}
+
 function useDevComposerPair() {
   const owner = useId();
   const list = useRef<MessageListViewMethods>(null);
   const safe = useSafeAreaInsets();
   const screen = useWindowDimensions();
   const keyboard = useMenuKeyboardHold();
-  const [pair, setPair] = useState(() => ({
-    height: 160,
-    release: 0,
-    rows: devRows(60, 0, "bubbles"),
-  }));
+  const {
+    pair,
+    setPair,
+    releasePair: publishPair,
+    stageNext,
+  } = useDevPairState();
   const [layout, setLayout] = useState<"bubbles" | "stacked">("bubbles");
   const [held, setHeld] = useState<DevHold>();
   const [lifting, setLifting] = useState(false);
@@ -49,19 +82,7 @@ function useDevComposerPair() {
   }
   function releasePair(close: boolean) {
     beforeWorker.current = close;
-    setPair((now) => ({
-      height: now.height === 160 ? 96 : 160,
-      release: now.release + 1,
-      rows: now.rows.map((row, index) =>
-        index === 0 && row.kind === "message"
-          ? {
-              ...row,
-              accessibilityLabel: `Pair ${now.release + 1}`,
-              arrived: false,
-            }
-          : row,
-      ),
-    }));
+    publishPair();
     setStatus(close ? "Close queued with pair" : "Pair released while frozen");
   }
   function closing() {
@@ -100,6 +121,8 @@ function useDevComposerPair() {
     lifting,
     status,
     releasePair,
+    stageNext,
+    releaseStaged: () => publishPair(true),
     closing,
     barLaidOut,
     onEvent,
@@ -129,6 +152,8 @@ export function DevComposerLayout() {
     lifting,
     status,
     releasePair,
+    stageNext,
+    releaseStaged,
     closing,
     barLaidOut,
     onEvent,
@@ -168,7 +193,7 @@ export function DevComposerLayout() {
         offset={{ closed: 0, opened: safe.bottom }}
         style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
       >
-        <ComposerLayout enabled owner={owner} sequence={pair.release}>
+        <ComposerLayout enabled owner={owner} sequence={pair.sequence}>
           <View
             testID="dev-composer-bar"
             style={{ height: pair.height, backgroundColor: "#eee" }}
@@ -177,6 +202,11 @@ export function DevComposerLayout() {
             <Pressable onPress={changeLayout}>
               <Text>{layout}</Text>
             </Pressable>
+            {pair.sequence > pair.release && (
+              <Pressable onPress={releaseStaged}>
+                <Text>Release staged pair</Text>
+              </Pressable>
+            )}
             <TextInput
               accessibilityLabel="Message"
               placeholder="Message"
@@ -191,22 +221,48 @@ export function DevComposerLayout() {
           onClosing={closing}
           onClosed={closed}
           controls={(close) => (
-            <View style={{ gap: 12, backgroundColor: "white", padding: 12 }}>
-              <Pressable onPress={() => releasePair(false)}>
-                <Text>Release pair, keep menu</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  releasePair(true);
-                  close();
-                }}
-              >
-                <Text>Release pair and close</Text>
-              </Pressable>
-            </View>
+            <DevComposerControls
+              close={close}
+              releasePair={releasePair}
+              stageNext={stageNext}
+            />
           )}
         />
       )}
+    </View>
+  );
+}
+
+function DevComposerControls({
+  close,
+  releasePair,
+  stageNext,
+}: {
+  close: () => void;
+  releasePair: (close: boolean) => void;
+  stageNext: () => void;
+}) {
+  return (
+    <View style={{ gap: 12, backgroundColor: "white", padding: 12 }}>
+      <Pressable onPress={() => releasePair(false)}>
+        <Text>Release pair, keep menu</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => {
+          releasePair(true);
+          close();
+        }}
+      >
+        <Text>Release pair and close</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => {
+          stageNext();
+          close();
+        }}
+      >
+        <Text>Stage newer host and close</Text>
+      </Pressable>
     </View>
   );
 }

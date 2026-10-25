@@ -125,3 +125,25 @@ test("release-while-open retains real lift until the later close request", async
   expect(mockList.mock.lastCall?.[0].lift).toBeUndefined();
   expect(mockLand).toHaveBeenCalledTimes(1);
 });
+
+test("an unreleased newer host closes normally and requires explicit release afterward", async () => {
+  const view = await holdRow();
+  function listProps() {
+    const props = mockList.mock.lastCall?.[0];
+    if (props === undefined) throw new Error("No list rendered");
+    return props;
+  }
+  const previousRows = listProps().rows;
+  await fireEvent.press(view.getByText("Stage newer host and close"));
+  expect(mockHost.mock.lastCall?.[0].sequence).toBe(1);
+  expect(listProps()).toMatchObject({
+    composer: { release: 0 },
+    lift: undefined,
+  });
+  expect(listProps().rows).toBe(previousRows);
+  expect(mockLand).toHaveBeenCalledTimes(1);
+  await expect(mockMenu.mock.lastCall?.[0]).resolves.toBeUndefined();
+  await fireEvent.press(view.getByText("Release staged pair"));
+  expect(listProps()).toMatchObject({ composer: { release: 1 } });
+  expect(listProps().rows).not.toBe(previousRows);
+});

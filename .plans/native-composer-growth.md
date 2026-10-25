@@ -382,3 +382,44 @@ Raw clips, trajectories, frame reports and mount logs are under
 trajectories, send900ms/rapid/supersession/fallback cases, actual paired-close
 Modal/worker landing and remaining touched gesture checks. No fresh phone
 artifact, delivery, private-production test or runtime-ready claim follows yet.
+
+### iOS delayed clear and paired-close samples, 20:11 EDT
+
+The real bubbles send `3145eeb4-7e66-4ea6-895a-019b6b698bc7` used the
+strictly opt-in DEV UI-thread fault. Worklet timestamps record a 900.000125ms
+physical UI stall. JS and native clocks remain separate. Native host sequence1
+mounted height76 while release0 still held the old230 geometry; release1 then
+applied bottom84 with the exact own optimistic row. The same pre-send Jonah
+"Warm stacked arrival after typing" copy stays at y277, then moves monotonically
+up to180 through PTS3.513333, with no recorded downward step. Later automatic
+bot replies move the own message above the viewport. The final newest Priya
+"haha yes" row ends at482 and the composer starts490, an8pt gap. This is one
+bubbles boundary case, not all-send acceptance. Its deliberate907.8ms worst
+frame is fault evidence, not a performance comparison.
+
+The actual Modal fixture completed both orderings. Same-batch pair+close seals
+release1 then applies `close=true`, bottom104, retained keyboard294. The later
+case seals release2 at20:11:01.622 while the menu remains open and does not
+apply it until close at20:11:03.648, with `close=true`, bottom168 and keyboard294.
+Both return the focused input/keyboard, remove the Modal and settle at an8pt
+gap: Pair1 row427..476/bar484; Pair2 row363..412/bar420. Finite sampled contacts
+show the borrowed row returning continuously to the changed raised home, with
+no whole-list drop to the hidden-keyboard bottom. These made-up local rows are
+distinct from normal real-app hold evidence. iOS has no awaited `landLift`
+feature, so fixture status alone is not a native restoration ACK.
+
+Frame reports remain nonzero: before-worker close3slow/worst114ms, CPU17%avg/
+21%peak; after-worker close4slow/worst150ms, CPU12%avg/14%peak. No boot overlapped.
+The videos/raw AX/logs are `r2-ios-ui-modal-{before,after}-worker` under the local
+evidence/round2 directories. No threshold changes or all-zero smoothness claim.
+
+Existing iOS signposts establish actual worker ordering without a new probe:
+release2 measurement finishes20:11:01.616; its apply stays blocked until close
+at20:11:03.641. These are the same native clock domain. Add one local fixture
+action before the next captures: stage a newer host sequence without authorizing
+its release, then close the real Modal. It must take the normal no-pair close
+path rather than wait for that unauthorized sequence. A bar action can explicitly
+release the staged pair afterward to restore ordinary geometry. This is DEV
+fixture coverage using existing props, with no native field, timer or product
+policy change. A focused render test must show host sequence advances while
+list release stays unchanged; actual Modal close remains the runtime proof.
