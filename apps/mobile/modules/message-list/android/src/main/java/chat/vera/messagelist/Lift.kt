@@ -23,6 +23,17 @@ import kotlin.math.sqrt
 data class LiftRequest(val rowId: String, val part: String?, val index: Int?, val shift: Float, val scale: Float, val origin: String)
 data class LiftPieces(val frame: Rect, val views: List<View>, val card: Int?)
 
+/** The window position where the borrowed content will return. */
+internal fun landingDestination(holder: RecyclerView.ViewHolder): IntArray {
+  // A paired apply can still be moving this holder via FLIP. Finish only
+  // that row before capturing home, so the landing and its frame-commit
+  // cover agree with the restored real part. Other rows keep animating.
+  // Any unborrowed name/avatar in this holder reaches final layout now.
+  val view = holder.itemView
+  (view.parent as? RecyclerView)?.itemAnimator?.endAnimation(holder)
+  return IntArray(2).also { view.getLocationOnScreen(it) }
+}
+
 /** A screen transition may still own this native child after a viewer closes. */
 internal fun removeForLift(home: ViewGroup, view: View) {
   view.clearAnimation()
@@ -184,7 +195,7 @@ class Lifter(private val units: Units, private val activityRoot: () -> ViewGroup
     val fromScale = view.scaleX
     val fromY = view.translationY
     val fromCard = current.card?.alpha ?: 0f
-    val destination = IntArray(2).also { current.cell.getLocationOnScreen(it) }
+    val destination = landingDestination(current.holder)
     val dx = destination[0] + current.pieces.frame.left - current.screen[0]
     val dy = destination[1] + current.pieces.frame.top - current.screen[1]
     val easing = PathInterpolator(0.215f, 0.61f, 0.355f, 1f)
