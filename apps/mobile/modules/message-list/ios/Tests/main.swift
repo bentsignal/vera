@@ -249,6 +249,42 @@ if let layout = messageLayout(captioned) {
   check(layout.target(forPart: "2").map { $0.at == 1 && $0.index == 1 } == true, "a photo's under a caption: that photo")
 }
 
+// Message chips belong directly below stacked body text, before its photo.
+let bodyAndPhoto = message("body-photo", layout: "stacked", blocks: [
+  ["type": "text", "part": "message", "spans": [["text": "Testing"]]],
+  media([item("photo", reactions: [reaction("photo ❤️")])]),
+], reactions: [reaction("message 👍"), reaction("message 👎")])
+if let layout = messageLayout(bodyAndPhoto), layout.parts.count == 2 {
+  let body = layout.parts[0].frame
+  let photo = layout.parts[1].frame
+  let bodyChips = layout.chips.filter { $0.part == "message" }
+  equal(bodyChips.count, 2, "both body reactions appear once")
+  for chip in bodyChips {
+    equal(chip.frame.minY, body.maxY + 4, "body chip keeps the existing4pt gap under body text")
+    check(chip.frame.maxY <= photo.minY, "body chip ends before media begins")
+    let hit = layout.reaction(at: CGPoint(x: chip.frame.midX, y: chip.frame.midY))
+    equal(hit?.key, chip.reaction.key, "body chip hit retains its own key")
+    equal(hit?.part, "message", "body chip hit targets message, not photo")
+    check(hit.flatMap { layout.target(forPart: $0.part) }.map { $0.at == 0 && $0.index == nil } == true,
+          "body chip routes to text part")
+  }
+  if let photoChip = layout.chips.first(where: { $0.part == "photo" }) {
+    equal(photoChip.frame.minY, photo.maxY + 4, "photo heart keeps the existing4pt gap under photo")
+    let hit = layout.reaction(at: CGPoint(x: photoChip.frame.midX, y: photoChip.frame.midY))
+    equal(hit?.key, "photo ❤️", "photo heart retains its item reaction")
+    check(hit.flatMap { layout.target(forPart: $0.part) }.map { $0.at == 1 && $0.index == 0 } == true,
+          "photo heart still routes to exact media item")
+  } else { check(false, "mixed row retains photo heart") }
+} else { check(false, "stacked body and photo layout") }
+if let layout = messageLayout(message("photo-no-body", layout: "stacked", blocks: [
+  media([item("photo", reactions: [reaction("photo ❤️")])]),
+], reactions: [reaction("message 👍")])),
+   let photoChip = layout.chips.first(where: { $0.part == "photo" }),
+   let messageChip = layout.chips.first(where: { $0.part == "message" }) {
+  equal(photoChip.frame.minY, layout.parts[0].frame.maxY + 4, "without text, photo chips keep their placement")
+  equal(messageChip.frame.minY, photoChip.frame.maxY + 4, "without text, message chips retain existing trailing placement")
+} else { check(false, "photo-only message retains both chip groups") }
+
 // Holding a carousel card lifts that card alone, framed where it's drawn.
 let strip4 = message("s", layout: "stacked", blocks: [
   ["type": "text", "part": "message", "spans": [["text": "Trip"]]],
