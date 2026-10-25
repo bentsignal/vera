@@ -255,8 +255,8 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_space", ["spaceId"]),
-  // Kinds of pushes an account turned off; absent fields are on, but for
-  // `yourName`. Default alerts for groups and channels are `groupAlerts`
+  // Kinds of pushes an account turned off; absent fields are on. Default
+  // alerts for groups and channels are `groupAlerts`
   // and `channelAlerts`, or else `none` where `groups` or `channels` is
   // false, else `all`.
   notificationSettings: defineTable({

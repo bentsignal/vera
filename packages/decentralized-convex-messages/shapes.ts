@@ -504,8 +504,8 @@ export const notificationSettings = v.object({
   /** New replies in threads the caller is in. */
   threadReplies: v.optional(v.boolean()),
   /**
-   * Messages that say the caller's display name, heard as @mentions are;
-   * off until turned on (absent from older PDSs).
+   * Messages that say the caller's display name, heard as @mentions are
+   * (absent from older PDSs).
    */
   yourName: v.optional(v.boolean()),
 });

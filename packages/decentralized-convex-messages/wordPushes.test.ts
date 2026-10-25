@@ -60,11 +60,15 @@ void test("a message may say the keywords of others, and the names of those who 
   const { ctx, say } = setup(t);
   await setNotificationSettings(ctx, LEO, {
     keywords: ["launch day", "deploy"],
-    yourName: true,
   });
-  await setNotificationSettings(ctx, ME, { yourName: true });
+  await setNotificationSettings(ctx, MAYA, { yourName: false });
+  await say(ME, "deploy it");
+  // A keyword settles it; a name, on until turned off, still needs checking.
+  assert.deepEqual(await candidatesOf(ctx, "deploy it"), {
+    keywords: [{ accountId: LEO, keyword: "deploy" }],
+    names: [],
+  });
   await say(MAYA, "deploy");
-  // A keyword settles it; a name still needs checking.
   assert.deepEqual(await candidatesOf(ctx, "deploy"), {
     keywords: [{ accountId: LEO, keyword: "deploy" }],
     names: [ME],
@@ -81,6 +85,12 @@ void test("a message may say the keywords of others, and the names of those who 
   assert.deepEqual(await candidatesOf(ctx, "deploy now"), {
     keywords: [],
     names: [],
+  });
+  // Nor anyone a conversation at none reaches with nothing.
+  await setAlerts(ctx, LEO, { alerts: "none", conversationId: GROUP });
+  assert.deepEqual(await candidatesOf(ctx, "deploy"), {
+    keywords: [],
+    names: [ME],
   });
 });
 

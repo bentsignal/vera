@@ -24,7 +24,7 @@ void test("every kind of push but your name and keywords is on until turned off"
     reactions: true,
     replies: true,
     threadReplies: true,
-    yourName: false,
+    yourName: true,
   });
   assert.equal(await wantsPush(ctx, ME, "reactions"), true);
 });

@@ -4,7 +4,7 @@ import { moveDisabled } from "@expo/ui/swift-ui/modifiers";
 
 /**
  * Your keywords, each removed with its delete control or a swipe, as iOS
- * lists do (see `KEYWORDS_LIST_MODIFIERS`). `keywords-section.android.tsx`
+ * lists do (in a list with `editingList`). `keywords-section.android.tsx`
  * gives each row a remove button instead.
  */
 export function KeywordsSection({

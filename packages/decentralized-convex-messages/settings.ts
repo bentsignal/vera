@@ -46,10 +46,7 @@ function isOn(value: boolean | undefined) {
   return value !== false;
 }
 
-/**
- * An account's push settings; everything is on until turned off, except
- * pushes for messages that say their name or a keyword.
- */
+/** An account's push settings; everything is on until turned off. */
 export async function notificationSettings(
   ctx: QueryCtx,
   accountId: string,
@@ -75,7 +72,7 @@ export async function notificationSettings(
     reactions: isOn(row.reactions),
     replies: isOn(row.replies),
     threadReplies: isOn(row.threadReplies),
-    yourName: row.yourName === true,
+    yourName: isOn(row.yourName),
   };
 }
 

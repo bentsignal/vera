@@ -88,10 +88,10 @@ export default function NotificationSettingsScreen() {
               )}
               {/* Servers from before these leave keywords out. */}
               {settings.enabled && settings.keywords !== undefined && (
-                <FieldGroup.Section title="Messages That Say">
+                <FieldGroup.Section title="Notify Me About Messages That Say">
                   <OptimisticSwitch
-                    label="Your Name"
-                    value={settings.yourName ?? false}
+                    label="My Name"
+                    value={settings.yourName ?? true}
                     onChange={(on) => set("yourName", on)}
                   />
                   <ListItem

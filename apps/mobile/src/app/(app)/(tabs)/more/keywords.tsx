@@ -12,9 +12,9 @@ import { FieldGroup } from "@expo/ui";
 import { FieldList } from "~/components/field-list";
 import { NativeHost } from "~/components/native-host";
 import { TextInput } from "~/components/text-input";
-import { KEYWORDS_LIST_MODIFIERS } from "~/features/settings/keywords-list";
 import { KeywordsSection } from "~/features/settings/keywords-section";
 import { useNotificationSettings } from "~/features/settings/notification-settings";
+import { dismissKeyboardOnScroll, editingList } from "~/lib/ui-modifiers";
 
 /**
  * The words that alert you when a message says one: a field to add one,
@@ -56,7 +56,7 @@ export default function KeywordsScreen() {
       {settings != null && (
         <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
           <NativeHost style={{ flex: 1 }}>
-            <FieldList modifiers={KEYWORDS_LIST_MODIFIERS}>
+            <FieldList modifiers={[...dismissKeyboardOnScroll, ...editingList]}>
               <FieldGroup.Section>
                 <TextInput
                   ref={input}

@@ -10,6 +10,7 @@ export const circleProminentButton = [];
 export const linkButton = [];
 export const destructive = [];
 export const dismissKeyboardOnScroll = [];
+export const editingList = [];
 export const edgeToEdgeRow = [];
 export const plainRow = [fillMaxWidth()];
 export function choiceButton(_label: string, _selected: boolean) {

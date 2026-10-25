@@ -2,8 +2,8 @@ import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { ConversationAccess } from "./model.ts";
 import type { Mention, Said } from "./protocol.ts";
-import { mentionedBy } from "./alerts.ts";
-import { fail, memberAddresses } from "./model.ts";
+import { alertsFor, mentionedBy } from "./alerts.ts";
+import { fail, findAccess, memberAddresses } from "./model.ts";
 import { MAX_MENTIONS } from "./protocol.ts";
 import { notificationSettings } from "./settings.ts";
 
@@ -64,12 +64,33 @@ export async function validMentions(
 }
 
 /**
+ * Which of a member's words a message may say: a keyword of theirs, their
+ * name if they want to hear of it (for the caller to check), or nothing
+ * (null), as from a conversation at `none`.
+ */
+async function wordsOf(
+  ctx: QueryCtx,
+  message: Doc<"messages">,
+  accountId: string,
+): Promise<Said | null> {
+  const settings = await notificationSettings(ctx, accountId);
+  const access = await findAccess(ctx, message.conversationId, accountId);
+  if (access === null || alertsFor(access, settings) === "none") return null;
+  const keyword = settings.keywords.find((word) =>
+    saysWord(message.body, word),
+  );
+  if (keyword !== undefined) return { keyword, kind: "keyword" };
+  return settings.yourName ? { kind: "name" } : null;
+}
+
+/**
  * The members a new message would count as @mentioning for the words it
  * says (see `noteWords`): those it says a keyword of (`keywords`), and
  * those who want to hear of their name (`names`), which the caller checks,
  * since names live in Accounts (see `accountProfile`). Not its author or
  * anyone it @mentions, and none in a direct message, where every message
- * reaches you anyway. Nobody once it's been worked out.
+ * reaches you anyway, nor anyone a conversation at `none` reaches with
+ * nothing. Nobody once it's been worked out.
  */
 export async function wordCandidates(
   ctx: QueryCtx,
@@ -86,15 +107,12 @@ export async function wordCandidates(
   ) {
     return { keywords, names };
   }
-  const mentioned = new Set(mentionedBy(message));
-  for (const accountId of members) {
-    if (accountId === message.authorId || mentioned.has(accountId)) continue;
-    const settings = await notificationSettings(ctx, accountId);
-    const keyword = settings.keywords.find((word) =>
-      saysWord(message.body, word),
-    );
-    if (keyword !== undefined) keywords.push({ accountId, keyword });
-    else if (settings.yourName) names.push(accountId);
+  const skipped = new Set([message.authorId, ...mentionedBy(message)]);
+  for (const accountId of members.filter((id) => !skipped.has(id))) {
+    const said = await wordsOf(ctx, message, accountId);
+    if (said === null) continue;
+    if (said.kind === "name") names.push(accountId);
+    else keywords.push({ accountId, keyword: said.keyword });
   }
   return { keywords, names };
 }

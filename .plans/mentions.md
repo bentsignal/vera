@@ -37,11 +37,11 @@ messages keep Hide Alerts (everything or nothing).
 
 ## Your name and keywords
 
-Settings > Notifications > Messages That Say has a Your Name switch (off
-until turned on) and a Keywords screen: a field that stays focused, so
+Settings > Notifications > Notify Me About Messages That Say has a My
+Name switch (on until turned off) and a Keywords screen: a field that stays focused, so
 you can type a word and press return, then the next, and the list below
 it, each row with its delete control showing (iOS's editing list, swipe
-too; a remove button on Android). A message in a group or channel that
+too; a remove button on Android); dragging the list puts the keyboard away. A message in a group or channel that
 says your display name, with the switch on, or one of your keywords
 counts as @mentioning you: whole words, any case ("Maya" matches "maya!"
 but not "Mayans"; "deploy" doesn't match "deployed"). So it follows the
@@ -65,7 +65,9 @@ you whole, so they're left out.
   `noteWords` records the matches on the message (`saidTo`, never sent
   to apps) and as `mentions` rows with `said`. From then on `alerts`
   treats `saidTo` as @mentions, so pushes, Activity, and the badge need
-  nothing else. An edit keeps them, like the push they sent; deleting
+  nothing else. Members at `none` aren't looked up; everyone else is,
+  one `getProfile` each (Accounts has no batch lookup; Convex caches the
+  query). An edit keeps them, like the push they sent; deleting
   the message forgets them.
 - No highlight in the message itself.
 
