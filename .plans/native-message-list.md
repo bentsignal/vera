@@ -3179,3 +3179,14 @@ archived application-identifier39K6A9FP99.chat.vera.app and implicit keychain
 group are re-read for the new IPA comparison. Live production association and
 passkey origins include EAS productionE6:A1…44:5F and Google Play69:B5…BB:EE;
 the actual new APK signer must still be checked before installation claims.
+
+### Verified joint private production installers
+
+Both production-config private previews from079b9a64 are verified and delivered
+together on October25. The exact links, local/remote hashes, signing and data
+consequences, production configuration proof and short three-case phone script
+are in [the private phone report](native-message-list-private-20261025.md).
+This later report does not change either artifact's source. Normal Dev8492
+stays available; all devices are down. No public distribution, merge, backend
+deploy, OTA or data pass was performed. Actual cold first-open and Android
+camera acceptance remain Shawn's phone checks.
