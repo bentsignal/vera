@@ -3063,3 +3063,30 @@ refinement is selected. Own devices and panels are down; normal8492 serves the
 phones. Fresh physical Dev clients will build in sequence, then signatures,
 packages, fingerprints and hosted payloads will be verified before joint link
 delivery. Private production, merge, release, OTA and data pass remain held.
+
+### Joint physical Dev artifacts verified, October 24 at22:26 EDT
+
+Both updated Dev clients are verified for joint delivery, built from clean
+source `23bc96fef4d7e8d74ba859506a414bf56387da53`. The iPhone workflow ran02:10:17Z through upload02:18:52Z;
+its IPA is75,181,496 bytes, fingerprint`897820a317f6e609066555f18a24b01511403928`. Codesign deep/strict,
+correct Dev package/team, both registered iPhones, embedded fingerprint, hosted
+page/manifest and complete hosted IPA SHA256 all pass. Android began02:19:24Z,
+build success by02:25:43Z and verification completes02:26:36Z. Its APK is
+286,659,538 bytes, fingerprint`9b0684340b0fffbdd806c633e9f9dde6782954ec`; matching prior Dev signing
+certificate, package, fingerprint sentinel/file, hosted page and full hosted
+APK SHA256 all pass. Runtime uses Expo's file:fingerprint sentinel, resolving
+the verified embedded hash; it is not a literal resource hash.
+
+- [Updated iPhone Dev client](https://vera-evidence.b-cdn.net/dev-client/ios/897820a317f6e609066555f18a24b01511403928-2536e670fcde/index.html)
+- [Updated Android Dev client](https://vera-evidence.b-cdn.net/dev-client/android/9b0684340b0fffbdd806c633e9f9dde6782954ec-a2fff5069c13/index.html)
+
+Both source pointers are23bc96fe, with9/9 CI green. Installing over Vera Dev
+preserves its data and leaves production Vera untouched. Android pastes the
+Home Wi-Fi address; its open-link crash remains the known Expo limitation.
+Metro8492 remains up, Tailscale is off, own devices/panels are down. The exact
+phone.sh block, sign-in/preservation/rollback/switch instructions and13 matching
+phone cases were delivered together to the parent; cached copy is
+`.cache/round2/joint-phone-growth-final-handoff.md`. Parent remains available
+for Shawn's feedback. No schedule, merge, release, OTA, private production or
+data pass is started. Both-phone physical growth/video/gesture and photo-send
+acceptance remains Shawn's check, not inferred from artifact verification.
