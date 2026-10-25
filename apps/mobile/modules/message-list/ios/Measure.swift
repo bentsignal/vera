@@ -819,6 +819,7 @@ struct Measurer {
     }
 
     let edited = message.footer.first { $0.kind == .edited }
+    let firstText = blocks.first { if case .text = $0.element { return true } else { return false } }?.offset
     let lastText = blocks.last { if case .text = $0.element { return true } else { return false } }?.offset
     var first = true
     for (index, block) in blocks {
@@ -837,6 +838,7 @@ struct Measurer {
         let text = box(string, x: 0, y: 0, maxWidth: contentWidth, lineHeight: style.lineHeight)
         frame = CGRect(x: contentX, y: y, width: text.frame.width, height: text.frame.height)
         content = .text(text, bubble: nil, spans: spans)
+        if index == firstText { chipReactions = message.reactions }
       case let .deleted(label, _):
         let text = box(plain(label, theme.body.size, theme.muted, lineHeight: theme.body.lineHeight, italic: true), x: 0, y: 0, maxWidth: contentWidth, lineHeight: theme.body.lineHeight)
         frame = CGRect(x: contentX, y: y, width: text.frame.width, height: text.frame.height)
@@ -912,7 +914,7 @@ struct Measurer {
       layout.footer.append(notSent("Not sent", y: y + 2, side: .left, left: contentX - 4, right: width - pad, maxWidth: contentWidth))
       y += 2 + theme.caption.lineHeight
     }
-    if !message.reactions.isEmpty {
+    if firstText == nil, !message.reactions.isEmpty {
       let placed = chips(message.reactions, part: reactionPartForMessage(message), origin: CGPoint(x: contentX, y: y), width: contentWidth)
       layout.chips += placed.chips
       y += placed.height

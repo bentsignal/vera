@@ -345,6 +345,20 @@ landing and keyboard return; normal unpaired close, interruption and final
 8 pt gap. Both updated Dev clients must be delivered together. This checkout
 has run no device, full-client or phone build and claims no runtime pass.
 
+## Stacked body reactions before media, 2026-10-25
+
+Shawn's photo shows body `Testing`, then a photo with its correct heart,
+then the body's thumbs. Stacked measurement appended message reactions after
+all blocks and footers. It now places those chips directly under the first
+text block, before subsequent media. The text-absent trailing path and
+per-media chip placement/targets stay unchanged; bubbles use separate code.
+Only this layout ordering and its position/part-target regressions changed.
+330/330 native host checks, the 23-file installed simulator SDK typecheck,
+ordered lint/typecheck/tests/React Doctor, then format:fix pass. Existing
+4 pt chip spacing is retained. The heavy lock is released.
+Integration owns brief actual-client verification. No device or full-client
+build, gesture/composer change, benchmark or profile was run here.
+
 ## Checks
 
 - Earlier phone-polish checkpoint: `Tests/run.sh`, 94 checks. 61 of them are new, for the reaction toggle
