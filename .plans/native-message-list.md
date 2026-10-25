@@ -3090,3 +3090,68 @@ phone cases were delivered together to the parent; cached copy is
 for Shawn's feedback. No schedule, merge, release, OTA, private production or
 data pass is started. Both-phone physical growth/video/gesture and photo-send
 acceptance remains Shawn's check, not inferred from artifact verification.
+
+### October25 phone acceptance and final stacked placement fix
+
+Shawn confirms both-phone passes for growth/send except the message-chip
+placement below, keyboard/menu/dismissal, typing faces, fullscreen photo viewer,
+video and immediate media opening, deck lift/centering/rapid swipes and per-item
+reactions. These cover numbered checks1–7 and9–12. Dev busy-chat opening looks
+fine, but actual production cold first open remains pending. Check13 has NOT
+been separately number-confirmed and must not be invented as a phone pass.
+
+The only reported remaining bug is stacked on both platforms: body "Testing"
+with media puts message-part 👍/👎 after the photo, although the photo's own ❤️
+is correctly media-scoped. The screenshot is inspected. Both native authors
+confirm correct bindings but trailing row-level chip placement. Bounded changes
+move message chips directly after the first rendered body text, before media;
+media chips/part/index and bubbles remain unchanged, and no-text rows retain
+existing trailing placement. iOS97ca1798 has330 focused host checks/SDK23 and
+ordered repo checks. Android8359e4bd has130 focused native checks and ordered
+repo validation. Integration will capture before/after screenshots on each
+platform, briefly exercise exact reaction hit/motion, then required ordered
+checks. No benchmark, firehose, burst seed, cold profile or extra audit matrix.
+
+After this fix passes, Shawn NOW authorizes BOTH private production-config
+preview installers together, from this branch. This supersedes the earlier
+production-build hold and main-only release workflow ONLY for private previews.
+Use existing preview profile and local ad-hoc IPA/signed production APK route,
+production Vera/chat.vera.app/vera.chat, Release, separate preview channel and
+install pages. No main commit/merge/tag, store/TestFlight/Play submission,
+production OTA/channel write, production function deploy or data pass. Required
+binary gate stays OFF; missing-query fallback and preview exclusion remain.
+Verify unchanged production API compatibility before building, not by deploying
+backend code. Current release plan reports backend differences from the newly
+advanced production deploy, so recheck those actual deltas instead of repeating
+the earlier dev-only claim.
+
+Verify both artifacts' signatures/identifiers/runtime/domain and hosted payloads
+before any new install links. Compare actual current iOS store entitlements and
+Android EAS versus Play certificates. Preserve iOS production app data only if
+identifiers/keychain entitlements match. If Android signer differs, explain
+uninstall/local-data loss and sign-in/Play rollback; do not promise preservation.
+Normal Vera Dev8492 remains available for fallback feedback. Short private phone
+script: stacked text/media chip ordering and exact part reactions; real cold
+busy-group first open; mandatory Galaxy A16 Camera→selfie→OK→rounded staged
+preview→send→reopen/no crash. No RAM cause or camera fix is claimed.
+
+Private-preview compatibility check on October25: production DNS resolves to
+`disciplined-hyena-211`; its live manifest advertises core/accounts/messages
+lastChanged0.1.0, matching this branch, and public breakingVersion returns3,
+matching the compiled value. The optional outdatedRuntimes query returns an
+error; client error handling means no outdated runtimes, and channelpreview
+never subscribes or shows that gate. Local list remains empty. No gate/deploy
+change is made. Live preview channel still points to its original empty branch,
+with zero update groups; no OTA was published.
+
+Current production has advanced since the older private preview. Actual backend
+deltas include dev helpers, internal assistant model/history work and optional
+profile/notification additions now on production, plus this branch's additive
+optional gate query. Normal message transport, schema contract version and
+breaking version used by this app remain supported; its full profile arguments
+remain accepted by production's newer optional arguments. No production backend
+function is deployed or required to enable the private client. Raw manifest,
+public query responses, backend diff, channel and live association/passkey public
+certificate records are retained under `.cache/stacked-body-chips-20261025/`.
+The new built binaries still need their actual Release/domain/channel/signature
+verification before distribution; source compatibility is not phone acceptance.
