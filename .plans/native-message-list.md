@@ -3004,3 +3004,41 @@ current-height reconciliation in principle, requiring exact8pt gap transport,
 post-mount ordering, rapid-send/FIFO, missing-host fallback and real landing
 lifetime rules. Those are now written explicitly; no height implementation or
 phone readiness is claimed.
+
+### Integration runtime checkpoint, October24 after21:00 EDT
+
+The accepted composer revision3 is implemented and both real clients compile.
+iOS5c4f9ba4 and Android18d435f3 are combined in ec8af1bd. Android's initial
+blank list was an Expo default-view registration error, corrected by declaring
+the list before the named composer host. A real module-definition regression
+fails on the old order and passes on the corrected one. Actual runtime now shows
+the proper list, rows and mount callbacks. Detailed ordering and trajectory
+records are in `.plans/native-composer-growth.md`.
+
+Both layouts show the same named row and composer edge moving on the same
+recorded frames for ordinary newline growth/backspace. Stationary attachment
+removal follows the bar too. This is bounded sample evidence, with nonzero slow
+frames, not a universal all-FPS claim. Matching clear-height ACK/exact-ID pairs
+also survive deliberate900ms physical UI stalls, with UI and JS clocks reported
+separately. Existing phone-passing send semantics remain constraints.
+
+Current Android Modal release+close has a functional blocker. A valid initial
+latest row has8dp clearance, but after the authorized pair/real restoration/
+keyboard return its bottom is147 physical pixels under the new bar top. Both
+close orderings reproduce it. Resolving the Modal Promise does not clear the
+geometry failure. Native owner is assessing inset-only/unchanged-row anchoring
+and lift restoration before a narrow causal correction. Both next artifacts
+remain held until this and remaining functional/lifecycle gates pass.
+
+Two current-client one-JPEG sends produce high emulator CPU and135/128slow
+frames. The ONE cached previous-binary control with currentJS/same29KBJPEG also
+reproduces sustained load,173slow over a longer11.2s window. Thus the new growth
+coordinator is not required and no faster/slower claim follows. Native upload
+pulse STOP/lifetime is not yet measured; JS canonical state alone is insufficient.
+One opt-in DEBUG lifetime diagnostic is authorized, no speculative animation
+disable or media rewrite. Preserve this common-path emulator limit unless an
+actual app fault is proved, rather than making it an indefinite unrelated gate.
+Add explicit next JOINT DEV PHONE acceptance: send one small photo plus multiline
+text on BOTH phones, observe staged clear, upload pulse completion, responsive
+scroll/taps and final newest8pt gap; report sustained jank or a continuing pulse.
+Physical A16 camera/private-production retest remains separately required.

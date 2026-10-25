@@ -494,3 +494,97 @@ add a real module-definition default/named registration regression. No height
 policy, timer, disabling the feature or fallback workaround is selected.
 Both phone artifacts are held. The earlier2–3h planning window was conditional
 on no new defect and is now uncertain until corrected-source/build/runtime logs.
+
+### Corrected Android runtime and photo-send blocker
+
+The corrected9307bc1 client built successfully at20:41 and the actual activity
+hierarchy now shows MessageListView in the full list region, MessageListComposer
+around the bar,50 visible query rows and real seal callbacks. The default-view
+registration cause is fixed at18d435f3, not bypassed.
+
+The same-current-JS cached pre-coordinator8c59c078 client supplies a valid stacked
+newline baseline. Independent full-width composer-edge tracking finds the bar
+leading the same Leo message by89.900ms,23.233ms and26.589ms on three returns.
+Corrected stacked and bubbles captures each show all six newline/backspace row
+and bar displacements on the same original recorded frames. Final row-to-bar
+gap is21 physical pixels at2.625 density,8dp. These are finite trajectory samples,
+not a same-frame guarantee for all mounts. Stacked4slow/worst50ms and bubbles
+2slow/worst50ms remain recorded. A stationary attachment removal follows the
+full72dp bar displacement on the same frames within one scaled pixel;6slow/50ms.
+Picker dismissal/add has22slow/66.7ms and overlapping preparation/keyboard work,
+so it is not isolated picker-latency proof.
+
+Bubbles send e16c5427-6007-4a54-ab94-3ecee40b3aa0 establishes a deliberate
+900.000209ms physical UI stall, matching clear ACK80.380981, exact outgoing ID,
+navigation arm and native release1 pair. The same existing Leo row moves only
+upward through its entry. UI/native/JS clocks remain separate. The deliberate
+900ms frame is fault evidence, not an FPS comparison or all-send acceptance.
+
+Two ordinary stacked eight-line sends with ONE29,529-byte960x540 JPEG are a
+repeatable performance blocker. No physical UI fault is armed. First message
+50d0f26b-1de4-49f0-8208-d8197b17047b has135slow/worst100ms, Mac69%average/93%peak.
+The quiet repeat f16c162a-e521-418f-a9f4-8a6a102b2af5 starts at14–16%CPU, trace
+logging off, but has128slow/worst83.3ms, Mac72%average/91%peak over8.6s. Both
+functionally ACK/authorize/publish their exact rows and native pairs. This is NOT
+a performance pass or an unrelated-host dismissal. Both clips and raw state/frame
+windows remain under r2-android-ui-send-files-busy and -quiet in .cache.
+
+At the1.4s snapshots both attachments are uploading; later settled query state
+shows canonical files without upload state. Source review finds no unconditional
+ordinary mount layout/worker loop: refreshComposerGeometry checks applied inset
+and actual padding. The media upload ValueAnimator changes drawable imageAlpha
+0.8..1 repeatedly and invalidates; no per-frame decode/layout appears there.
+A detached/prefetched holder can theoretically start its pulse without a later
+detach callback, but occurrence is not established. Neither pulse nor coordinator
+is blamed from source alone. Preserve the two captures and use at most one narrow
+previous-binary control with the SAME current JS/JPEG, with process CPU and upload
+timeline, before choosing a diagnostic/fix. No speculative pulse disable, timer,
+height prediction or expanded benchmark workload. Both new phone artifacts held.
+
+### One previous-binary photo control and a distinct Modal geometry defect
+
+The ONE authorized control uses cached8c59c078, the same current JS and the same
+29KB JPEG, with native composerLayout absent. It also reproduces load:173slow,
+worst100ms over11.167s. Its longer window and added bounded diagnostics mean no
+faster/slower comparison with the8.6s current-client clips. Timestamped host
+process samples show our own emulator at roughly737–890% CPU during the bad
+interval, returning toward50–180% afterward. No foreign build accounts for those
+samples. This does not identify app versus software-emulator rendering cost.
+
+Control message38db0e49-0d62-4e75-aa22-2b71a54c3d75 first appears uploading at
+JS-relative2270.9ms, becomes uploaded at3609.9ms and canonical at4119.1ms. Slow
+frames continue later. JS state is NOT native pulse STOP proof. Native slow logs
+show isolated measure/apply work, including66.6ms apply, not a proved continuous
+worker loop. The new coordinator is not required for this common-path workload;
+it is not called a new growth regression. Parent permits one opt-in DEBUG pulse
+lifetime diagnostic and one guest/RenderThread CPU window if needed, no pulse
+disable or media rewrite. Unless an actual app fault/permanent pulse is proved,
+retain this bounded emulator limit and explicitly test one photo send on BOTH
+next Dev phone clients, rather than making common emulator cost an indefinite
+unrelated delivery gate. No all-FPS or readiness claim.
+
+Current9307 was restored after the control. Independent real Android Modal
+release+close completes the authorized frozen pair, real restoration Promise
+and keyboard return, but leaves Pair1 below the composer: row1370..1499, bar top
+1352 physical pixels. The147px overlap is a FUNCTIONAL failure. Expected gap is
+21px at2.625 density,8dp. Native trace records release1/bottom104/keyboard820/
+closeFlush=true before land begin/restored. Resolving the Modal is not acceptance.
+
+A fresh fixture proves valid initial latest placement: Maya's identical
+'Is anyone around this weekend?' row1854..1983 with bar2004; after keyboard opens
+row1034..1163 with bar1184. Both gaps are21px. Fixture alignTop is false, the
+latest adapter row is position0 and no reader scroll preceded the failed pair.
+The fixture changes only that row's accessibility label, not newest insertion.
+Owner source assessment is reviewing inset-only pin/reader anchoring and real
+lift placement before choosing a correction. Both phone artifacts remain held.
+
+The second Android fixture run starts from the verified keyboard-up8dp gap,
+releases while keeping the Modal open, waits1.3s, then closes. It ends with the
+same147px overlap. That wait is not direct worker-completion proof because the
+current Android trace records seal/apply but not result-ready. Captures retain
+19slow/worst100ms for same-batch close and17slow/worst83.3ms for delayed close,
+Mac33%/52% and28%/58% average/peak respectively. No boot overlapped. Both devices
+and the Device panel are now down while the source owner assesses the cause.
+Normal phone Metro8492 stays up. Required integration lint/typecheck/test/
+React Doctor against the PR base and format pass,26 Jest tests across8 suites;
+no runtime failure is relabelled by those checks.
