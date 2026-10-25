@@ -147,3 +147,20 @@ test("an unreleased newer host closes normally and requires explicit release aft
   expect(listProps()).toMatchObject({ composer: { release: 1 } });
   expect(listProps().rows).not.toBe(previousRows);
 });
+
+test("a newer host can finish mounting before the pending authorized pair closes", async () => {
+  const view = await holdRow();
+  await fireEvent.press(view.getByText("Release pair, keep menu"));
+  const authorized = mockList.mock.lastCall?.[0];
+  await fireEvent.press(view.getByText("Stage newer host, keep menu"));
+  expect(mockHost.mock.lastCall?.[0].sequence).toBe(2);
+  expect(mockList.mock.lastCall?.[0]).toMatchObject({
+    composer: { release: 1 },
+    rows: authorized?.rows,
+    lift: authorized?.lift,
+  });
+  expect(mockLand).not.toHaveBeenCalled();
+  await fireEvent.press(view.getByText("Close menu"));
+  expect(mockLand).toHaveBeenCalledTimes(1);
+  expect(mockList.mock.lastCall?.[0].composer?.release).toBe(1);
+});

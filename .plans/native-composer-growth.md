@@ -620,3 +620,42 @@ about every unsampled frame. Capture retains 6 slow frames, worst 129.6 ms,
 Mac CPU 24% average/38% peak and no boot overlap. Files are
 `r2-ios-ui-attachment-send*`, native trace `ios-ui-attachment-send-native.log`
 and the original-frame contact/PTS log in `.cache/round2/`.
+
+### Corrected Android pair placement and remaining handback motion
+
+Combined `638fe6f` builds from `0d7c69e4` with the native correction and opt-in
+diagnostics. Both actual authorized close timings now finish at 8dp with the
+focused keyboard returned. After-worker case: result ready v3 at uptime357993,
+apply release2/bottom168/retained keyboard820 at358646, land begins358652 and
+restores359155; row1034..1163, bar1184. Before-worker same-batch case: release3
+seals, v4 becomes ready at428138, close-flush applies bottom104/keyboard820,
+land begins428149 and restores428634; row1202..1331, bar1352. Retain18slow/
+worst133.3ms and17slow/worst100ms respectively, not all-zero motion claims.
+
+A separate close-before-release case lands release0 before release1 mounts.
+Its early raw sample catches the keyboard down; actual later keyboard-visible
+settlement is row1202..1331/bar1352. It is not the authorized before-worker proof.
+One earlier launcher refused a stale ref behind the keyboard and took no action;
+that clip is explicitly marked `launcher-keyboard`, not a result.
+
+The DEV fixture now has a stage-newer-host/keep-menu control, with a compiled
+regression, to prove T mounted before requesting close. No product/native field
+or timer is added. Unreleased host4/release3 closes normally, then only explicit
+release4 applies its geometry. Authorized S5 is ready before mounted T6; close
+applies S5 captured bottom104 although T's height is160. T remains held until
+explicit release6 applies bottom168. Both final row1163/bar1184 gaps are8dp.
+The deliberate unreleased fixture phase retains older geometry and is not
+claimed aligned with the manually changed bar. These clips retain25/28 slow
+frames and worst66.7/83.3ms. All ordered integration checks pass with27 Jest tests.
+
+Final geometry is not the whole acceptance. The finite contact includes EVERY
+original frame from1.736089 through3.400722 of the corrected before-worker clip.
+Frames9–14, PTS2.052333..2.209144, show two visible copies of the same
+"Is anyone around this weekend?" text. The upper copy then gives way to the
+neighbor "Probably, depends on the weather". This is a functional handback
+motion failure, not a formal analyzer alias dismissal. Preserve original clip,
+`android-paired-fixed-before-contact.png` and its PTS log. The Android owner is
+assessing exact borrowed-view identity, row layout versus FLIP presentation and
+landing destination/cover lifetime before a minimal causal correction. No broad
+animation disable, bitmap duplicate or new field. S/T authority, frozen keyboard
+geometry and final8dp must survive. Both phone artifacts remain held.

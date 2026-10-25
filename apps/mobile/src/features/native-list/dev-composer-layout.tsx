@@ -255,6 +255,9 @@ function DevComposerControls({
       >
         <Text>Release pair and close</Text>
       </Pressable>
+      <Pressable onPress={stageNext}>
+        <Text>Stage newer host, keep menu</Text>
+      </Pressable>
       <Pressable
         onPress={() => {
           stageNext();
