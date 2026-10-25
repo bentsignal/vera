@@ -540,3 +540,27 @@ combined native target passes 123 tests including the separate diagnostic gate
 check. Integration still owns the new APK's actual Modal close-before/after-worker
 geometry, raised landing, keyboard return and final 8 dp verification. Host checks
 are not a runtime or frame-performance pass.
+
+### Bounded upload lifetime diagnostic
+
+The old binary control reproduced the high emulator CPU/slow-frame window with
+the same current JavaScript and static JPEG. The new composer coordinator is
+therefore not required for that cost. JavaScript upload completion does not
+prove when a particular native MediaView stopped pulsing. A detached, rebound
+uploading holder is a source possibility, not an established runtime fault.
+
+The authorized diagnostic keeps pulse behavior unchanged. Only a debuggable app
+with `adb shell setprop log.tag.VeraMediaUpload DEBUG` writes START/STOP,
+rebind and attach/detach lifetime events. Each includes monotonic uptime, native
+view identity, upload/pulse state, attachment/visibility, local bounds, drawable
+type and hardware/layer state. It logs no content, message ID, URL or frame
+updates, adds no polling and constructs diagnostic details only when enabled.
+The gate regression verifies both opt-in and debuggable are required before
+details are evaluated. Set the tag to INFO to stop collection.
+
+The existing opt-in VeraComposerLayout trace also reports one `result:ready`
+with rows version and captured authority generation when the main thread receives
+each worker result. This distinguishes actual worker completion from elapsed
+fixture wait time. Integration owns the single diagnostic APK/CPU collection and
+any subsequent attribution. No pulse disable, lifecycle fix or new benchmark loop
+was selected.

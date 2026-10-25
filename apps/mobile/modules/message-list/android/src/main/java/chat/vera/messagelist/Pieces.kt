@@ -3,6 +3,7 @@ package chat.vera.messagelist
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Outline
@@ -12,6 +13,8 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.text.TextPaint
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.ImageView
@@ -204,17 +207,18 @@ class MediaView(context: Context, private val units: Units) : FixedImageView(con
   fun bind(item: MediaItem, theme: Theme, images: Images) {
     val previous = this.item
     this.item = item
+    tracePulse { "rebind previousUploading=${previous?.uploading}" }
     setBackgroundColor(theme.fill)
     if (previous?.shownUrl != item.shownUrl || drawable == null) {
       images.load(this, item.shownUrl, widthPx, heightPx)
     }
     duration = item.durationSeconds?.let { formatDuration(it) }
     durationText.textSize = units.sp(theme.caption.size)
-    if (item.uploading) startPulse() else stopPulse()
+    if (item.uploading) startPulse("bind") else stopPulse("notUploading")
     invalidate()
   }
 
-  private fun startPulse() {
+  private fun startPulse(reason: String) {
     if (pulse != null) return
     pulse = ValueAnimator.ofFloat(0.8f, 1f).apply {
       duration = 1400
@@ -223,9 +227,11 @@ class MediaView(context: Context, private val units: Units) : FixedImageView(con
       addUpdateListener { imageAlpha = ((it.animatedValue as Float) * 255).toInt() }
       start()
     }
+    tracePulse { "START reason=$reason" }
   }
 
-  private fun stopPulse() {
+  private fun stopPulse(reason: String) {
+    if (pulse != null) tracePulse { "STOP reason=$reason" }
     pulse?.cancel()
     pulse = null
     imageAlpha = 255
@@ -233,12 +239,22 @@ class MediaView(context: Context, private val units: Units) : FixedImageView(con
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
-    stopPulse()
+    tracePulse { "detach" }
+    stopPulse("detach")
   }
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    if (item?.uploading == true) startPulse()
+    tracePulse { "attach" }
+    if (item?.uploading == true) startPulse("attach")
+  }
+
+  // Lifetime events only, never frames, content, IDs or URLs. Inlining keeps
+  // the disabled path free of diagnostic strings/closures and per-view state.
+  private inline fun tracePulse(event: () -> String) = mediaUploadTrace(this) {
+    "${event()} view=${System.identityHashCode(this)} uploading=${item?.uploading} pulse=${pulse != null} " +
+      "attached=$isAttachedToWindow shown=$isShown bounds=$left,$top,$right,$bottom " +
+      "drawable=${drawable?.javaClass?.simpleName} hardware=$isHardwareAccelerated layer=$layerType"
   }
 
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -268,6 +284,13 @@ class MediaView(context: Context, private val units: Units) : FixedImageView(con
     val rect = RectF(left, bottom - textHeight - padY * 2, left + textWidth + padX * 2, bottom)
     canvas.drawRoundRect(rect, rect.height() / 2, rect.height() / 2, pill)
     canvas.drawText(label, left + padX, rect.bottom - padY - durationText.descent(), durationText)
+  }
+}
+
+internal inline fun mediaUploadTrace(view: View, message: () -> String) {
+  if ((view.context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 &&
+    Log.isLoggable("VeraMediaUpload", Log.DEBUG)) {
+    Log.d("VeraMediaUpload", "uptime=${SystemClock.uptimeMillis()} ${message()}")
   }
 }
 

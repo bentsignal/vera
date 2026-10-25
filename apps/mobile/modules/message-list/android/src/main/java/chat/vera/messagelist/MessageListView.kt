@@ -423,6 +423,7 @@ class MessageListView(context: Context, appContext: AppContext) : ExpoView(conte
       workerRows = next
       val diff = if (!changed || before.isEmpty()) null else DiffUtil.calculateDiff(RowsDiff(before, next), false)
       main.post {
+        composerTrace(this) { "result:ready version=$version generation=${authority?.generation}" }
         applies.addLast(ApplyResult(next, diff, carried, version, authority, changed))
         drainApplies()
       }
