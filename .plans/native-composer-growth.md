@@ -423,3 +423,74 @@ release the staged pair afterward to restore ordinary geometry. This is DEV
 fixture coverage using existing props, with no native field, timer or product
 policy change. A focused render test must show host sequence advances while
 list release stays unchanged; actual Modal close remains the runtime proof.
+
+### Remaining iOS finite cases, 20:25 EDT
+
+The added fixture action/test passed ordered lint/typecheck/test/React Doctor/
+format at22c9a893,26 Jest tests total. Actual unreleased host1/release0 closed
+the Modal normally. No unauthorized height applied. Explicit release1 afterward
+applied bottom104, with row427..476 and bar484, an8pt gap. Its2slow/worst134.4ms
+and CPU14%avg/19%peak remain recorded.
+
+The same fixture then retained authorized S=2 while mounting newer T=3. On close,
+native applies release2/host3/bottom168/keyboard294, using captured S geometry
+instead of T's96pt host. Only the later explicit release3 applies bottom104.
+The Modal returns and the final gap is8pt. Capture4slow/worst142.2ms,
+CPU14%avg/19%peak, no boot. This exercises S/T separation with a genuinely held
+worker result, not only the coordinator unit cases. No source/native change
+was needed after those captures.
+
+Real-app clips also cover normal stacked8line send, short text from a tall
+stacked composer, a bubbles8line send while scrolled up, and a same-height
+bubbles send after switching RN then native with the same Composer store. The
+native route rebinds and replays the persistent release. Exact IDs include
+757166e3-c15b-41b9-8e32-fc3cc8930cd2, c80a2a1a-19bc-4ad0-9fd7-a524d63e848f,
+6a23bd8b-b2a3-4bd9-afe5-b88cc3d65fb1 and4093ecfc-f519-472d-a015-6a5f9fc91db4.
+Finite contacts show the normal entry, one net downward easing for the short
+row, smooth latest travel and stable final placement. The scrolled own row ends
+at482 with bar490. A real unpaired keyboard-up long hold opens the menu, not
+the thread, then returns the same focused keyboard with the latest row482/bar490.
+A separate single release opens that row's thread and Back returns directly.
+This is functional recognition evidence, not a precise native text latency span.
+
+One short-send launcher attempt used a stale AX ref and opened a thread; it is
+retained as `wrong-target`, not a send result. The retry sent the expected trimmed
+body, but its JS probe had been stopped by the discarded capture, so it supplies
+video/message/native-release evidence without a fresh JS ACK timeline. Other
+valid sends include matching ACK, exact ID, command resolution, arm and release.
+
+Current analyzer results are NOT relabelled passes: stacked19 blank flags,
+short-stacked18 blank flags during entry, scrolled-bubbles3 snap flags plus2
+minor flags, rebound0 flags. Finite contacts show no old whole-list reversal;
+they do not invalidate those formal flags or prove every unsampled frame.
+Frame reports respectively4slow/38.3ms,5slow/33.6ms,6slow/47.4ms and8slow/35.9ms.
+The last capture had Mac57%avg/63%peak with another worktree's lint active,
+so it is not clean performance evidence. Real unpaired hold10slow/98.2ms and
+thread-open7slow/211.3ms also remain qualified. A queue wait prevented overlap
+with the other worktree's simulator boot. No thresholds, broad profiling or
+unrelated optimization changed. Android mounted trajectory/lifecycle cases and
+new phone artifacts are still pending; both next clients are delivered together.
+
+### Android initial runtime blocker, 20:33 EDT
+
+The first pre-coordinator growth attempt accidentally navigated to a thread when
+a stale AX reference was used for Jump to latest. Its capture is discarded as
+growth evidence. It must not become a baseline or an Android sync result.
+
+After installing the real187f34f coordinator binary and force-stopping/relaunching
+through sim.sh, the settled Mixed media screen has50 query messages and a valid
+title/composer but a completely blank native area. No composer seal traces arrive.
+The actual runtime `dumpsys activity top` identifies the full1080x2424 default
+region as `chat.vera.messagelist.MessageListComposer`; the inner bar is another
+instance of that host. The local screenshot/state/hierarchy are preserved in
+`android-composer-current-initial.png`, `android-initial-blank-state.json` and
+`android-composer-blank-activity.txt`.
+
+Android's source owner confirms installed Expo aliases the FIRST declared View
+as DEFAULT_MODULE_VIEW.14f57836 placed named MessageListComposer before the list,
+so the old unnamed requireNativeView("MessageList") creates the host instead.
+The native owner is authorized to move the named host AFTER MessageListView and
+add a real module-definition default/named registration regression. No height
+policy, timer, disabling the feature or fallback workaround is selected.
+Both phone artifacts are held. The earlier2–3h planning window was conditional
+on no new defect and is now uncertain until corrected-source/build/runtime logs.
