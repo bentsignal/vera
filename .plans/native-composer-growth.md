@@ -659,3 +659,34 @@ assessing exact borrowed-view identity, row layout versus FLIP presentation and
 landing destination/cover lifetime before a minimal causal correction. No broad
 animation disable, bitmap duplicate or new field. S/T authority, frozen keyboard
 geometry and final8dp must survive. Both phone artifacts remain held.
+
+### Single pulse-lifetime diagnostic disposition
+
+The authorized one-shot diagnostic uses the same small source JPEG. Picker
+output size is34,036 bytes for ALL four Android sends, including both current
+failures, the previous-binary control and diagnostic message
+`cd3bf65a-1539-461b-9bad-389f6ed5e9f1`; source is29,529 bytes. Do not confuse the
+picked file's processed size with its source size.
+
+Native view123956979 starts at uptime1059882 and immediately attaches in that
+same millisecond. It rebinds uploading=false and logs STOP/notUploading at
+1061001, a1,119ms pulse. Later rebinds at1061414 and1064783 explicitly show
+pulse=false. This sample does not demonstrate a detached animator leak or
+permanent pulse. No pulse behavior fix follows. Both diagnostic tags are off
+after the capture.
+
+The diagnostic retains162 slow frames, worst100ms over12.15s, Mac72%average/
+92%peak, including substantial load after pulse STOP. The ONE guest-thread CPU
+window records RenderThread roughly19–36%, JavaScript occasionally40%, main
+thread4–11% and MessageList worker1–6% of one guest core during sustained work.
+Host process samples identify our emulator's high CPU. This is neither a precise
+GPU/CPU root cause nor a phone extrapolation. Native, guest and JS clock domains
+stay distinct; no uncalibrated subtraction. Files are
+`android-pulse-lifetime{,-state.json,-raw.txt}`, `android-pulse-guest-threads.log`,
+`android-pulse-host-processes.log` and the native lifetime log. No new physical
+UI fault was armed.
+
+The common-path emulator limit remains explicit, with photo-send responsiveness
+and pulse completion on BOTH next phones as acceptance. No additional media
+profile, benchmark loop or speculative animation disable is planned. The actual
+paired-land double presentation remains a separate functional gate.
