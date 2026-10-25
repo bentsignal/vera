@@ -120,6 +120,22 @@ deploys the backend, and publishes the update straight after, about 15–20
 seconds of "Updating Vera…" for anyone in the app. `pnpm release plan`
 says when the number went up.
 
+### Native-list update policy
+
+The October 25 native-list release uses voluntary store updates. Keep
+`OUTDATED_RUNTIMES` empty unless Shawn explicitly approves a different policy.
+Old binaries retain their React Native list and compatible server access;
+new native binaries use their own runtime and cannot reach old binaries as
+an OTA. No old-runtime gate prelude or automatic deny-list activation is
+required. A future forced-update rollout needs its own approval and runtime
+review. The release kept `BREAKING_VERSION` at 3.
+
+Native lists default on in compatible new builds. Settings → Experimental →
+Native Message List is the persisted opt-out. Unsupported older binaries keep
+the React Native fallback. The detailed acceptance and deferred Android camera
+preview cosmetics are recorded in
+[the native-list release record](../.plans/native-list-release-20261025.md).
+
 ## Release history in git
 
 Every release is an annotated tag on the commit it shipped, with the runtime
