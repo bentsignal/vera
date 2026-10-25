@@ -495,96 +495,128 @@ policy, timer, disabling the feature or fallback workaround is selected.
 Both phone artifacts are held. The earlier2–3h planning window was conditional
 on no new defect and is now uncertain until corrected-source/build/runtime logs.
 
-### Corrected Android runtime and photo-send blocker
+### Corrected Android runtime and ordinary growth evidence
 
-The corrected9307bc1 client built successfully at20:41 and the actual activity
-hierarchy now shows MessageListView in the full list region, MessageListComposer
-around the bar,50 visible query rows and real seal callbacks. The default-view
-registration cause is fixed at18d435f3, not bypassed.
+The corrected `9307bc1` client built at 20:41. Runtime hierarchy now shows
+MessageListView in the full list region and MessageListComposer around the bar,
+with 50 query rows and real seal callbacks. The default-view registration cause
+is fixed at `18d435f3`, with a real Expo registration regression.
 
-The same-current-JS cached pre-coordinator8c59c078 client supplies a valid stacked
-newline baseline. Independent full-width composer-edge tracking finds the bar
-leading the same Leo message by89.900ms,23.233ms and26.589ms on three returns.
-Corrected stacked and bubbles captures each show all six newline/backspace row
-and bar displacements on the same original recorded frames. Final row-to-bar
-gap is21 physical pixels at2.625 density,8dp. These are finite trajectory samples,
-not a same-frame guarantee for all mounts. Stacked4slow/worst50ms and bubbles
-2slow/worst50ms remain recorded. A stationary attachment removal follows the
-full72dp bar displacement on the same frames within one scaled pixel;6slow/50ms.
-Picker dismissal/add has22slow/66.7ms and overlapping preparation/keyboard work,
-so it is not isolated picker-latency proof.
+The cached pre-coordinator `8c59c078` client uses the same current JavaScript.
+Independent full-width composer-edge tracking finds the bar leading the same
+Leo message by 89.900 ms, 23.233 ms and 26.589 ms on three Returns. Corrected
+stacked and bubbles captures each put all six newline/backspace row and bar
+moves on the same original recorded frames. Final clearance is 21 physical
+pixels at 2.625 density, or 8 dp. These finite samples do not guarantee every
+mount. Stacked retains 4 slow frames, worst 50 ms; bubbles 2, worst 50 ms.
 
-Bubbles send e16c5427-6007-4a54-ab94-3ecee40b3aa0 establishes a deliberate
-900.000209ms physical UI stall, matching clear ACK80.380981, exact outgoing ID,
-navigation arm and native release1 pair. The same existing Leo row moves only
-upward through its entry. UI/native/JS clocks remain separate. The deliberate
-900ms frame is fault evidence, not an FPS comparison or all-send acceptance.
+Stationary attachment removal follows the full 72 dp bar displacement on the
+same frames within one scaled pixel, with 6 slow frames, worst 50 ms. Picker
+Done/add has 22 slow frames, worst 66.7 ms, with preparation and keyboard work
+overlapping. It does not isolate picker latency.
 
-Two ordinary stacked eight-line sends with ONE29,529-byte960x540 JPEG are a
-repeatable performance blocker. No physical UI fault is armed. First message
-50d0f26b-1de4-49f0-8208-d8197b17047b has135slow/worst100ms, Mac69%average/93%peak.
-The quiet repeat f16c162a-e521-418f-a9f4-8a6a102b2af5 starts at14–16%CPU, trace
-logging off, but has128slow/worst83.3ms, Mac72%average/91%peak over8.6s. Both
-functionally ACK/authorize/publish their exact rows and native pairs. This is NOT
-a performance pass or an unrelated-host dismissal. Both clips and raw state/frame
-windows remain under r2-android-ui-send-files-busy and -quiet in .cache.
+Bubbles send `e16c5427-6007-4a54-ab94-3ecee40b3aa0` establishes a deliberate
+900.000209 ms physical UI stall, matching clear ACK 80.380981, exact outgoing ID,
+navigation arm and native release 1. The same Leo row moves upward through
+entry without reversing. UI/native/JS clocks remain separate. The deliberate
+900 ms frame is fault evidence, not an FPS comparison or all-send acceptance.
 
-At the1.4s snapshots both attachments are uploading; later settled query state
-shows canonical files without upload state. Source review finds no unconditional
-ordinary mount layout/worker loop: refreshComposerGeometry checks applied inset
-and actual padding. The media upload ValueAnimator changes drawable imageAlpha
-0.8..1 repeatedly and invalidates; no per-frame decode/layout appears there.
-A detached/prefetched holder can theoretically start its pulse without a later
-detach callback, but occurrence is not established. Neither pulse nor coordinator
-is blamed from source alone. Preserve the two captures and use at most one narrow
-previous-binary control with the SAME current JS/JPEG, with process CPU and upload
-timeline, before choosing a diagnostic/fix. No speculative pulse disable, timer,
-height prediction or expanded benchmark workload. Both new phone artifacts held.
+### One-JPEG send load and the previous-binary control
 
-### One previous-binary photo control and a distinct Modal geometry defect
+Two ordinary stacked eight-line sends use one 29,529-byte, 960×540 JPEG. No UI
+fault is armed. Both functionally ACK, authorize and publish their exact rows
+and native pairs, but produce sustained load. Preserve these reports:
 
-The ONE authorized control uses cached8c59c078, the same current JS and the same
-29KB JPEG, with native composerLayout absent. It also reproduces load:173slow,
-worst100ms over11.167s. Its longer window and added bounded diagnostics mean no
-faster/slower comparison with the8.6s current-client clips. Timestamped host
-process samples show our own emulator at roughly737–890% CPU during the bad
-interval, returning toward50–180% afterward. No foreign build accounts for those
-samples. This does not identify app versus software-emulator rendering cost.
+| Client / capture                                            | Message ID                             | Slow frames | Worst   | Mac CPU average / peak |
+| ----------------------------------------------------------- | -------------------------------------- | ----------- | ------- | ---------------------- |
+| Current, `r2-android-ui-send-files-busy`                    | `50d0f26b-1de4-49f0-8208-d8197b17047b` | 135         | 100 ms  | 69% / 93%              |
+| Current, `r2-android-ui-send-files-quiet`                   | `f16c162a-e521-418f-a9f4-8a6a102b2af5` | 128         | 83.3 ms | 72% / 91%              |
+| Previous `8c59c078`, `r2-android-ui-send-files-old-control` | `38db0e49-0d62-4e75-aa22-2b71a54c3d75` | 173         | 100 ms  | 48% / 94%              |
 
-Control message38db0e49-0d62-4e75-aa22-2b71a54c3d75 first appears uploading at
-JS-relative2270.9ms, becomes uploaded at3609.9ms and canonical at4119.1ms. Slow
-frames continue later. JS state is NOT native pulse STOP proof. Native slow logs
-show isolated measure/apply work, including66.6ms apply, not a proved continuous
-worker loop. The new coordinator is not required for this common-path workload;
-it is not called a new growth regression. Parent permits one opt-in DEBUG pulse
-lifetime diagnostic and one guest/RenderThread CPU window if needed, no pulse
-disable or media rewrite. Unless an actual app fault/permanent pulse is proved,
-retain this bounded emulator limit and explicitly test one photo send on BOTH
-next Dev phone clients, rather than making common emulator cost an indefinite
-unrelated delivery gate. No all-FPS or readiness claim.
+The quiet repeat starts at 14–16% CPU with native trace logging off. Current
+clips last about 8.6 s; the single authorized control lasts 11.167 s and adds
+bounded diagnostics. There is no faster/slower comparison. Raw clips, states
+and frame windows remain in `.cache/evidence/` and `.cache/round2/`.
 
-Current9307 was restored after the control. Independent real Android Modal
-release+close completes the authorized frozen pair, real restoration Promise
-and keyboard return, but leaves Pair1 below the composer: row1370..1499, bar top
-1352 physical pixels. The147px overlap is a FUNCTIONAL failure. Expected gap is
-21px at2.625 density,8dp. Native trace records release1/bottom104/keyboard820/
-closeFlush=true before land begin/restored. Resolving the Modal is not acceptance.
+The previous client has no composerLayout feature, so the new coordinator is
+not required for this workload's load. Host process samples identify our own
+emulator at roughly 737–890% CPU during the bad interval, returning toward
+50–180% afterward. They do not identify app versus software-emulator cost.
 
-A fresh fixture proves valid initial latest placement: Maya's identical
-'Is anyone around this weekend?' row1854..1983 with bar2004; after keyboard opens
-row1034..1163 with bar1184. Both gaps are21px. Fixture alignTop is false, the
-latest adapter row is position0 and no reader scroll preceded the failed pair.
-The fixture changes only that row's accessibility label, not newest insertion.
-Owner source assessment is reviewing inset-only pin/reader anchoring and real
-lift placement before choosing a correction. Both phone artifacts remain held.
+Control upload samples first show uploading at JS-relative 2270.9 ms, uploaded
+at 3609.9 ms and canonical at 4119.1 ms. Slow frames continue later. This is not
+native pulse STOP proof. Existing native logs show isolated measure/apply work,
+including a 66.6 ms apply, not a continuous worker loop. Source has no obvious
+unconditional ordinary-mount loop: refreshComposerGeometry checks both applied
+inset and actual padding before layout. The upload ValueAnimator changes drawable
+imageAlpha and invalidates; no per-frame decode/layout call appears there. A
+prefetched detached holder could theoretically start an animator without a later
+detach callback, but that has not been observed here.
 
-The second Android fixture run starts from the verified keyboard-up8dp gap,
-releases while keeping the Modal open, waits1.3s, then closes. It ends with the
-same147px overlap. That wait is not direct worker-completion proof because the
-current Android trace records seal/apply but not result-ready. Captures retain
-19slow/worst100ms for same-batch close and17slow/worst83.3ms for delayed close,
-Mac33%/52% and28%/58% average/peak respectively. No boot overlapped. Both devices
-and the Device panel are now down while the source owner assesses the cause.
-Normal phone Metro8492 stays up. Required integration lint/typecheck/test/
-React Doctor against the PR base and format pass,26 Jest tests across8 suites;
-no runtime failure is relabelled by those checks.
+One opt-in DEBUG pulse START/STOP and view-lifetime diagnostic is authorized,
+plus one guest/RenderThread CPU window if needed. No speculative pulse disable,
+height timer, animation rewrite or repeated benchmark loop. Unless an actual app
+fault or permanent pulse is proved, retain this bounded common-path emulator
+limit and explicitly test a photo send on BOTH next Dev phone clients. Do not
+make it an indefinite unrelated delivery gate or call the frame reports passes.
+
+### Android Modal pair-close geometry failure
+
+Current `9307bc1` was restored after the control. The actual RN Modal pair+close
+flushes release 1 at bottom 104 and retained keyboard 820, then completes real
+restoration and keyboard return. Yet Pair 1 ends at y=1499 with composer top
+1352, an overlap of 147 physical pixels. Its cell bounds are 1370..1499. This is
+a functional failure even though the Modal Promise resolves. Expected final
+clearance is 21 pixels, or 8 dp.
+
+A fresh fixture proves valid initial latest placement. Maya's identical
+"Is anyone around this weekend?" row is 1854..1983 with bar top 2004. After
+keyboard focus it is 1034..1163 with bar top 1184. Both gaps are 21 pixels.
+Fixture alignTop is false; this is adapter position 0 and no reader scroll
+preceded the release. The pair changes its accessibility label, not insertion.
+The bar moves down 168 pixels after shrinking by 64 dp. Expected row bottom is
+1331; actual 1499 moves by twice that padding delta. This arithmetic helps the
+source assessment but does not establish whether layout, animation or lift
+restoration caused it.
+
+Both same-batch close and release-keep-menu followed by close reproduce the
+same final overlap. The latter waits 1.3 s; that is not direct worker-completion
+proof because the present Android trace has no result-ready event. Captures
+retain 19 slow frames / worst 100 ms and 17 / 83.3 ms respectively, Mac CPU
+33% / 52% and 28% / 58% average/peak, with no overlapping boot. Raw files are
+`r2-android-ui-modal-{before,after}-worker-raw.txt`, corresponding clips and
+`android-composer-mounted.log`. Native owner is assessing anchoring and held-view
+restoration before a narrow causal fix. No blanket always-pin, force-thaw, timer
+or new contract field is accepted. Both next phone artifacts remain held.
+
+Integration lint, typecheck, test, React Doctor against the PR base, then format
+pass at this evidence checkpoint: 26 Jest tests across eight suites. These checks
+do not clear the runtime failure. Android device/panel are down during source
+work; phone Metro 8492 remains available.
+
+### Causal native regression and remaining iOS attachment send
+
+Android's focused regression now reproduces the exact 1331-versus-1499 failure
+with real RecyclerView, ListLayoutManager and ListItemAnimator. Predictive layout
+is enabled but the animator's `animate=false`, so this reproduction has no FLIP
+translation. Fifty stable 129px rows, padding 1261→1093 and notifyItemChanged(0)
+produce the extra 168px. AndroidX reverse-layout predictive PRE and POST passes
+can each add the same total-space change. The owner retains the RED result and
+is testing a correction only when the newest bottom is within one physical
+pixel of the padded bottom before a paired padding change. Off-bottom readers,
+generic smooth anchors, real insertions and short top-aligned threads are
+explicit boundaries. No blanket near-latest pin or animation disable.
+
+The remaining iOS attachment-send check uses the cached combined client and one
+existing IMG_0111.heic, not a new media fixture or profiling workload. Eight-line
+send `ddc05283-bc69-49ba-864f-f7ff6a66e6bb` records committed bar 302→76, clear
+ACK 76, exact ID, navigation arm and pair publication. Native post-mount trace
+seals host sequence 1/release 0 at height 76, then release 1 applies bottom 84
+with keyboard 308. The empty strip and clear field are mounted before release;
+no attachment-animation deadline supplies readiness. Representative original
+frames show the existing Priya row moving upward while the photo enters. The
+final typing row ends at 482 with bar top 490, an 8pt gap. This is not a claim
+about every unsampled frame. Capture retains 6 slow frames, worst 129.6 ms,
+Mac CPU 24% average/38% peak and no boot overlap. Files are
+`r2-ios-ui-attachment-send*`, native trace `ios-ui-attachment-send-native.log`
+and the original-frame contact/PTS log in `.cache/round2/`.
