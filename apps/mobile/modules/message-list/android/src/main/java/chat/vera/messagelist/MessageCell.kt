@@ -290,6 +290,9 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
   private fun mainPart(row: MessageRow): String? =
     row.blocks.firstOrNull { it is TextBlock }?.part ?: row.blocks.firstOrNull()?.part
 
+  private fun bodyChipsSlot(row: MessageRow): Int =
+    blockIndex.indexOfFirst { row.blocks.getOrNull(it) is TextBlock }
+
   private fun partOf(block: Block, view: View): String? =
     when (block) {
       is MediaBlock -> if (view is DeckView) view.currentItem?.part else block.items.firstOrNull()?.part
@@ -541,6 +544,8 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
       time.measure(atMost(0), unspecified())
     }
     blocksTop = y
+    val chipsAt = bodyChipsSlot(row)
+    rowChips?.measure(atMost(columnWidth), unspecified())
     for ((slot, view) in blockViews.withIndex()) {
       if (slot > 0) y += units.px(4f)
       blockTops[slot] = y
@@ -551,6 +556,7 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
         view.measure(atMost(columnWidth), unspecified())
       }
       y += view.measuredHeight
+      if (slot == chipsAt) y += rowChips?.measuredHeight ?: 0
       partChips[slot]?.let { chips ->
         chips.measure(atMost(columnWidth), unspecified())
         y += chips.measuredHeight
@@ -562,10 +568,7 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
       footer.measure(atMost(columnWidth), unspecified())
       y += footer.measuredHeight
     }
-    rowChips?.let { chips ->
-      chips.measure(atMost(columnWidth), unspecified())
-      y += chips.measuredHeight
-    }
+    if (chipsAt < 0) y += rowChips?.measuredHeight ?: 0
     setMeasuredDimension(width, y)
   }
 
@@ -648,11 +651,16 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
       time.visibility = GONE
     }
     var y = blocksTop
+    val chipsAt = bodyChipsSlot(row)
     recedeTo = 1f
     var strip: CarouselView? = null
     for ((slot, view) in blockViews.withIndex()) {
       place(view, if (view is CarouselView) 0 else columnX, blockTops[slot])
       y = blockTops[slot] + view.measuredHeight
+      if (slot == chipsAt) rowChips?.let { chips ->
+        place(chips, columnX, y)
+        y += chips.measuredHeight
+      }
       partChips[slot]?.let { chips ->
         place(chips, columnX, y)
         y += chips.measuredHeight
@@ -669,7 +677,7 @@ class MessageCell(context: Context, private val env: CellEnv, val signature: Sig
       place(footer, columnX, y)
       y += footer.measuredHeight
     }
-    rowChips?.let { place(it, columnX, y) }
+    if (chipsAt < 0) rowChips?.let { place(it, columnX, y) }
   }
 
   // MARK: Revealing times

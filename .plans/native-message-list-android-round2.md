@@ -604,3 +604,22 @@ claim real-time pacing or frame-commit continuity. The full native target passes
 keyboard geometry and no-field/no-timer policy are unchanged. Integration owns
 the new combined APK's original-frame continuous-land check, pending/running
 pair paths, neighbor motion, keyboard return and final 8 dp gap.
+
+### Stacked body reactions precede media
+
+Shawn's phone showed text/message thumbs below a photo while the photo's heart
+was correctly attached to media. MessageCell already bound the thumbs to the
+body part, but stacked measurement and layout appended rowChips after all blocks
+and footers. Both now place that existing lane immediately after the first
+rendered text block, matching its existing mainPart binding, before later media.
+The current 4 dp block gap and chip metrics are unchanged. Without a text block,
+the lane retains its previous trailing position. Media chip binding/placement,
+bubbles, gestures, composer and landing paths are unchanged.
+
+Real MessageCell regressions fail before the fix for single-photo and carousel
+rows, then pass with the lane directly below body text. Actual hit tests verify
+thumbs still report the body part with no media index and photo hearts retain
+their item part/index for tap and hold. A no-text row preserves its trailing lane
+and targets. All 130 native module tests pass. Integration owns brief combined
+runtime verification; no device, full client, motion batch or benchmark was run
+in the Android owner checkout for this small correction.
