@@ -120,10 +120,15 @@ function body(seed: number) {
 }
 
 /** A conversation's history, oldest first, ending `endsAgo` milliseconds ago. */
-function history(seed: string, authors: readonly Author[], endsAgo: number) {
+function history(
+  seed: string,
+  authors: readonly Author[],
+  endsAgo: number,
+  count = MESSAGES,
+) {
   const end = Date.now() - endsAgo;
-  const step = (5 * 24 * 60 * 60 * 1000) / MESSAGES;
-  return Array.from({ length: MESSAGES }, (_, index) => {
+  const step = (5 * 24 * 60 * 60 * 1000) / count;
+  return Array.from({ length: count }, (_, index) => {
     const author = pick(authors, Math.floor(index / 2) + index * 5);
     const withPhotos = index % 6 === 2;
     return {
@@ -132,22 +137,24 @@ function history(seed: string, authors: readonly Author[], endsAgo: number) {
       authorName: author.name,
       body: withPhotos && index % 12 === 2 ? "" : body(index * 7 + seed.length),
       messageId: crypto.randomUUID(),
-      sentAt: Math.round(end - (MESSAGES - index) * step),
+      sentAt: Math.round(end - (count - index) * step),
     };
   });
 }
 
 /**
- * Reactions on about a third of the newest messages, and replies in two
- * threads, from the bots in the conversation.
+ * Reactions on about a third of the newest messages (`count` of them),
+ * and replies in a thread for every 25 of them, from the bots in the
+ * conversation.
  */
 async function liven(
   ctx: ActionCtx,
   conversationId: string,
   messages: ReturnType<typeof history>,
   bots: readonly ReturnType<typeof botIdentity>[],
+  count = 50,
 ) {
-  const newest = messages.slice(-50);
+  const newest = messages.slice(-count);
   for (const [index, message] of newest.entries()) {
     if (index % 3 !== 0) continue;
     for (let count = 0; count <= index % 3; count += 1) {
@@ -162,7 +169,7 @@ async function liven(
       });
     }
   }
-  const roots = newest.filter((_, index) => index === 10 || index === 35);
+  const roots = newest.filter((_, index) => index % 25 === 10);
   for (const root of roots) {
     for (let reply = 0; reply < 3; reply += 1) {
       await asAccount(ctx, pick(bots, reply), {
@@ -186,15 +193,16 @@ async function fill(
   authors: readonly Author[],
   bots: readonly ReturnType<typeof botIdentity>[],
   endsAgo: number,
+  { count = MESSAGES, livened = 50 } = {},
 ) {
-  const messages = history(conversationId, authors, endsAgo);
+  const messages = history(conversationId, authors, endsAgo, count);
   for (let start = 0; start < messages.length; start += 100) {
     await ctx.runMutation(components.messages.history.importHistory, {
       conversationId,
       messages: messages.slice(start, start + 100),
     });
   }
-  await liven(ctx, conversationId, messages, bots);
+  await liven(ctx, conversationId, messages, bots, livened);
 }
 
 function authorOf(bot: (typeof BOTS)[number]) {
@@ -280,4 +288,35 @@ export async function seedFull(ctx: ActionCtx, me: Author) {
     );
   }
   return { conversations: order };
+}
+
+/**
+ * One busy group with every bot: `count` messages, reactions on a third
+ * of the newest `livened`, and a thread for every 25 of those, for
+ * measuring what a long, lively conversation costs to open and follow.
+ */
+export async function seedBusy(
+  ctx: ActionCtx,
+  me: Author,
+  { count, livened }: { count: number; livened: number },
+) {
+  const conversationId = stringField(
+    await asAccount(ctx, botIdentity(BOTS[0]), {
+      args: {
+        members: [me.address, ...BOTS.map((bot) => botIdentity(bot).accountId)],
+        name: "Busy group",
+      },
+      type: "createGroup",
+    }),
+    "conversationId",
+  );
+  await fill(
+    ctx,
+    conversationId,
+    [me, ...BOTS.map(authorOf)],
+    BOTS.map(botIdentity),
+    60 * 1000,
+    { count, livened },
+  );
+  return { conversationId };
 }

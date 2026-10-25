@@ -1,6 +1,7 @@
+import type { RefObject } from "react";
 import type { View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
-import { useState } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 import {
   measure,
@@ -10,7 +11,10 @@ import {
   withTiming,
 } from "react-native-reanimated";
 
+import type { SendCommitStore } from "./send-commit";
+import { markSendState } from "~/features/dev/send-timing";
 import { GROW_EASING, GROW_MS } from "./moves";
+import { createSendCommit } from "./send-commit";
 
 const IOS = Platform.OS === "ios";
 /** How long the list's room takes to follow attachments opening or closing. */
@@ -29,6 +33,10 @@ const ATTACHMENTS_MOVE_MS = 300;
 
 /** The floating composer's height, as the conversation's list uses it. */
 export interface ComposerHeight {
+  /** The committed host geometry, distinct from delayed live reports. */
+  bar: RefObject<View | null>;
+  /** Per-composer local submit/clear identities; never waits for the network. */
+  sendCommit: SendCommitStore;
   /** Every height it reports, for the list to follow on the UI thread. */
   live: SharedValue<number>;
   /**
@@ -49,6 +57,11 @@ export interface ComposerHeight {
    */
   sent: SharedValue<boolean>;
   /**
+   * How many sends have waited for the composer to get shorter
+   * (`report.onSend`), for the native list (`useComposerInset`).
+   */
+  sends: number;
+  /**
    * Until when (`Date.now()`) the composer's height is changing a step at
    * a time, as attachments open or close.
    */
@@ -65,12 +78,26 @@ export type ComposerReport = ReturnType<typeof useComposerHeight>["report"];
  * JavaScript each time, three times as attachments opened or closed, and
  * the list could only catch up after each.
  */
-export function useComposerHeight() {
+export function useComposerHeight({
+  roomCloses,
+}: {
+  /**
+   * Whether the list's room closes with the messages after a send (the
+   * React Native list, `useComposerRoom`), so the field's glass waits for
+   * it. The native list takes each height at once (its `insets`).
+   */
+  roomCloses: boolean;
+}) {
   const live = useSharedValue(0);
   const room = useSharedValue(0);
   const sent = useSharedValue(false);
   const stepsUntil = useSharedValue(0);
   const [laidOut, setLaidOut] = useState<number>();
+  const owner = useId();
+  const [sendCommit] = useState(() =>
+    createSendCommit(owner, (step, value) => markSendState(step, owner, value)),
+  );
+  const sends = useSyncExternalStore(sendCommit.subscribe, sendCommit.sequence);
   /** The composer's bar, measured on the UI thread (see `heightNow`). */
   const bar = useAnimatedRef<View>();
   /**
@@ -85,7 +112,17 @@ export function useComposerHeight() {
     return measure(bar)?.height ?? fallback;
   }
   const report = {
+    /** Read by the opt-in dev geometry probe; it never writes this value. */
+    live,
+    sendCommit,
+    sends,
     onHeight: (height: number) => {
+      // Layout is already committed here. The native list needn't wait for
+      // this JS callback to go through `live` on UI and back to JS again.
+      // Read the current host, since a queued callback may carry an old size.
+      if (!roomCloses && bar.current !== null) {
+        sendCommit.observeLayout(bar.current.getBoundingClientRect().height);
+      }
       // Already there, from `onSentShorter` or `onTyped`.
       if (Math.abs(height - live.get()) >= 0.5) live.set(height);
       if (Platform.OS !== "ios" || laidOut === undefined) setLaidOut(height);
@@ -118,13 +155,34 @@ export function useComposerHeight() {
     },
     /** The list's room (see `ComposerHeight`), for the field's glass. */
     room,
+    /**
+     * Whether the list's room closes with the messages after a send (the
+     * React Native list, `useComposerRoom`), so the field's glass waits
+     * for it.
+     */
+    roomCloses,
+    /**
+     * Begin a local submission before clearing. The native list keeps
+     * its rows and inset until this clear's height and sent ID are ready.
+     */
+    onSend: (clear: number, files: readonly string[]) =>
+      sendCommit.begin(clear, files),
     /** Attachments started to open or close, a height at a time. */
     onAttachmentsMove: () => {
       stepsUntil.set(Date.now() + ATTACHMENTS_MOVE_MS);
     },
   };
   return {
-    composerHeight: { laidOut, live, room, sent, stepsUntil },
+    composerHeight: {
+      bar,
+      laidOut,
+      live,
+      room,
+      sendCommit,
+      sends,
+      sent,
+      stepsUntil,
+    },
     report,
   };
 }

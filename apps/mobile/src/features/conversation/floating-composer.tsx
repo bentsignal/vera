@@ -90,7 +90,7 @@ export function FloatingComposer({
   mentionable?: readonly MentionCandidate[];
   /** Its height, for the list (see `useComposerHeight`). */
   report: ComposerReport;
-  onSend: (draft: OutgoingDraft) => void;
+  onSend: (draft: OutgoingDraft) => string;
   /** Every change to the text (see `Composer`), to report typing. */
   onChangeText?: (text: string, sent: boolean) => void;
   /** Set while the next message is a reply (see `Composer`). */
@@ -169,7 +169,7 @@ export function FloatingComposer({
           restage((current) => current.filter((file) => file.id !== id));
         }}
         onSend={(body, mentions) => {
-          onSend({
+          const messageId = onSend({
             body,
             files: staged,
             linkPreviews: links.cardsFor(body),
@@ -178,6 +178,7 @@ export function FloatingComposer({
           // The outbox uploads the files from where they are; the drafts
           // folder clears them out next launch.
           restage(() => []);
+          return messageId;
         }}
       />
     </KeyboardStickyView>

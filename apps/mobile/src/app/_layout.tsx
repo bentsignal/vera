@@ -21,8 +21,10 @@ import {
   noteTouch,
   UpdateNavigation,
 } from "~/features/updates/app-updates";
+import { StoreUpdateCover } from "~/features/updates/store-update-cover";
 import { UpdateCover } from "~/features/updates/update-cover";
 import { WatchBreakingVersion } from "~/features/updates/watch-breaking-version";
+import { WatchOutdatedRuntimes } from "~/features/updates/watch-outdated-runtimes";
 
 void SplashScreen.preventAutoHideAsync();
 // The splash is a plain background, so the app fades in over it.
@@ -73,9 +75,11 @@ export default function RootLayout() {
             <SessionProvider fallback={null}>
               <UpdateNavigation />
               <WatchBreakingVersion />
+              <WatchOutdatedRuntimes />
               <Navigator />
             </SessionProvider>
             <UpdateCover />
+            <StoreUpdateCover />
           </QueryClientProvider>
         </KeyboardProvider>
       </ThemeProvider>

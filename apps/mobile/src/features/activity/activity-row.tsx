@@ -10,6 +10,7 @@ import { Avatar } from "~/components/avatar";
 import { usernameOf } from "~/features/messaging/profiles";
 import { formatInboxTimestamp } from "~/lib/format";
 import { actorsOf, markSeen } from "./activity";
+import { activityDestination } from "./activity-destination";
 
 type ProfileOf = ReturnType<typeof useProfileState>["profileOf"];
 
@@ -158,45 +159,6 @@ function footnote(entry: ActivityEntry, showAccount: boolean) {
   return parts.join(" · ");
 }
 
-/** The message a row is about, for a reaction, a mention, or a reply. */
-function itemMessage(item: ActivityEntry["item"]) {
-  return item.kind === "reactions" ||
-    item.kind === "mention" ||
-    item.kind === "reply"
-    ? item.message
-    : undefined;
-}
-
-/** Where tapping a row goes: the conversation, or a reply's thread. */
-function destination({ account, item, title }: ActivityEntry) {
-  const { conversationId } = item.conversation;
-  const message = itemMessage(item);
-  // A reaction to or mention in a reply kept in its thread opens the
-  // thread, where the reply is.
-  const threadId =
-    item.kind === "thread"
-      ? item.threadId
-      : message?.threadOnly === true
-        ? message.threadId
-        : undefined;
-  if (threadId !== undefined) {
-    return {
-      params: { account, conversationId, threadId },
-      pathname: "/thread/[threadId]" as const,
-    };
-  }
-  return {
-    params: {
-      account,
-      conversationId,
-      title,
-      // A reaction, a mention, or a reply opens at the message.
-      ...(message === undefined ? {} : { messageId: message.messageId }),
-    },
-    pathname: "/conversation/[conversationId]" as const,
-  };
-}
-
 /**
  * One Activity row: the person who acted, what happened (a reaction's
  * emoji in its headline), and a dot until it's been seen. Tapping opens
@@ -221,7 +183,7 @@ export function ActivityRow({
   /** Opening a row is seeing it: its dot is gone when you come back. */
   function open() {
     if (unseen) void markSeen([entry]);
-    router.push(destination(entry));
+    router.push(activityDestination(entry));
   }
 
   return (

@@ -1,6 +1,6 @@
 import type { Message } from "./types";
-import { attachmentPart } from "~/features/messaging/reactions";
-import { linkCardsOf, visibleBody } from "./message-text";
+import { attachmentPart } from "../messaging/reaction-part.ts";
+import { linkCardsOf, visibleBody } from "./message-text.ts";
 
 /**
  * The part a message's link card is: the first of a message whose text is

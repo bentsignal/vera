@@ -21,7 +21,12 @@ import { useAccount } from "~/features/messaging/account";
 import { impact } from "~/lib/native-extras";
 import { GlassMessageMenu } from "./glass-message-menu";
 import { handlersFor } from "./menu-actions";
-import { MenuPressContext, reportTouch, usePartTarget } from "./row-touch";
+import {
+  MenuPressContext,
+  rowGestureBegan,
+  useMenuPress,
+  usePartTarget,
+} from "./row-touch";
 
 /** Adds or takes back your reaction on a part of a message. */
 export type ToggleReaction = (
@@ -59,6 +64,11 @@ const LiftedPartContext = createContext<
 export function useIsLifted(messageId: string, part: ReactionPart) {
   const lifted = use(LiftedPartContext);
   return lifted?.messageId === messageId && lifted.part === part;
+}
+
+/** The message lifted into the menu right now, if one is. */
+export function useLiftedMessageId() {
+  return use(LiftedPartContext)?.messageId;
 }
 
 const ReactionPartContext = createContext<ReactionPart>("message");
@@ -332,6 +342,7 @@ export function useMenuTarget({
       delayLongPress: LONG_PRESS_MS,
       onLongPress: openMenu,
       onPressIn: () => {
+        rowGestureBegan();
         if (holdable) squeeze.pressIn();
       },
       onPressOut: squeeze.release,
@@ -342,9 +353,7 @@ export function useMenuTarget({
 
 /**
  * A part of a message that opens its menu on a long press, lifted as is.
- * Its taps are its row's (see `MessageRowTarget`): a double tap opens its
- * menu as a hold does, and in a conversation a single tap opens its
- * thread.
+ * Its taps open the row's thread on release. A hold opens this part's menu.
  */
 export function MenuTargetView({
   shape,
@@ -355,14 +364,12 @@ export function MenuTargetView({
   children: ReactNode;
 }) {
   const ref = useRef<NativeView>(null);
+  const rowPress = useMenuPress()?.onPress;
   const target = useMenuTarget({ measured: ref, preview: children, shape });
   if (target === null) return children;
   const press = {
     ...target.press,
-    onPressIn: () => {
-      reportTouch({ openMenu: target.openMenu });
-      target.press.onPressIn();
-    },
+    onPress: rowPress,
   };
   return (
     <Pressable ref={ref} {...press}>

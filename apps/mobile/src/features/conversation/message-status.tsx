@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Alert, Pressable, Text } from "react-native";
+import { Pressable, Text } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
@@ -13,25 +13,8 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import type { Message } from "./types";
 import { SymbolIcon } from "~/components/symbol-icon";
-import { deleteOutgoing, retryOutgoing } from "~/features/messaging/outbox";
 import { Fading } from "./fading";
-
-function showNotSent(messageId: string) {
-  Alert.alert(
-    "Message Not Sent",
-    undefined,
-    [
-      { style: "cancel", text: "Cancel" },
-      {
-        onPress: () => deleteOutgoing(messageId),
-        style: "destructive",
-        text: "Delete",
-      },
-      { onPress: () => retryOutgoing(messageId), text: "Try Again" },
-    ],
-    { cancelable: true },
-  );
-}
+import { showNotSent } from "./not-sent";
 
 /** How see-through a message is until the PDS has it. */
 export const SENDING_OPACITY = 0.5;

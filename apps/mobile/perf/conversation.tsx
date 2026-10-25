@@ -3,6 +3,7 @@ import { makeMutable } from "react-native-reanimated";
 
 import type { Message } from "~/features/conversation/types";
 import { MessageList } from "~/features/conversation/message-list";
+import { createSendCommit } from "~/features/conversation/send-commit";
 import { SELF } from "./messages";
 
 /** The same profile object each time, as `useProfileState` gives. */
@@ -12,9 +13,12 @@ function profileOf() {
 }
 /** A composer laid out once, as on iOS. */
 const COMPOSER = {
+  bar: { current: null },
+  sendCommit: createSendCommit(),
   laidOut: 56,
   live: makeMutable(56),
   room: makeMutable(56),
+  sends: 0,
   sent: makeMutable(false),
   stepsUntil: makeMutable(0),
 };

@@ -1,22 +1,21 @@
+import type { RefObject } from "react";
 import { useRef } from "react";
 import { Text, View } from "react-native";
-import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import type { ComposerHandle } from "~/features/conversation/composer";
 import type { MessageListHandle } from "~/features/conversation/message-list";
+import type { OutgoingDraft } from "~/features/messaging/outbox";
 import type { MessageLayout } from "~/features/preferences/store";
 import { Pending } from "~/components/pending";
 import { useAfterSend } from "~/features/conversation/after-send";
 import { useComposerBottomInset } from "~/features/conversation/composer";
-import { useComposerHeight } from "~/features/conversation/composer-height";
 import {
   CONVERSATION_HEADER_HEIGHT,
   ConversationHeader,
 } from "~/features/conversation/conversation-header";
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
-import { MessageList } from "~/features/conversation/message-list";
 import { usePacedMessages } from "~/features/conversation/paced-messages";
 import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
@@ -28,6 +27,11 @@ import { useMemberNotices } from "~/features/messaging/member-events";
 import { useMarkRead, useMessages } from "~/features/messaging/messages";
 import { useStayLive } from "~/features/messaging/stay-live";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
+import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
+import {
+  ConversationList,
+  useConversationComposerHeight,
+} from "~/features/native-list/conversation-list";
 import { useActiveConversation } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 import { useAccountPending } from "~/features/saved/offline-pill";
@@ -148,6 +152,22 @@ function useOpening(
   return useAccountPending(!shown);
 }
 
+/** Enqueue locally, then perform the conversation's existing send actions. */
+function useConversationSubmission(
+  messages: ReturnType<typeof useMessages>,
+  replies: ReturnType<typeof useReplies>,
+  list: RefObject<MessageListHandle | null>,
+  afterSend: () => void,
+) {
+  return (draft: OutgoingDraft) => {
+    const messageId = messages.sendMessage(draft, replies.replyTo);
+    replies.cancel();
+    list.current?.scrollToLatest();
+    afterSend();
+    return messageId;
+  };
+}
+
 function Conversation({
   conversationId,
   anchorId,
@@ -173,7 +193,7 @@ function Conversation({
   const typing = useConversationTyping(conversationId, shownMessages);
   // Not laid out yet: the list leaves room for it under the newest
   // message, so it waits rather than shift once it knows.
-  const { composerHeight, report } = useComposerHeight();
+  const { composerHeight, report } = useConversationComposerHeight();
   const list = useRef<MessageListHandle>(null);
   useWhileOpen(conversationId, messages);
 
@@ -188,6 +208,7 @@ function Conversation({
     listReady([messages, notices, typing], layout, profilesLoaded) &&
     composerHeight.laidOut !== undefined;
   const pending = useOpening(conversationId, messages, shown);
+  const submit = useConversationSubmission(messages, replies, list, afterSend);
   if (!isLoading && conversation === undefined) {
     return (
       <MissingConversation
@@ -199,10 +220,10 @@ function Conversation({
   return (
     <View className="bg-background flex-1">
       <Stack.Title>{heading}</Stack.Title>
-      <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
+      <ConversationGestureArea>
         <Pending phase={pending} />
         {shown && pending === "ready" && (
-          <MessageList
+          <ConversationList
             ref={list}
             key={messages.viewKey}
             messages={shownMessages}
@@ -227,7 +248,7 @@ function Conversation({
             onViewReactions={viewReactions}
           />
         )}
-      </KeyboardGestureArea>
+      </ConversationGestureArea>
       <ConversationHeader
         title={heading}
         kind={loaded.kind}
@@ -244,12 +265,7 @@ function Conversation({
         replyingTo={replies.replyingTo}
         onCancelReply={replies.cancel}
         edit={editing}
-        onSend={(draft) => {
-          messages.sendMessage(draft, replies.replyTo);
-          replies.cancel();
-          list.current?.scrollToLatest();
-          afterSend();
-        }}
+        onSend={submit}
       />
     </View>
   );
