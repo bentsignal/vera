@@ -14,7 +14,7 @@ import { NativeHost } from "~/components/native-host";
 import { TextInput } from "~/components/text-input";
 import { KeywordsSection } from "~/features/settings/keywords-section";
 import { useNotificationSettings } from "~/features/settings/notification-settings";
-import { dismissKeyboardOnScroll, editingList } from "~/lib/ui-modifiers";
+import { editingList, hideKeyboardOnScroll } from "~/lib/ui-modifiers";
 
 /**
  * The words that alert you when a message says one: a field to add one,
@@ -56,7 +56,7 @@ export default function KeywordsScreen() {
       {settings != null && (
         <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
           <NativeHost style={{ flex: 1 }}>
-            <FieldList modifiers={[...dismissKeyboardOnScroll, ...editingList]}>
+            <FieldList modifiers={[...hideKeyboardOnScroll, ...editingList]}>
               <FieldGroup.Section>
                 <TextInput
                   ref={input}

@@ -45,6 +45,8 @@ export const destructive = [buttonStyle("borderless"), foregroundStyle("red")];
 export const dismissKeyboardOnScroll = [
   scrollDismissesKeyboard("interactively"),
 ];
+/** Scrolling a form at all puts the keyboard away. */
+export const hideKeyboardOnScroll = [scrollDismissesKeyboard("immediately")];
 /** A form in editing mode: rows that can be deleted show their control. */
 export const editingList = [environment({ key: "editMode", value: "active" })];
 /** A form row whose content (such as a carousel) reaches the card edges. */

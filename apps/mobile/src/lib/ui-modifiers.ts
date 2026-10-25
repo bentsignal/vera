@@ -21,6 +21,7 @@ export const linkButton = [] satisfies ModifierConfig[];
 export const destructive = [] satisfies ModifierConfig[];
 export const dismissKeyboardOnScroll = [] satisfies ModifierConfig[];
 export const editingList = [] satisfies ModifierConfig[];
+export const hideKeyboardOnScroll = [] satisfies ModifierConfig[];
 export const edgeToEdgeRow = [] satisfies ModifierConfig[];
 export const plainRow = [] satisfies ModifierConfig[];
 export function choiceButton(_label: string, _selected: boolean) {

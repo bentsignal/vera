@@ -41,7 +41,7 @@ Settings > Notifications > Notify Me About Messages That Say has a My
 Name switch (on until turned off) and a Keywords screen: a field that stays focused, so
 you can type a word and press return, then the next, and the list below
 it, each row with its delete control showing (iOS's editing list, swipe
-too; a remove button on Android); dragging the list puts the keyboard away. A message in a group or channel that
+too; a remove button on Android); scrolling the list at all puts the keyboard away. A message in a group or channel that
 says your display name, with the switch on, or one of your keywords
 counts as @mentioning you: whole words, any case ("Maya" matches "maya!"
 but not "Mayans"; "deploy" doesn't match "deployed"). So it follows the
