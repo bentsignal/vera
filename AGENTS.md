@@ -64,7 +64,7 @@ Shawn starts each feature or fix in its own T3 Code worktree and thread
   doesn't re-test each change. The dev server stays up through the rounds
   of feedback and comes down when the PR merges or Shawn drops the work.
 - Merge only after Shawn approves that PR in the thread ("merge it", "ship
-  it", "approved"), following the `merge` skill: a merge commit,
+  it", "approved"), following the `merge` skill: squash and merge,
   deleting the branch, then the dev server and devices down and the
   thread settled. Approval of one PR is not approval of another.
 - After merging a PR that changed the backend (Convex functions, schema, or
