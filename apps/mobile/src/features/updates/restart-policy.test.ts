@@ -10,7 +10,6 @@ import {
 
 const OPENED = {
   active: true,
-  embeddedLaunch: false,
   keyboardVisible: false,
   now: 10_000,
   openedAt: 9_000,
@@ -58,20 +57,6 @@ void test("someone typing or watching is never restarted after the opening", () 
       now: IN_USE.touchedAt + QUIET_MS * 10,
       viewingMedia: true,
     }),
-    false,
-  );
-});
-
-void test("the built-in bundle restarts without waiting for a pause", () => {
-  const embedded = { ...IN_USE, embeddedLaunch: true };
-  assert.equal(canRestartForUpdate(embedded), true);
-  assert.equal(
-    canRestartForUpdate({ ...embedded, keyboardVisible: true }),
-    false,
-  );
-  assert.equal(canRestartForUpdate({ ...embedded, viewingMedia: true }), false);
-  assert.equal(
-    canRestartForUpdate({ ...embedded, unsentMessages: true }),
     false,
   );
 });

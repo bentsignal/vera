@@ -81,21 +81,30 @@ base and head on Linux, which is consistent within that one run.
 ### When an update goes in
 
 The app checks for an update on every launch, every return from the
-background, and every minute in the foreground, and downloads it without
-showing anything (`apps/mobile/src/features/updates`). Then it restarts into
-it behind a splash-colored screen and reopens on the screen it was on:
+background, and every minute in the foreground
+(`apps/mobile/src/features/updates`).
+
+A launch waits for its update, so it opens on the latest one (a new install
+from TestFlight or the store may be dozens of updates behind):
+
+- The splash stays up while it checks and downloads. With no update, or one
+  that lands within 1.5 seconds, the app opens (restarting into the update
+  first, behind the same blank screen).
+- Past 1.5 seconds, "Updating Vera…" shows, for at least a second, until the
+  app restarts into the update.
+- Nobody gets stuck there. After 15 seconds it offers "Continue Without
+  Updating". It opens the app by itself if the check or download fails or
+  goes 10 seconds without progress, and after 60 seconds whatever happens.
+  The update then goes in like any other, below.
+
+Coming back from the background never waits. An update found then, or one a
+launch gave up on, downloads without showing anything and restarts the app
+behind a splash-colored screen, on the screen it was on:
 
 - at once, if the update is ready within about 3 seconds of opening;
 - otherwise at the first quiet moment: 10 seconds with no touches, the
   keyboard down, and no photo or video open. Someone typing, scrolling, or
   watching a video is never interrupted; someone reading sees a blink.
-
-A launch of the bundle built into the binary (a new install from TestFlight
-or the store, which may be dozens of updates behind) keeps the splash up
-while it checks and downloads, for up to 6 seconds, so it opens straight
-into the latest update. If the download takes longer, the app shows and the
-update goes in as soon as it lands, with the keyboard down and no photo or
-video open, without waiting for a pause.
 
 It never restarts while a message is sending or failed, or a change is still
 on its way to a server, since a restart would lose them. A launch always
