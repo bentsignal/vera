@@ -7,7 +7,7 @@ import type { AlertLevel, Conversation, Message } from "./protocol.ts";
 import type { SpaceReads } from "./spaceReads.ts";
 import { chosenAlerts } from "./alertChoice.ts";
 import { changedAtOf } from "./changes.ts";
-import { latestMessage, unreadCount } from "./chatMessages.ts";
+import { hasUnread, latestMessage, unreadCount } from "./chatMessages.ts";
 import { createdId, isCreatedId } from "./naming.ts";
 import { readPosition } from "./readStates.ts";
 import {
@@ -283,6 +283,24 @@ export function toMessage(message: Doc<"messages">): Message {
 }
 
 /**
+ * A row's unread: how many for a direct message or a group (the app's
+ * badge counts each message), and for a channel only whether anything is
+ * (it shows as a dot, and the badge counts a channel once).
+ */
+async function unreadOf(
+  ctx: QueryCtx,
+  conversation: Doc<"conversations">,
+  accountId: string,
+  readAt: number,
+) {
+  const { conversationId, kind } = conversation;
+  if (kind !== "channel") {
+    return unreadCount(ctx, conversationId, accountId, readAt);
+  }
+  return (await hasUnread(ctx, conversationId, accountId, readAt)) ? 1 : 0;
+}
+
+/**
  * `alerts` is what the conversation alerts the caller about (see
  * `alertsFor`), which the caller works out once for all they convert.
  */
@@ -300,7 +318,7 @@ export async function toConversation(
     spaceOf(ctx, conversation.spaceId, spaces),
     memberAddresses(ctx, conversation, spaces),
     readPosition(ctx, access, accountId).then((readAt) =>
-      unreadCount(ctx, conversation.conversationId, accountId, readAt),
+      unreadOf(ctx, conversation, accountId, readAt),
     ),
     changedAtOf(ctx, conversation),
   ]);

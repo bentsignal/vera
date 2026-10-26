@@ -30,7 +30,7 @@ function Mark({ thread }: { thread: ConversationThread }) {
     <View className="size-5 items-center justify-center">
       {thread.unreadCount > 0 ? (
         <View
-          accessibilityLabel={`${thread.unreadCount} unread`}
+          accessibilityLabel="Unread"
           className="bg-accent size-[10px] rounded-full"
         />
       ) : thread.following ? (

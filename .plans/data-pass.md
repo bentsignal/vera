@@ -471,3 +471,18 @@ The busy group, for an account that never reads it (469 unread):
 then 70 s: numbering took 30 looks (148 documents, about 5 a message) and
 numbered all 30 in one go; the conversation reran 31 times (30 messages,
 one numbering) at 29 documents each, against about 119 before.
+
+### 10. Dots don't count (D)
+
+Where a row shows only a dot, the PDS says whether anything is unread
+instead of counting: an Inbox channel row (`unreadCount` 1 or 0), and a
+thread's row in the Inbox and in a conversation's threads (stopping at
+the first unread reply instead of counting up to 99). Direct messages and
+groups keep their number, now counted cheaply (#276), since the badge
+counts each of their messages; the Spaces tab's channel rows keep theirs,
+which they show. VoiceOver says "Unread" on a dot, without a number.
+
+| One run                         |           Before |            After |
+| ------------------------------- | ---------------: | ---------------: |
+| `inbox` (seeded account)        |         271 docs |              259 |
+| `inboxThreads` (seeded account) | 246 docs, 140 KB | 204 docs, 105 KB |

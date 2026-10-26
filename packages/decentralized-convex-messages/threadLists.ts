@@ -69,7 +69,11 @@ async function toListing(
   const following = member !== null && member.unfollowed !== true;
   const [root, unreadCount] = await Promise.all([
     messageById(ctx, row.threadId),
-    following ? unreadReplies(ctx, self, row.threadId, member.lastReadAt) : 0,
+    // Whether there are any is all a thread's row shows (a dot): it stops
+    // at the first.
+    following
+      ? unreadReplies(ctx, self, row.threadId, member.lastReadAt, 1)
+      : 0,
   ]);
   return {
     conversationId: row.conversationId,
