@@ -42,6 +42,7 @@ async function unreadReplies(
   self: string,
   threadId: string,
   lastReadAt: number,
+  most = MAX_THREAD_UNREAD,
 ) {
   const newer = ctx.db
     .query("messages")
@@ -53,7 +54,7 @@ async function unreadReplies(
   for await (const reply of newer) {
     if (reply.authorId !== self && reply.threadOnly === true) unread += 1;
     scanned += 1;
-    if (unread >= MAX_THREAD_UNREAD || scanned >= MAX_REPLIES_SCANNED) break;
+    if (unread >= most || scanned >= MAX_REPLIES_SCANNED) break;
   }
   return unread;
 }
@@ -253,7 +254,8 @@ export async function unreadThreadCount(ctx: QueryCtx, self: string) {
           // Nothing newer than when it was read: nothing to count.
           member.lastReplyAt <= member.lastReadAt
             ? Promise.resolve(0)
-            : unreadReplies(ctx, self, member.threadId, member.lastReadAt),
+            : // Whether it has any is all that counts: stop at the first.
+              unreadReplies(ctx, self, member.threadId, member.lastReadAt, 1),
         );
       }
     }

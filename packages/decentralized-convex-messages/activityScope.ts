@@ -65,6 +65,22 @@ export function conversationDescriber(ctx: QueryCtx, spaces: SpaceReads) {
   };
 }
 
+/**
+ * A conversation as an item counted but not shown has it: without reading
+ * who's in it or its space's name.
+ */
+export function undescribed(
+  conversation: Doc<"conversations">,
+): Promise<ActivityConversation> {
+  return Promise.resolve({
+    conversationId: conversation.conversationId,
+    kind: conversation.kind,
+    members: [],
+    name: conversation.name ?? null,
+    spaceId: conversation.spaceId ?? null,
+  });
+}
+
 /** Finds the caller's access to each conversation once. */
 export function accessFinder(ctx: QueryCtx, self: string, spaces: SpaceReads) {
   const access = new Map<string, Promise<ConversationAccess | null>>();
@@ -82,6 +98,8 @@ export interface Scope {
   /** Whether only what's about the caller shows (see `activity`). */
   readonly aboutYou: boolean;
   readonly accessTo: ReturnType<typeof accessFinder>;
+  /** Items are only counted (the badge), not shown (see `activity`). */
+  readonly counting: boolean;
   readonly describe: ReturnType<typeof conversationDescriber>;
   /** Whether mentions are their own items (see `activity`). */
   readonly mentions: boolean;

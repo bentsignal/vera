@@ -10,6 +10,7 @@ import {
   leftForMention,
   messageById,
   seenState,
+  undescribed,
 } from "./activityScope.ts";
 import { alerts, alertsFor } from "./alerts.ts";
 import { inboxAccess } from "./inbox.ts";
@@ -47,13 +48,15 @@ function countsInItem(
 
 /**
  * The newest of others' messages `newer` lists that `counts`, at most
- * `MAX_ACTIVITY_MESSAGES` of them.
+ * `MAX_ACTIVITY_MESSAGES` of them, or only the newest when items are
+ * only counted (whether one is unseen depends only on its newest).
  */
 async function othersNewest(
   scope: Scope,
   newer: AsyncIterable<Doc<"messages">>,
   counts: (message: Doc<"messages">) => boolean,
 ) {
+  const most = scope.counting ? 1 : MAX_ACTIVITY_MESSAGES;
   const theirs = new Array<Doc<"messages">>();
   let scanned = 0;
   for await (const message of newer) {
@@ -65,10 +68,7 @@ async function othersNewest(
       theirs.push(message);
     }
     scanned += 1;
-    if (
-      theirs.length >= MAX_ACTIVITY_MESSAGES ||
-      scanned >= MAX_MESSAGES_SCANNED
-    ) {
+    if (theirs.length >= most || scanned >= MAX_MESSAGES_SCANNED) {
       break;
     }
   }
@@ -231,12 +231,15 @@ export async function activity(
   ctx: QueryCtx,
   self: string,
   options: ActivityOptions = {},
+  /** Only counted (the badge): conversations go undescribed. */
+  { counting = false } = {},
 ) {
   const spaces = spaceReads(ctx);
   const scope: Scope = {
     aboutYou: options.aboutYou === true,
     accessTo: accessFinder(ctx, self, spaces),
-    describe: conversationDescriber(ctx, spaces),
+    counting,
+    describe: counting ? undescribed : conversationDescriber(ctx, spaces),
     mentions: options.mentions === true,
     now: Date.now(),
     self,

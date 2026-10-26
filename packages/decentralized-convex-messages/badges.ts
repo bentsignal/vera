@@ -3,7 +3,7 @@ import type { ActivityOptions } from "./activity.ts";
 import type { InboxKind } from "./protocol.ts";
 import { activity, isUnseen } from "./activity.ts";
 import { alertsFor } from "./alerts.ts";
-import { unreadCount } from "./chatMessages.ts";
+import { hasUnread } from "./chatMessages.ts";
 import { inboxAccess } from "./inbox.ts";
 import { pendingInvites } from "./model.ts";
 import { readPosition } from "./readStates.ts";
@@ -35,7 +35,7 @@ async function homeCount(
   const [unread, threads] = await Promise.all([
     Promise.all(
       listed.map(async (access) =>
-        unreadCount(
+        hasUnread(
           ctx,
           access.conversation.conversationId,
           accountId,
@@ -45,7 +45,7 @@ async function homeCount(
     ),
     kinds.includes("threads") ? unreadThreadCount(ctx, accountId) : 0,
   ]);
-  return unread.filter((count) => count > 0).length + threads;
+  return unread.filter(Boolean).length + threads;
 }
 
 /**
@@ -71,7 +71,14 @@ export async function badgeCount(
   inbox?: readonly InboxKind[],
 ) {
   const [items, invites, home] = await Promise.all([
-    activity(ctx, accountId, { ...shows, aboutYou: inbox !== undefined }),
+    // Counted, not shown, so it skips what only shows (who's in each
+    // conversation).
+    activity(
+      ctx,
+      accountId,
+      { ...shows, aboutYou: inbox !== undefined },
+      { counting: true },
+    ),
     pendingInvites(ctx, accountId),
     inbox === undefined ? 0 : homeCount(ctx, accountId, inbox),
   ]);

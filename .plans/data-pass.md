@@ -182,3 +182,30 @@ person typing for 9 s:
 A closed conversation stays live for 3 minutes (`useStayLive`, up to 5 of
 them), so it opens again at once; that no longer includes who's typing,
 which nobody sees while it's closed and is asked for again on opening.
+
+### 4. The badge counts cheaply
+
+Production showed a cost the app's queries don't: every push works out
+the recipient's app icon badge (`notifications:badge`), once per
+recipient account, and that read 64,675 documents in 41 minutes, as much
+as every app query together (94,555): 59 runs for 11 messages, median
+830 documents, up to 3,093. The badge is `activity` counted, plus the
+Inbox rows with something unread.
+
+Counting now skips what only shows: each conversation's item stops at
+its newest message from others (whether it's unseen depends only on
+that; older apps' badge scanned up to 300 messages per conversation for
+up to 99), conversations aren't described (who's in them), and an Inbox
+row or thread asks whether anything is unread rather than counting up to
+99. Badge values are identical (checked for four account and app
+combinations).
+
+| Badge, one run | Before | After |
+| --- | ---: | ---: |
+| Reads everything, current app | 864 | 693 |
+| Reads everything, older app | 2,555 | 571 |
+| Never reads, current app | 353 | 235 |
+| Never reads, older app | 1,436 | 253 |
+
+Still per push and per recipient; pushes coalescing per conversation
+(the high-load plan's step 1.4) would cut how often it runs.
