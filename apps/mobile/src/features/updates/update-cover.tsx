@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 import {
   continueWithoutUpdating,
@@ -35,20 +36,27 @@ export function UpdateCover() {
       <View className="bg-background flex-1 items-center justify-center gap-3 px-8">
         {required !== "store" ? (
           <>
+            {/* Equal space above and below keeps the words centered, so the
+                button appears under them without moving them. */}
+            <View className="flex-1" />
             <ActivityIndicator />
             <Text className="text-title3 text-foreground font-semibold">
               Updating Vera…
             </Text>
-            {required === undefined && launch === "continue" ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={continueWithoutUpdating}
-              >
-                <Text className="text-body text-accent font-semibold">
-                  Continue Without Updating
-                </Text>
-              </Pressable>
-            ) : null}
+            <View className="flex-1">
+              {required === undefined && launch === "continue" ? (
+                <Animated.View entering={FadeIn.duration(220)}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={continueWithoutUpdating}
+                  >
+                    <Text className="text-body text-accent font-semibold">
+                      Continue Without Updating
+                    </Text>
+                  </Pressable>
+                </Animated.View>
+              ) : null}
+            </View>
           </>
         ) : (
           <>
