@@ -41,8 +41,16 @@ export default defineSchema({
      * issue was closed (supportClosures.ts).
      */
     note: v.optional(v.string()),
+    /** The first message the model sees, as of the last reply (assistant-history.ts). */
+    historyFrom: v.optional(v.number()),
+    /** The last reply's agent.ts `cachedPartHash`. */
+    cachedPart: v.optional(v.string()),
     /** A message arrived while a reply was running: answer it next. */
     rerun: v.optional(v.boolean()),
+    /** The scheduled reply for `wakeAt`. */
+    runId: v.optional(v.id("_scheduled_functions")),
+    /** The reply running since `runningSince`, to tell if it died (agent.ts `watch`). */
+    running: v.optional(v.id("_scheduled_functions")),
     runningSince: v.optional(v.number()),
     /** When the reply started waiting for them to stop typing. */
     waitingSince: v.optional(v.number()),
@@ -133,12 +141,25 @@ export default defineSchema({
     /** Dollars, as the AI Gateway reports them, plus Parallel's search fee. */
     cost: v.number(),
     inputTokens: v.number(),
+    /** Of `inputTokens`, those read from the provider's prompt cache. */
+    cachedInputTokens: v.optional(v.number()),
+    /**
+     * Whether the instructions or tools changed since the conversation's
+     * last reply (usage.ts `record`); unset on its first.
+     */
+    cachedPartChanged: v.optional(v.boolean()),
     memoryLookups: v.number(),
     ms: v.number(),
     outputTokens: v.number(),
     searches: v.number(),
     steps: v.number(),
   }).index("by_bot", ["bot"]),
+  /** Photos converted for assistants to see (assistantImages.ts), by their URL. */
+  assistantImages: defineTable({
+    source: v.string(),
+    /** The JPEG; none when it couldn't be converted. */
+    storageId: v.optional(v.id("_storage")),
+  }).index("by_source", ["source"]),
   /** Each person's device time zone, from the app, for assistants' sense of time. */
   timeZones: defineTable({
     accountId: v.string(),
@@ -159,8 +180,12 @@ export default defineSchema({
    */
   bugReports: defineTable({
     accountId: v.string(),
-    /** The known bug this follows (supportKnownBugs.ts). */
-    bug: v.optional(v.id("knownBugs")),
+    /**
+     * Unused: the ID of a row in the old known-bugs copy of GitHub's
+     * issues, which is gone. `supportReports:forgetKnownBugs` clears it
+     * (docs/next-release.md), and then it can go.
+     */
+    bug: v.optional(v.string()),
     conversationId: v.string(),
     /** The commit that fixed it and what it needs to reach people. */
     fix: v.optional(
@@ -184,34 +209,6 @@ export default defineSchema({
     tracking: v.boolean(),
   })
     .index("by_account", ["accountId"])
-    .index("by_bug", ["bug"])
     .index("by_issue", ["issueNumber"])
     .index("by_tracking", ["tracking"]),
-  /**
-   * The team's known bugs and ideas, one per GitHub issue (or per report
-   * kept on this PDS without GitHub): what support checks before filing,
-   * with no wait for GitHub's search to catch up (supportKnownBugs.ts).
-   */
-  knownBugs: defineTable({
-    /** Not settled yet: its issue is checked for progress. */
-    active: v.boolean(),
-    /** The issue's description, as public as the issue (anonymized when support filed it). */
-    description: v.string(),
-    /** The issue this was closed as a duplicate of. */
-    duplicateOf: v.optional(v.number()),
-    /** When GitHub last changed the issue, for the next sync. */
-    githubUpdatedAt: v.optional(v.number()),
-    issueNumber: v.optional(v.number()),
-    issueUrl: v.optional(v.string()),
-    kind: v.union(v.literal("bug"), v.literal("idea")),
-    /** When it was first reported (the issue's creation). */
-    reportedAt: v.number(),
-    stage: reportStage,
-    /** The first reporter's everyday phrase, when support filed it. */
-    summary: v.optional(v.string()),
-    title: v.string(),
-  })
-    .index("by_active", ["active"])
-    .index("by_github_updated", ["githubUpdatedAt"])
-    .index("by_issue", ["issueNumber"]),
 });

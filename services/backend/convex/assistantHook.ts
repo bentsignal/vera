@@ -84,6 +84,7 @@ export async function scheduleReply(
     .unique();
   const update = {
     ...(note !== undefined && { note }),
+    runId: await scheduleRun(ctx, conversationId, wakeAt),
     waitingSince: undefined,
     wakeAt,
   };
@@ -97,7 +98,18 @@ export async function scheduleReply(
   } else {
     await ctx.db.patch(existing._id, update);
   }
-  await ctx.scheduler.runAt(wakeAt, internal.agent.run, {
+}
+
+/**
+ * Schedules the reply that runs at `wakeAt` and returns its ID, which the
+ * caller stores as the row's `runId` with that `wakeAt`.
+ */
+export function scheduleRun(
+  ctx: MutationCtx,
+  conversationId: string,
+  wakeAt: number,
+) {
+  return ctx.scheduler.runAt(wakeAt, internal.agent.run, {
     conversationId,
     wakeAt,
   });
@@ -148,12 +160,9 @@ export async function waitWhileTyping(
   if (!typing) return false;
   const wakeAt = now + TYPING_RECHECK;
   await ctx.db.patch(row._id, {
+    runId: await scheduleRun(ctx, row.conversationId, wakeAt),
     wakeAt,
     waitingSince: row.waitingSince ?? now,
-  });
-  await ctx.scheduler.runAt(wakeAt, internal.agent.run, {
-    conversationId: row.conversationId,
-    wakeAt,
   });
   return true;
 }

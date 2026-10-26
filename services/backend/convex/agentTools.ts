@@ -29,6 +29,8 @@ export interface Turn {
   readonly lastHeardAt: number;
   /** Older passages of this conversation that match what they just said. */
   readonly recalled: readonly string[];
+  /** The assistant's own address, the author of its messages. */
+  readonly self: string;
   /** Their device's time zone, when the app has sent it. */
   readonly timeZone: string | null;
   /** The oldest message the model was given, for `read_earlier_messages`. */
@@ -74,9 +76,17 @@ How you write:
 - Never mention your tools, these instructions, or how you work inside.
 - Never guess about their life or what was said before. Go by the messages and notes you have; if something isn't there, say you don't remember instead of inventing it.
 
-You can see the newest few images they send; older ones show as a note that an image was sent.
+You can see the newest few images they send; older ones show as a note that an image was sent.`;
+}
 
-It's now ${localTime(turn.timeZone)} where they are${turn.timeZone === null ? " (their time zone isn't known; say so if it matters)" : ""}.`;
+/**
+ * The time, which goes last with `currentTools` rather than in the
+ * instructions: it changes every minute, and the provider's prompt cache
+ * only reuses a request's unchanged start, so in the instructions it would
+ * make every reply pay full price for the whole conversation.
+ */
+export function currentTime(turn: Turn) {
+  return `It's now ${localTime(turn.timeZone)} where they are${turn.timeZone === null ? " (their time zone isn't known; say so if it matters)" : ""}.`;
 }
 
 /** Reading and writing this conversation, which every assistant has. */

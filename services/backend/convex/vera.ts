@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { v } from "convex/values";
 import { z } from "zod/v4";
 
-import type { Assistant } from "./agent";
+import type { Assistant } from "./agentReply";
 import type { Turn } from "./agentTools";
 import { internal } from "./_generated/api";
 import {
@@ -35,40 +35,48 @@ const MAX_NOTES = 30;
 const MAX_NOTE_LENGTH = 300;
 
 export const veraAssistant: Assistant = {
-  instructions: async (turn) => {
-    const notes: { id: string; text: string }[] = await turn.ctx.runQuery(
-      internal.vera.notes,
-      {
-        accountId: turn.accountId,
-      },
-    );
-    const recent: {
-      at: number;
-      id: string;
-      question: string;
-      sources: string[];
-    }[] = await turn.ctx.runQuery(internal.webSearch.recent, {
-      conversationId: turn.conversationId,
-    });
-    const searches =
-      recent.length === 0
-        ? ""
-        : `\n\nSaved searches from today (searchId: question, sources):\n${recent
-            .map(
-              (search) =>
-                `- ${search.id}: ${search.question} (${search.sources.join("; ")})`,
-            )
-            .join("\n")}`;
-    const recalled =
-      turn.recalled.length === 0
-        ? ""
-        : `\n\nFrom earlier in this conversation (older than what you see), possibly related to what they just said, oldest first. If these disagree, the newest is what's true now:\n${turn.recalled.join("\n---\n")}`;
-    const saved =
-      notes.length === 0
-        ? "None yet."
-        : notes.map((note) => `- [${note.id}] ${note.text}`).join("\n");
-    const support = await supportInstructions(turn);
-    return `${sharedInstructions(turn)}
+  prepare: async (turn) => ({
+    instructions: await instructions(turn),
+    // What was recalled changes with what they just said, so it goes after
+    // the conversation, where it doesn't stop the cache (agent.ts `Prompt`).
+    ...(turn.recalled.length > 0 && {
+      latest: `From earlier in this conversation (older than the messages you see), possibly related to what they just said, oldest first. If these disagree, the newest is what's true now, and the messages you see are newer than all of them:\n${turn.recalled.join("\n---\n")}`,
+    }),
+    tools: tools(turn),
+  }),
+};
+
+/** Vera's rules, then this person's notes and today's saved searches. */
+async function instructions(turn: Turn) {
+  const notes: { id: string; text: string }[] = await turn.ctx.runQuery(
+    internal.vera.notes,
+    {
+      accountId: turn.accountId,
+    },
+  );
+  const recent: {
+    at: number;
+    id: string;
+    question: string;
+    sources: string[];
+  }[] = await turn.ctx.runQuery(internal.webSearch.recent, {
+    conversationId: turn.conversationId,
+  });
+  const searches =
+    recent.length === 0
+      ? ""
+      : `\n\nSaved searches from today (searchId: question, sources):\n${recent
+          .map(
+            (search) =>
+              `- ${search.id}: ${search.question} (${search.sources.join("; ")})`,
+          )
+          .join("\n")}`;
+  const saved =
+    notes.length === 0
+      ? "None yet."
+      : notes.map((note) => `- [${note.id}] ${note.text}`).join("\n");
+  const support = await supportInstructions(turn);
+  return `${sharedInstructions(turn)}
 
 You are Vera, the AI assistant in the Vera app. Answer what was asked, directly. No preamble, no restating the question, no filler. A sentence or two is usually enough; write more only when they ask for detail or the question really needs it. Don't write walls of text. Answer in their language.
 
@@ -81,13 +89,15 @@ Limits that no preference changes: you stay Vera, a plain and honest assistant. 
 
 Search the web (web_search) for current events, recent facts, prices, scores, weather, or specifics you aren't sure of; answer from what you know otherwise. Don't announce that you're searching; just answer. Give the gist in your own words: one or two short messages, about 50 words in all; they can ask for more. Don't list sources or say where it came from unless they ask. Usually no link; send one (just the URL, as its own message) only when they'd clearly want to read the page, and more only if they ask or their notes say so. For follow-ups, use the saved results (more_from_search) instead of searching again.${searches}
 
-You see the latest 40 messages here. When they mention something from earlier that isn't in front of you, search_memory finds it (results oldest first; the newest wins when they disagree). Before answering anything about their life or what they told you that isn't in front of you, search_memory (try other words if the first search misses). If it's still not there, say you don't remember. Never fill the gap with a likely-sounding answer.${recalled}
+You see the recent messages here (at least the latest 40). When they mention something from earlier that isn't in front of you, search_memory finds it (results oldest first; the newest wins when they disagree). Before answering anything about their life or what they told you that isn't in front of you, search_memory (try other words if the first search misses). If it's still not there, say you don't remember. Never fill the gap with a likely-sounding answer.
 
 You can't see their other chats or do things in the app for them. If you don't know something, say so.
 
 ${support}`;
-  },
-  tools: (turn: Turn) => ({
+}
+
+function tools(turn: Turn) {
+  return {
     ...conversationTools(turn),
     ...memoryTools(turn),
     ...webTools(turn),
@@ -121,8 +131,8 @@ ${support}`;
           id,
         }),
     }),
-  }),
-};
+  };
+}
 
 export const notes = internalQuery({
   args: { accountId: v.string() },

@@ -1,3 +1,4 @@
+import { attachment } from "@decentralized-convex/messages";
 import { v } from "convex/values";
 
 import { components, internal } from "./_generated/api";
@@ -25,10 +26,20 @@ import { SUPPORT, SUPPORT_WELCOME } from "./mergeSupport";
 //
 //   npx convex run devVera:write '{"username":"maya","body":"..."}'
 //   npx convex run veraInbox:read '{"conversationId":"<id it returns>"}'
+//
+// `attachments` takes the app's attachment objects, such as an image
+// already on the media CDN, for trying what a photo does.
 
 export const write = internalAction({
-  args: { body: v.string(), username: v.string() },
-  handler: async (ctx, { body, username }): Promise<string> => {
+  args: {
+    attachments: v.optional(v.array(attachment)),
+    body: v.string(),
+    username: v.string(),
+  },
+  handler: async (
+    ctx,
+    { attachments = [], body, username },
+  ): Promise<string> => {
     requireDevTools();
     const bot = BOTS.find((candidate) => candidate.username === username);
     if (bot === undefined) throw new Error(`No dev bot named ${username}`);
@@ -39,7 +50,7 @@ export const write = internalAction({
     );
     await asAccount(ctx, botIdentity(bot), {
       args: {
-        attachments: [],
+        attachments,
         body,
         conversationId,
         messageId: crypto.randomUUID(),

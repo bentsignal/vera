@@ -23,7 +23,6 @@ import { sendAsBot, VERA } from "./bots";
 import { githubConfig, issueStates } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";
 import { reportStage } from "./schema";
-import { checkKnownBugs, syncKnownBugs } from "./supportBugSync";
 import { explainClosure } from "./supportClosures";
 
 // The bug reports Vera files (supportAgent.ts) and how they're
@@ -32,9 +31,9 @@ import { explainClosure } from "./supportClosures";
 // being worked on, when it's fixed, and when the fix is out. "Out" means
 // the fix's commit is in the newest production release tags (see
 // docs/releasing.md): an update or store build for app changes, a backend
-// deploy for backend changes. Each row is one person following one known
-// bug (supportKnownBugs.ts): whoever reported it first, and anyone who
-// reported the same thing after, all hear the same updates.
+// deploy for backend changes. Each row is one person following one
+// issue: whoever reported it first, and anyone who reported the same thing
+// after, all hear the same updates.
 
 /**
  * A report to follow: a new issue Vera filed, or (with `stage`) an
@@ -44,7 +43,6 @@ import { explainClosure } from "./supportClosures";
 export const insert = internalMutation({
   args: {
     accountId: v.string(),
-    bug: v.optional(v.id("knownBugs")),
     conversationId: v.string(),
     issueNumber: v.optional(v.number()),
     issueUrl: v.optional(v.string()),
@@ -59,9 +57,8 @@ export const insert = internalMutation({
       .collect();
     const same = theirs.find(
       (report) =>
-        (args.issueNumber !== undefined &&
-          report.issueNumber === args.issueNumber) ||
-        (args.bug !== undefined && report.bug === args.bug),
+        args.issueNumber !== undefined &&
+        report.issueNumber === args.issueNumber,
     );
     if (same !== undefined) return same._id;
     return ctx.db.insert("bugReports", {
@@ -229,34 +226,24 @@ export const track = internalAction({
   handler: async (ctx): Promise<{ checked: number }> => {
     const config = githubConfig();
     if (config === null) return { checked: 0 };
-    try {
-      await syncKnownBugs(ctx, config);
-    } catch (error) {
-      // Reporters still hear about their own reports.
-      console.error("Couldn't sync known bugs from GitHub", error);
-    }
-    const [reports, bugs] = await Promise.all([
-      ctx.runQuery(internal.supportReports.tracked, {}),
-      ctx.runQuery(internal.supportKnownBugs.toCheck, {}),
-    ]);
+    const reports = await ctx.runQuery(internal.supportReports.tracked, {});
     const numbered = reports.flatMap((report) =>
       report.issueNumber === undefined
         ? []
         : [{ ...report, issueNumber: report.issueNumber }],
     );
-    const states = await issueStates(config, [
-      ...numbered.map((report) => report.issueNumber),
-      ...bugs.map((bug) => bug.issueNumber),
-    ]);
+    const states = await issueStates(
+      config,
+      numbered.map((report) => report.issueNumber),
+    );
     const releases = lazyReleases(config);
-    await checkKnownBugs(ctx, config, releases, bugs, states);
     for (const report of numbered) {
       const state = states.get(report.issueNumber);
       if (state !== undefined) {
         await checkReport(ctx, config, releases, report, state);
       }
     }
-    return { checked: numbered.length + bugs.length };
+    return { checked: numbered.length };
   },
 });
 
@@ -339,5 +326,24 @@ export const list = internalQuery({
       conversationId: report.conversationId,
       reporter: report.accountId,
     }));
+  },
+});
+
+/**
+ * Operator command, once per deployment (docs/next-release.md):
+ * `npx convex run supportReports:forgetKnownBugs`. Clears reports' links
+ * to the old known-bugs copy of GitHub's issues. Safe to run again.
+ */
+export const forgetKnownBugs = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const reports = await ctx.db.query("bugReports").take(5000);
+    let cleared = 0;
+    for (const report of reports) {
+      if (report.bug === undefined) continue;
+      await ctx.db.patch(report._id, { bug: undefined });
+      cleared += 1;
+    }
+    return { cleared, reports: reports.length };
   },
 });

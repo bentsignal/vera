@@ -1,7 +1,7 @@
 // The models assistant replies run on (convex/agent.ts), through the Convex
 // AI Gateway (billed on the Convex bill). Grok answers first; Gemini takes
 // over when Grok fails, or when the conversation has a photo only Gemini
-// can see.
+// can see (a GIF; HEIC photos reach both as JPEGs, assistant-images.ts).
 
 export interface AssistantModel {
   readonly id: string;
@@ -26,14 +26,6 @@ export const GEMINI: AssistantModel = {
     "image/heif",
   ],
 };
-
-/** The formats the gateway fetches from a URL; others are sent inline. */
-export const GATEWAY_URL_IMAGES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-];
 
 /**
  * The models to try for a reply, in order: those that can see every photo

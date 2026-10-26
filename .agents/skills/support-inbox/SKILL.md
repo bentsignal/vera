@@ -75,17 +75,13 @@ which conversation. The issue itself never names the reporter: look them up
 here when Shawn needs to. Issues never include screenshots, only Vera's
 description of them; read the conversation (`veraInbox:read`) for the images.
 
-Before filing, Vera checks the team's known bugs, kept in Convex
-(`supportKnownBugs.ts`): every issue Vera filed, the moment it's filed,
-and every other GitHub issue, synced every 10 minutes. The model reads all
-the open ones and compares them by meaning; keywords and GitHub's search
-cover closed issues and merged fixes. When one matches, it follows that bug
-for the reporter instead of filing a duplicate (they get the same updates
-as the first reporter), or tells them the fix is already out.
-
-```sh
-npx convex run supportKnownBugs:list '{"open":true}' --prod   # each known bug and who follows it
-```
+Before filing, Vera searches the repository's GitHub issues, the one
+record of bugs (`supportLookup.ts`): GitHub's search by keywords, plus every
+issue filed in the last day, which search can lag on. When one matches, it
+follows that issue for the reporter instead of filing a duplicate (they get
+the same updates as the first reporter) and adds anything new they said as a
+comment, or tells them the fix is already out. `supportReports:list` shows
+who follows which issue.
 
 A PR that fixes one says `Fixes #<issue>` in its description. That links
 the PR to the issue, which is how Vera knows a fix is being worked on,

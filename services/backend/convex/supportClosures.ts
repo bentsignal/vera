@@ -42,13 +42,8 @@ export const followOriginal = internalMutation({
       });
       return;
     }
-    const original = await ctx.db
-      .query("knownBugs")
-      .withIndex("by_issue", (q) => q.eq("issueNumber", issueNumber))
-      .first();
     await ctx.db.replace(reportId, {
       accountId: report.accountId,
-      bug: original?._id,
       conversationId: report.conversationId,
       issueNumber,
       issueUrl,
