@@ -1,9 +1,9 @@
 import type { QueryCtx } from "./_generated/server.js";
 import type { ActivityOptions } from "./activity.ts";
-import type { InboxKind } from "./protocol.ts";
+import type { ActivityItem, InboxKind } from "./protocol.ts";
 import { activity, isUnseen } from "./activity.ts";
 import { alertsFor } from "./alerts.ts";
-import { hasUnread } from "./chatMessages.ts";
+import { hasUnread, unreadCount } from "./chatMessages.ts";
 import { inboxAccess } from "./inbox.ts";
 import { pendingInvites } from "./model.ts";
 import { readPosition } from "./readStates.ts";
@@ -11,12 +11,14 @@ import { notificationSettings } from "./settings.ts";
 import { unreadThreadCount } from "./threadLists.ts";
 
 /**
- * The Inbox rows of these kinds with something unread, counted the way
- * the app counts its Home tab's badge: direct messages and groups
- * (`chats`) and channels that alert about every message, and (with
- * `threads`) threads you're in with unread replies. A conversation at
- * `mentions` or muted keeps its unread dot without counting; its mentions
- * and replies to you count in activity instead.
+ * Home's part of the badge, counted the way the app counts its Home
+ * tab's: every unread message in the direct messages and groups (`chats`)
+ * the Inbox lists, one for each channel with anything unread, and (with
+ * `threads`) one for each thread you're in with unread replies. Only
+ * conversations that alert about every message count; one at `mentions`
+ * or muted keeps its unread dot without counting, and its mentions and
+ * replies to you count in activity instead. `counted` are the chats
+ * counted message by message.
  */
 async function homeCount(
   ctx: QueryCtx,
@@ -34,18 +36,41 @@ async function homeCount(
   );
   const [unread, threads] = await Promise.all([
     Promise.all(
-      listed.map(async (access) =>
-        hasUnread(
-          ctx,
-          access.conversation.conversationId,
-          accountId,
-          await readPosition(ctx, access, accountId),
-        ),
-      ),
+      listed.map(async (access) => {
+        const { conversationId, kind } = access.conversation;
+        const readAt = await readPosition(ctx, access, accountId);
+        if (kind !== "channel") {
+          return unreadCount(ctx, conversationId, accountId, readAt);
+        }
+        return (await hasUnread(ctx, conversationId, accountId, readAt))
+          ? 1
+          : 0;
+      }),
     ),
     kinds.includes("threads") ? unreadThreadCount(ctx, accountId) : 0,
   ]);
-  return unread.filter(Boolean).length + threads;
+  return {
+    count: unread.reduce((sum, count) => sum + count, 0) + threads,
+    counted: new Set(
+      listed
+        .filter(({ conversation }) => conversation.kind !== "channel")
+        .map(({ conversation }) => conversation.conversationId),
+    ),
+  };
+}
+
+/**
+ * Whether an activity item counts on its own: not a mention or reply in
+ * a chat Home counts message by message (reading the conversation sees
+ * it, so while it's unseen it's one of the chat's unread messages),
+ * unless it's kept in a thread.
+ */
+function countsOnItsOwn(item: ActivityItem, counted: ReadonlySet<string>) {
+  if (item.kind !== "mention" && item.kind !== "reply") return true;
+  return (
+    item.message.threadOnly === true ||
+    !counted.has(item.conversation.conversationId)
+  );
 }
 
 /**
@@ -55,8 +80,9 @@ async function homeCount(
  * @mentions you, or a thread you're in with new replies; what
  * conversations don't alert you about left out), plus each pending space
  * invitation. For an app whose Activity is about you (`inbox` given),
- * activity has no conversation items; the Inbox rows of the kinds it
- * lists that have something unread count instead (see `homeCount`).
+ * activity has no conversation items; Home's unread count instead (see
+ * `homeCount`), and a mention or reply in a chat it counts message by
+ * message counts once, as one of its messages.
  *
  * Only this PDS's activity and invitations are counted, and a push
  * carries only its own account's count. A device signed into several
@@ -80,7 +106,12 @@ export async function badgeCount(
       { counting: true },
     ),
     pendingInvites(ctx, accountId),
-    inbox === undefined ? 0 : homeCount(ctx, accountId, inbox),
+    inbox === undefined
+      ? { count: 0, counted: new Set<string>() }
+      : homeCount(ctx, accountId, inbox),
   ]);
-  return items.filter(isUnseen).length + invites.length + home;
+  const unseen = items.filter(
+    (item) => isUnseen(item) && countsOnItsOwn(item, home.counted),
+  );
+  return unseen.length + invites.length + home.count;
 }

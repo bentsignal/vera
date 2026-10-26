@@ -486,3 +486,30 @@ which they show. VoiceOver says "Unread" on a dot, without a number.
 | ------------------------------- | ---------------: | ---------------: |
 | `inbox` (seeded account)        |         271 docs |              259 |
 | `inboxThreads` (seeded account) | 246 docs, 140 KB | 204 docs, 105 KB |
+
+### 11. The badge rule
+
+The app icon badge (the app's own, and the one each push carries) counts,
+for current apps:
+
+- every unread message in the direct messages and groups the Inbox lists,
+  now that counting is cheap (#276);
+- one for each channel the Inbox lists with anything unread;
+- each thread you're in with unread replies (with threads in the Inbox),
+  each unseen Activity item, and each pending space invitation, as before.
+
+Only conversations that alert about every message count, as before; one
+at Mentions or muted keeps its dot without counting, and its mentions and
+replies count in Activity. The Home tab's badge follows the same rule, so
+the icon still equals Home and Activity together.
+
+**The clash with Activity, and how it's settled:** a message in a direct
+message or group that mentions you or replies to you was counted twice,
+once as one of the chat's unread messages and once as its Activity item.
+Reading a conversation marks its mentions and replies to you as seen
+through your place (`seeMentions`, `seeReplies`), so while such an item is
+unseen, its message is always one of the chat's unread ones. So it counts
+once, as the message; the Activity tab itself still lists and counts it.
+A mention or reply kept in a thread isn't one of the chat's messages, so
+its item still counts. Older apps (whose Activity has conversation items)
+keep their badge.

@@ -8,6 +8,7 @@ import { pds } from "@vera/backend/pds";
 
 import { ACTIVITY_ARGS, isUnseen } from "~/features/activity/activity";
 import { useHomeQueries } from "~/features/home/home-badge";
+import { countedChats, countsOnItsOwn } from "~/features/home/home-count";
 import { useAccounts } from "~/features/messaging/account";
 import { pdsResultOr } from "~/features/messaging/results";
 import { deliveredAt, dismissPresented, stringField } from "./presented";
@@ -86,9 +87,11 @@ function isAnswered(
 
 /**
  * Keeps the app icon badge equal to the Home and Activity tabs' together:
- * the Inbox rows Home lists with something unread, plus activity not yet
- * seen and pending space invitations, summed over every signed-in account
- * (the tabs follow the account filter; the icon doesn't). These are live
+ * Home's unread messages (see `homeCount`), plus activity not yet seen
+ * (but a mention or reply in a chat Home counts message by message only
+ * once, as one of its unread messages), and pending space invitations,
+ * summed over every signed-in account (the tabs follow the account
+ * filter; the icon doesn't). These are live
  * queries, so reading a conversation, seeing a row, or answering an
  * invite, here or on another device, updates it.
  *
@@ -131,9 +134,15 @@ export function useAppBadge() {
   const loaded =
     home.loaded &&
     [...invites, ...activity].every((result) => result.data !== undefined);
+  // A mention or reply in a chat Home counts message by message is one
+  // of its unread messages already.
+  const counted = countedChats(
+    inboxes.flatMap((result) => result.data ?? []),
+    home.kinds,
+  );
   const unseen = activity
     .flatMap((result) => result.data ?? [])
-    .filter(isUnseen).length;
+    .filter((item) => isUnseen(item) && countsOnItsOwn(item, counted)).length;
   const pending = invites.reduce(
     (sum, result) => sum + (result.data?.length ?? 0),
     0,
