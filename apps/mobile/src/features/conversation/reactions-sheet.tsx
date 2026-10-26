@@ -17,6 +17,7 @@ import { loadedBatchWith } from "~/features/messaging/loaded-batch";
 import { useProfiles } from "~/features/messaging/profiles";
 import { reactionPart, reactionsQuery } from "~/features/messaging/reactions";
 import { pdsResult } from "~/features/messaging/results";
+import { useReactionConversation } from "~/features/notifications/push";
 import { cn } from "~/lib/cn";
 import { selectionTick } from "~/lib/native-extras";
 
@@ -213,6 +214,7 @@ export function ReactionsSheet({
    */
   since?: number;
 }) {
+  useReactionConversation(conversationId);
   const data = useMessageReactions(conversationId, messageId, since);
   const [picked, setPicked] = useState(emoji ?? ALL);
   const reactors = byPerson(

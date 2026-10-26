@@ -3,12 +3,13 @@ import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation } from "./_generated/server";
 
-// What Vera Support knows about the people who write to it: the app version
+// What Vera knows about the people who report bugs to it: the app version
 // and device their app reports, whether they want technical details, and
 // whether they've been told reports are public.
 
 /**
- * Called by the app after it sends a message to support: the app version
+ * Called by the app after it sends a message to Vera (Vera Support, in
+ * apps from before the merge): the app version
  * and device, for the bug reports support files. Old apps never call it.
  */
 export const reportClient = mutation({
@@ -44,7 +45,7 @@ export const reportClient = mutation({
   },
 });
 
-/** What support knows about a reporter. */
+/** What Vera knows about a reporter. */
 export const reporter = internalQuery({
   args: { accountId: v.string() },
   handler: async (ctx, { accountId }): Promise<Reporter> => {
@@ -87,7 +88,7 @@ export const updateReporter = internalMutation({
   },
 });
 
-/** What support knows about a reporter (`reporter`). */
+/** What Vera knows about a reporter (`reporter`). */
 export interface Reporter {
   readonly client: {
     appVersion: string;
@@ -97,7 +98,7 @@ export interface Reporter {
     update: string;
   } | null;
   readonly developer: boolean | null;
-  /** When support last told them reports are public. */
+  /** When Vera last told them reports are public. */
   readonly noticeSharedAt: number | null;
 }
 

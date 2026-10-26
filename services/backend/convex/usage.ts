@@ -2,7 +2,7 @@ import type { ProviderMetadata } from "ai";
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery } from "./_generated/server";
-import { botName } from "./schema";
+import { botName, storedBotName } from "./schema";
 
 // What assistant replies cost: tokens and dollars per reply, from the AI
 // Gateway's own numbers, plus Parallel's fee per search.
@@ -20,6 +20,7 @@ export function usageOf(
   results: readonly {
     steps: readonly { providerMetadata: ProviderMetadata | undefined }[];
     totalUsage: {
+      inputTokenDetails: { cacheReadTokens: number | undefined };
       inputTokens: number | undefined;
       outputTokens: number | undefined;
     };
@@ -41,6 +42,11 @@ export function usageOf(
     return total + (typeof cost === "number" ? cost : 0);
   }, 0);
   return {
+    cachedInputTokens: results.reduce(
+      (sum, result) =>
+        sum + (result.totalUsage.inputTokenDetails.cacheReadTokens ?? 0),
+      0,
+    ),
     cost: gatewayCost + tally.searches * SEARCH_COST,
     inputTokens: total("inputTokens"),
     memoryLookups: tally.memoryLookups,
@@ -54,6 +60,10 @@ export const record = internalMutation({
   args: {
     accountId: v.string(),
     bot: botName,
+    /** agent.ts `cachedPartHash`. */
+    cachedPart: v.string(),
+    cachedInputTokens: v.number(),
+    conversationId: v.string(),
     cost: v.number(),
     inputTokens: v.number(),
     memoryLookups: v.number(),
@@ -62,17 +72,33 @@ export const record = internalMutation({
     searches: v.number(),
     steps: v.number(),
   },
-  handler: async (ctx, usage) => {
-    await ctx.db.insert("assistantUsage", usage);
+  handler: async (ctx, { cachedPart, conversationId, ...usage }) => {
+    const conversation = await ctx.db
+      .query("botConversations")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", conversationId),
+      )
+      .unique();
+    const previous = conversation?.cachedPart;
+    if (conversation !== null && previous !== cachedPart) {
+      await ctx.db.patch(conversation._id, { cachedPart });
+    }
+    await ctx.db.insert("assistantUsage", {
+      ...usage,
+      ...(previous !== undefined && {
+        cachedPartChanged: previous !== cachedPart,
+      }),
+    });
   },
 });
 
 /**
  * Operator command: `npx convex run usage:summary '{"bot":"vera"}'`. Totals
- * and averages for the latest replies (500 by default).
+ * and averages for the latest replies (500 by default); `"support"` reads
+ * Vera Support's, from before it became part of Vera.
  */
 export const summary = internalQuery({
-  args: { bot: botName, last: v.optional(v.number()) },
+  args: { bot: storedBotName, last: v.optional(v.number()) },
   handler: async (ctx, { bot, last }) => {
     const rows = await ctx.db
       .query("assistantUsage")
@@ -84,11 +110,28 @@ export const summary = internalQuery({
     }
     const replies = Math.max(1, rows.length);
     const searched = rows.filter((row) => row.searches > 0);
+    // Rows from before cached tokens were recorded don't count toward the rate.
+    const measured = rows.filter((row) => row.cachedInputTokens !== undefined);
+    // Nor do first replies, with nothing before them to compare.
+    const followUps = rows.filter((row) => row.cachedPartChanged !== undefined);
     return {
       replies: rows.length,
       totalCost: total((row) => row.cost),
       averageCost: total((row) => row.cost) / replies,
       averageInputTokens: Math.round(total((row) => row.inputTokens) / replies),
+      cacheHitRate:
+        measured.reduce((sum, row) => sum + (row.cachedInputTokens ?? 0), 0) /
+        Math.max(
+          1,
+          measured.reduce((sum, row) => sum + row.inputTokens, 0),
+        ),
+      // Replies whose instructions or tools changed since the last one in
+      // their conversation, which the cache can't reuse past them. Filing a
+      // report or saving a note does it; a high rate means something
+      // changes every reply that belongs in `latest` (agent.ts `Prompt`).
+      cachedPartChangeRate:
+        followUps.filter((row) => row.cachedPartChanged === true).length /
+        Math.max(1, followUps.length),
       averageSeconds: total((row) => row.ms) / replies / 1000,
       repliesThatSearched: searched.length,
       searches: total((row) => row.searches),

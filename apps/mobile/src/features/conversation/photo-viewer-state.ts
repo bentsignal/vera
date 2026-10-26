@@ -16,6 +16,7 @@ import {
 import { scheduleOnRN } from "react-native-worklets";
 
 import type { Point, Sample, Size, Transform } from "./photo-transform";
+import { pagePosition, pageTarget } from "./photo-pager";
 import {
   dismissProgress,
   doubleTapTransform,
@@ -36,8 +37,10 @@ const SETTLE_SPRING = { dampingRatio: 1, duration: 350 } as const;
  *   still be a tap.
  * - `zoom`: pinching, or dragging a zoomed photo around.
  * - `dismiss`: dragging a photo at fit, to swipe it closed.
+ * - `page`: dragging a photo at fit sideways, to the next or previous one
+ *   of a group (see `Pager`).
  */
-export type Mode = "dismiss" | "idle" | "pending" | "zoom";
+export type Mode = "dismiss" | "idle" | "page" | "pending" | "zoom";
 
 /**
  * The fingers' state, as of the last time their number changed. Each move
@@ -66,6 +69,8 @@ export interface Track {
   samples: Sample[];
   /** The fingers' last center. */
   focal: Point;
+  /** Where the pager was when a sideways drag began (`page`). */
+  pageFrom: number;
 }
 
 export const IDLE = {
@@ -73,6 +78,7 @@ export const IDLE = {
   focal: { x: 0, y: 0 },
   mode: "idle",
   origin: { x: 0, y: 0 },
+  pageFrom: 0,
   raw: IDENTITY,
   samples: [],
   spread: 0,
@@ -100,6 +106,61 @@ export interface Viewer {
   closing: SharedValue<boolean>;
   /** Fades the whole viewer out when the close button is pressed. */
   fade: SharedValue<number>;
+}
+
+/**
+ * A group of photos the viewer swipes through sideways: `position` is the
+ * page shown, fractional mid-swipe, and `onTurn` hears the page a swipe
+ * goes to as it's let go. The group draws one backdrop behind every page
+ * (`backdrop`, its opacity), which the shown page fades as it's swiped
+ * away: each page drawing its own moved it with the page, so the
+ * conversation showed past the first and last pages and between them.
+ */
+export interface Pager {
+  position: SharedValue<number>;
+  count: number;
+  onTurn: (index: number) => void;
+  backdrop: SharedValue<number>;
+  /**
+   * Bumped by the group's close button, which sits still over the pages:
+   * the shown page closes the viewer, as its own `close` does.
+   */
+  closeRequests: SharedValue<number>;
+}
+
+const PAGE_SPRING = { dampingRatio: 1, duration: 380 } as const;
+
+/** Moves the pager with a sideways drag `dx` (window points) from where it began. */
+export function dragPage(
+  pager: Pager,
+  from: number,
+  dx: number,
+  width: number,
+) {
+  "worklet";
+  pager.position.set(pagePosition(from, dx, width, pager.count));
+}
+
+/**
+ * Stops the pager where it is, for a sideways drag that starts while the
+ * last one's spring is still running, and says where that is.
+ */
+export function catchPage(pager: Pager) {
+  "worklet";
+  cancelAnimation(pager.position);
+  return pager.position.get();
+}
+
+/** Lets go of a sideways drag: on to the next page, or back. */
+export function releasePage(
+  pager: Pager,
+  swipe: { from: number; dx: number; speedX: number; width: number },
+) {
+  "worklet";
+  const target = pageTarget({ ...swipe, count: pager.count });
+  // Now, not once it lands, so the page after it mounts during the spring.
+  scheduleOnRN(pager.onTurn, target);
+  pager.position.set(withSpring(target, PAGE_SPRING));
 }
 
 export function useViewer(size: Size | undefined) {

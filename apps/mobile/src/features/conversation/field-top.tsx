@@ -16,12 +16,14 @@ export function FieldTop({
   onCancelReply,
   staged,
   onRemoveStaged,
+  send,
 }: {
   edit: EditSession | undefined;
   replyingTo: ReplyingTo | undefined;
   onCancelReply: () => void;
   staged: readonly StagedFile[];
   onRemoveStaged: (id: string) => void;
+  send: number;
 }) {
   if (edit?.editing !== undefined) {
     return <EditBar editing={edit.editing} onCancel={edit.cancel} />;
@@ -31,7 +33,7 @@ export function FieldTop({
       {replyingTo !== undefined && (
         <ReplyBar replyingTo={replyingTo} onCancel={onCancelReply} />
       )}
-      <StagedAttachments files={staged} onRemove={onRemoveStaged} />
+      <StagedAttachments key={send} files={staged} onRemove={onRemoveStaged} />
     </>
   );
 }

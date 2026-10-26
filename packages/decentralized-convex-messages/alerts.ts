@@ -48,20 +48,34 @@ export function alertsFor(
   return access.alerts ?? inheritedAlerts(access, settings);
 }
 
+/** What a message says about who it @mentions. */
+interface Mentioning {
+  readonly mentions?: readonly { accountId: string }[];
+  readonly saidTo?: readonly string[];
+}
+
+/**
+ * Who a message @mentions, or counts as mentioning because it says their
+ * name or a keyword (`saidTo`).
+ */
+export function mentionedBy(message: Mentioning) {
+  return [
+    ...(message.mentions ?? []).map(({ accountId }) => accountId),
+    ...(message.saidTo ?? []),
+  ];
+}
+
 /**
  * Whether a message alerts an account at this level: anything at `all`,
- * and at `mentions` only a message that @mentions them.
+ * and at `mentions` only a message that @mentions them (see `mentionedBy`).
  */
 export function alerts(
   level: AlertLevel,
-  message: { mentions?: readonly { accountId: string }[] },
+  message: Mentioning,
   accountId: string,
 ) {
   if (level === "all") return true;
-  return (
-    level === "mentions" &&
-    (message.mentions ?? []).some((mention) => mention.accountId === accountId)
-  );
+  return level === "mentions" && mentionedBy(message).includes(accountId);
 }
 
 /**

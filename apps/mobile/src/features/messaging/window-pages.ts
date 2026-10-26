@@ -61,7 +61,7 @@ export function threadPageQuery(
   cursor: PageCursor,
 ) {
   return pdsQuery({
-    // A thread always opens at its latest replies.
+    // Threads use existing time cursors; around IDs are conversation-only.
     args: { conversationId, threadId, ...("around" in cursor ? {} : cursor) },
     options: {
       select: (result) => {

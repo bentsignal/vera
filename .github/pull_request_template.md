@@ -2,7 +2,7 @@
 
 <!-- What changed and why, in a few sentences. Note any decisions you made on Shawn's behalf. -->
 
-<!-- Fixing a GitHub issue? Add "Fixes #<issue>" (one line per issue). Vera Support follows that link to tell the reporter about the fix. -->
+<!-- Fixing a GitHub issue? Add "Fixes #<issue>" (one line per issue). Vera follows that link to tell the reporter about the fix. -->
 
 ## Evidence
 
