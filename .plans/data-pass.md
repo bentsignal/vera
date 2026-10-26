@@ -40,18 +40,26 @@ send only what screens draw; one round trip per screen on first open.
 
 ### Production (an hour of logs, 2026-10-22 evening)
 
-Over 40 minutes: 909 query runs read 95,659 documents (30 MB) and
-returned 2.6 MB; 102 mutations read 14,868 documents.
+In 59 minutes, functions read 257,902 documents (81 MB) and returned
+6.6 MB:
 
-- **44 query runs (5%) read 64% of all documents**: 1,260–1,520 each,
-  returning 4–6 KB. That's the shape of `activity` (it scans up to 500
-  reactions to your messages, 200 mentions, 200 replies and 200 threads,
-  each with its sightings, over the last 7 days) and the badge count,
-  which runs `activity` per push (`notifications:badge`: 1,354 documents
-  a run).
-- **11 mutations (11%) read 95% of mutation documents**: 1,100–1,500
-  each. That's `markRead`, which scanned every reaction to your messages
-  in every conversation to see this one's.
+| What                                           |  Runs |   Documents | Share |
+| ---------------------------------------------- | ----: | ----------: | ----: |
+| App queries (`pds:dispatchQuery`)              | 1,159 |     130,700 |   51% |
+| The badge on each push (`notifications:badge`) |    81 |      90,732 |   35% |
+| App writes (`pds:dispatchMutation`)            |   143 |      34,620 |   13% |
+| Everything else                                |       | under 3,000 |    1% |
+
+- **36 query runs (3%) read 60% of the queries' documents**, over 1,000
+  each, returning 4–6 KB: the shape of `activity` (it scans up to 500
+  reactions to your messages, 200 mentions, 200 replies and 200 threads
+  over the last 7 days, each with its sightings).
+- **The badge**: every push works out the recipient's badge, which is
+  `activity` counted plus the Inbox rows with something unread. 81 runs,
+  median 830 documents, up to 3,093.
+- **17 writes (12%) read 82% of the writes' documents**, 1,100–1,500
+  each: `markRead`, which scanned every reaction to your messages in
+  every conversation to see this one's.
 
 ### Per operation (busy group, one run each)
 
@@ -102,18 +110,102 @@ What it shows, in order of cost:
 5. **Typing reruns the conversation** (`conversation` includes `typing`),
    and every thread page; typing in one thread reruns the others' typing.
 
-## Plan, one pull request each, in order of cost
+## Pull requests, in order of cost
 
-1. `markRead` sees only what's new (this PR).
-2. The inbox: each row reads less; then a message reruns one row, not
-   the whole inbox (proposal below).
-3. Typing decoupled: out of the conversation's and thread pages'
-   includes, and indexed by thread.
-4. Pages without their includes on every rerun (proposal below), and a
-   small live page.
-5. `activity` sends and reads less.
-6. Older pages asked for ahead; first open (the inbox saved on the device
-   at once).
+Stacked, each on the one before:
+
+1. #267 `markRead` sees only what's new (and the measuring tools).
+2. #268 Inbox rows read less.
+3. #269 Typing out of the conversation's and threads' includes.
+4. #270 The badge counts without reading what only shows.
+5. #271 The next page asked for ahead.
+6. #272 A small live page.
+7. Open timings in a production bundle, and the app opening on the saved
+   Home at once (with the simulator's timings).
+
+The rest needs a decision first (proposals below): pages and the
+conversation without their includes on every rerun (A), the inbox's rows
+apart from its list (B), Activity's shape (C), unread counts (D), and
+pushes (E).
+
+## Proposals (need Shawn's call)
+
+### A. Included queries answered once, not on every rerun
+
+The PDS answers a query's included queries inside that query
+(`answerIncluded` in the router), so everything included is part of what
+reruns it, and every rerun resends the includes too. A reaction resends
+the page it's on (29 KB) as well as the reaction batch; the newest page
+resends its `since` reactions, summaries, and profiles with every message;
+the inbox reruns when anyone's profile changes. The app subscribes to each
+included query on its own anyway (that's how it gets their updates), so a
+rerun's includes are redundant.
+
+Two shapes keep "a message never shows without its reactions":
+
+1. **Reactions and summaries keyed by the page's cursor** (Shawn's
+   proposal): `reactions({ conversationId, before })` and the like,
+   asked for at the same moment as the page, without waiting for its
+   message IDs. The PDS works out the page's messages again to find
+   their reactions (about 50 more message reads per page and query, and
+   the reactions query reruns whenever a message in that range changes,
+   so the newest page's reruns on every message). It fixes pages only.
+2. **Includes on the first answer only.** The app's first fetch of a
+   query is a one-shot that comes back with what it includes (one round
+   trip, as now); the live subscription asks with `include: false` and
+   carries just its own result. Apps already installed don't send the
+   flag and keep today's behavior. On opening, the query runs twice
+   (one-shot and subscription), about the same as today's doubled
+   includes (today the includes run inside the query and again as their
+   own subscriptions). After that, nothing a query includes reruns it.
+   It fixes pages, the conversation (member events, profiles), thread
+   pages, and the inbox (profiles) at once, and it's what makes B
+   possible.
+
+Measured on the busy group, a page of 50: the page alone reads 55
+documents and returns 20 KB; with its includes, 96 documents and 30 KB.
+A reaction today reruns the page (96 docs, 29 KB to the phone) and its
+batch (23 docs, 2.5 KB); with either shape, only the batch.
+Recommendation: **2**, since it fixes every screen with one mechanism and
+reads less than 1.
+
+### B. The inbox's rows apart from the list
+
+Every message in any conversation, and every `markRead`, reruns the whole
+inbox and resends it: 24 KB (29 rows) each time, which #268 made cheaper
+to read but not smaller. Splitting the list (who's in it, names, pins,
+alerts; changes rarely) from each row's latest message and unread count
+(changes with every message) makes a message rerun one row (about 1 KB).
+On opening, the list would include its rows (one round trip), which needs
+A.2, or its rows would rerun the list again.
+
+Cost on opening: one query per row (29 here) rather than one. Each is
+small, and Convex runs them in parallel.
+
+### C. Activity's shape
+
+Each Activity item carries its whole conversation (with every member)
+and its whole message: 143 KB for 130 items here, 41 KB of it the same 29
+conversations repeated. Listing each conversation once and items pointing
+at it would cut it by about half; it changes the result's shape, so the
+app reads both until older apps are gone.
+
+### D. Unread counts capped lower
+
+An Inbox row and a conversation count unread messages up to 99, reading
+each one, on every rerun. The app draws only a dot; the number shows only
+in VoiceOver ("12 unread"). In a busy group you aren't reading, every new
+message reruns the inbox and reads up to 99 messages for that row. Capping
+at 10 (VoiceOver: "10 or more unread") would cut that to 10.
+
+### E. Pushes coalesced per conversation
+
+The high-load plan's step 1.4: a recipient gets at most one push per
+conversation every couple of seconds. Each push works out the badge
+(#270 made it 3–5× cheaper); in production the badge was 35% of all
+documents read (81 runs in an hour). Coalescing would cut how often it
+runs during bursts, and it changes what people receive, so it's Shawn's
+call.
 
 ## Results
 
@@ -140,18 +232,18 @@ A query that lists many channels of a space (the inbox, activity, the
 thread list) reads the space, its members, and the caller's membership
 once, not once per channel (`spaceReads.ts`). Results are identical.
 
-| One run | Before | After |
-| --- | ---: | ---: |
+| One run           |                Before |                After |
+| ----------------- | --------------------: | -------------------: |
 | `inbox` (29 rows) | 592 docs, 272 KB read | 245 docs, 99 KB read |
-| `inboxThreads` | 312 docs, 163 KB | 249 docs, 142 KB |
-| `conversation` | 36 docs, 13 KB | 26 docs, 9 KB |
-| `activity` | 677 docs, 319 KB | 614 docs, 298 KB |
+| `inboxThreads`    |      312 docs, 163 KB |     249 docs, 142 KB |
+| `conversation`    |        36 docs, 13 KB |        26 docs, 9 KB |
+| `activity`        |      677 docs, 319 KB |     614 docs, 298 KB |
 
-| Live | Before | After |
-| --- | ---: | ---: |
-| One message: documents read, everything it reruns | 2,216* | 315 |
-| 30 messages in 15 s: documents read | 23,414 | 10,904 |
-| 30 messages in 15 s: sent to the phone | 1,008 KB | 1,008 KB |
+| Live                                              |   Before |    After |
+| ------------------------------------------------- | -------: | -------: |
+| One message: documents read, everything it reruns |  2,216\* |      315 |
+| 30 messages in 15 s: documents read               |   23,414 |   10,904 |
+| 30 messages in 15 s: sent to the phone            | 1,008 KB | 1,008 KB |
 
 \* the before includes the phone's `markRead`; the after doesn't.
 
@@ -172,12 +264,12 @@ doesn't rerun the conversation's typing, or the reverse.
 Live, the conversation, a thread page, and both typing queries open; one
 person typing for 9 s:
 
-| | Before | After |
-| --- | ---: | ---: |
-| Typing in the chat: server runs | 16 (`conversation` ×4, the thread page ×4, both typing ×4) | 4 (`typing` ×4) |
-| Documents read | 486 | 45 |
-| Sent to the phone | 12 KB | 1.1 KB |
-| Typing in the thread: sent to the phone | 27 KB | 1.1 KB |
+|                                         |                                                     Before |           After |
+| --------------------------------------- | ---------------------------------------------------------: | --------------: |
+| Typing in the chat: server runs         | 16 (`conversation` ×4, the thread page ×4, both typing ×4) | 4 (`typing` ×4) |
+| Documents read                          |                                                        486 |              45 |
+| Sent to the phone                       |                                                      12 KB |          1.1 KB |
+| Typing in the thread: sent to the phone |                                                      27 KB |          1.1 KB |
 
 A closed conversation stays live for 3 minutes (`useStayLive`, up to 5 of
 them), so it opens again at once; that no longer includes who's typing,
@@ -196,16 +288,15 @@ Counting now skips what only shows: each conversation's item stops at
 its newest message from others (whether it's unseen depends only on
 that; older apps' badge scanned up to 300 messages per conversation for
 up to 99), conversations aren't described (who's in them), and an Inbox
-row or thread asks whether anything is unread rather than counting up to
-99. Badge values are identical (checked for four account and app
+row or thread asks whether anything is unread rather than counting up to 99. Badge values are identical (checked for four account and app
 combinations).
 
-| Badge, one run | Before | After |
-| --- | ---: | ---: |
-| Reads everything, current app | 864 | 693 |
-| Reads everything, older app | 2,555 | 571 |
-| Never reads, current app | 353 | 235 |
-| Never reads, older app | 1,436 | 253 |
+| Badge, one run                | Before | After |
+| ----------------------------- | -----: | ----: |
+| Reads everything, current app |    864 |   693 |
+| Reads everything, older app   |  2,555 |   571 |
+| Never reads, current app      |    353 |   235 |
+| Never reads, older app        |  1,436 |   253 |
 
 Still per push and per recipient; pushes coalescing per conversation
 (the high-load plan's step 1.4) would cut how often it runs.
@@ -234,13 +325,40 @@ include reaction batches, since its app follows those by time.
 Headless phone following the newest page as the app does (chaining the
 next page when one fills), 60 messages over 30 s:
 
-| | Pages of 50 | Pages of 20 |
-| --- | ---: | ---: |
-| Sent to the phone | 528 KB | 287 KB |
-| Documents read | 2,851 | 1,904 |
+|                   | Pages of 50 | Pages of 20 |
+| ----------------- | ----------: | ----------: |
+| Sent to the phone |      528 KB |      287 KB |
+| Documents read    |       2,851 |       1,904 |
 
 The longer a conversation stays open, the bigger the difference: a page
 of 50 resends 25 messages on average, a page of 20 resends 10. A window
 reopened more than one live page behind (20 messages now, 50 before)
 opens afresh at the latest messages, as it does when it's more than a
 page behind today.
+
+### 7. Opening: timings, and the saved Home at once
+
+`veraDev.timings()` (development and profile bundles on a dev PDS) says
+how long the inbox, a conversation, and a thread took to show their
+content: from the bundle starting for the first screen, from
+`veraDev.open` for each after. `VERA_METRO_PROFILE=1 scripts/sim.sh up`
+serves a production bundle to the dev client.
+
+The app now opens on the Home saved on the device at once (it showed only
+after the PDS hadn't answered for 2 seconds); the PDS's answers replace
+it as they arrive. The deadline still says "Can't connect" if the Inbox
+hasn't come from the PDS by then.
+
+iOS simulator, production bundle, the seeded account (29 conversations),
+cold launches (the app sent to the background first, so it saves), ms:
+
+| Screen | Before (main) | After (this stack) |
+| --- | --- | --- |
+| Inbox, from launch | 1,076 · 1,303 · 1,273 | 228 · 233 · 231 |
+| Busy group, from opening | 828 · 731 · 741 | 791 · 740 · 874 |
+| Thread, from opening | 709 · 861 · 707 · 693 · 687 | 694 · 741 · 711 |
+
+A conversation or thread opening is one round trip to the PDS plus
+drawing, the same before and after: what changed is what they cost the
+server and the phone afterwards, not their first answer. (One before run
+of a thread took 2,129 ms and didn't repeat.)

@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
 import { ScreenList } from "~/components/screen-list";
+import { markShown } from "~/features/dev/open-timing";
 import { INBOX_ROW_HEIGHT } from "~/features/inbox/conversation-row";
 import { filterInbox } from "~/features/inbox/filter";
 import { InboxRow, ThreadInboxRow } from "~/features/inbox/inbox-row";
@@ -29,7 +30,8 @@ function Empty({ title, detail }: { title: string; detail: string }) {
  */
 export function InboxList() {
   const { conversations, isLoading } = useInbox();
-  useSavedHome(isLoading);
+  markShown("inbox", !isLoading);
+  useSavedHome();
   const offline = useHomeOffline();
   const showAccount = useVisibleAccounts().length > 1;
   const show = usePreference("inboxShow");

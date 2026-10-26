@@ -24,8 +24,10 @@ Built in `apps/mobile/src/features/saved`. Saving follows the live cache
 saved from, so new messages join below. Dev builds can hold back the
 server's answers (Developer > Server Answers) to try it.
 
-**Fresh data first.** A screen shows nothing until the server answers, as
-before. Only when it hasn't answered in 2 s (when the PDS client itself
+**Fresh data first** (the Inbox changed in the data pass, 2026-10-22: the
+app opens on the saved Home at once and the server's answer replaces it;
+see `.plans/data-pass.md`). A screen shows nothing until the server
+answers, as before. Only when it hasn't answered in 2 s (when the PDS client itself
 gives up on a server's first answer) does it show what's saved on the
 device instead. From then on the account's server counts as not
 answering, so its other screens show what's saved as they open, until a

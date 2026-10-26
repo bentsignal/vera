@@ -22,6 +22,7 @@ import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
 import { useReplies } from "~/features/conversation/use-replies";
 import { useDevConversation } from "~/features/dev/dev-conversation";
+import { markShown } from "~/features/dev/open-timing";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useMemberNotices } from "~/features/messaging/member-events";
@@ -147,6 +148,7 @@ function useOpening(
   shown: boolean,
 ) {
   useSavedConversation(conversationId, messages, !shown);
+  markShown("conversation", shown);
   return useAccountPending(!shown);
 }
 

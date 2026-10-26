@@ -41,6 +41,7 @@ import {
   writeSaved,
   writeVersions,
 } from "./saved-files";
+import { showSavedHome } from "./show-saved";
 import { watchAnswers } from "./unanswered";
 
 interface Account {
@@ -335,6 +336,8 @@ function startSaving(queryClient: QueryClient, account: Account) {
  */
 export function installSaving() {
   onAccountSession((account) => {
+    // The app opens on what's saved, at once (see `showSavedHome`).
+    showSavedHome(queryClient, account.storagePrefix);
     const stopSaving = startSaving(queryClient, account);
     const stopWatching = watchAnswers(queryClient, account.address);
     const stopRefreshing = refreshSaved(queryClient, account);

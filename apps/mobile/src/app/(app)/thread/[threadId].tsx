@@ -24,6 +24,7 @@ import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
 import { useDevConversation } from "~/features/dev/dev-conversation";
 import { useDevTools } from "~/features/dev/dev-tools";
+import { markShown } from "~/features/dev/open-timing";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useMessages } from "~/features/messaging/messages";
@@ -205,6 +206,7 @@ function Thread({
   });
 
   const pending = useAccountPending(shown === null && !missing);
+  markShown("thread", shown !== null, pending === "ready");
 
   return (
     <View className="bg-background flex-1">

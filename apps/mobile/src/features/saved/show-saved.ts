@@ -1,29 +1,44 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAccount, useVisibleAccounts } from "~/features/messaging/account";
 import { inboxQuery } from "~/features/messaging/inbox";
 import { typingQueryKey } from "~/features/messaging/typing";
-import { hasResult, showSaved } from "./saved-cache";
+import { hasResult, liveResult, showSaved } from "./saved-cache";
 import { conversationFile, inboxFile, readSaved } from "./saved-files";
 import { useSavedFallback } from "./use-saved-fallback";
 
 /**
- * Shows each visible account's saved Home (its Inbox and Spaces) if the
- * Inbox is still loading at the deadline.
+ * Shows an account's saved Home (its Inbox and Spaces) as its session
+ * starts, so the app opens on it at once; its PDS's answers replace it as
+ * they arrive.
  */
-export function useSavedHome(loading: boolean) {
+export function showSavedHome(queryClient: QueryClient, storagePrefix: string) {
+  const saved = readSaved(inboxFile(storagePrefix));
+  if (saved !== undefined) showSaved(queryClient, saved);
+}
+
+/**
+ * Counts each visible account's PDS as not answering if its Inbox hasn't
+ * come from it by the deadline (what's saved shows from the start, see
+ * `showSavedHome`), and shows what's saved if anything is and it isn't
+ * already.
+ */
+export function useSavedHome() {
   const queryClient = useQueryClient();
   const accounts = useVisibleAccounts();
   useSavedFallback(
     accounts.map(({ address }) => address),
-    loading,
+    true,
     () =>
       accounts.flatMap(({ address, storagePrefix }) => {
-        if (hasResult(queryClient.getQueryData(inboxQuery(address).queryKey))) {
-          return [];
+        const query = queryClient
+          .getQueryCache()
+          .find({ exact: true, queryKey: inboxQuery(address).queryKey });
+        if (liveResult(query) !== undefined) return [];
+        if (!hasResult(query?.state.data)) {
+          showSavedHome(queryClient, storagePrefix);
         }
-        const saved = readSaved(inboxFile(storagePrefix));
-        if (saved !== undefined) showSaved(queryClient, saved);
         return [address];
       }),
   );
