@@ -16,7 +16,12 @@ import {
   visibleImageTypes,
 } from "./agentHistory";
 import { generateReply } from "./agentModels";
-import { currentTools, keepTyping, messageSender } from "./agentTools";
+import {
+  currentTime,
+  currentTools,
+  keepTyping,
+  messageSender,
+} from "./agentTools";
 import { waitWhileTyping } from "./assistantHook";
 import { botAccount, botAddress, sendAsBot } from "./bots";
 import { recallOlder } from "./memory";
@@ -195,6 +200,23 @@ function saidItsPiece({ steps }: { steps: StepResult<ToolSet>[] }) {
 }
 
 /**
+ * The gateway's `session_id` for a conversation, which sends all of its
+ * requests to the same place, where its prompt cache is. Without it, most
+ * replies land elsewhere and pay full price for the whole conversation
+ * instead of a quarter for what the last one already sent. A hash, since
+ * the ID holds their address.
+ */
+async function cacheSession(conversationId: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(conversationId),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+/**
  * Answers the person's messages that no reply has seen yet, and returns
  * when the newest of them was sent (undefined when there were none).
  */
@@ -254,12 +276,17 @@ async function reply(
     };
     const assistant = ASSISTANTS[bot.username];
     const tools = assistant.tools(turn);
-    // Last before it answers, where it outweighs what the chat says.
+    // Last before it answers, where it outweighs what the chat says. What
+    // changes from one reply to the next goes here too, after the
+    // conversation, so the prompt cache can reuse everything before it.
     const closing: ModelMessage[] = [
       ...(note === null
         ? []
         : [{ content: teamNote(note), role: "system" as const }]),
-      { content: currentTools(tools), role: "system" as const },
+      {
+        content: `${currentTools(tools)}\n\n${currentTime(turn)}`,
+        role: "system" as const,
+      },
     ];
     const models = modelOrder(visibleImageTypes(history, self)).map(
       (model) => ({
@@ -267,10 +294,13 @@ async function reply(
         model,
       }),
     );
+    const sessionId = await cacheSession(conversationId);
     const options = {
       allowSystemInMessages: true,
       instructions: await assistant.instructions(turn),
-      providerOptions: REASONING,
+      providerOptions: {
+        convexGateway: { ...REASONING.convexGateway, session_id: sessionId },
+      },
       stopWhen: [isStepCount(MAX_STEPS), saidItsPiece],
       // Every step calls a tool: it speaks only through send_message (or
       // stays quiet), and models otherwise often answer in plain text.

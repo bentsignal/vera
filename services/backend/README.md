@@ -130,7 +130,8 @@ Empty or whitespace-only memory searches return no matches without calling
 the embedding provider.
 
 `npx convex run usage:summary '{"bot":"vera"}'` totals what replies cost
-(tokens, dollars, searches), from the gateway's own numbers.
+(tokens, dollars, searches), from the gateway's own numbers, and how much
+of the input came from the prompt cache (`cacheHitRate`).
 
 When an issue is closed without a fix, support follows the original issue
 if it was marked as a duplicate. If the team left a comment when closing
@@ -169,6 +170,14 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   Gemini answers first while one of those is among them; a format neither
   reads shows as a note. One image a model can't read fails the whole
   request, which is what took both assistants down on 2026-10-23.
+- Replies are built so the providers' prompt cache can reuse them: cached
+  input costs a quarter of the full price (Grok 4.7: $0.50 per million
+  tokens against $2). The cache only reuses a request's unchanged start,
+  so the instructions, tools, and conversation come first and what
+  changes every reply (the time, the tool list, the team's note) comes
+  last. Each conversation's requests carry a `session_id` (a hash of its
+  ID) so the gateway sends them where its cache is; without one, most
+  replies missed it.
 - The app sends the device's time zone after a message to an assistant
   (`timeZones:report`), so they know the person's date and time.
 - Each person gets at most 300 replies an hour from Vera and another 300

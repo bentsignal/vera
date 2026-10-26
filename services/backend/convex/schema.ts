@@ -125,6 +125,8 @@ export default defineSchema({
     /** Dollars, as the AI Gateway reports them, plus Parallel's search fee. */
     cost: v.number(),
     inputTokens: v.number(),
+    /** Of `inputTokens`, those read from the provider's prompt cache. */
+    cachedInputTokens: v.optional(v.number()),
     memoryLookups: v.number(),
     ms: v.number(),
     outputTokens: v.number(),

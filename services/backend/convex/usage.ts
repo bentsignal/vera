@@ -20,6 +20,7 @@ export function usageOf(
   results: readonly {
     steps: readonly { providerMetadata: ProviderMetadata | undefined }[];
     totalUsage: {
+      inputTokenDetails: { cacheReadTokens: number | undefined };
       inputTokens: number | undefined;
       outputTokens: number | undefined;
     };
@@ -41,6 +42,11 @@ export function usageOf(
     return total + (typeof cost === "number" ? cost : 0);
   }, 0);
   return {
+    cachedInputTokens: results.reduce(
+      (sum, result) =>
+        sum + (result.totalUsage.inputTokenDetails.cacheReadTokens ?? 0),
+      0,
+    ),
     cost: gatewayCost + tally.searches * SEARCH_COST,
     inputTokens: total("inputTokens"),
     memoryLookups: tally.memoryLookups,
@@ -54,6 +60,7 @@ export const record = internalMutation({
   args: {
     accountId: v.string(),
     bot: botName,
+    cachedInputTokens: v.number(),
     cost: v.number(),
     inputTokens: v.number(),
     memoryLookups: v.number(),
@@ -84,11 +91,19 @@ export const summary = internalQuery({
     }
     const replies = Math.max(1, rows.length);
     const searched = rows.filter((row) => row.searches > 0);
+    // Rows from before cached tokens were recorded don't count toward the rate.
+    const measured = rows.filter((row) => row.cachedInputTokens !== undefined);
     return {
       replies: rows.length,
       totalCost: total((row) => row.cost),
       averageCost: total((row) => row.cost) / replies,
       averageInputTokens: Math.round(total((row) => row.inputTokens) / replies),
+      cacheHitRate:
+        measured.reduce((sum, row) => sum + (row.cachedInputTokens ?? 0), 0) /
+        Math.max(
+          1,
+          measured.reduce((sum, row) => sum + row.inputTokens, 0),
+        ),
       averageSeconds: total((row) => row.ms) / replies / 1000,
       repliesThatSearched: searched.length,
       searches: total((row) => row.searches),
