@@ -4,14 +4,7 @@ import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
 import { internal } from "./_generated/api";
-import {
-  ASSISTANTS,
-  botAccount,
-  botAddress,
-  field,
-  queryAsBot,
-  VERA,
-} from "./bots";
+import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
@@ -91,6 +84,7 @@ export async function scheduleReply(
     .unique();
   const update = {
     ...(note !== undefined && { note }),
+    runId: await scheduleRun(ctx, conversationId, wakeAt),
     waitingSince: undefined,
     wakeAt,
   };
@@ -104,7 +98,18 @@ export async function scheduleReply(
   } else {
     await ctx.db.patch(existing._id, update);
   }
-  await ctx.scheduler.runAt(wakeAt, internal.agent.run, {
+}
+
+/**
+ * Schedules the reply that runs at `wakeAt` and returns its ID, which the
+ * caller stores as the row's `runId` with that `wakeAt`.
+ */
+export function scheduleRun(
+  ctx: MutationCtx,
+  conversationId: string,
+  wakeAt: number,
+) {
+  return ctx.scheduler.runAt(wakeAt, internal.agent.run, {
     conversationId,
     wakeAt,
   });
@@ -145,7 +150,7 @@ export async function waitWhileTyping(
   ) {
     return false;
   }
-  const response = await queryAsBot(ctx, botAccount(row.bot), {
+  const response = await queryAsBot(ctx, VERA, {
     args: { conversationId: row.conversationId },
     type: "typing",
   });
@@ -155,12 +160,9 @@ export async function waitWhileTyping(
   if (!typing) return false;
   const wakeAt = now + TYPING_RECHECK;
   await ctx.db.patch(row._id, {
+    runId: await scheduleRun(ctx, row.conversationId, wakeAt),
     wakeAt,
     waitingSince: row.waitingSince ?? now,
-  });
-  await ctx.scheduler.runAt(wakeAt, internal.agent.run, {
-    conversationId: row.conversationId,
-    wakeAt,
   });
   return true;
 }

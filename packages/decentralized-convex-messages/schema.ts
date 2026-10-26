@@ -10,6 +10,7 @@ import {
   linkPreview,
   mention,
   quote,
+  said,
   spaceRole,
 } from "./protocol.ts";
 
@@ -95,6 +96,10 @@ export default defineSchema({
     linkPreviews: v.optional(v.array(linkCard)),
     mentions: v.optional(v.array(mention)),
     messageId: v.string(),
+    // Who it counts as @mentioning because it says their name or a keyword
+    // (see `noteWords`), set once its push works that out. Only for this
+    // PDS's activity and pushes, never in what's sent.
+    saidTo: v.optional(v.array(v.string())),
     // A reply's quote of the message it answers, its thread (the original's
     // ID), and whether it stays out of the conversation (one sent in the
     // thread). See `message` in the protocol.
@@ -136,11 +141,13 @@ export default defineSchema({
     "by_key",
     ["key"],
   ),
-  // One per account a message @mentions, so their activity finds it.
+  // One per account a message @mentions, or says the name or a keyword
+  // of (`said`), so their activity finds it.
   mentions: defineTable({
     accountId: v.string(),
     conversationId: v.string(),
     messageId: v.string(),
+    said: v.optional(said),
     sentAt: v.number(),
     // The thread of a reply kept there, which shows it instead of the
     // conversation.
@@ -288,8 +295,9 @@ export default defineSchema({
     .index("by_code", ["code"])
     .index("by_space", ["spaceId"]),
   // Kinds of pushes an account turned off; absent fields are on. Default
-  // alerts for groups and channels are `groupAlerts` and `channelAlerts`,
-  // or else `none` where `groups` or `channels` is false, else `all`.
+  // alerts for groups and channels are `groupAlerts`
+  // and `channelAlerts`, or else `none` where `groups` or `channels` is
+  // false, else `all`.
   notificationSettings: defineTable({
     accountId: v.string(),
     channelAlerts: v.optional(alertLevel),
@@ -299,9 +307,13 @@ export default defineSchema({
     groupAlerts: v.optional(alertLevel),
     groups: v.optional(v.boolean()),
     invites: v.optional(v.boolean()),
+    // Words that alert the account when a message says one.
+    keywords: v.optional(v.array(v.string())),
     reactions: v.optional(v.boolean()),
     replies: v.optional(v.boolean()),
     threadReplies: v.optional(v.boolean()),
+    // Pushes for messages that say the account's name: off until turned on.
+    yourName: v.optional(v.boolean()),
   }).index("by_account", ["accountId"]),
   pushTokens: defineTable({
     accountId: v.string(),

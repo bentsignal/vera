@@ -2,7 +2,7 @@ import type { IssueState } from "../bug-reports";
 import { closingCommentOf, duplicateOf } from "../issue-closures";
 import { optionalEnvironment } from "./lib";
 
-// GitHub for Vera Support's bug reports: creating issues and reading how
+// GitHub for Vera's bug reports: creating issues and reading how
 // their fixes are going. Needs GITHUB_TOKEN (a fine-grained token with
 // read and write access to issues, read access to pull requests and
 // contents) and GITHUB_REPOSITORY ("owner/name"). Without them, reports are

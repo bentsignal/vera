@@ -107,8 +107,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       : "./google-services.json",
   },
   plugins: [
+    "./plugins/with-android-websocket-policy.cjs",
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
+    // React Native from source on iOS, for the repo's patch to it.
+    "./plugins/with-react-native-from-source.cjs",
     ["./plugins/with-alternate-icons.cjs", { icons: ALTERNATE_ICONS }],
     "expo-router",
     [

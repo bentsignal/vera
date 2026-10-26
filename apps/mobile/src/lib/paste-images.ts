@@ -1,3 +1,5 @@
+import type { RefObject } from "react";
+import type { TextInput } from "react-native";
 import {
   EventEmitter,
   requireOptionalNativeModule,
@@ -44,4 +46,14 @@ export function usePastedImages(
   useEventListener(pasteImages, "onPasteImages", ({ images }) =>
     onPaste(images),
   );
+}
+
+/** Only the focused composer receives a paste when routes stay mounted. */
+export function useFocusedPastedImages(
+  input: RefObject<TextInput | null>,
+  onPaste: (images: readonly PastedImage[]) => void,
+) {
+  usePastedImages((images) => {
+    if (input.current?.isFocused() === true) onPaste(images);
+  });
 }

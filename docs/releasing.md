@@ -13,6 +13,7 @@ the release with the `vera-release` skill and
 | ---------------- | -------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
 | Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
 | Play build       | Vera     | `production` (app bundle, Play signing) | `vera.chat`     | `production`   | Play internal testing ("Vera testers")          |
+| Private preview  | Vera     | `preview` (ad hoc iOS, signed APK)      | `vera.chat`     | `preview`      | Shawn only, installed from an install page     |
 | Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, for update and channel checks    |
 | Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone, the same                 |
 | Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
@@ -37,6 +38,20 @@ Google's key, whose SHA-256 is in the passkey variables and
 TestFlight and the App Store run the same binary: Apple promotes a TestFlight
 build to the App Store, so there is one store profile and one production
 channel.
+
+Private production tests use `eas build --local --profile preview`, then
+`scripts/install-page.sh` with its fourth argument `production`, so its
+page names Vera and explains the replacement. This profile inherits
+production configuration,
+uses an empty, separate preview update channel, and submits to no store.
+It can build the integration branch before Shawn approves merging it.
+
+The iOS preview uses the production bundle ID and signing team. Install it
+over TestFlight without deleting Vera to keep its app data and keychain;
+reinstall from TestFlight to return. Android's APK uses EAS's production
+key, while Play uses Google's key, so switching in either direction needs
+uninstalling Vera and signing in again. Check the APK certificate against
+the live passkey and invite-link association files before distributing it.
 
 Each binary accepts over-the-air updates (EAS Update, `expo-updates`) only
 for its **runtime version**, which is the native fingerprint (`runtimeVersion:
@@ -66,9 +81,25 @@ base and head on Linux, which is consistent within that one run.
 ### When an update goes in
 
 The app checks for an update on every launch, every return from the
-background, and every minute in the foreground, and downloads it without
-showing anything (`apps/mobile/src/features/updates`). Then it restarts into
-it behind a splash-colored screen and reopens on the screen it was on:
+background, and every minute in the foreground
+(`apps/mobile/src/features/updates`).
+
+A launch waits for its update, so it opens on the latest one (a new install
+from TestFlight or the store may be dozens of updates behind):
+
+- The splash stays up while it checks and downloads. With no update, or one
+  that lands within 1.5 seconds, the app opens (restarting into the update
+  first, behind the same blank screen).
+- Past 1.5 seconds, "Updating Vera…" shows, for at least a second, until the
+  app restarts into the update.
+- Nobody gets stuck there. After 15 seconds it offers "Continue Without
+  Updating". It opens the app by itself if the check or download fails or
+  goes 10 seconds without progress, and after 60 seconds whatever happens.
+  The update then goes in like any other, below.
+
+Coming back from the background never waits. An update found then, or one a
+launch gave up on, downloads without showing anything and restarts the app
+behind a splash-colored screen, on the screen it was on:
 
 - at once, if the update is ready within about 3 seconds of opening;
 - otherwise at the first quiet moment: 10 seconds with no touches, the
@@ -101,6 +132,24 @@ So the update has to be out seconds after the deploy:
 deploys the backend, and publishes the update straight after, about 15–20
 seconds of "Updating Vera…" for anyone in the app. `pnpm release plan`
 says when the number went up.
+
+### Native-list update policy
+
+The October 25 native-list release uses voluntary store updates. Keep
+`OUTDATED_RUNTIMES` empty unless Shawn explicitly approves a different policy.
+Old binaries retain their React Native list and compatible server access;
+new native binaries use their own runtime and cannot reach old binaries as
+an OTA. No old-runtime gate prelude or automatic deny-list activation is
+required. A future forced-update rollout needs its own approval and runtime
+review. The release kept `BREAKING_VERSION` at 3.
+
+The native list is now the app's only message list: the React Native list
+and its Settings → Experimental switch are removed. Binaries from before
+the native-list release (iOS build 9, Android build 6) keep the React
+Native list in the JavaScript they already have: updates match the native
+fingerprint, so newer JavaScript never reaches them. The detailed acceptance and deferred Android camera preview cosmetics
+are recorded in
+[the native-list release record](../.plans/native-list-release-20261025.md).
 
 ## Release history in git
 

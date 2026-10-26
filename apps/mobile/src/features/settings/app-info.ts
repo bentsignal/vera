@@ -4,7 +4,7 @@ import * as Device from "expo-device";
 import * as Updates from "expo-updates";
 
 // What this copy of the app is: shown in More → About, and sent to Vera
-// Support with bug reports.
+// with bug reports.
 
 /** The marketing version and the native build number, such as "0.1.0 (6)". */
 export function appVersion() {
