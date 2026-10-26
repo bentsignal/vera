@@ -470,7 +470,7 @@ final class MessageCell: RowCell {
 
   override func setReveal(_ reveal: CGFloat) {
     let reveal = message?.layout == .bubbles ? reveal : 0
-    revealTime.alpha = reveal / Metrics.revealWidth
+    revealTime.alpha = reveal / Metrics.revealWidth(theme ?? Theme())
     revealTime.transform = CGAffineTransform(translationX: -reveal, y: 0)
     body.transform = layout?.slides == true ? CGAffineTransform(translationX: -reveal, y: 0) : .identity
   }

@@ -307,7 +307,10 @@ export interface Theme {
     readonly monogramTop: string;
     readonly monogramBottom: string;
   };
-  /** Point sizes and line heights. */
+  /**
+   * Point sizes and line heights at the default system text size. Native
+   * scales them, and the list's other text, to the device's setting.
+   */
   readonly type: {
     readonly body: { readonly size: number; readonly lineHeight: number };
     readonly name: { readonly size: number; readonly lineHeight: number };

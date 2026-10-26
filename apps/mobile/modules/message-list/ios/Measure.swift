@@ -298,14 +298,14 @@ enum Metrics {
   static let tapbackPeek: CGFloat = 14
   static let tapbackSpace: CGFloat = 25
   static let tapbackOverhang: CGFloat = 14
-  static let nameSpace: CGFloat = 22
   static let mediaWidth: CGFloat = 240
   static let mediaMaxHeight: CGFloat = 300
   static let mediaRadius: CGFloat = 16
   static let cardWidth: CGFloat = 256
   static let replyIndent: CGFloat = 22
-  static let revealWidth: CGFloat = 72
-  static let chipHeight: CGFloat = 26
+  /// How far dragging the list left reveals message times: 72, wider
+  /// when larger text needs it.
+  static func revealWidth(_ theme: Theme) -> CGFloat { max(72, theme.text(60) + 12) }
   static let carouselHeight: CGFloat = 200
   static let carouselGap: CGFloat = 6
   static let deckWidth: CGFloat = 220
@@ -435,14 +435,18 @@ struct Measurer {
     return count == 0 ? 0 : Metrics.tapback + CGFloat(count - 1) * Metrics.tapbackPeek
   }
 
+  /// A reaction chip's height: a line of its text and 4 above and below.
+  var chipHeight: CGFloat { theme.text(18) + 8 }
+
   func chipText(_ reaction: Reaction) -> NSAttributedString {
     let color = reaction.mine ? theme.accent : theme.muted
+    let line = theme.text(18)
     let result = NSMutableAttributedString()
     if reaction.imageUrl == nil {
-      result.append(plain(reaction.emoji ?? reaction.label, 13, color, lineHeight: 18))
-      result.append(plain(" ", 4, color, lineHeight: 18))
+      result.append(plain(reaction.emoji ?? reaction.label, theme.text(13), color, lineHeight: line))
+      result.append(plain(" ", theme.text(4), color, lineHeight: line))
     }
-    result.append(plain("\(reaction.count)", 13, color, weight: .semibold, lineHeight: 18))
+    result.append(plain("\(reaction.count)", theme.text(13), color, weight: .semibold, lineHeight: line))
     return result
   }
 
@@ -454,19 +458,19 @@ struct Measurer {
     var result: [ChipLayout] = []
     for reaction in reactions {
       let string = chipText(reaction)
-      let textSize = measure(string, width: 200, lineHeight: 18)
+      let textSize = measure(string, width: 200, lineHeight: theme.text(18))
       let imageWidth: CGFloat = reaction.imageUrl == nil ? 0 : 20
       let chipWidth = 8 + imageWidth + textSize.width + 8
       if x > 0 && x + chipWidth > width {
         x = 0
-        y += Metrics.chipHeight + 4
+        y += chipHeight + 4
       }
-      let frame = CGRect(x: origin.x + x, y: origin.y + y, width: chipWidth, height: Metrics.chipHeight)
-      let text = TextBox(string: string, frame: CGRect(x: 8 + imageWidth, y: (Metrics.chipHeight - textSize.height) / 2, width: textSize.width, height: textSize.height))
+      let frame = CGRect(x: origin.x + x, y: origin.y + y, width: chipWidth, height: chipHeight)
+      let text = TextBox(string: string, frame: CGRect(x: 8 + imageWidth, y: (chipHeight - textSize.height) / 2, width: textSize.width, height: textSize.height))
       result.append(ChipLayout(id: "\(part)|\(reaction.key)", part: part, reaction: reaction, text: text, frame: frame))
       x += chipWidth + 4
     }
-    return (result, y + Metrics.chipHeight)
+    return (result, y + chipHeight)
   }
 
   // MARK: Media sizes
@@ -518,6 +522,8 @@ struct Measurer {
     var y = message.startsGroup ? theme.runGap : theme.rowGap
     let top = y
 
+    // The sender's name over a group's first message, and 6 under it.
+    let nameSpace = theme.name.lineHeight + 6
     var nameWidth: CGFloat = 0
     if incomingGroup && message.startsGroup {
       let string = plain(message.author.name, theme.name.size, theme.muted, lineHeight: theme.name.lineHeight, truncate: true)
@@ -589,19 +595,20 @@ struct Measurer {
           content = .deck(deck)
         }
       case let .file(name, sizeLabel, url, _):
-        size = CGSize(width: min(Metrics.cardWidth, available), height: 64)
-        let nameBox = box(plain(name, 15, theme.foreground, weight: .semibold, lineHeight: 20, truncate: true), x: 64, y: 12, maxWidth: size.width - 76, lineHeight: 20, maxLines: 1)
-        let sizeBox = box(plain(sizeLabel, 13, theme.muted, lineHeight: 18, truncate: true), x: 64, y: 32, maxWidth: size.width - 76, lineHeight: 18, maxLines: 1)
-        content = .file(name: nameBox, size: sizeBox, icon: CGRect(x: 12, y: 12, width: 40, height: 40), url: url)
+        let card = fileCard(name: name, sizeLabel: sizeLabel, url: url, width: min(Metrics.cardWidth, available))
+        size = CGSize(width: min(Metrics.cardWidth, available), height: card.height)
+        content = card.content
       case let .linkCard(card):
         let card = linkCard(card, width: min(Metrics.cardWidth, available))
         size = CGSize(width: min(Metrics.cardWidth, available), height: card.height)
         content = .linkCard(card.layout)
       case let .quote(author, text, thumbnailUrl, messageId, _):
         let thumb: CGFloat = thumbnailUrl == nil ? 0 : 40
-        let authorBox = box(plain(author.name, 12, theme.muted, weight: .semibold, lineHeight: 16, truncate: true), x: 12, y: 6, maxWidth: available - 24 - thumb, lineHeight: 16, maxLines: 1)
-        let textBox = box(plain(text, 13, theme.muted, lineHeight: 17), x: 12, y: 22, maxWidth: available - 24 - thumb, lineHeight: 17, maxLines: 2)
-        let innerHeight = 16 + textBox.frame.height
+        let authorLine = theme.text(16)
+        let textLine = theme.text(17)
+        let authorBox = box(plain(author.name, theme.text(12), theme.muted, weight: .semibold, lineHeight: authorLine, truncate: true), x: 12, y: 6, maxWidth: available - 24 - thumb, lineHeight: authorLine, maxLines: 1)
+        let textBox = box(plain(text, theme.text(13), theme.muted, lineHeight: textLine), x: 12, y: 6 + authorLine, maxWidth: available - 24 - thumb, lineHeight: textLine, maxLines: 2)
+        let innerHeight = authorLine + textBox.frame.height
         size = CGSize(width: max(authorBox.frame.width, textBox.frame.width) + 24 + thumb, height: innerHeight + 12)
         let thumbnail = thumbnailUrl == nil ? nil : CGRect(x: size.width - 12 - 32, y: (size.height - 32) / 2, width: 32, height: 32)
         content = .quote(author: authorBox, text: textBox, thumbnail: thumbnail, thumbnailUrl: thumbnailUrl, messageId: messageId)
@@ -616,7 +623,7 @@ struct Measurer {
         if layout.name != nil {
           let fanLeft = x + size.width + Metrics.tapbackOverhang - fan
           let besideName = fan == 0 || fanLeft >= left + 12 + nameWidth + 6
-          above = besideName ? max(Metrics.nameSpace, fan > 0 ? Metrics.tapbackSpace : 0) : Metrics.nameSpace + Metrics.tapbackSpace
+          above = besideName ? max(nameSpace, fan > 0 ? Metrics.tapbackSpace : 0) : nameSpace + Metrics.tapbackSpace
         } else if fan > 0 {
           above = Metrics.tapbackSpace
         }
@@ -625,7 +632,7 @@ struct Measurer {
       }
       y += above
       if first, layout.name != nil {
-        layout.name?.frame.origin.y = y - Metrics.nameSpace
+        layout.name?.frame.origin.y = y - nameSpace
         if fan > 0, above > Metrics.tapbackSpace { layout.name?.frame.origin.y = y - above }
       }
       let frame = CGRect(x: x, y: y, width: size.width, height: size.height)
@@ -646,7 +653,9 @@ struct Measurer {
     if let quoteFrame, let bodyTop {
       // The "L" from the quote down into the reply, on the reply's side.
       let x = side == .right ? right - 12 - 7 : left + 12
-      layout.replyCurve = CGRect(x: x, y: quoteFrame.maxY, width: 7, height: bodyTop + 19 - quoteFrame.maxY)
+      // It ends halfway down a one-line bubble.
+      let bodyMiddle = (theme.body.lineHeight + 16) / 2
+      layout.replyCurve = CGRect(x: x, y: quoteFrame.maxY, width: 7, height: bodyTop + bodyMiddle - quoteFrame.maxY)
     }
 
     // Lines under the message.
@@ -664,7 +673,7 @@ struct Measurer {
       case .replies:
         let piece = replies(line, y: y + 4, side: side, left: left, right: right, maxWidth: maxBubble, pill: false)
         layout.footer.append(piece)
-        y += 4 + 18
+        y += 4 + repliesHeight(pill: false)
       }
     }
     if message.status == .failed, !message.footer.contains(where: { $0.kind == .notSent }) {
@@ -681,7 +690,7 @@ struct Measurer {
     let firstTop = layout.parts.first?.frame.minY ?? top
     let time = plain(message.timeLabel, theme.caption.size, theme.muted, lineHeight: theme.caption.lineHeight, alignment: .right)
     let timeY = firstTop + (y - firstTop - theme.caption.lineHeight) / 2
-    layout.revealTime = TextBox(string: time, frame: CGRect(x: width, y: max(0, timeY), width: Metrics.revealWidth - 12, height: theme.caption.lineHeight))
+    layout.revealTime = TextBox(string: time, frame: CGRect(x: width, y: max(0, timeY), width: Metrics.revealWidth(theme) - 12, height: theme.caption.lineHeight))
 
     layout.height = ceil(y)
     layout.bounds = layout.parts.reduce(CGRect.null) { $0.union($1.frame) }
@@ -698,34 +707,56 @@ struct Measurer {
     return .notSent(frame: CGRect(x: x, y: y, width: width, height: theme.caption.lineHeight), icon: icon, label: label)
   }
 
+  /// A thread's replies line: its 18-point faces or its label's line,
+  /// whichever is taller, and 4 above and below in a pill.
+  func repliesHeight(pill: Bool) -> CGFloat {
+    max(18, theme.text(18)) + (pill ? 8 : 0)
+  }
+
   func replies(_ line: FooterLine, y: CGFloat, side: Side, left: CGFloat, right: CGFloat, maxWidth: CGFloat, pill: Bool) -> FooterPiece {
     let faces = Array(line.people.prefix(3))
     let faceSize: CGFloat = 18
     let facesWidth = faces.isEmpty ? 0 : faceSize + CGFloat(faces.count - 1) * (faceSize - 6)
-    let string = plain(line.text, 13, pill ? theme.foreground : theme.accent, weight: .semibold, lineHeight: 18, truncate: true)
-    var label = box(string, x: 0, y: 0, maxWidth: maxWidth - facesWidth - 40, lineHeight: 18, maxLines: 1)
+    let textLine = theme.text(18)
+    let content = repliesHeight(pill: false)
+    let faceY = (content - faceSize) / 2
+    let string = plain(line.text, theme.text(13), pill ? theme.foreground : theme.accent, weight: .semibold, lineHeight: textLine, truncate: true)
+    var label = box(string, x: 0, y: 0, maxWidth: maxWidth - facesWidth - 40, lineHeight: textLine, maxLines: 1)
     let gap: CGFloat = faces.isEmpty ? 0 : 6
     if pill {
       let chevron: CGFloat = 6 + 8
       let width = 6 + facesWidth + gap + label.frame.width + chevron + 10
       var placed: [(Person, CGRect)] = []
       for (index, person) in faces.enumerated() {
-        placed.append((person, CGRect(x: 6 + CGFloat(index) * (faceSize - 6), y: 4, width: faceSize, height: faceSize)))
+        placed.append((person, CGRect(x: 6 + CGFloat(index) * (faceSize - 6), y: 4 + faceY, width: faceSize, height: faceSize)))
       }
-      label.frame.origin = CGPoint(x: 6 + facesWidth + gap, y: 4)
-      let chevronFrame = CGRect(x: label.frame.maxX + 6, y: 4 + 5, width: 8, height: 8)
-      return .replies(frame: CGRect(x: left, y: y, width: width, height: 26), faces: placed, label: label, pill: true, chevron: chevronFrame)
+      label.frame.origin = CGPoint(x: 6 + facesWidth + gap, y: 4 + (content - label.frame.height) / 2)
+      let chevronFrame = CGRect(x: label.frame.maxX + 6, y: 4 + (content - 8) / 2, width: 8, height: 8)
+      return .replies(frame: CGRect(x: left, y: y, width: width, height: content + 8), faces: placed, label: label, pill: true, chevron: chevronFrame)
     }
     let width = facesWidth + gap + label.frame.width
     let x = side == .right ? right - width : left + 4
     var placed: [(Person, CGRect)] = []
     // Your own messages read right to left: the label, then the faces.
     let facesX: CGFloat = side == .right ? label.frame.width + gap : 0
-    label.frame.origin = CGPoint(x: side == .right ? 0 : facesWidth + gap, y: 0)
+    label.frame.origin = CGPoint(x: side == .right ? 0 : facesWidth + gap, y: (content - label.frame.height) / 2)
     for (index, person) in faces.enumerated() {
-      placed.append((person, CGRect(x: facesX + CGFloat(index) * (faceSize - 6), y: 0, width: faceSize, height: faceSize)))
+      placed.append((person, CGRect(x: facesX + CGFloat(index) * (faceSize - 6), y: faceY, width: faceSize, height: faceSize)))
     }
-    return .replies(frame: CGRect(x: x, y: y, width: width, height: faceSize), faces: placed, label: label, pill: false, chevron: nil)
+    return .replies(frame: CGRect(x: x, y: y, width: width, height: content), faces: placed, label: label, pill: false, chevron: nil)
+  }
+
+  /// A file: its icon, and its name over its size, both centered in the
+  /// card's height (at least the icon's).
+  func fileCard(name: String, sizeLabel: String, url: String, width: CGFloat) -> (content: PartContent, height: CGFloat) {
+    let nameLine = theme.text(20)
+    let sizeLine = theme.text(18)
+    let inner = max(40, nameLine + sizeLine)
+    let textTop = 12 + (inner - nameLine - sizeLine) / 2
+    let nameBox = box(plain(name, theme.text(15), theme.foreground, weight: .semibold, lineHeight: nameLine, truncate: true), x: 64, y: textTop, maxWidth: width - 76, lineHeight: nameLine, maxLines: 1)
+    let sizeBox = box(plain(sizeLabel, theme.text(13), theme.muted, lineHeight: sizeLine, truncate: true), x: 64, y: textTop + nameLine, maxWidth: width - 76, lineHeight: sizeLine, maxLines: 1)
+    let icon = CGRect(x: 12, y: 12 + (inner - 40) / 2, width: 40, height: 40)
+    return (.file(name: nameBox, size: sizeBox, icon: icon, url: url), inner + 24)
   }
 
   func linkCard(_ card: Block.LinkCard, width: CGFloat) -> (layout: LinkCardLayout, height: CGFloat) {
@@ -736,12 +767,16 @@ struct Measurer {
       // No preview (link-preview-card.tsx): an icon, the host, the address.
       let textX: CGFloat = 12 + 36 + 12
       let inner = width - textX - 12
-      let host = box(plain(card.site, 15, theme.foreground, weight: .semibold, lineHeight: 20, truncate: true), x: textX, y: 10, maxWidth: inner, lineHeight: 20, maxLines: 1)
-      let address = box(plain(card.url, 13, theme.muted, lineHeight: 18, truncate: true), x: textX, y: 32, maxWidth: inner, lineHeight: 18, maxLines: 1)
+      let hostLine = theme.text(20)
+      let addressLine = theme.text(18)
+      let height = max(60, 10 + hostLine + 2 + addressLine + 10)
+      let textTop = (height - hostLine - 2 - addressLine) / 2
+      let host = box(plain(card.site, theme.text(15), theme.foreground, weight: .semibold, lineHeight: hostLine, truncate: true), x: textX, y: textTop, maxWidth: inner, lineHeight: hostLine, maxLines: 1)
+      let address = box(plain(card.url, theme.text(13), theme.muted, lineHeight: addressLine, truncate: true), x: textX, y: textTop + hostLine + 2, maxWidth: inner, lineHeight: addressLine, maxLines: 1)
       layout.title = host
       layout.description = address
-      layout.icon = CGRect(x: 12, y: 12, width: 36, height: 36)
-      return (layout, 60)
+      layout.icon = CGRect(x: 12, y: (height - 36) / 2, width: 36, height: 36)
+      return (layout, height)
     }
     var y: CGFloat = 0
     if card.imageUrl != nil {
@@ -751,17 +786,17 @@ struct Measurer {
     y += 10
     let inner = width - 24
     if !card.site.isEmpty {
-      let site = box(plain(card.site.uppercased(), 12, theme.muted, lineHeight: 16, truncate: true), x: 12, y: y, maxWidth: inner, lineHeight: 16, maxLines: 1)
+      let site = box(plain(card.site.uppercased(), theme.text(12), theme.muted, lineHeight: theme.text(16), truncate: true), x: 12, y: y, maxWidth: inner, lineHeight: theme.text(16), maxLines: 1)
       layout.site = site
       y = site.frame.maxY + 2
     }
     if let title = card.title, !title.isEmpty {
-      let text = box(plain(title, 15, theme.foreground, weight: .semibold, lineHeight: 20), x: 12, y: y, maxWidth: inner, lineHeight: 20, maxLines: 2)
+      let text = box(plain(title, theme.text(15), theme.foreground, weight: .semibold, lineHeight: theme.text(20)), x: 12, y: y, maxWidth: inner, lineHeight: theme.text(20), maxLines: 2)
       layout.title = text
       y = text.frame.maxY + 2
     }
     if let description = card.description, !description.isEmpty {
-      let text = box(plain(description, 13, theme.muted, lineHeight: 18), x: 12, y: y, maxWidth: inner, lineHeight: 18, maxLines: 2)
+      let text = box(plain(description, theme.text(13), theme.muted, lineHeight: theme.text(18)), x: 12, y: y, maxWidth: inner, lineHeight: theme.text(18), maxLines: 2)
       layout.description = text
       y = text.frame.maxY + 2
     }
@@ -794,28 +829,33 @@ struct Measurer {
     var blocks = Array(message.blocks.enumerated())
     if let quoteIndex = blocks.firstIndex(where: { if case .quote = $0.element { return true } else { return false } }),
        case let .quote(author, text, _, messageId, _) = blocks[quoteIndex].element {
-      let string = NSMutableAttributedString(attributedString: plain(author.name + " ", 13, theme.muted, weight: .semibold, lineHeight: 18, truncate: true))
-      string.append(plain(text.replacingOccurrences(of: "\n", with: " "), 13, theme.muted, lineHeight: 18, truncate: true))
+      let textLine = theme.text(18)
+      // The 18-point face or the text's line, whichever is taller.
+      let line = max(18, textLine)
+      let string = NSMutableAttributedString(attributedString: plain(author.name + " ", theme.text(13), theme.muted, weight: .semibold, lineHeight: textLine, truncate: true))
+      string.append(plain(text.replacingOccurrences(of: "\n", with: " "), theme.text(13), theme.muted, lineHeight: textLine, truncate: true))
       let lineY: CGFloat = 16
       let faceX = pad + 17 + 22 + 4
-      let textBox = box(string, x: faceX + 18 + 6, y: lineY, maxWidth: width - (faceX + 24) - pad, lineHeight: 18, maxLines: 1)
-      let face = CGRect(x: faceX, y: lineY, width: 18, height: 18)
-      let elbow = CGRect(x: pad + 17, y: lineY + 9, width: 22, height: 12 + 6)
-      let frame = CGRect(x: 0, y: 0, width: width, height: lineY + 18)
+      let textBox = box(string, x: faceX + 18 + 6, y: lineY + (line - textLine) / 2, maxWidth: width - (faceX + 24) - pad, lineHeight: textLine, maxLines: 1)
+      let face = CGRect(x: faceX, y: lineY + (line - 18) / 2, width: 18, height: 18)
+      // From the face's middle down into the reply's photo, 3 into it.
+      let elbow = CGRect(x: pad + 17, y: lineY + line / 2, width: 22, height: line / 2 + 6 + 3)
+      let frame = CGRect(x: 0, y: 0, width: width, height: lineY + line)
       layout.parts.append(PartLayout(frame: frame, content: .quoteLine(face: face, person: author, text: textBox, elbow: elbow, messageId: messageId), part: nil, blockIndex: blocks[quoteIndex].offset))
       blocks.remove(at: quoteIndex)
-      y = lineY + 18 + 6
+      y = lineY + line + 6
     } else {
       y = message.startsGroup ? 20 : 6
     }
 
     if message.startsGroup && message.showAuthor {
       layout.avatar = (message.author, CGRect(x: pad, y: y, width: avatar, height: avatar))
-      let name = box(plain(message.author.name, 15, theme.foreground, weight: .bold, lineHeight: 20, truncate: true), x: contentX, y: y, maxWidth: contentWidth * 0.7, lineHeight: 20, maxLines: 1)
+      let line = theme.text(20)
+      let name = box(plain(message.author.name, theme.text(15), theme.foreground, weight: .bold, lineHeight: line, truncate: true), x: contentX, y: y, maxWidth: contentWidth * 0.7, lineHeight: line, maxLines: 1)
       layout.name = name
-      let time = box(plain(message.timeLabel, theme.caption.size, theme.muted, lineHeight: 20, truncate: true), x: name.frame.maxX + 8, y: y, maxWidth: contentWidth - name.frame.width - 8, lineHeight: 20, maxLines: 1)
+      let time = box(plain(message.timeLabel, theme.caption.size, theme.muted, lineHeight: line, truncate: true), x: name.frame.maxX + 8, y: y, maxWidth: contentWidth - name.frame.width - 8, lineHeight: line, maxLines: 1)
       layout.headerTime = time
-      y += 20 + 4
+      y += line + 4
     }
 
     let edited = message.footer.first { $0.kind == .edited }
@@ -876,10 +916,9 @@ struct Measurer {
         }
       case let .file(name, sizeLabel, url, _):
         let cardWidth = min(Metrics.cardWidth, contentWidth)
-        frame = CGRect(x: contentX, y: y, width: cardWidth, height: 64)
-        let nameBox = box(plain(name, 15, theme.foreground, weight: .semibold, lineHeight: 20, truncate: true), x: 64, y: 12, maxWidth: cardWidth - 76, lineHeight: 20, maxLines: 1)
-        let sizeBox = box(plain(sizeLabel, 13, theme.muted, lineHeight: 18, truncate: true), x: 64, y: 32, maxWidth: cardWidth - 76, lineHeight: 18, maxLines: 1)
-        content = .file(name: nameBox, size: sizeBox, icon: CGRect(x: 12, y: 12, width: 40, height: 40), url: url)
+        let card = fileCard(name: name, sizeLabel: sizeLabel, url: url, width: cardWidth)
+        frame = CGRect(x: contentX, y: y, width: cardWidth, height: card.height)
+        content = card.content
       case let .linkCard(card):
         let cardWidth = min(Metrics.cardWidth, contentWidth)
         let measured = linkCard(card, width: cardWidth)
@@ -907,7 +946,7 @@ struct Measurer {
       case .replies:
         let piece = replies(line, y: y + 6, side: .left, left: contentX, right: width - pad, maxWidth: contentWidth, pill: true)
         layout.footer.append(piece)
-        y += 6 + 26
+        y += 6 + repliesHeight(pill: true)
       }
     }
     if message.status == .failed, !message.footer.contains(where: { $0.kind == .notSent }) {
@@ -998,6 +1037,7 @@ struct Measurer {
       var x = pad + (faces.isEmpty ? 0 : CGFloat(faces.count - 1) * (size - 6) + size)
       var overflow: TextBox?
       if faced.count > 4 {
+        // Sized like the faces it sits among, so not with the text size.
         let string = plain("+\(faced.count - 3)", 12, theme.muted, weight: .semibold, lineHeight: 16, alignment: .center)
         // Ringed like the faces and overlapping the last as they overlap
         // (`Faces`' more: marginLeft -overlap - ring, margin -ring), so
@@ -1015,13 +1055,15 @@ struct Measurer {
       }
       return TypingLayout(height: height, faces: faces, faceRing: 2, bubble: bubble, label: nil, dots: dots, overflow: overflow)
     }
-    let height: CGFloat = 10 + 20 + 2
+    let line = theme.text(20)
+    let height: CGFloat = 10 + line + 2
     let size: CGFloat = 18
+    let faceY = 10 + (line - size) / 2
     let faced = showFaces ? people : []
     let shown = faced.count == 4 ? faced : Array(faced.prefix(3))
     var faces: [(Person, CGRect)] = []
     for (index, person) in shown.enumerated() {
-      faces.append((person, CGRect(x: pad + CGFloat(index) * (size - 4), y: 11, width: size, height: size)))
+      faces.append((person, CGRect(x: pad + CGFloat(index) * (size - 4), y: faceY, width: size, height: size)))
     }
     // No faces: the label starts where a stacked message's text does.
     var x = faced.isEmpty ? pad + theme.avatarSize + 12 : pad + CGFloat(faces.count - 1) * (size - 4) + size + 8
@@ -1031,15 +1073,16 @@ struct Measurer {
       // last face as the faces overlap (typing-parts.tsx `Faces`): at least
       // the faces' size, 4 of padding at each side, the ring around it.
       let ring: CGFloat = 1.5
+      // Sized like the faces it sits among, so not with the text size.
       let string = plain("+\(faced.count - 3)", 10, theme.muted, weight: .semibold, lineHeight: 16, alignment: .center)
-      let inner = CGRect(x: x - 8 - 4, y: 11, width: max(size, measure(string, width: 40, lineHeight: 16).width + 8), height: size)
+      let inner = CGRect(x: x - 8 - 4, y: faceY, width: max(size, measure(string, width: 40, lineHeight: 16).width + 8), height: size)
       overflow = TextBox(string: string, frame: inner.insetBy(dx: -ring, dy: -ring))
       x = inner.maxX + 8
     }
-    let text = box(plain(label, 13, theme.muted, lineHeight: 20, truncate: true), x: x, y: 10, maxWidth: width - x - pad - 22, lineHeight: 20, maxLines: 1)
+    let text = box(plain(label, theme.text(13), theme.muted, lineHeight: line, truncate: true), x: x, y: 10, maxWidth: width - x - pad - 22, lineHeight: line, maxLines: 1)
     // 4-point dots 2 apart, 8 after the label (`gap-2`), centered on the line.
     let dots = (0..<3).map { index in
-      CGRect(x: text.frame.maxX + 8 + CGFloat(index) * 6, y: 10 + 8, width: 4, height: 4)
+      CGRect(x: text.frame.maxX + 8 + CGFloat(index) * 6, y: 10 + line / 2 - 2, width: 4, height: 4)
     }
     return TypingLayout(height: height, faces: faces, faceRing: 1.5, bubble: nil, label: text, dots: dots, overflow: overflow)
   }
