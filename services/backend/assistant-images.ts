@@ -20,9 +20,10 @@ export const MAX_SIDE = 1568;
 export const JPEG_QUALITY = 85;
 
 /**
- * The most pixels a photo can have to be converted. Decoding one takes
- * about 16 bytes a pixel at its peak, and a Node action has 512 MB: a
- * 24-megapixel iPhone photo peaks at about 450 MB.
+ * The most pixels a photo can have to be converted, by the size the app
+ * sent with it. Decoding one takes about 16 bytes a pixel at its peak, and
+ * a Node action has 512 MB: a 24-megapixel iPhone photo peaks at about
+ * 450 MB.
  */
 export const MAX_PIXELS = 26_000_000;
 
@@ -59,20 +60,24 @@ export function shrink(image: Pixels, maxSide: number): Pixels {
         left + 1,
         Math.min(image.width, Math.floor((x + 1) / scale)),
       );
-      const sums = [0, 0, 0, 0];
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let alpha = 0;
       for (let row = top; row < bottom; row += 1) {
         for (let column = left; column < right; column += 1) {
           const from = (row * image.width + column) * 4;
-          for (let channel = 0; channel < 4; channel += 1) {
-            sums[channel] += image.data[from + channel] ?? 0;
-          }
+          red += image.data[from] ?? 0;
+          green += image.data[from + 1] ?? 0;
+          blue += image.data[from + 2] ?? 0;
+          alpha += image.data[from + 3] ?? 0;
         }
       }
       const count = (bottom - top) * (right - left);
-      const to = (y * width + x) * 4;
-      for (let channel = 0; channel < 4; channel += 1) {
-        data[to + channel] = Math.round((sums[channel] ?? 0) / count);
-      }
+      data.set(
+        [red, green, blue, alpha].map((sum) => Math.round(sum / count)),
+        (y * width + x) * 4,
+      );
     }
   }
   return { data, height, width };

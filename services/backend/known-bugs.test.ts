@@ -183,7 +183,8 @@ void test("open bugs are listed one line each, without follower counts", () => {
   const lines = openBugLines([
     {
       _id: "k1",
-      description: "## What happened\n\nThe screen goes **white**.\n\n## Steps\n\n1. Open it",
+      description:
+        "## What happened\n\nThe screen goes **white**.\n\n## Steps\n\n1. Open it",
       issueNumber: 311,
       kind: "bug",
       reportedAt: Date.parse("2026-10-26T14:06:19Z"),

@@ -755,6 +755,9 @@ importers:
       '@acme/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
+      '@types/heic-decode':
+        specifier: 2.0.0
+        version: 2.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
@@ -4071,6 +4074,9 @@ packages:
 
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
+
+  '@types/heic-decode@2.0.0':
+    resolution: {integrity: sha512-Zj/zngTwbbIE84GsJ9hBI3VmvQRGOe65QV/xVdmLEAGB9bswOBxTMhQVcqNLcxnQhzOmAro5KBg7trrLaYe5Jg==}
 
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
@@ -12010,6 +12016,8 @@ snapshots:
   '@types/hast@3.0.4':
     dependencies:
       '@types/unist': 3.0.3
+
+  '@types/heic-decode@2.0.0': {}
 
   '@types/istanbul-lib-coverage@2.0.6': {}
 

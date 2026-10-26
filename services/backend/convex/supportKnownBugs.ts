@@ -86,9 +86,7 @@ export const open = internalQuery({
   args: {},
   handler: async (ctx) => {
     const bugs = await ctx.db.query("knownBugs").take(2000);
-    return bugs
-      .filter(isOpenBug)
-      .sort((a, b) => b.reportedAt - a.reportedAt);
+    return bugs.filter(isOpenBug).sort((a, b) => b.reportedAt - a.reportedAt);
   },
 });
 

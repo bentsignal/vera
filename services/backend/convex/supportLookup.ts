@@ -7,12 +7,7 @@ import type { GitHubConfig } from "./github";
 import type { Releases } from "./githubReleases";
 import type { SearchedBug } from "./supportKnownBugs";
 import { releaseNeeds } from "../bug-reports";
-import {
-  briefOf,
-  isOpenBug,
-  keywordMatches,
-  statusOf,
-} from "../known-bugs";
+import { briefOf, isOpenBug, keywordMatches, statusOf } from "../known-bugs";
 import { internal } from "./_generated/api";
 import { githubConfig, pullRequestFix, searchRepository } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";

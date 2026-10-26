@@ -5,7 +5,6 @@ import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
 import { scheduleReply } from "./assistantHook";
 import { SUPPORT } from "./bots";
-import { botName } from "./schema";
 import {
   asAccount,
   botAddress,
@@ -13,6 +12,7 @@ import {
   BOTS,
   requireDevTools,
 } from "./devBots";
+import { botName } from "./schema";
 
 // Development only: a bot (devBots.ts) writes to Vera Support (or Vera,
 // with `"to":"vera"`) and the assistant's model answers, the way it answers
