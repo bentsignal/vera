@@ -12,6 +12,11 @@ export const OPEN_WINDOW_MS = 3_000;
 export const QUIET_MS = 10_000;
 
 export interface RestartState {
+  /**
+   * Whether the app is running the bundle built into its binary, which may
+   * be far behind: a new install from the store or TestFlight.
+   */
+  readonly embeddedLaunch: boolean;
   /** When the app last launched or came back from the background. */
   readonly openedAt: number;
   /** When the screen was last touched. */
@@ -34,9 +39,8 @@ export function canRestartForUpdate(state: RestartState) {
     return false;
   }
   if (state.now - state.openedAt <= OPEN_WINDOW_MS) return true;
-  return (
-    !state.keyboardVisible &&
-    !state.viewingMedia &&
-    state.now - state.touchedAt >= QUIET_MS
-  );
+  if (state.keyboardVisible || state.viewingMedia) return false;
+  // The built-in bundle can be dozens of updates behind, so it doesn't wait
+  // for a pause: someone just setting up the app shouldn't keep using it.
+  return state.embeddedLaunch || state.now - state.touchedAt >= QUIET_MS;
 }
