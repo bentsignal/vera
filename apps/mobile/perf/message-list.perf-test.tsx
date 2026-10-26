@@ -22,6 +22,13 @@ jest.mock("~/features/native-list/native", () => ({
   nativeSupport: null,
 }));
 
+// A fixed day: `useToday` re-arms a timer for each midnight, which
+// `runAllTimers` would chase forever.
+jest.mock("~/lib/use-today", () => {
+  const today = new Date(Date.UTC(2026, 9, 2));
+  return { useToday: () => today };
+});
+
 beforeEach(() => {
   jest.useFakeTimers();
 });
