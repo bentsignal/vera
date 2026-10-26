@@ -51,6 +51,7 @@ import type * as settings from "../settings.js";
 import type * as shapes from "../shapes.js";
 import type * as sightings from "../sightings.js";
 import type * as sites from "../sites.js";
+import type * as spaceReads from "../spaceReads.js";
 import type * as spaces from "../spaces.js";
 import type * as threadLists from "../threadLists.js";
 import type * as threadOperations from "../threadOperations.js";
@@ -109,6 +110,7 @@ const fullApi: ApiFromModules<{
   shapes: typeof shapes;
   sightings: typeof sightings;
   sites: typeof sites;
+  spaceReads: typeof spaceReads;
   spaces: typeof spaces;
   threadLists: typeof threadLists;
   threadOperations: typeof threadOperations;

@@ -131,3 +131,30 @@ you likewise (`by_quote_author_conversation_sent`).
 | `activity` reruns per `markRead`               | 1 (143 KB to the phone) |                                        0 |
 | Documents per `markRead`, everything it reruns |                   1,484 |                                      801 |
 | Sent to the phone per `markRead`               |                  142 KB |          0 KB when nothing shown changed |
+
+### 2. Inbox rows read less
+
+Each row read its 11 newest messages to find the newest that isn't a
+deleted original; it now reads one (and more only past a deleted one).
+A query that lists many channels of a space (the inbox, activity, the
+thread list) reads the space, its members, and the caller's membership
+once, not once per channel (`spaceReads.ts`). Results are identical.
+
+| One run | Before | After |
+| --- | ---: | ---: |
+| `inbox` (29 rows) | 592 docs, 272 KB read | 245 docs, 99 KB read |
+| `inboxThreads` | 312 docs, 163 KB | 249 docs, 142 KB |
+| `conversation` | 36 docs, 13 KB | 26 docs, 9 KB |
+| `activity` | 677 docs, 319 KB | 614 docs, 298 KB |
+
+| Live | Before | After |
+| --- | ---: | ---: |
+| One message: documents read, everything it reruns | 2,216* | 315 |
+| 30 messages in 15 s: documents read | 23,414 | 10,904 |
+| 30 messages in 15 s: sent to the phone | 1,008 KB | 1,008 KB |
+
+\* the before includes the phone's `markRead`; the after doesn't.
+
+What's sent doesn't change: the inbox is one result, so each message
+resends all of it (24 KB). That needs the rows apart from the list
+(proposal below).

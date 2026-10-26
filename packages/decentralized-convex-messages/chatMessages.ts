@@ -14,16 +14,24 @@ const MAX_DELETED_SKIPPED = 10;
  * message was sent, deleted or not.
  */
 export async function latestMessage(ctx: QueryCtx, conversationId: string) {
-  const newest = await ctx.db
-    .query("messages")
-    .withIndex("by_chat_sent", (index) =>
-      index.eq("conversationId", conversationId).eq("threadOnly", undefined),
-    )
-    .order("desc")
-    .take(MAX_DELETED_SKIPPED + 1);
+  function newestFirst() {
+    return ctx.db
+      .query("messages")
+      .withIndex("by_chat_sent", (index) =>
+        index.eq("conversationId", conversationId).eq("threadOnly", undefined),
+      )
+      .order("desc");
+  }
+  // Almost always the newest itself, so it reads one message; only past a
+  // deleted original does it read more.
+  const first = await newestFirst().first();
+  const newest =
+    first?.deletedAt === undefined
+      ? [first]
+      : await newestFirst().take(MAX_DELETED_SKIPPED + 1);
   return {
     newestSentAt: newest[0]?.sentAt,
-    shown: newest.find((message) => message.deletedAt === undefined) ?? null,
+    shown: newest.find((message) => message?.deletedAt === undefined) ?? null,
   };
 }
 

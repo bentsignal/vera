@@ -20,6 +20,7 @@ import {
   THREAD_PAGE_SIZE,
 } from "./protocol.ts";
 import { notificationSettings } from "./settings.ts";
+import { spaceReads } from "./spaceReads.ts";
 import { messageById, threadMember, threadRow } from "./threads.ts";
 
 // Lists of threads: a conversation's (its info page), and every thread an
@@ -183,8 +184,9 @@ export async function threads(ctx: QueryCtx, self: string, args: Args) {
  * inbox, as `activity` does. Only this PDS's threads are listed.
  */
 export async function inboxThreads(ctx: QueryCtx, self: string) {
-  const accessTo = accessFinder(ctx, self);
-  const describe = conversationDescriber(ctx);
+  const spaces = spaceReads(ctx);
+  const accessTo = accessFinder(ctx, self, spaces);
+  const describe = conversationDescriber(ctx, spaces);
   const settings = await notificationSettings(ctx, self);
   const memberships = ctx.db
     .query("threadMembers")
@@ -234,7 +236,7 @@ export async function inboxThreads(ctx: QueryCtx, self: string) {
  * the badge.
  */
 export async function unreadThreadCount(ctx: QueryCtx, self: string) {
-  const accessTo = accessFinder(ctx, self);
+  const accessTo = accessFinder(ctx, self, spaceReads(ctx));
   const settings = await notificationSettings(ctx, self);
   const memberships = ctx.db
     .query("threadMembers")

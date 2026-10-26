@@ -18,6 +18,7 @@ import { mentionItems, reactionItems, replyItems } from "./personalActivity.ts";
 import { ACTIVITY_HORIZON, MAX_ACTIVITY_MESSAGES } from "./protocol.ts";
 import { notificationSettings } from "./settings.ts";
 import { messagesKey, threadKey } from "./sightings.ts";
+import { spaceReads } from "./spaceReads.ts";
 
 /** Messages read to fill one conversation's item, the caller's included. */
 const MAX_MESSAGES_SCANNED = 300;
@@ -118,12 +119,12 @@ async function messagesItem(
 
 /** Messages others sent, an item per conversation in the inbox. */
 async function messagesItems(ctx: QueryCtx, scope: Scope) {
-  const conversations = (await inboxAccess(ctx, scope.self, true)).flatMap(
-    (access) => {
-      const level = alertsFor(access, scope.settings);
-      return isHeard(access, level) ? [{ access, level }] : [];
-    },
-  );
+  const conversations = (
+    await inboxAccess(ctx, scope.self, true, scope.spaces)
+  ).flatMap((access) => {
+    const level = alertsFor(access, scope.settings);
+    return isHeard(access, level) ? [{ access, level }] : [];
+  });
   return Promise.all(
     conversations.map(({ access, level }) =>
       messagesItem(ctx, scope, access, level),
@@ -231,14 +232,16 @@ export async function activity(
   self: string,
   options: ActivityOptions = {},
 ) {
+  const spaces = spaceReads(ctx);
   const scope: Scope = {
     aboutYou: options.aboutYou === true,
-    accessTo: accessFinder(ctx, self),
-    describe: conversationDescriber(ctx),
+    accessTo: accessFinder(ctx, self, spaces),
+    describe: conversationDescriber(ctx, spaces),
     mentions: options.mentions === true,
     now: Date.now(),
     self,
     settings: await notificationSettings(ctx, self),
+    spaces,
     threads: options.threads === true,
   };
   const [messages, reactions, mentions, replies, threads] = await Promise.all([

@@ -3,8 +3,9 @@ import type { QueryCtx } from "./_generated/server.js";
 import type { ConversationAccess } from "./model.ts";
 import type { ActivityConversation, AlertLevel } from "./protocol.ts";
 import type { AccountSettings } from "./settings.ts";
+import type { SpaceReads } from "./spaceReads.ts";
 import { alerts } from "./alerts.ts";
-import { findAccess, getSpace, memberAddresses } from "./model.ts";
+import { findAccess, memberAddresses } from "./model.ts";
 import { ACTIVITY_SEEN_LIFETIME } from "./protocol.ts";
 import { sightingsOf } from "./sightings.ts";
 
@@ -38,14 +39,13 @@ export async function seenState(
 }
 
 /** Describes each conversation once, however many items it has. */
-export function conversationDescriber(ctx: QueryCtx) {
+export function conversationDescriber(ctx: QueryCtx, spaces: SpaceReads) {
   const described = new Map<string, Promise<ActivityConversation>>();
   async function describe(conversation: Doc<"conversations">) {
+    const { spaceId } = conversation;
     const [members, space] = await Promise.all([
-      memberAddresses(ctx, conversation),
-      conversation.spaceId === undefined
-        ? null
-        : getSpace(ctx, conversation.spaceId),
+      memberAddresses(ctx, conversation, spaces),
+      spaceId === undefined ? null : spaces.space(spaceId),
     ]);
     return {
       conversationId: conversation.conversationId,
@@ -66,12 +66,12 @@ export function conversationDescriber(ctx: QueryCtx) {
 }
 
 /** Finds the caller's access to each conversation once. */
-export function accessFinder(ctx: QueryCtx, self: string) {
+export function accessFinder(ctx: QueryCtx, self: string, spaces: SpaceReads) {
   const access = new Map<string, Promise<ConversationAccess | null>>();
   return (conversationId: string) => {
     const known = access.get(conversationId);
     if (known !== undefined) return known;
-    const found = findAccess(ctx, conversationId, self);
+    const found = findAccess(ctx, conversationId, self, spaces);
     access.set(conversationId, found);
     return found;
   };
@@ -88,6 +88,8 @@ export interface Scope {
   readonly now: number;
   readonly self: string;
   readonly settings: AccountSettings;
+  /** Spaces' rows, read once for all their channels. */
+  readonly spaces: SpaceReads;
   /** Whether threads have items (see `activity`). */
   readonly threads: boolean;
 }
