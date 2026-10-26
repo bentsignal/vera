@@ -28,7 +28,7 @@ import { webTools } from "./webSearch";
 // takes bug reports and ideas for the app to the team (supportAgent.ts).
 
 export const VERA_WELCOME =
-  "Hi, I'm Vera, an AI assistant. Ask me anything, anytime. If something in the app isn't working right, tell me here and I'll pass it to the team.";
+  "Hey, welcome to Vera! If you notice any issues or have any feature requests, let me know.";
 
 /** The most notes Vera keeps for one person, and how long each can be. */
 const MAX_NOTES = 30;
