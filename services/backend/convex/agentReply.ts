@@ -98,7 +98,7 @@ async function recentMessages(
   return { hasOlder: page.hasOlder, messages };
 }
 
-/** What `claim` hands a reply (agentRuns.ts). */
+/** What `claim` hands a reply (agent.ts). */
 interface Claimed {
   readonly accountId: string;
   readonly answeredThrough: number | null;
