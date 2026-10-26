@@ -1,50 +1,28 @@
-import type { ModelMessage, StepResult, ToolSet } from "ai";
-import { convexGateway } from "@convex-dev/ai-sdk-provider";
-import { generateText, isStepCount } from "ai";
 import { v } from "convex/values";
 
-import type { ActionCtx } from "./_generated/server";
-import type { Turn } from "./agentTools";
-import type { BotAccount } from "./bots";
-import type { Tally } from "./usage";
-import { NO_TOOL_CALL, replyOutcome } from "../reply-outcome";
+import type { Doc } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+import type { Answered } from "./agentReply";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
-import { teamNote, toAnswer, toModelMessages } from "./agentHistory";
-import { currentTools, keepTyping, messageSender, MODEL } from "./agentTools";
-import { waitWhileTyping } from "./assistantHook";
-import { botAccount, botAddress, sendAsBot } from "./bots";
-import { recallOlder } from "./memory";
+import { reply } from "./agentReply";
+import { scheduleRun, waitWhileTyping } from "./assistantHook";
+import { botAccount, sendAsBot } from "./bots";
 import { takeReply } from "./rateLimits";
-import { supportAssistant } from "./supportAgent";
-import { usageOf } from "./usage";
-import { veraAssistant } from "./vera";
 
 // The harness every assistant runs on. A direct message to one schedules
-// `run` (bots.ts `afterPdsMutation`); it reads the conversation, hands it to
-// the model with the assistant's instructions and tools, and the model
-// answers by calling `send_message`. One reply runs per conversation at a
-// time; messages that arrive meanwhile get the next one.
+// `run` (assistantHook.ts); it claims the conversation, replies
+// (agentReply.ts), and finishes, starting the next reply if messages came
+// in meanwhile. One reply runs per conversation at a time, and `watch`
+// checks on it in case its action dies without finishing.
 
-export interface Assistant {
-  readonly instructions: (turn: Turn) => Promise<string>;
-  readonly tools: (turn: Turn) => ToolSet;
-}
-
-const ASSISTANTS: Record<BotAccount["username"], Assistant> = {
-  support: supportAssistant,
-  vera: veraAssistant,
-};
-
-/** How long one model call may take before it's tried again (it's usually 2-5 s). */
-const STEP_TIMEOUT = 40_000;
-/** Model calls in one reply (each may call several tools). */
-const MAX_STEPS = 8;
-/** A reply that has run this long is assumed to have died. */
+/**
+ * A reply that has run this long is assumed to have died, when there's no
+ * scheduled job to ask (rows from before `running`).
+ */
 const STALE_RUN = 10 * 60 * 1000;
-
-/** How hard Grok thinks before each step: lower is faster and cheaper. */
-const REASONING = { convexGateway: { reasoningEffort: "low" } };
+/** How often a running reply is checked on, in case it died. */
+const WATCH_EVERY = 15_000;
 
 const FAILURE_NOTICE =
   "Sorry, something went wrong on my end. Try again in a moment.";
@@ -58,9 +36,9 @@ export const run = internalAction({
     });
     if (claim === null) return;
     const bot = botAccount(claim.bot);
-    let answeredThrough: number | undefined;
+    let answered: Answered | undefined;
     try {
-      answeredThrough = await reply(ctx, bot, conversationId, claim);
+      answered = await reply(ctx, bot, conversationId, claim);
     } catch (error) {
       console.error(`${bot.username} failed to reply`, error);
       await ctx.runMutation(internal.bots.post, {
@@ -70,7 +48,7 @@ export const run = internalAction({
       });
     } finally {
       await ctx.runMutation(internal.agent.finish, {
-        answeredThrough,
+        ...answered,
         conversationId,
       });
     }
@@ -85,15 +63,11 @@ export const run = internalAction({
 export const claim = internalMutation({
   args: { conversationId: v.string(), wakeAt: v.number() },
   handler: async (ctx, { conversationId, wakeAt }) => {
-    const row = await ctx.db
-      .query("botConversations")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", conversationId),
-      )
-      .unique();
-    if (row?.wakeAt !== wakeAt) return null;
+    const row = await dueRow(ctx, conversationId, wakeAt);
+    if (row === null) return null;
     const now = Date.now();
-    if (row.runningSince !== undefined && now - row.runningSince < STALE_RUN) {
+    // A reply that died is taken over: this one answers its messages too.
+    if ((await runState(ctx, row, now)) === "running") {
       await ctx.db.patch(row._id, { rerun: true });
       return null;
     }
@@ -113,25 +87,48 @@ export const claim = internalMutation({
     await ctx.db.patch(row._id, {
       note: undefined,
       rerun: false,
+      running: row.runId,
       runningSince: now,
       waitingSince: undefined,
+    });
+    await ctx.scheduler.runAfter(WATCH_EVERY, internal.agent.watch, {
+      conversationId,
+      runningSince: now,
     });
     return {
       accountId: row.accountId,
       answeredThrough: row.answeredThrough ?? null,
       bot: row.bot,
+      historyFrom: row.historyFrom ?? null,
       note: row.note ?? null,
     };
   },
 });
+
+/** The conversation's reply state, if this wake-up is the one it's waiting for. */
+async function dueRow(
+  ctx: MutationCtx,
+  conversationId: string,
+  wakeAt: number,
+) {
+  const row = await ctx.db
+    .query("botConversations")
+    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+    .unique();
+  if (row?.wakeAt !== wakeAt) return null;
+  // Vera Support's rows wait for the merge (mergeSupport.ts) to remove them.
+  if (row.bot === "support") return null;
+  return { ...row, bot: row.bot };
+}
 
 /** Ends a reply, and starts the next if messages came in meanwhile. */
 export const finish = internalMutation({
   args: {
     answeredThrough: v.optional(v.number()),
     conversationId: v.string(),
+    historyFrom: v.optional(v.number()),
   },
-  handler: async (ctx, { answeredThrough, conversationId }) => {
+  handler: async (ctx, { answeredThrough, conversationId, historyFrom }) => {
     const row = await ctx.db
       .query("botConversations")
       .withIndex("by_conversation", (q) =>
@@ -141,6 +138,7 @@ export const finish = internalMutation({
     if (row === null) return;
     const answered = {
       answeredThrough: Math.max(row.answeredThrough ?? 0, answeredThrough ?? 0),
+      ...(historyFrom !== undefined && { historyFrom }),
     };
     // Vera remembers the whole conversation (memory.ts).
     if (row.bot === "vera") {
@@ -149,178 +147,76 @@ export const finish = internalMutation({
         conversationId,
       });
     }
-    if (row.rerun !== true) {
-      await ctx.db.patch(row._id, {
-        ...answered,
-        runningSince: undefined,
-      });
-      return;
-    }
-    const wakeAt = Date.now();
-    await ctx.db.patch(row._id, {
-      ...answered,
-      rerun: false,
-      runningSince: undefined,
-      wakeAt,
-    });
-    await ctx.scheduler.runAfter(0, internal.agent.run, {
-      conversationId,
-      wakeAt,
-    });
+    await endRun(ctx, row, answered);
   },
 });
 
 /**
- * Ends the reply after a step that only sent messages (or shared support's
- * privacy notice): the model has said its piece and waits for them. It goes
- * on only after other tools, such as a search, whose results it needs.
- * Without this, models keep talking after their answer, even to themselves.
+ * Checks on a running reply. One whose job died without finishing (it ran
+ * out of memory, say, which skips `run`'s `finally`) would otherwise hold
+ * the conversation until `STALE_RUN`, ignoring every message meanwhile.
+ * This ends it: the next reply answers what came in since, or, with
+ * nothing new, the person hears that something went wrong.
  */
-function saidItsPiece({ steps }: { steps: StepResult<ToolSet>[] }) {
-  const calls = steps.at(-1)?.toolCalls ?? [];
-  return (
-    calls.some(
-      (call) =>
-        call.toolName === "share_privacy_notice" ||
-        call.toolName === "stay_quiet",
-    ) ||
-    (calls.length > 0 &&
-      calls.every((call) => call.toolName === "send_message"))
-  );
-}
-
-type ReplyOptions = Parameters<typeof generateText<ToolSet>>[0] & {
-  messages: ModelMessage[];
-};
-
-/**
- * Runs the model for a reply. It speaks only through tools, and text it
- * writes outside them is never sent, so a reply with neither a message nor
- * stay_quiet gets its turn back once, told why (reply-outcome.ts).
- */
-async function generateReply(
-  options: ReplyOptions,
-  sender: { sent: () => number },
-  bot: BotAccount,
-) {
-  function generate(more: ModelMessage[] = []) {
-    const attempt = { ...options, messages: [...options.messages, ...more] };
-    return generateText(attempt).catch((error: unknown) => {
-      // A model call that stalled: try once more if nothing went out yet.
-      if (sender.sent() > 0) throw error;
-      console.warn(`${bot.username} retrying a failed reply`, error);
-      return generateText(attempt);
-    });
-  }
-  const first = await generate();
-  if (replyOutcome(first.steps, sender.sent()) !== "noToolCall") {
-    return [first];
-  }
-  console.warn(`${bot.username} answered without a tool call`, first.text);
-  const retry = await generate([
-    ...first.response.messages,
-    { content: NO_TOOL_CALL, role: "system" },
-  ]);
-  if (replyOutcome(retry.steps, sender.sent()) === "noToolCall") {
-    console.error(
-      `${bot.username} again answered without a tool call`,
-      retry.text,
-    );
-  }
-  return [first, retry];
-}
-
-/**
- * Answers the person's messages that no reply has seen yet, and returns
- * when the newest of them was sent (undefined when there were none).
- */
-async function reply(
-  ctx: ActionCtx,
-  bot: BotAccount,
-  conversationId: string,
-  {
-    accountId,
-    answeredThrough,
-    note,
-  }: {
-    accountId: string;
-    answeredThrough: number | null;
-    note: string | null;
+export const watch = internalMutation({
+  args: { conversationId: v.string(), runningSince: v.number() },
+  handler: async (ctx, { conversationId, runningSince }) => {
+    const row = await ctx.db
+      .query("botConversations")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", conversationId),
+      )
+      .unique();
+    if (row?.runningSince !== runningSince) return;
+    const state = await runState(ctx, row, Date.now());
+    if (state === "running") {
+      await ctx.scheduler.runAfter(WATCH_EVERY, internal.agent.watch, {
+        conversationId,
+        runningSince,
+      });
+      return;
+    }
+    console.error(`${row.bot}'s reply in ${conversationId} died`);
+    // Vera Support's rows wait for the merge (mergeSupport.ts); its account
+    // can't write any more.
+    if (row.rerun !== true && row.bot === "vera") {
+      await sendAsBot(ctx, botAccount(row.bot), conversationId, FAILURE_NOTICE);
+    }
+    await endRun(ctx, row, {});
   },
+});
+
+/** Whether the row's reply is still running, or died without finishing. */
+async function runState(
+  ctx: MutationCtx,
+  row: Doc<"botConversations">,
+  now: number,
 ) {
-  const page = await ctx.runQuery(internal.bots.page, {
-    bot: bot.username,
-    conversationId,
-  });
-  const self = botAddress(bot);
-  // A note from the team is reason enough to write, even with nothing new.
-  const history = toAnswer(page.messages, self, answeredThrough, note !== null);
-  const newest = history?.findLast((message) => message.authorId !== self);
-  if (history === null || newest === undefined) return;
-  await ctx.runMutation(internal.bots.markRead, {
-    bot: bot.username,
-    conversationId,
-  });
-  const typing = keepTyping(ctx, bot, conversationId);
-  try {
-    const messages = toModelMessages(history, self);
-    const sender = messageSender(ctx, bot, conversationId, typing);
-    const tally: Tally = { memoryLookups: 0, searches: 0 };
-    const started = Date.now();
-    const turn: Turn = {
-      ...sender,
-      counted: (what) => {
-        if (what === "search") tally.searches += 1;
-        else tally.memoryLookups += 1;
-      },
-      accountId,
-      bot,
-      conversationId,
-      ctx,
-      note,
-      lastHeardAt: newest.sentAt,
-      name: newest.authorName,
-      oldestSentAt: page.hasOlder ? (history[0]?.sentAt ?? null) : null,
-      recalled: await recallOlder(ctx, bot, conversationId, {
-        answeredThrough,
-        hasOlder: page.hasOlder,
-        history,
-        tally,
-      }),
-      timeZone: await ctx.runQuery(internal.timeZones.of, { accountId }),
-    };
-    const assistant = ASSISTANTS[bot.username];
-    const tools = assistant.tools(turn);
-    const options = {
-      allowSystemInMessages: true,
-      instructions: await assistant.instructions(turn),
-      // Last before it answers, where it outweighs what the chat says.
-      messages: [
-        ...messages,
-        ...(note === null
-          ? []
-          : [{ content: teamNote(note), role: "system" as const }]),
-        { content: currentTools(tools), role: "system" as const },
-      ],
-      model: convexGateway(MODEL, { zdr: true }),
-      providerOptions: REASONING,
-      stopWhen: [isStepCount(MAX_STEPS), saidItsPiece],
-      // Every step calls a tool: it speaks only through send_message (or
-      // stays quiet), and Grok otherwise often answers in plain text.
-      toolChoice: "required" as const,
-      timeout: { stepMs: STEP_TIMEOUT },
-      toolCallConcurrency: 1,
-      tools,
-    };
-    const results = await generateReply(options, sender, bot);
-    await ctx.runMutation(internal.usage.record, {
-      ...usageOf(results, tally),
-      accountId,
-      bot: bot.username,
-      ms: Date.now() - started,
-    });
-  } finally {
-    await typing.stop();
+  if (row.runningSince === undefined) return "idle";
+  if (row.running === undefined) {
+    return now - row.runningSince < STALE_RUN ? "running" : "died";
   }
-  return newest.sentAt;
+  const job = await ctx.db.system.get("_scheduled_functions", row.running);
+  const kind = job?.state.kind;
+  return kind === "pending" || kind === "inProgress" ? "running" : "died";
+}
+
+/** Ends the running reply, and starts the next if messages came in meanwhile. */
+async function endRun(
+  ctx: MutationCtx,
+  row: Doc<"botConversations">,
+  answered: { answeredThrough?: number; historyFrom?: number },
+) {
+  const ended = { ...answered, running: undefined, runningSince: undefined };
+  if (row.rerun !== true) {
+    await ctx.db.patch(row._id, ended);
+    return;
+  }
+  const wakeAt = Date.now();
+  await ctx.db.patch(row._id, {
+    ...ended,
+    rerun: false,
+    runId: await scheduleRun(ctx, row.conversationId, wakeAt),
+    wakeAt,
+  });
 }

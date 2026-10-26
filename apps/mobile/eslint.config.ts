@@ -123,7 +123,7 @@ const LAYOUT_PROPERTIES = new Set([
 ]);
 
 const layoutMessage = (what: string) =>
-  `${what} animates layout, which re-lays out the screen every frame (30fps or worse on a phone). Animate transform or opacity instead; if layout has to change, change it once and move things with a transform (see GrowingSpace).`;
+  `${what} animates layout, which re-lays out the screen every frame (30fps or worse on a phone). Animate transform or opacity instead; if layout has to change, change it once and move things with a transform.`;
 
 function keyName(property: { key: unknown; computed?: boolean }) {
   const key = property.key as { type: string; name?: string; value?: unknown };

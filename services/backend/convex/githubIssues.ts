@@ -1,17 +1,11 @@
 import type { GitHubConfig } from "./github";
-import {
-  github,
-  GitHubError,
-  githubResponse,
-  read,
-  stringOrNull,
-} from "./github";
+import { githubResponse, read, stringOrNull } from "./github";
 
-// The repository's issues as GitHub's REST API lists them, for Vera
-// Support's known bugs (supportBugSync.ts). Unlike GitHub's search, the
-// list has an issue the moment it's filed.
+// The repository's issues as GitHub's REST API lists them, for what Vera
+// checks before filing (supportLookup.ts). Unlike GitHub's search,
+// the list has an issue the moment it's filed.
 
-/** An issue as the REST API lists it, for support's known bugs. */
+/** An issue as the REST API lists it. */
 export interface GitHubIssue {
   readonly body: string;
   readonly closedAt: number | null;
@@ -25,7 +19,7 @@ export interface GitHubIssue {
   readonly url: string;
 }
 
-/** Pages of issues read per sync; the next sync carries on from there. */
+/** The most pages of issues read at once. */
 const MAX_ISSUE_PAGES = 10;
 
 /**
@@ -57,20 +51,6 @@ export async function issuesChangedSince(
     path = response.next;
   }
   return issues;
-}
-
-/** One issue, or null when there's no such issue (or it's a pull request). */
-export async function issueByNumber(config: GitHubConfig, number: number) {
-  try {
-    const item = await github(
-      config,
-      `/repos/${config.owner}/${config.name}/issues/${String(number)}`,
-    );
-    return read(item, "pull_request") === undefined ? issueFrom(item) : null;
-  } catch (error) {
-    if (error instanceof GitHubError && error.status === 404) return null;
-    throw error;
-  }
 }
 
 function issueFrom(item: unknown): GitHubIssue {

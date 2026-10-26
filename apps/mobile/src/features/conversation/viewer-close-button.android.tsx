@@ -1,24 +1,21 @@
-import Close from "@expo/material-symbols/close.xml";
-import { Icon, IconButton } from "@expo/ui/jetpack-compose";
+import { Pressable } from "react-native";
 
-import { NativeHost } from "~/components/native-host";
+import { SymbolIcon } from "~/components/symbol-icon";
 
-/**
- * Android `ViewerCloseButton`: a Material icon button on a dark circle.
- * See `viewer-close-button.tsx`.
- */
+/** Android viewer chrome with a fixed 48 dp touch target. */
 export function ViewerCloseButton({ onPress }: { onPress: () => void }) {
   return (
-    <NativeHost matchContents colorScheme="dark">
-      <IconButton
-        onClick={onPress}
-        colors={{
-          containerColor: "rgba(0, 0, 0, 0.5)",
-          contentColor: "white",
-        }}
-      >
-        <Icon source={Close} size={24} contentDescription="Close" />
-      </IconButton>
-    </NativeHost>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Close"
+      onPress={onPress}
+      className="size-12 items-center justify-center rounded-full bg-black/50 active:opacity-60"
+    >
+      <SymbolIcon
+        name={{ android: "close", ios: "xmark" }}
+        size={24}
+        tintColor="white"
+      />
+    </Pressable>
   );
 }

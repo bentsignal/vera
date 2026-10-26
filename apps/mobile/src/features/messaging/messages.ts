@@ -223,11 +223,20 @@ function newestSentAt(view: ReturnType<typeof useMessageWindow>) {
  */
 export function useMessages(
   conversationId: string,
-  { anchor, threadId }: { anchor?: string; threadId?: string } = {},
+  {
+    anchor,
+    anchorSentAt,
+    threadId,
+  }: { anchor?: string; anchorSentAt?: number; threadId?: string } = {},
 ) {
   const { address, session } = useAccount();
   const inThread = threadId !== undefined;
-  const view = useMessageWindow(address, { conversationId, threadId }, anchor);
+  const view = useMessageWindow(
+    address,
+    { conversationId, threadId },
+    anchor,
+    anchorSentAt,
+  );
   const { parts } = view;
   const { reactionsOf, sinceOf, toggle } = useReactions(
     address,
@@ -307,7 +316,7 @@ export function useMessages(
      */
     sendMessage: (draft: OutgoingDraft, replyTo?: ReplyTarget) => {
       if (!view.live) view.jumpToLatest();
-      sendOutgoing(session, conversationId, {
+      return sendOutgoing(session, conversationId, {
         ...draft,
         reply: replyFor(root, replyTo),
       });

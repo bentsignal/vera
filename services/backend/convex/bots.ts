@@ -10,23 +10,27 @@ import { actorFromEmail, requireEnvironment } from "./lib";
 import { botName } from "./schema";
 
 // Vera's own accounts: ordinary, verified accounts on this PDS that act
-// through the Messages plugin as themselves. They have no passkey. Support
-// and Vera answer people with a model (agent.ts) whenever someone sends them
-// a direct message; nothing they do reaches past that one conversation.
+// through the Messages plugin as themselves. They have no passkey. Vera
+// answers people with a model (agent.ts) whenever someone sends it a direct
+// message; nothing it does reaches past that one conversation.
 
-export interface BotAccount {
-  readonly name: string;
-  readonly username: "support" | "vera";
+export interface BotAccount extends AnyBotAccount {
+  readonly username: "vera";
 }
 
-export const SUPPORT = { name: "Vera Support", username: "support" } as const;
+/** Any of Vera's accounts, including the retired support account (mergeSupport.ts). */
+export interface AnyBotAccount {
+  readonly name: string;
+  readonly username: string;
+}
+
 export const VERA = { name: "Vera", username: "vera" } as const;
 
 /** The accounts that answer direct messages with a model. */
-export const ASSISTANTS: readonly BotAccount[] = [SUPPORT, VERA];
+export const ASSISTANTS: readonly BotAccount[] = [VERA];
 
 export function botAccount(username: BotAccount["username"]) {
-  return username === "support" ? SUPPORT : VERA;
+  return { vera: VERA }[username];
 }
 
 /** Whether an address is one of Vera's own accounts. */
@@ -34,11 +38,11 @@ export function isBotAddress(accountId: string) {
   return ASSISTANTS.some((bot) => botAddress(bot) === accountId);
 }
 
-export function botAddress(bot: BotAccount) {
+export function botAddress(bot: AnyBotAccount) {
   return `${bot.username}@${requireEnvironment("FEDERATION_DOMAIN").toLowerCase()}`;
 }
 
-export function botIdentity(bot: BotAccount) {
+export function botIdentity(bot: AnyBotAccount) {
   const accountId = botAddress(bot);
   return {
     accountId,
@@ -63,7 +67,7 @@ type MessagesQuery = FunctionArgs<
 
 export function mutateAsBot(
   ctx: MutationCtx,
-  bot: BotAccount,
+  bot: AnyBotAccount,
   operation: MessagesMutation,
 ) {
   return ctx.runMutation(components.messages.dispatcher.dispatchMutation, {
@@ -75,7 +79,7 @@ export function mutateAsBot(
 
 export function queryAsBot(
   ctx: QueryCtx,
-  bot: BotAccount,
+  bot: AnyBotAccount,
   operation: MessagesQuery,
 ) {
   return ctx.runQuery(components.messages.dispatcher.dispatchQuery, {
@@ -103,7 +107,7 @@ export async function sendAsBot(
 /** Up to 50 messages before `before` (or the latest), oldest first. */
 export async function pageAsBot(
   ctx: QueryCtx,
-  bot: BotAccount,
+  bot: AnyBotAccount,
   conversationId: string,
   before?: number,
 ) {
