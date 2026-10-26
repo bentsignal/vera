@@ -25,7 +25,7 @@ photo, and can choose to take new messages only from contacts.
   everyone in the group reads it; only your view of it uses the contact
   name.
 - Contacts is its own row on the More tab (see `more-tab.md`), with the
-  Who Can Message You choice at the top of the Contacts screen. A profile
+  Allow Messages From choice at the top of the Contacts screen. A profile
   has Add to Contacts, and a contact's profile has Edit Contact (name,
   photo, remove).
 

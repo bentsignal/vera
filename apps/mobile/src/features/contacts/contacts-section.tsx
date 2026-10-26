@@ -54,7 +54,7 @@ export function MessagesFromSection() {
   return (
     <FieldGroup.Section>
       <OptimisticChoice<MessagesFrom>
-        label="Messages From"
+        label="Allow Messages From"
         value={messagesFrom}
         choices={MESSAGES_FROM_CHOICES}
         onChange={setMessagesFrom}
