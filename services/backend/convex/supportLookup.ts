@@ -13,7 +13,7 @@ import { githubConfig, pullRequestFix, searchRepository } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";
 import { followKnownBug } from "./supportFollow";
 
-// Support's tools for what the team already knows: whether a problem was
+// Vera's tools for what the team already knows: whether a problem was
 // reported or fixed before, and following a known bug instead of filing a
 // duplicate (supportFollow.ts). Known bugs live in Convex (supportKnownBugs.ts), so one filed
 // a minute ago is there; GitHub's search is only a fallback, for merged

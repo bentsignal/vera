@@ -20,7 +20,7 @@ import { issueByNumber, issuesChangedSince } from "./githubIssues";
 import { delivered } from "./githubReleases";
 import { byIssue, DESCRIPTION_LENGTH } from "./supportKnownBugs";
 
-// Keeps support's known bugs (supportKnownBugs.ts) in step with GitHub:
+// Keeps Vera's known bugs (supportKnownBugs.ts) in step with GitHub:
 // each check (supportReports.ts `track`) reads the issues changed since the
 // last one, so issues the team files themselves are known too, then where
 // each open one stands. Reports support filed before known bugs were kept

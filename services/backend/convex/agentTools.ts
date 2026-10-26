@@ -35,7 +35,7 @@ export interface Turn {
   readonly oldestSentAt: number | null;
   /**
    * Sends a message to the person, pacing several like someone typing.
-   * `canned` messages (support's privacy notice) aren't the model's own
+   * `canned` messages (the bug-report privacy notice) aren't the model's own
    * and don't count toward `MAX_MESSAGES_PER_TURN`.
    */
   readonly send: (

@@ -1,11 +1,11 @@
-// What Vera Support checks before filing a report (convex/supportKnownBugs.ts):
+// What Vera checks before filing a report (convex/supportKnownBugs.ts):
 // the team's known bugs, kept in Convex so a report filed a minute ago is
 // already there, and how they're shown to the model to compare by meaning.
 // Plain functions, so they can be tested without Convex.
 
 import type { ReportStage } from "./bug-reports.ts";
 
-/** Where a known bug stands, in the words support's model sees. */
+/** Where a known bug stands, in the words Vera's model sees. */
 export type KnownBugStatus =
   | "open"
   | "being fixed"

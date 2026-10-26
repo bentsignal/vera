@@ -1,4 +1,4 @@
-// Bug reports from Vera Support (convex/supportAgent.ts): what goes in a
+// Bug reports from Vera (convex/supportAgent.ts): what goes in a
 // public GitHub issue, how far a fix has come, and what the reporter hears.
 // Plain functions, so they can be tested without Convex.
 
@@ -101,7 +101,7 @@ export function issueFor(
     "",
     "---",
     "",
-    "Reported in the app through Vera Support, which describes any screenshots in words instead of posting them. The reporter was told this is public; their identity is kept private.",
+    "Reported in the app through Vera, which describes any screenshots in words instead of posting them. The reporter was told this is public; their identity is kept private.",
   );
   return {
     body: lines.join("\n"),

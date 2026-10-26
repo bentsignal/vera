@@ -2,7 +2,7 @@ import type { ModelMessage, StepResult, ToolSet } from "ai";
 import { isStepCount } from "ai";
 import { v } from "convex/values";
 
-import type { ActionCtx } from "./_generated/server";
+import type { ActionCtx, MutationCtx } from "./_generated/server";
 import type { Turn } from "./agentTools";
 import type { BotAccount } from "./bots";
 import type { Tally } from "./usage";
@@ -21,7 +21,6 @@ import { waitWhileTyping } from "./assistantHook";
 import { botAccount, botAddress, sendAsBot } from "./bots";
 import { recallOlder } from "./memory";
 import { takeReply } from "./rateLimits";
-import { supportAssistant } from "./supportAgent";
 import { usageOf } from "./usage";
 import { veraAssistant } from "./vera";
 
@@ -37,7 +36,6 @@ export interface Assistant {
 }
 
 const ASSISTANTS: Record<BotAccount["username"], Assistant> = {
-  support: supportAssistant,
   vera: veraAssistant,
 };
 
@@ -90,13 +88,8 @@ export const run = internalAction({
 export const claim = internalMutation({
   args: { conversationId: v.string(), wakeAt: v.number() },
   handler: async (ctx, { conversationId, wakeAt }) => {
-    const row = await ctx.db
-      .query("botConversations")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", conversationId),
-      )
-      .unique();
-    if (row?.wakeAt !== wakeAt) return null;
+    const row = await dueRow(ctx, conversationId, wakeAt);
+    if (row === null) return null;
     const now = Date.now();
     if (row.runningSince !== undefined && now - row.runningSince < STALE_RUN) {
       await ctx.db.patch(row._id, { rerun: true });
@@ -129,6 +122,22 @@ export const claim = internalMutation({
     };
   },
 });
+
+/** The conversation's reply state, if this wake-up is the one it's waiting for. */
+async function dueRow(
+  ctx: MutationCtx,
+  conversationId: string,
+  wakeAt: number,
+) {
+  const row = await ctx.db
+    .query("botConversations")
+    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+    .unique();
+  if (row?.wakeAt !== wakeAt) return null;
+  // Vera Support's rows wait for the merge (mergeSupport.ts) to remove them.
+  if (row.bot === "support") return null;
+  return { ...row, bot: row.bot };
+}
 
 /** Ends a reply, and starts the next if messages came in meanwhile. */
 export const finish = internalMutation({
@@ -176,7 +185,7 @@ export const finish = internalMutation({
 });
 
 /**
- * Ends the reply after a step that only sent messages (or shared support's
+ * Ends the reply after a step that only sent messages (or shared the bug-report
  * privacy notice): the model has said its piece and waits for them. It goes
  * on only after other tools, such as a search, whose results it needs.
  * Without this, models keep talking after their answer, even to themselves.

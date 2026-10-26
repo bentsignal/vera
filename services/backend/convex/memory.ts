@@ -183,7 +183,7 @@ export async function recallOlder(
   },
 ) {
   const visibleFrom = history.at(0)?.sentAt;
-  if (bot.username !== "vera" || !hasOlder || visibleFrom === undefined) {
+  if (!hasOlder || visibleFrom === undefined) {
     return [];
   }
   const self = botAddress(bot);

@@ -1,90 +1,32 @@
 import { formatAddress, parseAddress } from "@decentralized-convex/address";
 import { ConvexError, v } from "convex/values";
 
-import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
   internalAction,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import {
-  botAddress,
-  ensureBotAccount,
-  isBotAddress,
-  mutateAsBot,
-  pageAsBot,
-  queryAsBot,
-  SUPPORT,
-  welcomeAccount as welcomeAs,
-  welcomeEveryAccount,
-} from "./bots";
+import { botAddress, mutateAsBot, pageAsBot, queryAsBot, VERA } from "./bots";
 
-// The support account: an ordinary, verified account on this PDS that
-// welcomes every new account. A model answers what people send it
-// (supportAgent.ts): it helps them describe a bug, files it on GitHub, and
-// keeps them posted (supportReports.ts). The operator's agents can still
-// read and answer its inbox with the commands below (see the
-// `support-inbox` agent skill).
-
-const WELCOME_MESSAGE =
-  "Hi, welcome to Vera! If you notice any bugs or anything that isn't working right, tell me here. I'll pass it to the team and let you know when it's fixed.";
-
-export function supportAddress() {
-  return botAddress(SUPPORT);
-}
-
-/** Creates the support account if it doesn't exist yet. */
-function ensureSupportAccount(ctx: ActionCtx) {
-  return ensureBotAccount(ctx, SUPPORT);
-}
-
-/** Operator command: `npx convex run support:setup`. Safe to run again. */
-export const setup = internalAction({
-  args: {},
-  handler: (ctx) => ensureSupportAccount(ctx),
-});
+// Vera's inbox for the operator's agents (the `support-inbox` agent skill):
+// Vera's model answers everything people send it (vera.ts), but Shawn's
+// agents can still read its conversations and write as Vera, such as to
+// tell someone a fix for a report it didn't file is out.
 
 /**
- * Sends the welcome message to a new account, unless support has already
- * written to them. Scheduled whenever an account is created.
- */
-export const welcome = internalAction({
-  args: { accountId: v.string() },
-  handler: async (ctx, { accountId }) => {
-    if (isBotAddress(accountId)) return;
-    await ensureSupportAccount(ctx);
-    await welcomeAccount(ctx, accountId);
-  },
-});
-
-function welcomeAccount(ctx: ActionCtx, accountId: string) {
-  return welcomeAs(ctx, SUPPORT, accountId, WELCOME_MESSAGE);
-}
-
-/**
- * Operator command: `npx convex run support:welcomeEveryone`. Welcomes
- * accounts made before the support account existed. Accounts that already
- * heard from support are skipped.
- */
-export const welcomeEveryone = internalAction({
-  args: {},
-  handler: (ctx) => welcomeEveryAccount(ctx, SUPPORT, WELCOME_MESSAGE),
-});
-
-/**
- * Operator command: `npx convex run support:inbox`. Support's
+ * Operator command: `npx convex run veraInbox:list`. Vera's
  * conversations, unread first, each with its latest message.
  */
-export const inbox = internalQuery({
+export const list = internalQuery({
   args: { unreadOnly: v.optional(v.boolean()) },
   handler: async (ctx, { unreadOnly }) => {
-    const response = await queryAsBot(ctx, SUPPORT, {
+    const response = await queryAsBot(ctx, VERA, {
       args: {},
       type: "inbox",
     });
     if (response.type !== "inbox") throw new Error("Unexpected response");
-    const support = supportAddress();
+    const vera = botAddress(VERA);
     return response.value
       .filter(
         (conversation) => unreadOnly !== true || conversation.unreadCount > 0,
@@ -106,7 +48,7 @@ export const inbox = internalQuery({
                 sentAt: new Date(conversation.lastMessage.sentAt).toISOString(),
               },
         name: conversation.name,
-        people: conversation.members.filter((member) => member !== support),
+        people: conversation.members.filter((member) => member !== vera),
         unreadCount: conversation.unreadCount,
       }));
   },
@@ -114,13 +56,13 @@ export const inbox = internalQuery({
 
 /**
  * Operator command:
- * `npx convex run support:read '{"conversationId":"..."}'`. The latest
+ * `npx convex run veraInbox:read '{"conversationId":"..."}'`. The latest
  * messages, oldest first; pass `before` (a `sentAtMs`) for older ones.
  */
 export const read = internalQuery({
   args: { before: v.optional(v.number()), conversationId: v.string() },
   handler: async (ctx, { before, conversationId }) => {
-    const page = await pageAsBot(ctx, SUPPORT, conversationId, before);
+    const page = await pageAsBot(ctx, VERA, conversationId, before);
     return {
       hasOlder: page.hasOlder,
       messages: page.messages.map((message) => ({
@@ -137,9 +79,9 @@ export const read = internalQuery({
 
 /**
  * Operator command:
- * `npx convex run support:send '{"conversationId":"...","body":"..."}'`,
+ * `npx convex run veraInbox:send '{"conversationId":"...","body":"..."}'`,
  * or `"to":"someone@vera.chat"` instead of `conversationId` to message an
- * account directly. Sends as the support account.
+ * account directly. Sends as Vera.
  */
 export const send = internalAction({
   args: {
@@ -158,14 +100,14 @@ export const send = internalAction({
         ? args.conversationId
         : await ctx.runMutation(internal.bots.openConversation, {
             accountId: formatAddress(parseAddress(args.to)),
-            bot: SUPPORT.username,
+            bot: VERA.username,
           });
     if (conversationId === undefined) {
       throw new ConvexError({ code: "CONVERSATION_OR_TO_REQUIRED" });
     }
     const messageId: string = await ctx.runMutation(internal.bots.post, {
       body,
-      bot: SUPPORT.username,
+      bot: VERA.username,
       conversationId,
     });
     return { conversationId, messageId };
@@ -174,12 +116,12 @@ export const send = internalAction({
 
 /**
  * Operator command:
- * `npx convex run support:markRead '{"conversationId":"..."}'`.
+ * `npx convex run veraInbox:markRead '{"conversationId":"..."}'`.
  */
 export const markRead = internalMutation({
   args: { conversationId: v.string() },
   handler: async (ctx, { conversationId }) => {
-    await mutateAsBot(ctx, SUPPORT, {
+    await mutateAsBot(ctx, VERA, {
       args: { conversationId, readAt: Date.now() },
       type: "markRead",
     });
