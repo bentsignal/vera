@@ -3,10 +3,11 @@ import { useCSSVariable } from "uniwind";
 
 import type { Behavior, Theme } from "./contract";
 import type { MessageLayout } from "~/features/preferences/store";
+import { PACE_MS } from "~/features/conversation/paced-messages";
 
-// How the native list looks and moves, from the same values the React
-// Native list uses: the app's CSS variables (global.css, with the accent
-// theme applied over them) and its spacing and timing constants.
+// How the native list looks and moves: the app's CSS variables
+// (global.css, with the accent theme applied over them), and its spacing
+// and timing constants.
 
 /** The CSS variables the theme reads, in `themeOf`'s order. */
 const VARIABLES = [
@@ -131,18 +132,18 @@ export function useNativeTheme(layout: MessageLayout) {
   return themeOf(useCSSVariable([...VARIABLES]), layout);
 }
 
-/** RN timings, with more page lead for fast native scrolling. */
+/** The list's timings, and how far ahead it loads pages. */
 export const BEHAVIOR = {
-  // A new message fades in as the others make room (`Arrive`).
+  // A new message fades in as the others make room.
   fadeMs: 400,
   firehoseFrom: 8,
   firehoseUntil: 3,
   firehoseWindowMs: 2000,
-  // `onEndReachedThreshold`. Native can keep more rows ready cheaply; five
-  // screens leave time for the network and JS during a 5,500 pt/s fling.
+  // Five screens leave time for the network and JS during a 5,500 pt/s
+  // fling.
   loadAheadScreens: 5,
-  // `GROW_MS`.
-  moveMs: 420,
-  // `NEAR_LATEST`.
+  // Others' new messages are paced to it (`usePacedMessages`).
+  moveMs: PACE_MS,
+  // How close to the newest message counts as at it (no jump button).
   nearLatestPoints: 80,
 } satisfies Behavior;

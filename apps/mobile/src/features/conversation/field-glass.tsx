@@ -14,80 +14,21 @@ import { scheduleOnUI } from "react-native-worklets";
 
 import type { ComposerReport } from "./composer-height";
 import { GlassSurface } from "~/components/glass-surface";
-import { glassAbove } from "./glass-hold";
 
 const IOS = Platform.OS === "ios";
 /** Frames to wait for the field to get shorter before letting the glass go. */
 const WAIT_FRAMES = 30;
-/** The most frames the glass follows the list's room down. */
-const FOLLOW_FRAMES = 120;
 
 /**
- * Holds the glass at the field's height until the field gets shorter, then
- * tells the list (`report.onSentShorter`) and follows the list's room down
- * to the field, its bottom staying put: the room closes as the messages
- * make room for the one sent (see `useComposerRoom`), so the glass's edge
- * stays on the messages' all the way. It follows the field too, as when
- * attachments close at the same time. If the field doesn't get shorter,
- * the glass lets go. With a list whose room doesn't close with the
- * messages (`roomCloses`), it lets go as soon as the field is shorter.
+ * Tells the list (`onSentShorter`) when a send makes the field shorter, so
+ * the list keeps the composer's old height until the message sent is in
+ * its rows (`useComposerInset`). On iOS the glass holds at the field's
+ * height until then, and lets go if the field doesn't get shorter.
+ * Android's bar is solid: there's no glass to hold.
  */
 function settle(
   field: AnimatedRef<View>,
   held: SharedValue<number>,
-  sends: SharedValue<number>,
-  {
-    onSentShorter,
-    room,
-    roomCloses,
-  }: Pick<ComposerReport, "onSentShorter" | "room" | "roomCloses">,
-) {
-  "worklet";
-  // A later send takes the glass over.
-  const send = sends.get() + 1;
-  sends.set(send);
-  const before = measure(field);
-  if (before === null) return;
-  const from = before.height;
-  held.set(from);
-  let frames = 0;
-  // How much shorter the field got, and the room for it then.
-  let lost = 0;
-  let wasRoom = 0;
-  function frame() {
-    if (sends.get() !== send) return;
-    frames += 1;
-    const now = measure(field)?.height ?? from;
-    if (lost === 0) {
-      if (now < from - 0.5) {
-        lost = from - now;
-        wasRoom = room.get();
-        onSentShorter(lost);
-      } else {
-        if (frames < WAIT_FRAMES) requestAnimationFrame(frame);
-        else held.set(0);
-        return;
-      }
-    }
-    const above = glassAbove({ lost, room: room.get(), roomCloses, wasRoom });
-    if (above <= 0.5 || frames > FOLLOW_FRAMES) {
-      held.set(0);
-      return;
-    }
-    held.set(now + above);
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-}
-
-/**
- * Android, with the native list: tells the list (`onSentShorter`) when a
- * send makes the field shorter, as `settle` does on iOS, so the list keeps
- * the composer's old height until the message sent is in its rows
- * (`useComposerInset`). There's no glass to hold: Android's bar is solid.
- */
-function reportShorter(
-  field: AnimatedRef<View>,
   sends: SharedValue<number>,
   onSentShorter: ComposerReport["onSentShorter"],
 ) {
@@ -98,29 +39,30 @@ function reportShorter(
   const before = measure(field);
   if (before === null) return;
   const from = before.height;
+  if (IOS) held.set(from);
   let frames = 0;
   function frame() {
     if (sends.get() !== send) return;
     frames += 1;
     const now = measure(field)?.height ?? from;
-    if (now < from - 0.5) {
-      onSentShorter(from - now);
+    if (now < from - 0.5) onSentShorter(from - now);
+    else if (frames < WAIT_FRAMES) {
+      requestAnimationFrame(frame);
       return;
     }
-    if (frames < WAIT_FRAMES) requestAnimationFrame(frame);
+    if (IOS) held.set(0);
   }
   requestAnimationFrame(frame);
 }
 
 /**
  * What `GlassField` needs (`glass`), and `settle`, to call just before
- * sending empties the field: rather than jumping down to the shorter field,
- * the glass eases down to it with the list (see `ComposerReport`).
+ * sending empties the field (see `ComposerReport`).
  */
 export function useFieldGlass(report: ComposerReport) {
   /** The field, measured as it changes. */
   const field = useAnimatedRef<View>();
-  /** The least height the glass is drawn at, while it eases down. */
+  /** The least height the glass is drawn at, while it holds after a send. */
   const held = useSharedValue(0);
   const sends = useSharedValue(0);
   const focused = useSharedValue(false);
@@ -128,7 +70,7 @@ export function useFieldGlass(report: ComposerReport) {
   // A line typed in or out changes the field's height: the list hears it
   // in the frame the field changes, rather than once its layout reaches
   // JavaScript a few frames later, so the messages move with the field.
-  // Not while the glass eases down after a send, which the list waits for.
+  // Not while the glass holds after a send, which the list waits for.
   useAnimatedReaction(
     () => input.get(),
     (now, before) => {
@@ -149,25 +91,12 @@ export function useFieldGlass(report: ComposerReport) {
       onBlur: () => focused.set(false),
     },
     /**
-     * `adds`: the send adds a message (not an edit's save). Every native
-     * send waits for its own committed clear height, even when unchanged.
-     * Android's bar is solid, with a border along its top that moves at
-     * once: glass held above it would show over the messages. With the
-     * native list, its send still has to reach the list's inset.
+     * `adds`: the send adds a message (not an edit's save). Every send
+     * waits for its own committed clear height, even when unchanged.
      */
     settle: (adds: boolean, clear: number, files: readonly string[]) => {
-      const sequence =
-        adds && !report.roomCloses ? report.onSend(clear, files) : undefined;
-      const { onSentShorter, room, roomCloses } = report;
-      if (IOS) {
-        scheduleOnUI(settle, field, held, sends, {
-          onSentShorter,
-          room,
-          roomCloses,
-        });
-      } else if (!roomCloses) {
-        scheduleOnUI(reportShorter, field, sends, onSentShorter);
-      }
+      const sequence = adds ? report.onSend(clear, files) : undefined;
+      scheduleOnUI(settle, field, held, sends, report.onSentShorter);
       return sequence;
     },
   };
@@ -175,7 +104,7 @@ export function useFieldGlass(report: ComposerReport) {
 
 /**
  * The message field: its glass, and what's in it on top. What's in it is
- * already where it ends up as the glass eases down, so it never moves.
+ * already where it ends up as the glass lets go, so it never moves.
  */
 export function GlassField({
   field,

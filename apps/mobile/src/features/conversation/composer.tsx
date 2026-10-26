@@ -319,7 +319,6 @@ export function Composer({
         />
       )}
       <ComposerLayout
-        enabled={!report.roomCloses}
         owner={report.sendCommit.owner}
         sequence={submission.sequence}
       >

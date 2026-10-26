@@ -9,10 +9,23 @@ import { useRouter } from "expo-router";
 
 import type { ViewerItem } from "./media-group";
 import type { Pager } from "./photo-viewer-state";
-import { PlayBadge } from "./attachment-view";
+import { SymbolIcon } from "~/components/symbol-icon";
 import { pagesAround } from "./photo-pager";
 import { PhotoViewer } from "./photo-viewer";
 import { ViewerCloseButton } from "./viewer-close-button";
+
+/** The play button over a video's poster. */
+function PlayBadge() {
+  return (
+    <View className="size-12 items-center justify-center rounded-full bg-black/40">
+      <SymbolIcon
+        name={{ android: "play_arrow", ios: "play.fill" }}
+        size={24}
+        tintColorClassName="accent-white"
+      />
+    </View>
+  );
+}
 
 function sizeOf(item: ViewerItem) {
   const { height = 0, width = 0 } = item;

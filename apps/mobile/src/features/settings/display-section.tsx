@@ -3,8 +3,6 @@ import { FieldGroup, Row, Spacer, Switch, Text } from "@expo/ui";
 import type { ConversationKind } from "~/features/inbox/types";
 import type { Appearance, MessageLayout } from "~/features/preferences/store";
 import { ChoiceMenu } from "~/components/choice-menu";
-import { NativeListSwitch } from "~/features/native-list/native-list-switch";
-import { nativeListInstalled } from "~/features/native-list/switch";
 import {
   LAYOUT_PREFERENCE,
   setPreference,
@@ -69,12 +67,11 @@ export function DisplaySection() {
   );
 }
 
-/** Experimental options, including the native list's persisted opt-out. */
+/** Experimental options. */
 export function ExperimentalSection() {
   const reversed = usePreference("reverseTabBar");
   return (
     <FieldGroup.Section title="Experimental">
-      {nativeListInstalled && <NativeListSwitch />}
       <Switch
         label="Reverse Tab Bar"
         value={reversed}

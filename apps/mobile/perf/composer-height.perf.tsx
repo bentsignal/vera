@@ -12,28 +12,17 @@ jest.mock("~/features/dev/send-timing", () => ({ markSendState: jest.fn() }));
 type Height = ReturnType<typeof useComposerHeight>;
 
 /** Exercise the actual hook through the app's React Compiler. */
-function ComposerHeight({
-  roomCloses,
-  onReport,
-}: {
-  roomCloses: boolean;
-  onReport: (height: Height) => void;
-}) {
-  const height = useComposerHeight({ roomCloses });
+function ComposerHeight({ onReport }: { onReport: (height: Height) => void }) {
+  const height = useComposerHeight();
   useLayoutEffect(() => {
     onReport(height);
   });
   return null;
 }
 
-async function composer(roomCloses = false) {
+async function composer() {
   const reports = new Array<Height>();
-  await render(
-    <ComposerHeight
-      roomCloses={roomCloses}
-      onReport={(height) => reports.push(height)}
-    />,
-  );
+  await render(<ComposerHeight onReport={(height) => reports.push(height)} />);
   const height = reports[0];
   if (height === undefined) throw new Error("Composer did not mount");
   // No native layout in Jest. Supply only the host API the real callback reads.
@@ -61,14 +50,6 @@ test("ordinary layout never acknowledges or releases a pending send", async () =
     expect(report.sendCommit.read().height).toBeUndefined();
     expect(report.sendCommit.read().published).not.toBe(true);
     expect(report.sendCommit.read().layout?.height).toBe(98);
-  });
-});
-
-test("the RN list retains its existing UI-thread room ownership", async () => {
-  const { report } = await composer(true);
-  await act(() => {
-    report.onHeight(76);
-    expect(report.sendCommit.read().layout).toBeUndefined();
   });
 });
 

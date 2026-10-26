@@ -43,10 +43,9 @@ function alsoTo(
 
 /**
  * What's picked for the next message, kept in the draft `key`, and
- * `restage` to change it. `onOpenOrClose` hears when the attachments start
- * to show or go.
+ * `restage` to change it.
  */
-function useStaged(key: string, onOpenOrClose: () => void) {
+function useStaged(key: string) {
   const [staged, setStaged] = useState(() => readDraft(key).files);
   return {
     staged,
@@ -57,9 +56,7 @@ function useStaged(key: string, onOpenOrClose: () => void) {
     restage: (
       change: (current: readonly StagedFile[]) => readonly StagedFile[],
     ) => {
-      const current = readDraft(key).files;
-      const next = change(current);
-      if (next.length > 0 !== current.length > 0) onOpenOrClose();
+      const next = change(readDraft(key).files);
       saveDraftFiles(key, next);
       setStaged(next);
     },
@@ -104,7 +101,7 @@ export function FloatingComposer({
   const { address } = useAccount();
   const key = draftKey(address, draftId);
   const links = useLinkPrefetch();
-  const { staged, restage } = useStaged(key, report.onAttachmentsMove);
+  const { staged, restage } = useStaged(key);
   // One picker at a time: a second tap on the menu while one is still
   // handing over files does nothing.
   const picking = useRef(false);

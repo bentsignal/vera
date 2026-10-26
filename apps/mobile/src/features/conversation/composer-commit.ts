@@ -9,8 +9,7 @@ export function useComposerCommit(
   {
     bar,
     sendCommit,
-    roomCloses,
-  }: Pick<ComposerReport, "sendCommit" | "roomCloses"> & {
+  }: Pick<ComposerReport, "sendCommit"> & {
     bar: RefObject<{ getBoundingClientRect: () => { height: number } } | null>;
   },
   clear: number,
@@ -18,7 +17,7 @@ export function useComposerCommit(
 ) {
   const send = useSyncExternalStore(sendCommit.subscribe, sendCommit.read);
   useLayoutEffect(() => {
-    if (roomCloses || !clearIsCommitted(send, clear, files)) return;
+    if (!clearIsCommitted(send, clear, files)) return;
     const host = bar.current;
     // This host disappears with its composer; no old instance can ACK a new one.
     if (host === null) return;

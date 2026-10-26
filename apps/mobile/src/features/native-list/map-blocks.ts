@@ -1,10 +1,10 @@
 import { textParts } from "@decentralized-convex/messages";
 
-import type { ProfileOf } from "../conversation/message-row";
 import type {
   LinkPreview,
   Message,
   MessageAttachment,
+  ProfileOf,
 } from "../conversation/types.ts";
 import type { ReactionPart } from "../messaging/reaction-part.ts";
 import type { ReactionSummary } from "../messaging/reactions";
@@ -27,7 +27,7 @@ import { attachmentPart, parsePart } from "../messaging/reaction-part.ts";
 import { isJumbo } from "./jumbo.ts";
 
 // A message's parts as the native list's blocks (see contract.ts), in the
-// order the React Native list draws them, with each part's reactions.
+// order they're drawn, with each part's reactions.
 
 export const DELETED_TEXT = "This message was deleted";
 /** "Not sent", under a message that failed. */
@@ -111,7 +111,7 @@ export function spansOf(text: string, mentions: Message["mentions"]) {
   return spans;
 }
 
-export function isStuck(attachment: MessageAttachment) {
+function isStuck(attachment: MessageAttachment) {
   const state = attachment.upload?.state;
   return state === "failed" || state === "too-large";
 }

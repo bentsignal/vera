@@ -1,8 +1,7 @@
 // The open conversation's list, for benchmarks that run outside React
-// (`globalThis.veraDev.list`), whichever list it is: the native one or the
-// React Native one. Both scroll the same way here, at a constant speed on
-// the UI thread, so the two can be measured head to head without a test
-// driver's injected touches (.plans/native-message-list.md).
+// (`globalThis.veraDev.list`). It scrolls at a constant speed on the UI
+// thread, so it can be measured without a test driver's injected touches
+// (.plans/native-message-list.md).
 
 export interface FlingResult {
   /** Points actually scrolled. */
@@ -12,7 +11,6 @@ export interface FlingResult {
 }
 
 export interface DevList {
-  readonly kind: "native" | "rn";
   /**
    * Scrolls toward older messages at `speed` points a second for `ms`;
    * null if this list can't (a native binary without `benchFling`).

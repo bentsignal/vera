@@ -21,7 +21,7 @@ export function useMenuClosing(
     onClosing?.();
     // Start native landing before the fade, and handle rejection immediately
     // if the source was removed while the menu was open.
-    const landed = target.lift?.onLand()?.catch(() => undefined);
+    const landed = target.lift.onLand()?.catch(() => undefined);
     function closed() {
       onClosed(backToChat);
       then?.();
