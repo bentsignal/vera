@@ -3,6 +3,15 @@ import type { Value } from "convex/values";
 
 const RoutedQueryResultMarker = Symbol("RoutedQueryResult");
 
+/**
+ * The queries a result includes, or a function that works them out, so a
+ * query asked for without its includes (a live subscription; see
+ * `include` on the router) doesn't read what only they need.
+ */
+export type IncludedQueries =
+  | readonly QueryRequest[]
+  | (() => Promise<readonly QueryRequest[]> | readonly QueryRequest[]);
+
 export interface RoutedQueryResult<Result> {
   readonly [RoutedQueryResultMarker]: true;
   readonly data: Result;
@@ -11,7 +20,7 @@ export interface RoutedQueryResult<Result> {
    * shows. The PDS answers them with this one, so the client has them
    * without another round trip.
    */
-  readonly include: readonly QueryRequest[];
+  readonly include: IncludedQueries;
   readonly routes: readonly string[];
 }
 
@@ -25,7 +34,7 @@ export function queryResult<Result>(
     include = [],
     routes = [],
   }: {
-    readonly include?: readonly QueryRequest[];
+    readonly include?: IncludedQueries;
     readonly routes?: readonly string[];
   },
 ): RoutedQueryResult<Result> {

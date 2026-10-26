@@ -169,12 +169,13 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
             args,
           );
           return queryResult(page, {
-            include: await pageIncludes(
-              ctx,
-              args.conversationId,
-              page.messages,
-              liveCursor(args, page),
-            ),
+            include: () =>
+              pageIncludes(
+                ctx,
+                args.conversationId,
+                page.messages,
+                liveCursor(args, page),
+              ),
             routes,
           });
         },
@@ -209,13 +210,14 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
             args,
           );
           return queryResult(found.page, {
-            include: await threadPageIncludes(
-              ctx,
-              args,
-              found.page.root,
-              found.page.messages,
-              liveCursor(args, found.page),
-            ),
+            include: () =>
+              threadPageIncludes(
+                ctx,
+                args,
+                found.page.root,
+                found.page.messages,
+                liveCursor(args, found.page),
+              ),
             routes: found.routes,
           });
         },

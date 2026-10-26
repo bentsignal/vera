@@ -4,6 +4,13 @@ export const DEFAULT_REVEAL_PARTIAL_RESULTS_AFTER = 500;
 export const DEFAULT_INITIAL_RESPONSE_TIMEOUT = 2_000;
 
 export interface PdsQueryExecutionOptions {
+  /**
+   * False asks the PDS for the result without the queries it includes
+   * (see `include` on the PDS router). For a subscription whose first
+   * answer came from a one-shot query that had them, so that what it
+   * includes doesn't rerun it. PDSs that predate this refuse it.
+   */
+  readonly include?: boolean;
   readonly initialResponseTimeout?: number;
   readonly requireCompleteResults?: boolean;
   readonly revealPartialResultsAfter?: number;

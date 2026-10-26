@@ -141,15 +141,17 @@ export function defineComponentDispatchers<
     dispatchQuery: query({
       args: {
         identity: componentDispatcherArgs.identity,
+        /** False: leave out what the result includes (see the router). */
+        include: v.optional(v.boolean()),
         lastChanged: v.literal(protocol.lastChanged),
         operation: queryOperation,
         version: v.string(),
       },
       returns: queryReturns,
-      handler: async (ctx, { identity, operation }) =>
+      handler: async (ctx, { identity, include, operation }) =>
         // Convex applies a top-level nullability transform that cannot be proven for an open union.
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        queryResponse(
+        (await queryResponse(
           operation.type,
           await invokeQueryOperation(
             handlers.queries,
@@ -157,7 +159,8 @@ export function defineComponentDispatchers<
             identity,
             operation,
           ),
-        ) as ValidatorTypeToReturnType<OperationResponse<Queries>>,
+          include !== false,
+        )) as ValidatorTypeToReturnType<OperationResponse<Queries>>,
     }),
     /**
      * Several queries in one call, for the router to answer what another

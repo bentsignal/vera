@@ -1950,6 +1950,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             subject: string;
             tokenIdentifier: string;
           };
+          include?: boolean;
           lastChanged: "0.1.0";
           operation:
             | { args: { channels?: boolean }; type: "inbox" }

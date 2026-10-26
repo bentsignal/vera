@@ -49,6 +49,12 @@ interface ActiveQuery {
 /** Bridges decentralized Convex transport into an application-owned QueryClient. */
 export class PdsQueryClient {
   readonly #activeQueries = new Map<string, ActiveQuery>();
+  /**
+   * Subscriptions holding an answer until their query's first answer (a
+   * one-shot fetch with what it includes) lands, by query hash: each
+   * publishes what it held when its query next updates.
+   */
+  readonly #held = new Map<string, () => void>();
   readonly #client;
   readonly #connections = new Map<QueryClient, () => void>();
   readonly #session;
@@ -92,6 +98,7 @@ export class PdsQueryClient {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.#startQuery(queryClient, event.query);
       }
+      if (event.type === "updated") this.#held.get(event.query.queryHash)?.();
       if (
         ((event.type === "observerRemoved" ||
           event.type === "observerOptionsUpdated") &&
@@ -193,7 +200,13 @@ export class PdsQueryClient {
 
     const active: ActiveQuery = {};
     this.#activeQueries.set(query.queryHash, active);
-    const observer = this.#client.watchPdsQuery(config.request, config.options);
+    // The subscription leaves out what the result includes: its first
+    // answer comes from the one-shot fetch TanStack makes (`queryFn`), which
+    // has them, and what it includes is followed by their own queries.
+    const observer = this.#client.watchPdsQuery(config.request, {
+      ...config.options,
+      include: false,
+    });
     const requireCompleteResults = config.options.requireCompleteResults;
     let cached: readonly IncludedPdsQuery[] | undefined;
     const publish = () => {
@@ -203,16 +216,24 @@ export class PdsQueryClient {
         this.#cacheIncluded(snapshot.included);
       }
       if (requireCompleteResults && snapshot.status !== "success") return;
+      const current = queryClient.getQueryData(query.queryKey);
       // A result already in the cache (from an earlier subscription, such
       // as a screen opened again, from a fetch or prefetch, or one the app
       // saved on the device) stays until this subscription answers,
       // instead of going back to loading or, offline, to an error.
+      if (!answers(snapshot.status) && hasResult(current)) return;
+      // Before the first answer, which comes with what it includes (a page
+      // with its reactions), the subscription's would show without them:
+      // it waits for that one, and shows after it.
       if (
-        !answers(snapshot.status) &&
-        hasResult(queryClient.getQueryData(query.queryKey))
+        answers(snapshot.status) &&
+        !hasResult(current) &&
+        query.state.fetchStatus === "fetching"
       ) {
+        this.#held.set(query.queryHash, publish);
         return;
       }
+      this.#held.delete(query.queryHash);
       queryClient.setQueryData(
         query.queryKey,
         pdsQueryDataFromSnapshot(snapshot),
@@ -220,6 +241,7 @@ export class PdsQueryClient {
     };
     const unsubscribe = observer.subscribe(publish);
     active.close = () => {
+      this.#held.delete(query.queryHash);
       unsubscribe();
       observer.close();
     };

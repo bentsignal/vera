@@ -72,7 +72,7 @@ export interface View {
  * whole page it lands in, so the page that's live stays small; a reopened
  * window more than this behind opens afresh at the latest (`advance`).
  */
-export const LIVE_PAGE_SIZE = 20;
+export const LIVE_PAGE_SIZE = 10;
 
 /** The most pages a window reopens with; past this it starts afresh. */
 export const MAX_REUSED_PAGES = 6;

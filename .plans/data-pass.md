@@ -128,7 +128,41 @@ conversation without their includes on every rerun (A), the inbox's rows
 apart from its list (B), Activity's shape (C), unread counts (D), and
 pushes (E).
 
-## Proposals (need Shawn's call)
+## Decided with Shawn (2026-10-22)
+
+- **A, yes.** A query's first answer is a one-shot call (not kept as a
+  subscription) that returns everything the first view needs: the page
+  with its reactions, thread summaries and profiles, so nothing shows
+  until the reactions are in. After that the app subscribes only to the
+  small pieces (messages, reactions, thread summaries); a reaction never
+  rebuilds a page, and there's no subscription per message. Smaller
+  pages are fine if they measure better; lean toward speed without
+  wasteful loading. Older apps keep today's behavior. To the person
+  using the app, everything arrives together (messages, reactions, reply
+  counts and thread lines, profiles and photos); only typing may arrive a
+  moment later, animating in as typing does.
+- **B, by the numbers**: Convex's pricing for calls, database I/O and
+  egress, a realistic day of opens and messages, today's one inbox query
+  against a list plus a query per row. Take it if it's a clear gain on
+  cost and speed, leaning toward speed. The math is below.
+- **C, yes, with items kept separate**: five threads with activity in one
+  channel are five items, opened one at a time. Only the repeated
+  conversation details go; nothing merges or groups. Older apps keep
+  working.
+- **D, replaced**: where only a dot shows, don't count; ask whether
+  anything is unread. VoiceOver says "unread" without a number.
+- **Real unread numbers**: badges show the real number, like Mail, into
+  the tens of thousands, not capped at 99. Counting has to be cheap, not
+  capped (for example, a sequence number per conversation, unread being
+  the newest number minus the last one read), minding deleted messages and
+  the reader's own.
+- **The badge rule**: the app icon badge counts every unread message from
+  a person in a direct message, every unread message in a group, and one
+  for each channel with anything unread. Activity items count as now
+  unless that clashes (written up below). Shawn tests it on his phone.
+- **E, skipped**: pushes aren't coalesced or delayed.
+
+## Proposals (as put to Shawn)
 
 ### A. Included queries answered once, not on every rerun
 
@@ -352,13 +386,54 @@ hasn't come from the PDS by then.
 iOS simulator, production bundle, the seeded account (29 conversations),
 cold launches (the app sent to the background first, so it saves), ms:
 
-| Screen | Before (main) | After (this stack) |
-| --- | --- | --- |
-| Inbox, from launch | 1,076 · 1,303 · 1,273 | 228 · 233 · 231 |
-| Busy group, from opening | 828 · 731 · 741 | 791 · 740 · 874 |
-| Thread, from opening | 709 · 861 · 707 · 693 · 687 | 694 · 741 · 711 |
+| Screen                   | Before (main)               | After (this stack) |
+| ------------------------ | --------------------------- | ------------------ |
+| Inbox, from launch       | 1,076 · 1,303 · 1,273       | 228 · 233 · 231    |
+| Busy group, from opening | 828 · 731 · 741             | 791 · 740 · 874    |
+| Thread, from opening     | 709 · 861 · 707 · 693 · 687 | 694 · 741 · 711    |
 
 A conversation or thread opening is one round trip to the PDS plus
 drawing, the same before and after: what changed is what they cost the
 server and the phone afterwards, not their first answer. (One before run
 of a thread took 2,129 ms and didn't repeat.)
+
+### 8. Included queries on the first answer only (A)
+
+A query's first answer is the one-shot fetch TanStack already makes
+(`queryFn`); it comes with what the result includes, as before, so a page
+arrives with its reactions, thread summaries and profiles. The live
+subscription now asks the PDS with `include: false` (a new optional
+argument on `pds:dispatchQuery`): the PDS neither answers the includes nor
+works out which they'd be (a page's include list is now a function,
+`IncludedQueries`), so nothing a query includes reruns it or is resent
+with it. Each included query is followed by its own small subscription,
+as it already was. A subscription answer that arrives before the one-shot
+waits for it, so a page never shows without its reactions. Every page,
+not just the ones a conversation opens with, now waits for its reactions
+and threads before showing; they come in the same answer, so it costs no
+time. Apps already installed don't send the flag and keep today's
+behavior.
+
+The live page holds 10 messages (it was 20 in #272); measured below.
+
+Headless phone, busy group, a page of 50 open with its reactions,
+summaries, conversation and profiles; one reaction to a message on it:
+
+|                   |                        Before |                   After |
+| ----------------- | ----------------------------: | ----------------------: |
+| Server runs       | page, reactions, conversation | reactions, conversation |
+| Documents read    |                           114 |                      31 |
+| Sent to the phone |                         23 KB |                  1.1 KB |
+
+60 messages over 30 s into an open conversation, following the newest
+page as the app does:
+
+| Live page                | Documents (page runs) | Sent to the phone |
+| ------------------------ | --------------------: | ----------------: |
+| 20, with includes (#272) |                 2,160 |            321 KB |
+| 20, without              |                 1,117 |            216 KB |
+| 10, without              |                   873 |            134 KB |
+
+Pages of 10 take a few more calls (66 against 61 here, one first answer
+per page). A window reopened more than 10 messages behind opens afresh at
+the latest, as a cold open would.

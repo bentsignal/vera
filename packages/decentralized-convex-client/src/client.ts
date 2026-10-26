@@ -85,6 +85,7 @@ export class DecentralizedConvexClient {
     return new RoutedPdsQueryObserver({
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
+      include: options.include,
       initialResponseTimeout: initialResponseTimeout(options),
       knownPds: this.#pdsByDomain,
       request,

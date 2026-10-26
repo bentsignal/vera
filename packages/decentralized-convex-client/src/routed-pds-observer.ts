@@ -24,6 +24,7 @@ export class RoutedPdsQueryObserver<
 > {
   readonly #getConnection;
   readonly #home;
+  readonly #include;
   readonly #initialResponseTimeout;
   readonly #initialResponseTimers = new Map<
     string,
@@ -52,6 +53,8 @@ export class RoutedPdsQueryObserver<
   constructor(options: {
     getConnection: (url: string) => PdsConnection;
     home: FederationTarget;
+    /** False: watch without what the result includes (see `PdsClient`). */
+    include?: boolean;
     initialResponseTimeout: number;
     request: Request;
     /** PDSs by domain, to tell which included results are complete. */
@@ -66,6 +69,7 @@ export class RoutedPdsQueryObserver<
       ids: [options.home.id],
       url: options.home.url,
     };
+    this.#include = options.include;
     this.#initialResponseTimeout = options.initialResponseTimeout;
     this.#request = options.request;
     this.#homeTarget = options.home;
@@ -125,6 +129,7 @@ export class RoutedPdsQueryObserver<
         });
       },
       (error) => this.#update(this.#home.url, { error, status: "error" }),
+      { include: this.#include },
     );
     this.#unsubscribes.set(this.#home.url, unsubscribe);
   }
@@ -187,6 +192,7 @@ export class RoutedPdsQueryObserver<
           this.#request,
           (data) => this.#update(target.url, { data, status: "live" }),
           (error) => this.#update(target.url, { error, status: "error" }),
+          { include: this.#include },
         ),
       );
     }

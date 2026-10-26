@@ -96,6 +96,14 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
     }),
     dispatchQuery: query({
       args: {
+        /**
+         * False leaves out the queries the result includes. An app asks
+         * with them once, for its first answer, and subscribes without
+         * them: everything included would otherwise be part of what reruns
+         * the query (and is resent with it), and the app follows each
+         * included query on its own anyway.
+         */
+        include: v.optional(v.boolean()),
         lastChanged: v.string(),
         operation: v.any(),
         plugin: v.string(),
@@ -106,19 +114,23 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
         const component = getDispatcherComponent(installed, request.plugin);
         if (trace?.() === true) logOperation("query", request);
         const identity = await resolveIdentity(ctx);
+        const include = request.include !== false;
         const response = await ctx.runQuery(component.query, {
           identity,
+          ...(include ? {} : { include: false }),
           lastChanged: request.lastChanged,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           operation: request.operation,
           version: request.version,
         });
-        const included = await answerIncluded(
-          ctx,
-          installed,
-          identity,
-          response.include ?? [],
-        );
+        const included = include
+          ? await answerIncluded(
+              ctx,
+              installed,
+              identity,
+              response.include ?? [],
+            )
+          : [];
         return {
           ...(included.length > 0 ? { included } : {}),
           routes: response.routes ?? [],

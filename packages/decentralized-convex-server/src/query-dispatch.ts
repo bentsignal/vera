@@ -23,11 +23,23 @@ type MaybePromise<Value> = Promise<Value> | Value;
 /** At most this many queries are answered along with another. */
 const MAX_INCLUDED_QUERIES = 200;
 
-/** A query handler's result as its component answers it. */
-export function queryResponse(type: string, result: unknown) {
+/**
+ * A query handler's result as its component answers it, with what it
+ * includes unless `include` is false (see the router's `include`).
+ */
+export async function queryResponse(
+  type: string,
+  result: unknown,
+  include = true,
+) {
   if (!isRoutedQueryResult(result)) return { type, value: result };
+  const included = !include
+    ? []
+    : typeof result.include === "function"
+      ? await result.include()
+      : result.include;
   return {
-    ...(result.include.length > 0 ? { include: result.include } : {}),
+    ...(included.length > 0 ? { include: included } : {}),
     routes: result.routes,
     type,
     value: result.data,
@@ -60,9 +72,11 @@ export function dispatchRequests<Queries extends OperationMap, Context>(
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       const operation = request.operation as OperationRequest<Queries>;
       try {
-        return queryResponse(
+        // Answered as what another query includes: nothing more is.
+        return await queryResponse(
           operation.type,
           await invokeQueryOperation(handlers, ctx, identity, operation),
+          false,
         );
       } catch {
         return null;

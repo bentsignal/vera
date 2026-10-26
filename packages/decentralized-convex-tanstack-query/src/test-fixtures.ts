@@ -44,15 +44,19 @@ export function createNote(args: {
 /**
  * `answerAfter` delays each subscription's first answer by that many
  * milliseconds, like a real connection; otherwise it answers at once.
+ * `queryAfter` does the same for one-shot queries.
  */
 export function memoryTransport(
   home: string,
-  { answerAfter }: { answerAfter?: number } = {},
+  {
+    answerAfter,
+    queryAfter,
+  }: { answerAfter?: number; queryAfter?: number } = {},
 ) {
   const connections = new Map<string, MemoryConnection>();
   const transport = new DecentralizedConvexClient({
     connectionFactory: (url) => {
-      const connection = new MemoryConnection(url, answerAfter);
+      const connection = new MemoryConnection(url, answerAfter, queryAfter);
       connections.set(url, connection);
       return connection;
     },
@@ -78,12 +82,16 @@ function includedWith(url: string, owner: string | undefined) {
 export class MemoryConnection implements FederationConnection {
   readonly #answerAfter;
   readonly #publishers = new Set<(body: string) => void>();
+  readonly #queryAfter;
   readonly #url;
+  /** The arguments of every subscription, oldest first. */
+  readonly subscribed: unknown[] = [];
   /** The last mutation's optimistic update, for tests to apply. */
   optimisticUpdate: PdsConnectionMutationOptions["optimisticUpdate"];
 
-  constructor(url: string, answerAfter?: number) {
+  constructor(url: string, answerAfter?: number, queryAfter?: number) {
     this.#answerAfter = answerAfter;
+    this.#queryAfter = queryAfter;
     this.#url = url;
   }
 
@@ -104,10 +112,11 @@ export class MemoryConnection implements FederationConnection {
     return Promise.resolve(result) as Promise<FunctionReturnType<Mutation>>;
   }
 
-  query<Query extends FederationQueryReference>(
+  async query<Query extends FederationQueryReference>(
     _query: Query,
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
+    if (this.#queryAfter !== undefined) await wait(this.#queryAfter);
     const owner = operationArgs(args).owner;
     const result = {
       included: includedWith(this.#url, owner),
@@ -116,7 +125,7 @@ export class MemoryConnection implements FederationConnection {
     };
     // The fake connection cannot derive a concrete result from an arbitrary reference.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return Promise.resolve(result) as Promise<FunctionReturnType<Query>>;
+    return result as FunctionReturnType<Query>;
   }
 
   subscribe<Query extends FederationQueryReference>(
@@ -126,10 +135,12 @@ export class MemoryConnection implements FederationConnection {
   ) {
     const routes = this.#url === "https://a.test" ? ["a.test", "b.test"] : [];
     const url = this.#url;
+    this.subscribed.push(args);
+    const include = Reflect.get(Object(args), "include") !== false;
     function publish(body: string) {
       const owner = operationArgs(args).owner;
       const result = {
-        included: includedWith(url, owner),
+        included: include ? includedWith(url, owner) : [],
         routes,
         value: [{ body, id: owner }],
       };

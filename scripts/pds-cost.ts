@@ -213,6 +213,8 @@ interface Subscription {
   readonly args: Record<string, unknown>;
   /** A page that, once full, is followed by the next, as the app does. */
   readonly follow?: boolean;
+  /** False: subscribed without what it includes, as apps now do. */
+  readonly include?: boolean;
   readonly name: string;
   readonly plugin?: string;
   readonly type: string;
@@ -264,11 +266,14 @@ async function live(scenario: Scenario) {
   let phase = "setup";
   const received: { bytes: number; name: string; phase: string }[] = [];
   function subscribe(subscription: Subscription) {
-    const { args, follow, name, plugin, type } = subscription;
+    const { args, follow, include, name, plugin, type } = subscription;
     let followed = false;
     client.onUpdate(
       "pds:dispatchQuery" as never,
-      request(plugin ?? "messages", type, args) as never,
+      {
+        ...request(plugin ?? "messages", type, args),
+        ...(include === false ? { include: false } : {}),
+      } as never,
       (result: unknown) => {
         received.push({ bytes: JSON.stringify(result).length, name, phase });
         const page = Reflect.get(Object(result), "value") as

@@ -92,6 +92,19 @@ export interface PdsConnection {
   ): () => void;
 }
 
+/** How a query is watched (see `PdsQueryExecutionOptions.include`). */
+export interface PdsWatchOptions {
+  readonly include?: boolean;
+}
+
+/** The request as sent, with `include: false` when asked. */
+function withInclude<Request extends SerializedPdsRequest>(
+  request: Request,
+  { include }: PdsWatchOptions,
+) {
+  return include === false ? { ...request, include: false } : request;
+}
+
 export class PdsClient {
   readonly #connection;
   readonly #mutation;
@@ -151,11 +164,13 @@ export class PdsClient {
     request: Request,
     onResult: (result: PdsRequestResult<Request>) => void,
     onError: (error: Error) => void,
+    options: PdsWatchOptions = {},
   ) {
     return this.watchQueryWithRouting(
       request,
       (result) => onResult(result.data),
       onError,
+      options,
     );
   }
 
@@ -163,10 +178,11 @@ export class PdsClient {
     request: Request,
     onResult: (result: PdsQueryResult<PdsRequestResult<Request>>) => void,
     onError: (error: Error) => void,
+    options: PdsWatchOptions = {},
   ) {
     return this.#connection.subscribe(
       this.#query,
-      request,
+      withInclude(request, options),
       (result) => {
         // An optimistic update set it loading; keep what was shown.
         if (result === undefined) return;
