@@ -7,12 +7,12 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { requireEnvironment } from "./lib";
 
 /**
- * Affiliated accounts speak for this PDS, such as `support@vera.chat`, and
+ * Affiliated accounts speak for this PDS, such as `vera@vera.chat`, and
  * the app shows a check badge next to their names. Only accounts on this
  * PDS's own domain can be affiliated.
  */
 
-/** Operator command: `npx convex run affiliations:add '{"address":"support@vera.chat"}'`. */
+/** Operator command: `npx convex run affiliations:add '{"address":"vera@vera.chat"}'`. */
 export const add = internalMutation({
   args: { address: v.string() },
   handler: async (ctx, { address }) => {
@@ -25,7 +25,7 @@ export const add = internalMutation({
   },
 });
 
-/** Operator command: `npx convex run affiliations:remove '{"address":"support@vera.chat"}'`. */
+/** Operator command: `npx convex run affiliations:remove '{"address":"vera@vera.chat"}'`. */
 export const remove = internalMutation({
   args: { address: v.string() },
   handler: async (ctx, { address }) => {

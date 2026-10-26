@@ -45,16 +45,23 @@ If this worktree has an isolated backend and Shawn signed in to it on his
 phone, ask him to sign out of that throwaway account in Vera Dev first
 (More > the account > Sign Out), and wait for him.
 
+Squash and merge, with the PR's title as the subject (the release plan
+finds PRs by the `(#<number>)` at its end):
+
 ```sh
-gh pr merge <number> --merge --delete-branch
+gh pr merge <number> --squash --subject "<PR title> (#<number>)" --delete-branch
 gh pr view <number> --json state     # MERGED
 ```
 
+Use `--merge` instead only when there's a reason to keep the branch's
+commits as they are, and say why in your report. A stack is one: each
+layer above contains the commits of the one below, so squashing a layer
+leaves the next one replaying it. Merge a stack with `--merge` from the
+bottom up, retargeting each layer to `main` as the one below it merges.
+
 `gh pr merge` may say it can't switch to `main` because another checkout has
 it. The merge still happened. Delete the remote branch with
-`git push origin --delete <branch>` if it's still there. For a stack, merge
-from the bottom up, retargeting each layer to `main` as the one below it
-merges.
+`git push origin --delete <branch>` if it's still there.
 
 ## 4. Backend
 

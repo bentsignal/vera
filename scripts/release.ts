@@ -267,8 +267,9 @@ function plan() {
   }
   const release = lastRelease();
   const range = release === undefined ? "HEAD" : `${release}..HEAD`;
-  // Changes land as merge commits ("Merge pull request #n", PR title in the
-  // body); anything committed straight to main is listed as it is.
+  // Changes land as squash commits ("PR title (#n)") or merge commits
+  // ("Merge pull request #n", PR title in the body); anything committed
+  // straight to main is listed as it is.
   const merges = git("log", "--first-parent", "--format=%s%n%b%x1e", range)
     .split("\x1e")
     .map((entry) => entry.trim())
@@ -276,9 +277,10 @@ function plan() {
     .map((entry) => {
       const [subject = "", title = ""] = entry.split("\n");
       const pr = /^Merge pull request #(\d+)/.exec(subject)?.[1];
-      return pr === undefined
-        ? `- ${subject} (direct commit)`
-        : `- ${title || subject} (#${pr})`;
+      if (pr !== undefined) return `- ${title || subject} (#${pr})`;
+      return /\(#\d+\)$/.test(subject)
+        ? `- ${subject}`
+        : `- ${subject} (direct commit)`;
     });
 
   console.log(`HEAD: ${head}`);

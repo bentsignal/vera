@@ -13,9 +13,12 @@ import {
   latestView,
   MAX_REUSED_PAGES,
   mergePages,
+  pageAfter,
   pageKey,
   reusable,
+  threadAnchoredView,
   windowParts,
+  withPage,
 } from "./window-model.ts";
 
 // A conversation on a fake PDS that answers pages like the real one: 50
@@ -130,6 +133,70 @@ void test("a burst of 300 is followed page by page with nothing lost or doubled"
   // with the last of the one before): seven.
   assert.equal(view.pages.length, 1 + 7);
   assert.equal(view.liveSince, 1_000);
+});
+
+void test("thread target older than the latest page opens with both neighboring pages, not latest", () => {
+  const chat = conversation();
+  history(chat, 250);
+  const view = threadAnchoredView("m70", 70);
+  assert.ok(view);
+  assert.equal(view.anchor, "m70");
+  assert.deepEqual(view.pages, [{ before: 71 }, { after: 69 }]);
+  assert.equal(pageKey(view.opened), pageKey(anchoredView("m70").opened));
+  const other = threadAnchoredView("m71", 71);
+  assert.ok(other);
+  assert.notEqual(pageKey(view.opened), pageKey(other.opened));
+  const ids = shown(chat, view);
+  assert.ok(ids.includes("m70"));
+  assert.equal(ids.filter((id) => id === "m70").length, 1);
+  assert.ok(!ids.includes("m250"));
+  const [before, after] = view.pages;
+  assert.ok(before && after);
+  assert.equal(chat.page(before).hasOlder, true);
+  assert.equal(chat.page(after).hasNewer, true);
+  assert.equal(advance(view, results(chat, view)), undefined);
+  assert.equal(view.liveSince, undefined);
+});
+
+void test("thread timestamp overlap includes tied targets once and pagination can reach live", () => {
+  const chat = conversation();
+  history(chat, 130);
+  chat.send(70, "same-time-a");
+  chat.send(70, "same-time-b");
+  let view = threadAnchoredView("same-time-a", 70);
+  assert.ok(view);
+  assert.equal(
+    shown(chat, view).filter((id) => id === "same-time-a").length,
+    1,
+  );
+  assert.ok(shown(chat, view).includes("same-time-b"));
+  const latestLoaded = mergePages(
+    view.pages.map((cursor) => chat.page(cursor)),
+  ).at(-1);
+  assert.ok(latestLoaded);
+  view = withPage(view, pageAfter(latestLoaded), "end");
+  view = settled(chat, view);
+  assert.ok(shown(chat, view).includes("m130"));
+  assert.equal(view.liveSince, 130);
+  const oldest = mergePages(view.pages.map((cursor) => chat.page(cursor)))[0];
+  assert.ok(oldest);
+  view = withPage(view, { before: oldest.sentAt }, "start");
+  assert.ok(shown(chat, view).includes("m1"));
+  assert.equal(new Set(shown(chat, view)).size, shown(chat, view).length);
+});
+
+void test("thread invalid or absent timestamps use caller's ordinary latest fallback", () => {
+  for (const sentAt of [
+    undefined,
+    NaN,
+    Infinity,
+    -1,
+    0.5,
+    Number.MAX_SAFE_INTEGER,
+  ]) {
+    assert.equal(threadAnchoredView("target", sentAt), undefined);
+  }
+  assert.equal(latestView(500).anchor, undefined);
 });
 
 void test("messages sent the same millisecond across a page boundary all show", () => {

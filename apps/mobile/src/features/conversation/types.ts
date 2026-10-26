@@ -99,3 +99,9 @@ export interface MemberNotice {
   readonly name: string;
   readonly at: Date;
 }
+
+/** A member's name and photo, by address. */
+export type ProfileOf = (address: string) => {
+  avatarUrl: string | null;
+  displayName: string;
+};

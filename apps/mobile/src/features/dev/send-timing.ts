@@ -1,0 +1,167 @@
+import type { RefObject } from "react";
+import type { TextInput, View } from "react-native";
+import { useLayoutEffect, useRef } from "react";
+import { PixelRatio, Platform } from "react-native";
+
+import type { ComposerReport } from "~/features/conversation/composer-height";
+import type { SendCommit } from "~/features/conversation/send-commit";
+import { env } from "~/env";
+import { beginSendUIFault, sendUIFault } from "./send-ui-fault";
+
+interface Host {
+  getBoundingClientRect?: () => { height: number; y: number };
+}
+type Step = "before send" | "commit" | "height callback" | "sample";
+interface Mark {
+  at: number;
+  wall: number;
+  owner: string;
+  send: number;
+  mode: "send" | "layout";
+  step: Step;
+  bar: { height: number; y: number } | null;
+  field: { height: number; y: number } | null;
+  input: { height: number; y: number } | null;
+  live: number;
+  fontScale: number;
+  platform: string;
+  empty: boolean;
+  placeholder: string;
+  reported?: number;
+}
+
+const available = (__DEV__ || env.profileBundle) && env.devTools;
+let active = false;
+let layoutOnly = false;
+let marks = new Array<Mark>();
+const samplers = new Map<string, () => void>();
+const states = new Array<{
+  at: number;
+  owner: string;
+  step: string;
+  send: SendCommit;
+  release?: number;
+}>();
+
+/** Shared send/ACK transitions, on the JS clock, separate from native apply. */
+export function markSendState(
+  step: string,
+  owner: string,
+  send: SendCommit,
+  release?: number,
+) {
+  if (!active) return;
+  states.push({
+    at: performance.now(),
+    owner,
+    step,
+    send,
+    ...(release === undefined ? {} : { release }),
+  });
+  if (states.length > 200) states.splice(0, states.length - 200);
+}
+
+function rect(host: Host | null) {
+  if (host?.getBoundingClientRect === undefined) return null;
+  const { height, y } = host.getBoundingClientRect();
+  return { height, y };
+}
+
+/** Explicitly enabled, bounded, local diagnostics. No release state or timers. */
+export const sendTiming = {
+  start: () => {
+    active = available;
+    layoutOnly = false;
+    marks = [];
+    states.length = 0;
+    sendUIFault.reset();
+    return { active };
+  },
+  /** Ordinary typing/attachment geometry, without starting a real send. */
+  startLayout: () => {
+    active = available;
+    layoutOnly = true;
+    marks = [];
+    states.length = 0;
+    sendUIFault.reset();
+    if (active) for (const sample of samplers.values()) sample();
+    return { active, mode: "layout" };
+  },
+  stop: () => {
+    active = false;
+    sendUIFault.clear();
+  },
+  /** Deliberate UI fault for the next real send, only after start() in DEV. */
+  blockUIOnce: (milliseconds: number) => sendUIFault.arm(milliseconds, active),
+  faultReport: sendUIFault.report,
+  report: () => marks.slice(),
+  stateReport: () => states.slice(),
+  sample: () => {
+    if (active) for (const sample of samplers.values()) sample();
+    return marks.slice();
+  },
+};
+
+/**
+ * Observes existing send renders, including same-height sends. It adds no
+ * React state, schedules no frames, and never supplies a height to the list.
+ * A commit rect is a shadow-tree measurement, not a UI completion claim.
+ */
+export function useSendProbe(
+  report: ComposerReport,
+  field: RefObject<View | null>,
+  input: RefObject<TextInput | null>,
+  { draft, hint }: { draft: string; hint: string },
+) {
+  const { bar, live } = report;
+  const owner = report.sendCommit.owner;
+  const send = useRef(0);
+
+  function mark(step: Step, reported?: number) {
+    if (!active || (!layoutOnly && send.current === 0)) return;
+    marks.push({
+      at: performance.now(),
+      wall: Date.now(),
+      owner,
+      send: send.current,
+      mode: layoutOnly ? "layout" : "send",
+      step,
+      bar: rect(bar.current),
+      field: rect(field.current),
+      input: rect(input.current),
+      live: live.get(),
+      fontScale: PixelRatio.getFontScale(),
+      platform: Platform.OS,
+      empty: draft === "",
+      placeholder: hint,
+      ...(reported === undefined ? {} : { reported }),
+    });
+    if (marks.length > 200) marks.splice(0, marks.length - 200);
+  }
+
+  // Read this commit's host layout, including same-height clears with no onLayout event.
+  useLayoutEffect(() => {
+    if (!available) return undefined;
+    mark("commit");
+    samplers.set(owner, () => mark("sample"));
+    return () => {
+      samplers.delete(owner);
+    };
+  });
+
+  return {
+    begin: () => {
+      if (!active) return;
+      send.current += 1;
+      mark("before send");
+      beginSendUIFault(owner, report.sendCommit.read().sequence + 1);
+    },
+    report: {
+      ...report,
+      onHeight: (height: number) => {
+        report.onHeight(height);
+        mark("height callback", height);
+      },
+    },
+  };
+}
