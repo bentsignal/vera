@@ -16,6 +16,7 @@ import {
   MessageActionsProvider,
   useMessageActions,
 } from "~/features/conversation/message-actions";
+import { useToday } from "~/lib/use-today";
 import { COMPOSER_GAP } from "./composer-binding";
 import { useDevNativeFling } from "./dev-native-fling";
 import { nativeRows } from "./map-rows";
@@ -121,6 +122,8 @@ function useRows({
 >) {
   // Only messages that arrive while it's open animate in.
   const [openedAt] = useState(Date.now);
+  // Re-labels the rows ("Today", "Yesterday · 9:14 PM") at midnight.
+  const now = useToday();
   const built = newestFirst(messages, context.layout, thread, notices);
   const byId = new Map<string, Message>();
   for (const row of built) {
@@ -129,6 +132,7 @@ function useRows({
   const typing = useHeldTypists(typists, recentOf(built));
   const rows = nativeRows(built, typing, {
     ...context,
+    now,
     openedAt,
     support: nativeSupport ?? {
       blockTypes: V1_BLOCK_TYPES,

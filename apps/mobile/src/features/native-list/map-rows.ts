@@ -17,6 +17,7 @@ import type {
 import type { MessageLayout } from "~/features/preferences/store";
 import {
   formatDaySeparator,
+  formatMessageTime,
   formatTime,
   formatTimeHeader,
 } from "../../lib/format.ts";
@@ -108,19 +109,26 @@ function reactionWords(reactions: readonly Reaction[]) {
 }
 
 /** The whole message read out, for VoiceOver and TalkBack. */
-function accessibilityLabelOf(
-  message: Message,
-  author: Person,
-  reactions: readonly Reaction[],
-  footer: readonly FooterLine[],
-) {
+function accessibilityLabelOf({
+  message,
+  author,
+  reactions,
+  footer,
+  now,
+}: {
+  message: Message;
+  author: Person;
+  reactions: readonly Reaction[];
+  footer: readonly FooterLine[];
+  now: Date | undefined;
+}) {
   const quoted =
     message.quote === undefined ? [] : [`Reply to ${quoteText(message.quote)}`];
   return [
     author.name,
     ...quoted,
     summaryOf(message),
-    formatTime(message.sentAt),
+    formatMessageTime(message.sentAt, now, ", "),
     ...reactionWords(reactions),
     ...footer.map((line) => line.text),
   ].join(", ");
@@ -159,12 +167,13 @@ function messageRow(
   const reactions = reactionsFor(message.reactions, rowParts(message));
   const footer = footerOf(message, profileOf);
   return {
-    accessibilityLabel: accessibilityLabelOf(
+    accessibilityLabel: accessibilityLabelOf({
       message,
       author,
       reactions,
       footer,
-    ),
+      now: context.now,
+    }),
     arrived: arrivedAfter(row, context.openedAt) ? true : undefined,
     author,
     blocks: blocksOf(message, layout, profileOf),
@@ -181,7 +190,12 @@ function messageRow(
     showAuthor: layout === "stacked" || (showAuthors && !isOwn),
     startsGroup: row.startsGroup,
     status: message.status,
-    timeLabel: formatTime(message.sentAt),
+    // Stacked rows show it beside the name. Bubbles reveal it in a narrow
+    // column beside headers that already give the day, so only the time.
+    timeLabel:
+      layout === "stacked"
+        ? formatMessageTime(message.sentAt, context.now)
+        : formatTime(message.sentAt),
   } satisfies MessageRow;
 }
 
@@ -236,7 +250,7 @@ function nativeRow(built: BuiltRow, context: RowContext) {
       );
     case "time": {
       const { day, time } = formatTimeHeader(built.date, context.now);
-      return headerRow(built.key, `${day} ${time}`, "time");
+      return headerRow(built.key, `${day} · ${time}`, "time");
     }
   }
 }

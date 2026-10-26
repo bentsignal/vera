@@ -90,6 +90,13 @@ it behind a splash-colored screen and reopens on the screen it was on:
   keyboard down, and no photo or video open. Someone typing, scrolling, or
   watching a video is never interrupted; someone reading sees a blink.
 
+A launch of the bundle built into the binary (a new install from TestFlight
+or the store, which may be dozens of updates behind) keeps the splash up
+while it checks and downloads, for up to 6 seconds, so it opens straight
+into the latest update. If the download takes longer, the app shows and the
+update goes in as soon as it lands, with the keyboard down and no photo or
+video open, without waiting for a pause.
+
 It never restarts while a message is sending or failed, or a change is still
 on its way to a server, since a restart would lose them. A launch always
 starts on the newest downloaded update. So within about a minute of an
