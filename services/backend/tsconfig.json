@@ -1,8 +1,14 @@
 {
   "extends": "./convex/tsconfig.json",
   "include": [
+    "./assistant-history.ts",
+    "./assistant-history.test.ts",
+    "./assistant-images.ts",
+    "./assistant-images.test.ts",
     "./assistant-limits.ts",
     "./assistant-limits.test.ts",
+    "./assistant-models.ts",
+    "./assistant-models.test.ts",
     "./bug-reports.ts",
     "./bug-reports.test.ts",
     "./issue-closures.ts",

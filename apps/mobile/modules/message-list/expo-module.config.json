@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["MessageListModule"]
+  },
+  "android": {
+    "modules": ["chat.vera.messagelist.MessageListModule"]
+  }
+}
