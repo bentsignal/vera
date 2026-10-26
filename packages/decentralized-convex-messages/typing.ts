@@ -110,16 +110,19 @@ export async function typing(
 ) {
   const { conversation } = await requireAccess(ctx, args.conversationId, self);
   const now = Date.now();
+  // Only this conversation's or thread's typing, so typing elsewhere in
+  // the conversation doesn't rerun it.
   const rows = await ctx.db
     .query("typing")
-    .withIndex("by_conversation", (index) =>
+    .withIndex("by_conversation_thread_typed", (index) =>
       index
         .eq("conversationId", args.conversationId)
+        .eq("threadId", args.threadId)
         .gt("typedAt", now - TYPING_TIMEOUT),
     )
     .take(MAX_TYPISTS + 1);
   const typists = rows
-    .filter((row) => row.accountId !== self && row.threadId === args.threadId)
+    .filter((row) => row.accountId !== self)
     .slice(0, MAX_TYPISTS)
     .map(({ accountId, startedAt, typedAt }) => ({
       accountId,

@@ -114,20 +114,20 @@ export function liveCursor(
 }
 
 /**
- * What a page of a thread shows: who's typing there, its original's
- * reactions and replies (asked for apart from the page's), and the page's
- * own.
+ * What a page of a thread shows: its original's reactions and replies
+ * (asked for apart from the page's), and the page's own. Who's typing
+ * isn't included: it changes every few seconds while someone types, and
+ * an included query reruns the page with it.
  */
 export async function threadPageIncludes(
   ctx: QueryCtx,
-  { conversationId, threadId }: { conversationId: string; threadId: string },
+  { conversationId }: { conversationId: string },
   root: Message | null,
   messages: readonly Message[],
   live?: number,
 ): Promise<QueryRequest[]> {
   const rootOnly = root === null ? [] : [root];
   return [
-    typing(conversationId, threadId),
     ...(root === null
       ? []
       : [
@@ -186,20 +186,10 @@ export function inboxIncludes(
 }
 
 /**
- * Who's typing in a conversation, or with `threadId`, in that thread: it
- * shows with the messages, so it comes with them rather than after.
- */
-function typing(conversationId: string, threadId?: string) {
-  return queryRequest(messagesProtocol, "typing", {
-    conversationId,
-    ...(threadId === undefined ? {} : { threadId }),
-  });
-}
-
-/**
- * Who's typing in a conversation; a direct conversation's or a group's
- * members, whose names it shows; and a group's joins and leaves
- * (`events`), with the names of those people.
+ * A direct conversation's or a group's members, whose names it shows,
+ * and a group's joins and leaves (`events`), with the names of those
+ * people. Who's typing isn't included: it changes every few seconds while
+ * someone types, and an included query reruns the conversation with it.
  */
 export function conversationIncludes(
   conversation: Conversation | null,
@@ -207,9 +197,8 @@ export function conversationIncludes(
 ): QueryRequest[] {
   if (conversation === null) return [];
   const { conversationId, kind, members } = conversation;
-  if (kind === "channel") return [typing(conversationId)];
+  if (kind === "channel") return [];
   return [
-    typing(conversationId),
     ...(kind === "group"
       ? [queryRequest(messagesProtocol, "memberEvents", { conversationId })]
       : []),

@@ -158,3 +158,27 @@ once, not once per channel (`spaceReads.ts`). Results are identical.
 What's sent doesn't change: the inbox is one result, so each message
 resends all of it (24 KB). That needs the rows apart from the list
 (proposal below).
+
+### 3. Typing decoupled
+
+Who's typing is no longer included with the conversation or a thread's
+pages: an included query reruns what includes it, so each typing refresh
+(every 3 s per typist) reran the conversation and every open thread page.
+The app asks for typing when the screen opens, alongside the
+conversation, so it still arrives with the messages. Typing is also
+indexed by thread (`by_conversation_thread_typed`), so typing in a thread
+doesn't rerun the conversation's typing, or the reverse.
+
+Live, the conversation, a thread page, and both typing queries open; one
+person typing for 9 s:
+
+| | Before | After |
+| --- | ---: | ---: |
+| Typing in the chat: server runs | 16 (`conversation` ×4, the thread page ×4, both typing ×4) | 4 (`typing` ×4) |
+| Documents read | 486 | 45 |
+| Sent to the phone | 12 KB | 1.1 KB |
+| Typing in the thread: sent to the phone | 27 KB | 1.1 KB |
+
+A closed conversation stays live for 3 minutes (`useStayLive`, up to 5 of
+them), so it opens again at once; that no longer includes who's typing,
+which nobody sees while it's closed and is asked for again on opening.

@@ -220,6 +220,12 @@ export default defineSchema({
     typedAt: v.number(),
   })
     .index("by_conversation", ["conversationId", "typedAt"])
+    // Who's typing in the conversation itself (no thread) or one thread.
+    .index("by_conversation_thread_typed", [
+      "conversationId",
+      "threadId",
+      "typedAt",
+    ])
     .index("by_account_conversation", ["accountId", "conversationId"]),
   // Each time an account saw an activity item (`key`) on screen, through
   // the newest activity in it then. Only the newest sighting older than a

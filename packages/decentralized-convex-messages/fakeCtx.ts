@@ -76,6 +76,7 @@ const INDEXES: Record<string, Record<string, string[]>> = {
   typing: {
     by_account_conversation: ["accountId", "conversationId"],
     by_conversation: ["conversationId", "typedAt"],
+    by_conversation_thread_typed: ["conversationId", "threadId", "typedAt"],
   },
 };
 

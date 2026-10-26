@@ -41,8 +41,10 @@ export function useTypists(
   },
 ) {
   const { address } = useAccount();
-  // Its PDS sends it with the conversation and with a thread's page, so
-  // it's there when the messages are.
+  // Asked for when the screen opens, alongside the conversation and its
+  // pages, so it's there when the messages are. (It isn't included with
+  // them: it changes every few seconds while someone types, and would
+  // rerun them each time.)
   const { data, dataUpdatedAt } = useQuery(
     pdsQuery({
       args: { conversationId, threadId },
