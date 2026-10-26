@@ -107,16 +107,11 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
     databaseHooks: {
       user: {
         create: {
-          // Every new account hears from the support account first, then
-          // from Vera, the assistant.
+          // Every new account hears from Vera, the assistant.
           after: async (user) => {
             if (!("scheduler" in ctx)) return;
-            const accountId = actorFromEmail(user.email);
-            await ctx.scheduler.runAfter(0, internal.support.welcome, {
-              accountId,
-            });
-            await ctx.scheduler.runAfter(2000, internal.vera.welcome, {
-              accountId,
+            await ctx.scheduler.runAfter(0, internal.vera.welcome, {
+              accountId: actorFromEmail(user.email),
             });
           },
         },

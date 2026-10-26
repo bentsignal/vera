@@ -19,7 +19,7 @@ ambiguous in a way that changes what you build, ask before building.
 Otherwise pick the sensible default and say so in the PR.
 
 **Fixing a GitHub issue.** Read it first (`gh issue view <n>`). Issues
-labeled "user report" were filed by Vera Support for a real person, who
+labeled "user report" were filed by Vera for a real person, who
 gets messages as the fix moves along, all driven by the PR's link to the
 issue. So the PR description must say `Fixes #<n>`, one line per issue
 (`Closes` and `Resolves` work too; a bare `#<n>` doesn't link). GitHub only

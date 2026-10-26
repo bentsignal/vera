@@ -1,6 +1,6 @@
 // How an assistant's reply ended (convex/agent.ts). The model talks to the
 // person only through tools: `send_message`, and canned messages like
-// support's privacy notice. Anything it writes outside a tool is never
+// the bug-report privacy notice. Anything it writes outside a tool is never
 // sent. A reply that ends without sending anything or calling
 // `stay_quiet` is an error, and the model gets its turn back.
 

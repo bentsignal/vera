@@ -111,6 +111,7 @@ function AppStack() {
         }}
       />
       <Stack.Screen name="dev-seed" options={{ headerShown: false }} />
+      <Stack.Screen name="dev-native-list" options={{ headerShown: false }} />
       <Stack.Screen
         name="media"
         options={{

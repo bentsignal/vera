@@ -14,6 +14,13 @@ export const env = {
       this.veraDomain.endsWith(".dev.vera.chat")
     );
   },
+  /**
+   * A production bundle served to the dev client for measuring performance
+   * (`VERA_METRO_PROFILE=1 scripts/sim.sh up`), which keeps the scripts'
+   * hooks (`globalThis.veraDev`) that only development bundles have
+   * otherwise.
+   */
+  profileBundle: process.env.EXPO_PUBLIC_PROFILE_BUNDLE === "1",
   /** Identifies the app to Expo's push service. */
   easProjectId: "5680db13-57a8-4b74-ae41-1f52abbda0b1",
 };

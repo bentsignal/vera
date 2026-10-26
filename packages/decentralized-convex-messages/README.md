@@ -21,6 +21,12 @@ that metadata from home and discovers the current participant PDS deployments.
 import messages from "@decentralized-convex/messages/convex.config";
 ```
 
+Two Component functions are for the host alone, never clients:
+`history.importHistory` inserts already-written messages at their original
+times (imports and seed data), and `history.deleteConversation` deletes a
+conversation and everything stored with it, a batch per call until it
+returns `{ done: true }`.
+
 Link previews: a sent message gets a card for each of its first four
 different links (`linkPreviews`, in order). Each card's `preview` is absent
 while the author's PDS fetches it and null when it has none, so an app can
