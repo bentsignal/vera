@@ -19,8 +19,8 @@ import { NativeHost } from "~/components/native-host";
 const BUTTON = 40;
 
 const SOURCES = [
-  { icon: PhotoLibrary, label: "Photos & Videos", source: "library" },
   { icon: PhotoCamera, label: "Camera", source: "camera" },
+  { icon: PhotoLibrary, label: "Photos & Videos", source: "library" },
   { icon: AttachFile, label: "Files", source: "files" },
 ] as const;
 
