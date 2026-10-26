@@ -71,46 +71,6 @@ export function briefOf(body: string, length = BRIEF_LENGTH) {
   return `${(space > length / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
-/**
- * Whether a known bug still counts as open to support: open on GitHub, or
- * a fix still on its way (`active`), but not one that just closed and is
- * waiting for its check.
- */
-export function isOpenBug(bug: {
-  readonly active: boolean;
-  readonly stage: ReportStage;
-}) {
-  return bug.active && bug.stage !== "closed";
-}
-
-/**
- * The open bugs and ideas as support's instructions list them, one short
- * line each: compact, since every support reply carries it, and only what
- * changes when the bug does (not how many follow it), so the prompt cache
- * keeps it between replies.
- */
-export function openBugLines(
-  bugs: readonly {
-    readonly _id: string;
-    readonly description: string;
-    readonly issueNumber?: number;
-    readonly kind: "bug" | "idea";
-    readonly reportedAt: number;
-    readonly stage: ReportStage;
-    readonly title: string;
-  }[],
-) {
-  if (bugs.length === 0) return "None.";
-  return bugs
-    .map((bug) => {
-      const issue = bug.issueNumber === undefined ? "" : ` #${bug.issueNumber}`;
-      const status = statusOf({ stage: bug.stage, stillOpen: true });
-      const reported = new Date(bug.reportedAt).toISOString().slice(0, 10);
-      return `- [${bug._id}]${issue} ${bug.title} (${bug.kind}, ${status}, reported ${reported}): ${briefOf(bug.description)}`;
-    })
-    .join("\n");
-}
-
 /** An imported issue's kind, from its labels. */
 export function kindOf(labels: readonly string[]): "bug" | "idea" {
   return labels.some((label) => /enhancement|idea|feature/i.test(label))

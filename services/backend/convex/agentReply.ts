@@ -35,13 +35,10 @@ export interface Assistant {
  */
 export interface Prompt {
   /**
-   * Its rules, then what it knows: about this person, and what it needs on
-   * most replies (support's open bugs). This may change only when something
-   * happens (they file a report, save a note), never just because it's a
-   * new reply: the time, what they just said, and what's looked up for it
-   * go in `latest`. And what the model needs on most replies belongs here,
-   * not behind a tool: a tool's results are sent anew, at full price, in
-   * every reply that calls it.
+   * Its rules, then what it knows about this person. This may change only
+   * when something happens (they file a report, save a note), never just
+   * because it's a new reply: the time, what they just said, and what's
+   * looked up for it go in `latest`.
    */
   readonly instructions: string;
   /**

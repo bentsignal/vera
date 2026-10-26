@@ -78,10 +78,9 @@ Two verified accounts answer direct messages with a model:
 
 - `support@<account domain>` helps people report bugs. It asks for what's
   missing (what happened, where, how to repeat it, a screenshot), tells them
-  reports are public and waits for their answer, checks the team's known
-  bugs (the open ones are in its instructions; older ones and merged fixes
-  it searches for) and follows a match instead of filing a duplicate, then
-  files an anonymized GitHub issue labeled "user report"
+  reports are public and waits for their answer, checks GitHub for an
+  existing issue or fix (following that issue instead of filing a
+  duplicate), then files an anonymized GitHub issue labeled "user report"
   with the app version and device the app reported. Screenshots never go in
   an issue: support describes what they show in words, without personal
   details. A cron (`crons.ts`, every 10 minutes) follows each issue and
@@ -223,11 +222,6 @@ nothing. So, when changing an assistant or adding a tool:
   recalled for what they just said, a lookup for this reply) goes in
   `latest`, which comes after the conversation, with the time and the
   team's note. Tool names and descriptions never change.
-- **What the model needs on most replies goes in the instructions, not
-  behind a tool.** A tool's results are part of only the reply that calls
-  it, so every reply that needs them pays for them in full again. Support's
-  open bugs were a tool, about 8,000 tokens a search; they're in its
-  instructions now, where the cache keeps them.
 - **The conversation only grows at the end.** The window of messages the
   model sees moves in jumps (`assistant-history.ts`), and images go by
   URL, with converted ones reused (`assistant-images.ts`). The newest four
