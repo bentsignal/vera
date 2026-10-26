@@ -20,23 +20,37 @@ enum Images {
 
   static let options: SDWebImageOptions = [.retryFailed, .decodeFirstFrameOnly]
 
+  /// The image a view shows or is loading (its URL and blur), so setting
+  /// it again doesn't load it again. Not `sd_imageURL`: SDWebImage keeps
+  /// that after a load fails or the view shows a placeholder instead, and a
+  /// recycled cell would then keep the placeholder (another person's
+  /// initials) when the URL came back.
+  private static let shownKey = "veraShown"
+
   /// Shows `url` in `view`, sized for `size`. Images already in memory show
   /// at once; downloaded ones fade in.
   static func load(_ view: UIImageView, _ url: URL?, size: CGSize, placeholder: UIImage? = nil, blur: CGFloat = 0) {
     guard let url else {
-      view.sd_cancelCurrentImageLoad()
+      cancel(view)
       view.image = placeholder
       return
     }
-    let blurKey = "veraBlur"
-    if view.sd_imageURL == url, view.image != nil, (view.layer.value(forKey: blurKey) as? CGFloat ?? 0) == blur { return }
-    view.layer.setValue(blur, forKey: blurKey)
+    let shown = "\(blur)|\(url.absoluteString)"
+    if view.layer.value(forKey: shownKey) as? String == shown, view.image != nil { return }
+    view.layer.setValue(shown, forKey: shownKey)
     view.sd_imageTransition = .fade(duration: 0.18)
-    view.sd_setImage(with: url, placeholderImage: placeholder, options: options, context: context(size, blur: blur))
+    view.sd_setImage(with: url, placeholderImage: placeholder, options: options, context: context(size, blur: blur), progress: nil) { [weak view] image, error, _, _ in
+      // Failed: the placeholder stays, and setting it again tries again.
+      // (A load replaced by another is cancelled, and that one's showing.)
+      guard image == nil, (error as NSError?)?.code != SDWebImageError.cancelled.rawValue,
+            let view, view.layer.value(forKey: shownKey) as? String == shown else { return }
+      view.layer.setValue(nil, forKey: shownKey)
+    }
   }
 
   static func cancel(_ view: UIImageView) {
     view.sd_cancelCurrentImageLoad()
+    view.layer.setValue(nil, forKey: shownKey)
   }
 
   private static let prefetcher: SDWebImagePrefetcher = {
@@ -55,7 +69,6 @@ enum Images {
 
 /// A round photo, or initials on a gradient when there's none.
 final class AvatarView: UIImageView {
-  private var person: Person?
   private var monogramColors: (UIColor, UIColor) = (.gray, .darkGray)
   private static let monograms = NSCache<NSString, UIImage>()
 
@@ -80,8 +93,8 @@ final class AvatarView: UIImageView {
     layer.borderColor = theme.background.cgColor
     layer.cornerRadius = size / 2
     let monogram = Self.monogram(person.initials, size: size, top: theme.monogramTop, bottom: theme.monogramBottom)
-    if person == self.person, image != nil, person.avatarUrl != nil { return }
-    self.person = person
+    // `load` skips a photo already showing or loading, and tries again
+    // after one that failed.
     Images.load(self, person.avatarUrl, size: CGSize(width: size, height: size), placeholder: monogram)
   }
 
