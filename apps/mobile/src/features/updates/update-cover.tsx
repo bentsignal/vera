@@ -24,7 +24,7 @@ import { STORE_LABEL, STORE_URL } from "./store-link";
 export function UpdateCover() {
   const required = useRequiredUpdate();
   const launch = useLaunchCover();
-  if (required === undefined && launch === "hidden") return null;
+  if (required === undefined && launch === undefined) return null;
   return (
     <Modal
       visible

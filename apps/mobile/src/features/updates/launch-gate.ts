@@ -29,12 +29,9 @@ export interface LaunchGateState {
 /**
  * What a launch shows while it brings in an update: "blank" (the splash),
  * "cover" ("Updating Vera…"), then "restart" into the update or "open" the
- * app as it is.
+ * app as it is. Every path ends in "open" or "restart".
  */
-export type LaunchStep = "blank" | "cover" | "open" | "restart";
-
-/** The step a launch is on. Every path ends in "open" or "restart". */
-export function launchStep(state: LaunchGateState): LaunchStep {
+export function launchStep(state: LaunchGateState) {
   const elapsed = state.now - state.startedAt;
   // Nothing holds the app past this, whatever expo-updates says or doesn't.
   if (elapsed >= GIVE_UP_MS) return "open";

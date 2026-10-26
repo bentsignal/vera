@@ -1,7 +1,5 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { AppState, Keyboard } from "react-native";
-import { File, Paths } from "expo-file-system";
-import { useNavigationContainerRef } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Updates from "expo-updates";
 import { BREAKING_VERSION } from "@vera/backend/breaking-version";
@@ -13,6 +11,7 @@ import { queryClient } from "~/features/session/account-session";
 import { canContinue, GIVE_UP_MS, launchStep } from "./launch-gate";
 import { releaseSplash } from "./launch-splash";
 import { canRestartForUpdate } from "./restart-policy";
+import { focusedScreen, forgetScreen, saveScreen } from "./update-screen";
 
 // Over-the-air updates go in as soon as they can without interrupting
 // anyone, so nobody keeps running old code against a newer backend. Every
@@ -36,9 +35,6 @@ import { canRestartForUpdate } from "./restart-policy";
 // with "Updating Vera…", looks for the update every 2 seconds (it's
 // published seconds after the deploy), and restarts into it at once.
 
-type NavigationRef = ReturnType<typeof useNavigationContainerRef>;
-type RootState = NonNullable<Parameters<NavigationRef["resetRoot"]>[0]>;
-
 /** How often an app in the foreground checks for an update. */
 const CHECK_EVERY_MS = 60_000;
 /** How often a launch waiting for its update looks at how it's going. */
@@ -52,10 +48,6 @@ const REQUIRED_CHECK_MS = 2_000;
  * is too old for any over-the-air update and needs one from the store.
  */
 const REQUIRED_WAIT_MS = 3 * 60_000;
-/** A screen saved longer ago than this belongs to some other restart. */
-const RESTORE_WITHIN_MS = 30_000;
-/** How long to wait for the navigator to mount before giving up on it. */
-const RESTORE_FRAMES = 60;
 
 let openedAt = Date.now();
 let touchedAt = openedAt;
@@ -64,7 +56,6 @@ let checking = false;
 let downloaded = false;
 let restarting = false;
 let ticker: ReturnType<typeof setInterval> | undefined;
-let navigation: NavigationRef | undefined;
 
 /**
  * Set when the backend needs a newer app: "updating" while the update is
@@ -83,10 +74,10 @@ let gate:
     }
   | undefined;
 /**
- * What the launch's wait shows over the app: nothing, "Updating Vera…", or
- * that with "Continue Without Updating".
+ * What the launch's wait shows over the app, if anything: "Updating Vera…",
+ * or that with "Continue Without Updating".
  */
-let launchCover: "continue" | "hidden" | "updating" = "hidden";
+let launchCover: "continue" | "updating" | undefined;
 
 const listeners = new Set<() => void>();
 
@@ -276,14 +267,17 @@ function waitForLaunchUpdate() {
     releaseSplash();
     return;
   }
+  // The backstop, never cancelled: it opens the app even if a restart
+  // hangs or nothing below works. Opening twice is harmless.
+  setTimeout(openApp, GIVE_UP_MS);
   const startedAt = Date.now();
+  // expo-updates' own state events (`useUpdates` uses them too) report the
+  // launch's check and download as they go.
   const subscription = Updates.addUpdatesStateChangeListener(() => {
     if (gate !== undefined) gate.heardAt = Date.now();
     stepLaunch();
   });
   const interval = setInterval(stepLaunch, GATE_TICK_MS);
-  // The backstop: it needs nothing above to work, and opening twice is fine.
-  const backstop = setTimeout(openApp, GIVE_UP_MS);
   gate = {
     coverShownAt: undefined,
     heardAt: startedAt,
@@ -291,7 +285,6 @@ function waitForLaunchUpdate() {
     stop: () => {
       subscription.remove();
       clearInterval(interval);
-      clearTimeout(backstop);
     },
   };
   stepLaunch();
@@ -330,132 +323,6 @@ function stepLaunch() {
 function openApp() {
   gate?.stop();
   gate = undefined;
-  setLaunchCover("hidden");
+  setLaunchCover(undefined);
   releaseSplash();
-}
-
-function screenFile() {
-  return new File(Paths.cache, "screen-before-update.json");
-}
-
-function forgetScreen() {
-  try {
-    screenFile().delete();
-  } catch {
-    // Never saved.
-  }
-}
-
-interface Navigated {
-  readonly index?: number;
-  readonly routes: readonly {
-    readonly name: string;
-    readonly params?: object;
-    readonly state?: Navigated;
-  }[];
-}
-
-/**
- * Only the screens' names and params. Restoring this partial state rebuilds
- * each navigator, which drops any screen the update renamed or removed.
- */
-// eslint-disable-next-line no-restricted-syntax -- It calls itself, and TypeScript can't infer a return type that refers to itself.
-function partialState(state: Navigated): Navigated {
-  return {
-    index: state.index,
-    routes: state.routes.map((route) => ({
-      name: route.name,
-      params: route.params,
-      state: route.state && partialState(route.state),
-    })),
-  };
-}
-
-/** The name of the screen in front, at the end of the focused routes. */
-function focusedScreen() {
-  if (navigation?.isReady() !== true) return undefined;
-  return focusedIn(navigation.getRootState());
-}
-
-function focusedIn(root: Navigated) {
-  let route = root.routes[root.index ?? 0];
-  while (route?.state !== undefined) {
-    route = route.state.routes[route.state.index ?? 0];
-  }
-  return route?.name;
-}
-
-function saveScreen(now: number) {
-  if (navigation?.isReady() !== true) return;
-  try {
-    const state = partialState(navigation.getRootState());
-    screenFile().write(JSON.stringify({ savedAt: now, state }));
-  } catch {
-    // The app reopens on Home instead.
-  }
-}
-
-function isRootState(value: unknown): value is RootState {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "routes" in value &&
-    Array.isArray(value.routes)
-  );
-}
-
-/** A saved screen, if it's from the restart that started this launch. */
-function recentScreen(saved: unknown) {
-  if (typeof saved !== "object" || saved === null) return undefined;
-  if (!("savedAt" in saved) || !("state" in saved)) return undefined;
-  const { savedAt, state } = saved;
-  if (typeof savedAt !== "number" || !isRootState(state)) return undefined;
-  return Date.now() - savedAt <= RESTORE_WITHIN_MS ? state : undefined;
-}
-
-/** The screen the app was on before restarting into an update, read once. */
-function takeSavedScreen() {
-  const file = screenFile();
-  if (!file.exists) return undefined;
-  try {
-    const text = file.textSync();
-    forgetScreen();
-    return recentScreen(JSON.parse(text));
-  } catch {
-    forgetScreen();
-    return undefined;
-  }
-}
-
-/**
- * Lets an update restart save which screen is open, and reopens the screen
- * saved by the restart that started this launch. Returns the cleanup.
- */
-function attachNavigation(ref: NavigationRef) {
-  navigation = ref;
-  const saved = takeSavedScreen();
-  let frame: number | undefined;
-  let framesLeft = RESTORE_FRAMES;
-  function restore() {
-    if (saved === undefined) return;
-    if (ref.isReady()) {
-      ref.resetRoot(saved);
-      return;
-    }
-    framesLeft -= 1;
-    if (framesLeft > 0) frame = requestAnimationFrame(restore);
-  }
-  restore();
-  return () => {
-    if (frame !== undefined) cancelAnimationFrame(frame);
-    if (navigation === ref) navigation = undefined;
-  };
-}
-
-/** Connects update restarts to the app's navigation. */
-export function UpdateNavigation() {
-  const ref = useNavigationContainerRef();
-  // eslint-disable-next-line no-restricted-syntax -- The navigation container lives outside React's data flow: restarts read its state, and the screen saved before one is restored into it once.
-  useEffect(() => attachNavigation(ref), [ref]);
-  return null;
 }

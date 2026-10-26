@@ -74,13 +74,13 @@ void test("nothing holds the app past the limit", () => {
   const limit = { ...COVERED, heardAt: GIVE_UP_MS, now: GIVE_UP_MS };
   assert.equal(launchStep(limit), "open");
   assert.equal(launchStep({ ...limit, updateReady: true }), "open");
-  assert.equal(
-    launchStep({ ...limit, coverShownAt: GIVE_UP_MS - 1 }),
-    "open",
-  );
+  assert.equal(launchStep({ ...limit, coverShownAt: GIVE_UP_MS - 1 }), "open");
 });
 
 void test("continuing without the update is offered after a while", () => {
-  assert.equal(canContinue({ now: CONTINUE_AFTER_MS - 1, startedAt: 0 }), false);
+  assert.equal(
+    canContinue({ now: CONTINUE_AFTER_MS - 1, startedAt: 0 }),
+    false,
+  );
   assert.equal(canContinue({ now: CONTINUE_AFTER_MS, startedAt: 0 }), true);
 });
