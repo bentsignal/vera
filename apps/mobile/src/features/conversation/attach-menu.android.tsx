@@ -23,8 +23,8 @@ const BUTTON = 40;
 const KEYBOARD_WAIT_MS = 600;
 
 const SOURCES = [
-  { icon: PhotoLibrary, label: "Photos & Videos", source: "library" },
   { icon: PhotoCamera, label: "Camera", source: "camera" },
+  { icon: PhotoLibrary, label: "Photos & Videos", source: "library" },
   { icon: AttachFile, label: "Files", source: "files" },
 ] as const;
 
