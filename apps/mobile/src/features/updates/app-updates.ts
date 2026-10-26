@@ -9,6 +9,7 @@ import { Uniwind } from "uniwind";
 import { saveDraftsNow } from "~/features/conversation/drafts";
 import { hasUnsentMessages } from "~/features/messaging/outbox";
 import { queryClient } from "~/features/session/account-session";
+import { releaseSplash } from "./launch-splash";
 import { canRestartForUpdate } from "./restart-policy";
 
 // Over-the-air updates go in as soon as they can without interrupting
@@ -18,6 +19,12 @@ import { canRestartForUpdate } from "./restart-policy";
 // The app then restarts into it behind a screen like the splash and reopens
 // on the same screen: at once while it's still opening, otherwise at the
 // first quiet moment (see `restart-policy.ts`).
+//
+// A launch of the bundle built into the binary (a new install from the
+// store or TestFlight) may be dozens of updates behind. It keeps the splash
+// up while it checks and downloads, for up to 10 seconds, so it opens on
+// the latest update; if the download takes longer, the update goes in as
+// soon as it lands, without waiting for a pause.
 //
 // A backend deploy that raises the breaking version (see
 // services/backend/breaking-version.ts) can't wait for that: the moment its
@@ -30,6 +37,8 @@ type RootState = NonNullable<Parameters<NavigationRef["resetRoot"]>[0]>;
 
 /** How often an app in the foreground checks for an update. */
 const CHECK_EVERY_MS = 60_000;
+/** How long a launch of the built-in bundle holds the splash for an update. */
+const EMBEDDED_SPLASH_MS = 10_000;
 /** How often the foreground timer runs: checks, and watching for a pause. */
 const TICK_MS = 1_000;
 /** While an update is required, how often to look for it. */
@@ -99,6 +108,13 @@ export function noteServerBreakingVersion(version: number) {
  * every minute in the foreground.
  */
 export function installAppUpdates() {
+  if (__DEV__ || !Updates.isEnabled || !Updates.isEmbeddedLaunch) {
+    releaseSplash();
+  } else {
+    setTimeout(() => {
+      if (!restarting) releaseSplash();
+    }, EMBEDDED_SPLASH_MS);
+  }
   if (__DEV__ || !Updates.isEnabled) return;
   // "inactive" (Control Center, Face ID, a system alert) isn't an open; only
   // coming back from the background is. A launch in the background, as for a
@@ -150,6 +166,8 @@ async function check() {
   downloaded = await download().catch(() => false);
   checking = false;
   if (downloaded) await restartIfUnnoticed();
+  // A restart keeps the splash up; otherwise the app shows.
+  if (!restarting) releaseSplash();
 }
 
 /** Downloads a newer update, if there is one. */
@@ -169,6 +187,7 @@ async function restartIfUnnoticed() {
     required !== undefined ||
     canRestartForUpdate({
       active: AppState.currentState === "active",
+      embeddedLaunch: Updates.isEmbeddedLaunch,
       keyboardVisible: Keyboard.isVisible(),
       now,
       openedAt,
@@ -195,6 +214,7 @@ async function restartIfUnnoticed() {
     // The update goes in on the next launch instead; `restarting` stays set
     // so this launch doesn't keep trying.
     forgetScreen();
+    releaseSplash();
   }
 }
 
