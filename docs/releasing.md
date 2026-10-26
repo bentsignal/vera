@@ -53,30 +53,77 @@ key, while Play uses Google's key, so switching in either direction needs
 uninstalling Vera and signing in again. Check the APK certificate against
 the live passkey and invite-link association files before distributing it.
 
-Each binary accepts over-the-air updates (EAS Update, `expo-updates`) only
-for its **runtime version**, which is the native fingerprint (`runtimeVersion:
-{ policy: "fingerprint" }` in `app.config.ts`). The fingerprint covers native
-code, native dependencies, config plugins, patches, and app config. Changing
-any of them makes a new runtime that the old binaries can't run, and that
-needs a new store build. Everything else (screens, logic, styles, assets) can
-ship over the air.
+## Runtime versions
 
-What moves a platform's runtime: native dependencies, patches, config
-plugins and their options, the notification service extension's Swift
+Each binary accepts over-the-air updates (EAS Update, `expo-updates`) only
+for its **runtime version**: the platform's `RUNTIME_VERSION` in
+`apps/mobile/app.config.ts`, which we set by hand. The goal is that everyone
+runs the newest JavaScript, matched to the newest backend, and only native
+changes wait for a store build. So the runtime version says which native
+API the JavaScript needs, not what native code a binary has:
+
+- **Native change, compatible** (most of them): Swift or Kotlin fixes and
+  polish, or a new native feature the JavaScript checks for before using.
+  The runtime version stays. Every binary on it keeps getting every update,
+  and the native change reaches people in the next store build, whenever
+  that is. Over the air and store releases are separate: ship the
+  JavaScript now, and the store build when it's worth one.
+- **New runtime**: the JavaScript needs native code older binaries don't
+  have, and can't check for it. That's a new native module, prop, event,
+  or method the JavaScript calls unconditionally; native code that
+  requires a field older JavaScript doesn't send; a new native dependency
+  the JavaScript imports; a config plugin, or plugin options, that the
+  JavaScript relies on; a new iOS permission string (calling the API
+  without its string crashes iOS). The PR raises that platform's runtime version (`ios-2`,
+  `ios-3`, …; the first values are iOS build 12's and Play build 9's
+  fingerprints). Older binaries then stay on the last update for their
+  runtime until people install the new store build, so prefer keeping a
+  native feature optional over raising it.
+
+Keep new native features optional: the native side reports what it can do,
+and the JavaScript checks before using it. The message list does this
+(`NativeSupport` in `apps/mobile/src/features/native-list/contract.ts`: a
+contract version, the row kinds and blocks it draws, and a `features`
+list); follow it for new native modules. An older binary on the same
+runtime then simply goes without the feature.
+
+Every PR's release notes say "Native change: no", "yes, compatible", or
+"yes, new runtime". CI checks the line: the Mobile fingerprint workflow
+fails a PR that changes the native fingerprint but says "no", and the
+Release steps check requires "yes, new runtime" exactly when the PR raises
+`RUNTIME_VERSION` (labeled "⛔ New Runtime"). Whether a native change is
+compatible is a judgment CI can't make, so make it carefully: before
+saying "yes, compatible", run this JavaScript on a dev client built
+without the native change (check out the native files from main, then
+`scripts/sim.sh up`), or reason through each call into native.
+
+The **native fingerprint** (`expo-updates fingerprint:generate`, configured
+by `apps/mobile/fingerprint.config.cjs`) still hashes everything native.
+Dev clients are built and cached by it (`scripts/sim.sh`,
+`scripts/phone.sh`), store build tags record it, and `pnpm release plan`
+compares it to say whether native changes are waiting for a store build.
+It skips the runtime version itself, so raising one rebuilds no dev
+client. What moves it: native dependencies, patches, config plugins and
+their options, the notification service extension's Swift
 (`plugins/notification-service`, added in `fingerprint.config.cjs`; it
-counts for Android too) (a plugin's options count for both platforms, even
-when they only affect one), and the shared parts of `app.config.ts`. The
+counts for Android too), and the shared parts of `app.config.ts`. The
 other platform's section (`ios: {}` or `android: {}`) doesn't count, and
-`apps/mobile/fingerprint.config.cjs` excludes `eas.json`, so editing build
-profiles never strands installed binaries. Check before merging anything
-native: `VERA_NOTIFICATION_EXTENSION=1 pnpm exec expo-updates fingerprint:generate --platform ios`
-in `apps/mobile`, before and after. Vera Dev's runtime (internal builds) is
-the same command with `APP_VARIANT=development`; `pnpm release` computes
-each channel's own.
+`eas.json` is excluded, so editing build profiles never needs a build.
+Check it before and after a native change:
+`VERA_NOTIFICATION_EXTENSION=1 pnpm exec expo-updates fingerprint:generate --platform ios`
+in `apps/mobile`.
 
 Fingerprints differ between macOS and Linux. Builds and updates both run on
 Shawn's Mac, so they match. CI's "📱 Native Change" label compares the PR's
 base and head on Linux, which is consistent within that one run.
+
+Until October 26, 2026 the runtime version was the fingerprint
+(`policy: "fingerprint"`), so any native change cut every older binary off
+from updates. Binaries from then (iOS build 12 and earlier, Play build 9
+and earlier) declare their fingerprint as their runtime, which is why the
+first set values are those hashes. Their tags have no `fingerprint:` line,
+so `plan` can't say whether native changes are waiting since them; read the
+merged PRs' "Native change" lines.
 
 ### When an update goes in
 
@@ -146,15 +193,15 @@ review. The release kept `BREAKING_VERSION` at 3.
 The native list is now the app's only message list: the React Native list
 and its Settings → Experimental switch are removed. Binaries from before
 the native-list release (iOS build 9, Android build 6) keep the React
-Native list in the JavaScript they already have: updates match the native
-fingerprint, so newer JavaScript never reaches them. The detailed acceptance and deferred Android camera preview cosmetics
+Native list in the JavaScript they already have: they're on an older
+runtime, so newer JavaScript never reaches them. The detailed acceptance and deferred Android camera preview cosmetics
 are recorded in
 [the native-list release record](../.plans/native-list-release-20261025.md).
 
 ## Release history in git
 
 Every release is an annotated tag on the commit it shipped, with the runtime
-in the message:
+in the message (and, for builds, the native fingerprint):
 
 - `mobile/build/<n>`: iOS store build `n` uploaded to App Store Connect.
 - `mobile/internal/<n>`: an iOS internal build.
@@ -169,9 +216,11 @@ in the message:
 
 "Changes since the last release" means the merges since the newest
 `mobile/build/*`, `mobile/android/build/*`, or `mobile/ota/production/*` tag. `pnpm release plan` prints
-them, whether the release can go over the air (current runtime equals the
-last store build's), and whether the backend (including `pnpm-lock.yaml`)
-changed since the last production deploy.
+them; per platform, whether the release can go over the air (the runtime
+version equals the last store build's) and whether native changes are
+waiting for a store build (the fingerprint differs from that build's); and
+whether the backend (including `pnpm-lock.yaml`) changed since the last
+production deploy.
 
 `mobile/build/5` (TestFlight build 5, the first one) predates `expo-updates`,
 so the first release after it is a store build.
@@ -191,7 +240,9 @@ the release a PR removes the finished steps.
    only what merging could have broken: places where the changes overlap
    or interact (shared files and screens, the same flow from two ends,
    backend changes against the app and against old app versions, native
-   changes together in one store build). The agent runs that list itself
+   changes together in one store build, and this JavaScript on binaries
+   without the native changes waiting for a store build). The agent runs
+   that list itself
    first, in the iOS simulator and Android emulator, and fixes what fails.
    Then it sends Shawn the notes, what it checked (with evidence), and the
    steps left for him: what a simulator can't settle.
@@ -223,6 +274,14 @@ the release a PR removes the finished steps.
      Review. On Android, `pnpm release build production --android` builds
      an app bundle and submits it to Play internal testing, where testers
      get it with no review.
+   - **Over the air and store builds are separate releases.** When native
+     changes are waiting but the runtime didn't change, the update goes
+     out to everyone now, and the store build (which carries the same
+     JavaScript plus the native changes) ships when Shawn wants it: in
+     the same sitting, or later with more native work. Both are on the
+     same runtime, so every later update reaches the old binaries and the
+     new build alike. Only a raised runtime makes a store build required:
+     then `plan` says so, and the update reaches only the new build.
 5. **App Store**, only when Shawn says so: `pnpm release appstore <build>`
    submits the TestFlight build for App Review. The first submission needs
    the store listing filled in first (see the skill).
@@ -233,4 +292,4 @@ the release a PR removes the finished steps.
 increment on their own (EAS remote versioning, shared by internal and store
 builds, counted separately for Vera and Vera Dev). Bump the version with a PR
 after a version is released on the App Store, because Apple closes that
-version to new builds. The runtime version is independent of both.
+version to new builds. The runtime version (above) is independent of both.

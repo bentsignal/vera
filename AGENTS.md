@@ -86,8 +86,12 @@ those changes overlap (each one was already tested on its own before it
 merged), run those tests yourself first in the iOS simulator and Android
 emulator, get main onto his phone for what only he can check, and ship
 only after he approves.
-Over-the-air updates are the default; a store build happens only when
-native code changed or Apple requires one.
+Over-the-air updates are the default, and they reach every binary on the
+same runtime version (`RUNTIME_VERSION` in `apps/mobile/app.config.ts`),
+so everyone runs JavaScript that matches the newest backend. Native
+changes reach people in a store build, a separate release Shawn times;
+it's required only when a PR raised the runtime, or Apple requires one
+(docs/releasing.md → Runtime versions).
 
 **Extra release steps go in [docs/next-release.md](docs/next-release.md),
 in the PR that needs them.** Some changes need more from a release than
@@ -162,11 +166,16 @@ Lint enforces the React rules: the React Compiler handles memoization (no
 (`pdsQuery`/`pdsMutation`), never fetched in an effect; and `useEffect` is
 banned except with an `eslint-disable-next-line` comment saying why nothing
 else works. CI also exports the iOS bundle and labels PRs that change native
-code ("📱 Native Change"), since those need a store build to ship, and PRs
-that raise the backend's breaking version ("💥 Breaking Backend"), since
-those must ship with `--with-backend` (docs/releasing.md → Breaking backend
-changes). Every PR says "Breaking backend change: no" or "yes" in its
-release notes, and CI checks it against the file.
+code ("📱 Native Change"), since those reach people only in a store build,
+PRs that raise the runtime version ("⛔ New Runtime"), since older binaries
+then stop getting updates, and PRs that raise the backend's breaking
+version ("💥 Breaking Backend"), since those must ship with
+`--with-backend` (docs/releasing.md → Runtime versions, Breaking backend
+changes). Every PR says "Breaking backend change: no" or "yes", and
+"Native change: no", "yes, compatible", or "yes, new runtime" in its
+release notes, and CI checks both. Keep native features optional: the
+native side reports what it supports and the JavaScript checks, so a
+native change rarely needs a new runtime.
 
 Two more rules, also enforced by lint:
 

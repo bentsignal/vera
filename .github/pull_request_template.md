@@ -20,7 +20,7 @@
 ## Release notes
 
 - Backend: <!-- shared dev PDS, or isolated dev/<branch> -->
-- Native change: <!-- no / yes (needs a store build; CI labels it "📱 Native Change") -->
+- Native change: <!-- no / yes, compatible: native code changed, but binaries without it still run this JavaScript (any new native feature is optional and checked for), so updates keep reaching them and it ships in the next store build / yes, new runtime: this JavaScript needs native code older binaries lack, so this raises RUNTIME_VERSION in apps/mobile/app.config.ts and they stop getting updates until they install a store build. See docs/releasing.md → Runtime versions. CI labels native changes "📱 Native Change" and new runtimes "⛔ New Runtime". -->
 - Convex deploy needed on release: <!-- no / yes -->
 - Breaking backend change: <!-- no / yes: this raises BREAKING_VERSION in services/backend/breaking-version.ts, because the backend change breaks the app version before it (a removed or renamed function, a result old apps can't read). Open older apps then update themselves the moment the backend deploys; see docs/releasing.md → Breaking backend changes. CI checks this line against the file and labels the PR "💥 Breaking Backend". -->
 - Extra release steps: <!-- none, or what this PR adds to docs/next-release.md: anything the release must do beyond `pnpm release` (deploys outside Convex like infra/, console or account setup, env vars, ordering, checks after shipping). CI checks this line. -->

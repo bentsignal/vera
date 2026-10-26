@@ -11,6 +11,12 @@
 // BREAKING_VERSION, by one. The workflow labels such PRs
 // "💥 Breaking Backend".
 //
+// And the "Native change" line against RUNTIME_VERSION in
+// apps/mobile/app.config.ts: "yes, new runtime" exactly when the PR raises a
+// platform's runtime version (older binaries stop getting updates; the
+// workflow labels it "⛔ New Runtime"). Whether native code changed at all
+// takes the fingerprint, which the Mobile fingerprint workflow checks.
+//
 //   PR_BODY="..." BASE_SHA=<sha> node --experimental-strip-types scripts/check-release-steps.ts
 import { execFileSync, spawnSync } from "node:child_process";
 
@@ -19,6 +25,7 @@ const CHECKLIST = "docs/next-release.md";
 // a step.
 const UNRELEASED_PATHS = ["infra/"];
 const BREAKING_FILE = "services/backend/breaking-version.ts";
+const APP_CONFIG = "apps/mobile/app.config.ts";
 
 function fail(message: string): never {
   console.error(`release steps: ${message}`);
@@ -108,3 +115,51 @@ if (saysBreaking && !raised) {
   );
 }
 console.log(`breaking backend change: ${saysBreaking ? breakingValue : "no"}`);
+
+/**
+ * A platform's runtime version in a commit's app.config.ts
+ * (`RUNTIME_VERSION`), if it sets one there.
+ */
+function runtimeVersionAt(ref: string, platform: "android" | "ios") {
+  const source = spawnSync("git", ["show", `${ref}:${APP_CONFIG}`], {
+    encoding: "utf8",
+  }).stdout;
+  const block = /const RUNTIME_VERSION = \{([\s\S]*?)\};/.exec(source)?.[1];
+  return new RegExp(`${platform}: "([^"]+)"`).exec(block ?? "")?.[1];
+}
+
+const nativeLine = /^\s*-\s*Native change:(.*)$/im.exec(body);
+if (nativeLine === null) {
+  fail(
+    'the description\'s Release notes need a "- Native change:" line (see .github/pull_request_template.md): "no", "yes, compatible", or "yes, new runtime".',
+  );
+}
+const nativeValue = (nativeLine[1] ?? "")
+  .replace(/<!--[\s\S]*?-->/g, "")
+  .trim();
+const saysNewRuntime = /^yes,?\s*new runtime\b/i.test(nativeValue);
+if (
+  !saysNewRuntime &&
+  !/^no\b/i.test(nativeValue) &&
+  !/^yes,?\s*compatible\b/i.test(nativeValue)
+) {
+  fail(
+    '"Native change:" must start with "no", "yes, compatible" (older binaries still run this JavaScript), or "yes, new runtime" (this raises RUNTIME_VERSION in app.config.ts).',
+  );
+}
+const raisedRuntimes = (["ios", "android"] as const).filter((platform) => {
+  const before = runtimeVersionAt(base, platform);
+  // Its first appearance raises nothing: the values were the binaries' own.
+  return before !== undefined && runtimeVersionAt("HEAD", platform) !== before;
+});
+if (raisedRuntimes.length > 0 && !saysNewRuntime) {
+  fail(
+    `this PR raises the ${raisedRuntimes.join(" and ")} runtime version, so "Native change:" must say "yes, new runtime", and what this JavaScript needs from native that older binaries lack.`,
+  );
+}
+if (saysNewRuntime && raisedRuntimes.length === 0) {
+  fail(
+    `"Native change:" says "yes, new runtime", but RUNTIME_VERSION in ${APP_CONFIG} isn't raised. Raise the runtime version of each platform whose older binaries can't run this JavaScript, or say "yes, compatible".`,
+  );
+}
+console.log(`native change: ${nativeValue}`);

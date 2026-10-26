@@ -1,10 +1,20 @@
-// Native fingerprint (the runtime version over-the-air updates match on).
-// eas.json only affects native builds through env such as
-// VERA_NOTIFICATION_EXTENSION, which already reaches the hashed app config,
-// so editing build profiles must not cut installed binaries off from updates.
+// Native fingerprint: a hash of everything native, which changes whenever
+// a binary would build differently. Dev clients are cached by it
+// (scripts/sim.sh, scripts/phone.sh), and `pnpm release plan` uses it to
+// say a store build has native changes waiting. Over-the-air updates match
+// on the runtime version in app.config.ts instead (docs/releasing.md →
+// Runtime versions). eas.json only affects native builds through env such
+// as VERA_NOTIFICATION_EXTENSION, which already reaches the hashed app
+// config, so it is left out.
 /** @type {import('expo/fingerprint').Config} */
 const config = {
   ignorePaths: ["eas.json"],
+  // The default skip, plus the runtime version itself: raising it changes
+  // which updates binaries take, not how they build.
+  sourceSkips: [
+    "PackageJsonAndroidAndIosScriptsIfNotContainRun",
+    "ExpoConfigRuntimeVersionIfString",
+  ],
   // The iOS notification service extension's Swift is copied in by a config
   // plugin, so the default sources miss it; without this, a change to it
   // would never call for a new build. (Sources can't be limited to iOS, so
