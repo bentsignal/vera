@@ -31,6 +31,14 @@ export function fetchableByGateway(mimeType: string) {
   return GATEWAY_URL_IMAGES.includes(mimeType.toLowerCase());
 }
 
+/**
+ * Whether a photo's bytes are a JPEG, whatever it was sent as. Android's
+ * photo picker saves a HEIC again as a JPEG but still calls it HEIC.
+ */
+export function isJpeg(bytes: Uint8Array) {
+  return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+}
+
 export interface Pixels {
   readonly data: Uint8Array | Uint8ClampedArray;
   readonly height: number;
