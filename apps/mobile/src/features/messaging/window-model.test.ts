@@ -11,6 +11,7 @@ import {
   advance,
   anchoredView,
   latestView,
+  LIVE_PAGE_SIZE,
   MAX_REUSED_PAGES,
   mergePages,
   pageAfter,
@@ -36,11 +37,12 @@ function conversation() {
     },
     page(cursor: PageCursor): PageData {
       if ("after" in cursor) {
+        const size = Math.min(PAGE, cursor.limit ?? PAGE);
         const newer = messages.filter(({ sentAt }) => sentAt > cursor.after);
         return {
-          hasNewer: newer.length > PAGE,
+          hasNewer: newer.length > size,
           hasOlder: true,
-          messages: newer.slice(0, PAGE),
+          messages: newer.slice(0, size),
         };
       }
       if ("before" in cursor) {
@@ -129,9 +131,9 @@ void test("a burst of 300 is followed page by page with nothing lost or doubled"
   assert.equal(ids.length, 350);
   assert.equal(new Set(ids).size, 350);
   assert.equal(ids.at(-1), "m1300");
-  // The frozen page, then 300 messages 49 new a page (each page starts
-  // with the last of the one before): seven.
-  assert.equal(view.pages.length, 1 + 7);
+  // The frozen page, then 300 messages in live pages of LIVE_PAGE_SIZE,
+  // each new page starting with the last of the one before.
+  assert.equal(view.pages.length, 1 + Math.ceil(300 / (LIVE_PAGE_SIZE - 1)));
   assert.equal(view.liveSince, 1_000);
 });
 
@@ -202,12 +204,14 @@ void test("thread invalid or absent timestamps use caller's ordinary latest fall
 void test("messages sent the same millisecond across a page boundary all show", () => {
   const chat = conversation();
   let view = latestView(0);
-  for (let index = 0; index < 49; index += 1) chat.send(index + 1);
+  const full = LIVE_PAGE_SIZE;
+  for (let index = 1; index < full; index += 1) chat.send(index);
   view = settled(chat, view);
-  // The 50th and 51st arrive at once, both at 50.
-  chat.send(50, "a");
-  chat.send(50, "b");
-  chat.send(51, "c");
+  // The page's last and the next page's first arrive together, the
+  // first two the same millisecond.
+  chat.send(full, "a");
+  chat.send(full, "b");
+  chat.send(full + 1, "c");
   view = settled(chat, view);
   const ids = shown(chat, view);
   assert.ok(ids.includes("a") && ids.includes("b") && ids.includes("c"));
@@ -233,7 +237,9 @@ void test("a cached copy isn't followed until the PDS confirms it", () => {
   assert.equal(advance(view, results(chat, view, false)), undefined);
   const next = advance(view, results(chat, view));
   assert.ok(next !== undefined && next !== "behind");
-  assert.deepEqual(next.view.followed, [pageKey({ after: 10 })]);
+  assert.deepEqual(next.view.followed, [
+    pageKey({ after: 10, limit: LIVE_PAGE_SIZE }),
+  ]);
 });
 
 void test("a window opened in older messages follows once it reaches the latest", () => {

@@ -1969,6 +1969,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   around?: string;
                   before?: number;
                   conversationId: string;
+                  limit?: number;
                 };
                 type: "list";
               }
@@ -1990,6 +1991,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   after?: number;
                   before?: number;
                   conversationId: string;
+                  limit?: number;
                   threadId: string;
                 };
                 type: "thread";

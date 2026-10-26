@@ -12,7 +12,7 @@
 // message arriving changes no query's key.
 
 export type PageCursor =
-  | { readonly after: number }
+  | { readonly after: number; readonly limit?: number }
   | { readonly around: string }
   | { readonly before: number };
 
@@ -66,6 +66,14 @@ export interface View {
   readonly followed: readonly string[];
 }
 
+/**
+ * How many messages a page of the newest messages holds before the next
+ * one starts (the PDS's pages hold 50). Each message sent resends the
+ * whole page it lands in, so the page that's live stays small; a reopened
+ * window more than this behind opens afresh at the latest (`advance`).
+ */
+export const LIVE_PAGE_SIZE = 20;
+
 /** The most pages a window reopens with; past this it starts afresh. */
 export const MAX_REUSED_PAGES = 6;
 
@@ -82,7 +90,7 @@ function asView(view: View) {
 /** The window over the latest messages as of `openedAt`. */
 export function latestView(openedAt: number) {
   const opened = { before: openedAt + 1 };
-  const pages = [opened, { after: openedAt }];
+  const pages = [opened, { after: openedAt, limit: LIVE_PAGE_SIZE }];
   return asView({
     anchor: undefined,
     followed: [],
@@ -222,7 +230,11 @@ function filled(view: View, key: string, last: PageData) {
   if (!view.followed.includes(key)) return "behind" as const;
   const newest = last.messages.at(-1);
   if (newest === undefined) return undefined;
-  const next = withPage(view, pageAfter(newest), "end");
+  const next = withPage(
+    view,
+    { ...pageAfter(newest), limit: LIVE_PAGE_SIZE },
+    "end",
+  );
   return next === view ? undefined : { view: next };
 }
 

@@ -125,14 +125,20 @@ export async function around(
   };
 }
 
+/** A page's size: `limit` if given, within 1 and `MESSAGE_PAGE_SIZE`. */
+function pageSize(limit: number | undefined) {
+  if (limit === undefined || !Number.isFinite(limit)) return MESSAGE_PAGE_SIZE;
+  return Math.min(MESSAGE_PAGE_SIZE, Math.max(1, Math.floor(limit)));
+}
+
 /**
  * One page by whichever cursor was given: older than `before`, newer than
- * `after`, or the latest.
+ * `after` (at most `limit` messages), or the latest.
  */
 export async function pageOf(
   ctx: QueryCtx,
   scope: Scope,
-  { after, before }: { after?: number; before?: number },
+  { after, before, limit }: { after?: number; before?: number; limit?: number },
 ): Promise<MessagePage> {
   if (after === undefined) {
     const older = await olderThan(ctx, scope, before);
@@ -142,6 +148,6 @@ export async function pageOf(
       messages: older.messages,
     };
   }
-  const newer = await newerThan(ctx, scope, after);
+  const newer = await newerThan(ctx, scope, after, false, pageSize(limit));
   return { hasNewer: newer.hasMore, hasOlder: true, messages: newer.messages };
 }

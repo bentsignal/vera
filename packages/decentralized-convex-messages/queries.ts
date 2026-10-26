@@ -64,11 +64,15 @@ export const queries = {
   list: defineOperation({
     // At most one cursor: older than `before`, newer than `after`, centered
     // on the `around` message ID, or the latest page when none is given.
+    // `limit` makes a page newer than `after` smaller than
+    // `MESSAGE_PAGE_SIZE`: an app following the newest messages keeps its
+    // newest page small, since every message sent resends all of it.
     args: v.object({
       after: v.optional(v.number()),
       around: v.optional(v.string()),
       before: v.optional(v.number()),
       conversationId: v.string(),
+      limit: v.optional(v.number()),
     }),
     returns: messagePage,
   }),
@@ -107,13 +111,15 @@ export const queries = {
   /**
    * A thread: its original message and one page of replies, oldest
    * first, gathered from every member's PDS. At most one cursor: older
-   * than `before`, newer than `after`, or the latest page.
+   * than `before`, newer than `after`, or the latest page. `limit` as in
+   * `list`.
    */
   thread: defineOperation({
     args: v.object({
       after: v.optional(v.number()),
       before: v.optional(v.number()),
       conversationId: v.string(),
+      limit: v.optional(v.number()),
       threadId: v.string(),
     }),
     returns: threadPage,

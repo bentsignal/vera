@@ -209,6 +209,15 @@ async function once(cases: readonly Case[]) {
   return results;
 }
 
+interface Subscription {
+  readonly args: Record<string, unknown>;
+  /** A page that, once full, is followed by the next, as the app does. */
+  readonly follow?: boolean;
+  readonly name: string;
+  readonly plugin?: string;
+  readonly type: string;
+}
+
 interface Scenario {
   readonly steps: readonly {
     readonly name: string;
@@ -218,12 +227,7 @@ interface Scenario {
     )[];
     readonly settle?: number;
   }[];
-  readonly subscriptions: readonly {
-    readonly args: unknown;
-    readonly name: string;
-    readonly plugin?: string;
-    readonly type: string;
-  }[];
+  readonly subscriptions: readonly Subscription[];
   readonly username: string;
 }
 
@@ -259,16 +263,30 @@ async function live(scenario: Scenario) {
   client.setAuth(() => Promise.resolve(token));
   let phase = "setup";
   const received: { bytes: number; name: string; phase: string }[] = [];
-  for (const { args, name, plugin, type } of scenario.subscriptions) {
+  function subscribe(subscription: Subscription) {
+    const { args, follow, name, plugin, type } = subscription;
+    let followed = false;
     client.onUpdate(
       "pds:dispatchQuery" as never,
       request(plugin ?? "messages", type, args) as never,
       (result: unknown) => {
         received.push({ bytes: JSON.stringify(result).length, name, phase });
+        const page = Reflect.get(Object(result), "value") as
+          | { hasNewer?: boolean; messages?: { sentAt: number }[] }
+          | undefined;
+        const newest = page?.messages?.at(-1);
+        if (follow !== true || followed || page?.hasNewer !== true) return;
+        if (newest === undefined) return;
+        followed = true;
+        subscribe({
+          ...subscription,
+          args: { ...args, after: newest.sentAt - 1 },
+        });
       },
       (error: Error) => console.error(name, error.message),
     );
   }
+  for (const subscription of scenario.subscriptions) subscribe(subscription);
   await sleep(8000);
   const phases = [];
   for (const step of scenario.steps) {

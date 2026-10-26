@@ -86,31 +86,53 @@ async function shownPeople(ctx: QueryCtx, messages: readonly Message[]) {
   ];
 }
 
+/** How an app follows a page's reactions and threads (see `liveCursor`). */
+type Live = number | "byTime" | undefined;
+
+/** A page's reactions and thread summaries, as `live` says apps ask. */
+function followed(
+  conversationId: string,
+  messages: readonly Message[],
+  live: Live,
+) {
+  if (live === undefined) return batch(conversationId, messages);
+  if (live === "byTime") return [];
+  return since(conversationId, live);
+}
+
 /**
  * What a page of a conversation shows its messages with. `live` is the
  * cursor of a page of the newest messages (`after`, with none newer),
- * whose reactions and threads apps follow by time as messages arrive.
+ * whose reactions and threads apps follow by time as messages arrive;
+ * `byTime` for a page that filled up while followed that way, whose
+ * reactions and threads come with the newest page's.
  */
 export async function pageIncludes(
   ctx: QueryCtx,
   conversationId: string,
   messages: readonly Message[],
-  live?: number,
+  live?: Live,
 ): Promise<QueryRequest[]> {
   return [
-    ...(live === undefined
-      ? batch(conversationId, messages)
-      : since(conversationId, live)),
+    ...followed(conversationId, messages, live),
     ...profiles(await shownPeople(ctx, messages)),
   ];
 }
 
-/** The cursor of a page of the newest messages, for `pageIncludes`. */
+/**
+ * The cursor of a page of the newest messages, for `pageIncludes`. A page
+ * newer than `after` that an app asked to keep small (`limit`) is one it
+ * follows the newest messages with, and once full, it still follows its
+ * reactions and threads by time (`byTime`).
+ */
 export function liveCursor(
-  args: { readonly after?: number },
+  args: { readonly after?: number; readonly limit?: number },
   page: { readonly hasNewer: boolean },
-) {
-  return page.hasNewer ? undefined : args.after;
+): Live {
+  if (!page.hasNewer) return args.after;
+  return args.after !== undefined && args.limit !== undefined
+    ? "byTime"
+    : undefined;
 }
 
 /**
@@ -124,7 +146,7 @@ export async function threadPageIncludes(
   { conversationId }: { conversationId: string },
   root: Message | null,
   messages: readonly Message[],
-  live?: number,
+  live?: Live,
 ): Promise<QueryRequest[]> {
   const rootOnly = root === null ? [] : [root];
   return [
@@ -140,22 +162,34 @@ export async function threadPageIncludes(
             messageIds: [root.messageId],
           }),
         ]),
-    ...(live !== undefined
-      ? [
-          queryRequest(messagesProtocol, "reactions", {
-            conversationId,
-            since: live,
-          }),
-        ]
-      : messages.length > 0 && messages.length <= MAX_REACTION_MESSAGES
-        ? [
-            queryRequest(messagesProtocol, "reactions", {
-              conversationId,
-              messageIds: messages.map((message) => message.messageId),
-            }),
-          ]
-        : []),
+    ...threadReactions(conversationId, messages, live),
     ...profiles(await shownPeople(ctx, [...rootOnly, ...messages])),
+  ];
+}
+
+/** A thread page's replies' reactions, as `live` says apps ask. */
+function threadReactions(
+  conversationId: string,
+  messages: readonly Message[],
+  live: Live,
+) {
+  if (live === "byTime") return [];
+  if (live !== undefined) {
+    return [
+      queryRequest(messagesProtocol, "reactions", {
+        conversationId,
+        since: live,
+      }),
+    ];
+  }
+  if (messages.length === 0 || messages.length > MAX_REACTION_MESSAGES) {
+    return [];
+  }
+  return [
+    queryRequest(messagesProtocol, "reactions", {
+      conversationId,
+      messageIds: messages.map((message) => message.messageId),
+    }),
   ];
 }
 

@@ -221,3 +221,26 @@ soon as the one before it arrives (`pagesAhead`), so it's cached when the
 list gets there. Opening doesn't fetch anything extra: someone who never
 scrolls up costs nothing more, and someone who does costs one page beyond
 where they stop.
+
+### 6. A small live page
+
+Each message resends the whole page it lands in, and the newest page
+grew to 50 messages before the next one started. Apps following the
+newest messages now ask for pages of 20 (`LIVE_PAGE_SIZE`, a new optional
+`limit` on `list` and `thread`; older apps don't send it and get 50), and
+the next page starts when one fills, as before. A full small page doesn't
+include reaction batches, since its app follows those by time.
+
+Headless phone following the newest page as the app does (chaining the
+next page when one fills), 60 messages over 30 s:
+
+| | Pages of 50 | Pages of 20 |
+| --- | ---: | ---: |
+| Sent to the phone | 528 KB | 287 KB |
+| Documents read | 2,851 | 1,904 |
+
+The longer a conversation stays open, the bigger the difference: a page
+of 50 resends 25 messages on average, a page of 20 resends 10. A window
+reopened more than one live page behind (20 messages now, 50 before)
+opens afresh at the latest messages, as it does when it's more than a
+page behind today.
