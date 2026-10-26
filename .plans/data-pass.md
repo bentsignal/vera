@@ -209,3 +209,15 @@ combinations).
 
 Still per push and per recipient; pushes coalescing per conversation
 (the high-load plan's step 1.4) would cut how often it runs.
+
+### 5. The next page asked for ahead
+
+A page's cursor is the last message of the page before it, so pages load
+one at a time, and the list waits a round trip each time it reaches the
+end of what's loaded (about 300 ms on the server for a page with what it
+includes, more over a phone's connection). Once the reader scrolls past
+the pages the window opened with, the next page that way is fetched as
+soon as the one before it arrives (`pagesAhead`), so it's cached when the
+list gets there. Opening doesn't fetch anything extra: someone who never
+scrolls up costs nothing more, and someone who does costs one page beyond
+where they stop.

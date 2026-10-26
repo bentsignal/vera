@@ -158,6 +158,39 @@ export function pageAfter(message: WindowMessage) {
 }
 
 /**
+ * The pages to ask for ahead of the list reaching them: once the reader
+ * has scrolled past the pages the window opened with (it added one), the
+ * next page further that way, so it's there when they get to it. Each
+ * needs the page before it (its cursor is that page's last message), so
+ * it's one ahead.
+ */
+export function pagesAhead(
+  view: Pick<View, "initial" | "liveSince" | "pages">,
+  pages: readonly (PageData | undefined)[],
+) {
+  const opened = new Set(view.initial.map(pageKey));
+  function added(cursor: PageCursor | undefined) {
+    return cursor !== undefined && !opened.has(pageKey(cursor));
+  }
+  const first = pages[0];
+  const last = pages.at(-1);
+  const oldest = first?.hasOlder === true ? first.messages[0] : undefined;
+  // At the latest messages, newer pages follow by themselves (`advance`).
+  const newest =
+    view.liveSince === undefined && last?.hasNewer === true
+      ? last.messages.at(-1)
+      : undefined;
+  return [
+    ...(added(view.pages[0]) && oldest !== undefined
+      ? [{ before: oldest.sentAt }]
+      : []),
+    ...(added(view.pages.at(-1)) && newest !== undefined
+      ? [pageAfter(newest)]
+      : []),
+  ];
+}
+
+/**
  * The window's newest page has nothing newer: it's followed from now on,
  * and the window is at the latest messages, if it wasn't already.
  */

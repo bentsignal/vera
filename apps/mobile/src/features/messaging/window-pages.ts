@@ -1,10 +1,12 @@
 import type { Message as PdsMessage } from "@decentralized-convex/messages";
 import type { QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
-import type { PageCursor, PageData } from "./window-model";
+import type { PageCursor, PageData, View } from "./window-model";
 import { cachedSelected, pdsResult } from "./results";
+import { pagesAhead } from "./window-model";
 
 // The queries for a window's pages (see `useMessageWindow`).
 
@@ -101,4 +103,48 @@ export function cachedPage(
         queryClient,
         threadPageQuery(session, { conversationId, threadId }, cursor),
       );
+}
+
+/**
+ * Fetches a page the window will add soon, unless it's cached or already
+ * loading, so it's there when the window does.
+ */
+export function prefetchPage(
+  queryClient: QueryClient,
+  session: string,
+  { conversationId, threadId }: WindowSource,
+  cursor: PageCursor,
+) {
+  const options =
+    threadId === undefined
+      ? listPageQuery(session, conversationId, cursor)
+      : threadPageQuery(session, { conversationId, threadId }, cursor);
+  if (queryClient.getQueryState(options.queryKey) !== undefined) return;
+  if (threadId === undefined) {
+    void queryClient.prefetchQuery(
+      listPageQuery(session, conversationId, cursor),
+    );
+  } else {
+    void queryClient.prefetchQuery(
+      threadPageQuery(session, { conversationId, threadId }, cursor),
+    );
+  }
+}
+
+/**
+ * Asks for the pages the list reaches next (see `pagesAhead`), once each:
+ * one cached or already loading isn't asked for again. Only fetched, not
+ * followed, until the window adds it.
+ */
+export function usePagesAhead(
+  session: string,
+  source: WindowSource,
+  view: View,
+  results: readonly { data?: Page }[],
+) {
+  const queryClient = useQueryClient();
+  const pages = results.slice(0, view.pages.length).map(({ data }) => data);
+  for (const cursor of pagesAhead(view, pages)) {
+    prefetchPage(queryClient, session, source, cursor);
+  }
 }
