@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { fetchableByGateway, shrink } from "./assistant-images.ts";
+import { fetchableByGateway, isJpeg, shrink } from "./assistant-images.ts";
 
 function solid(width: number, height: number, rgba: number[]) {
   const data = new Uint8Array(width * height * 4);
@@ -37,4 +37,12 @@ void test("HEIC isn't fetched by the gateway; the common formats are", () => {
   assert.equal(fetchableByGateway("image/heic"), false);
   assert.equal(fetchableByGateway("IMAGE/JPEG"), true);
   assert.equal(fetchableByGateway("image/gif"), true);
+});
+
+void test("a JPEG is known by its bytes, not its type", () => {
+  assert.equal(isJpeg(new Uint8Array([0xff, 0xd8, 0xff, 0xe1])), true);
+  // The start of an iPhone HEIC: a box size, then "ftypheic".
+  const heic = new Uint8Array([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70]);
+  assert.equal(isJpeg(heic), false);
+  assert.equal(isJpeg(new Uint8Array()), false);
 });
