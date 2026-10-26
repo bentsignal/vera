@@ -5,7 +5,6 @@
 #
 #   scripts/motion/check.sh                 # every scenario, both layouts
 #   scripts/motion/check.sh react-remove    # scenarios whose name matches
-#   MOTION_LIST=rn scripts/motion/check.sh  # the React Native list instead
 #
 # Round 2 adds two scenarios that run only when named, so a full run is
 # the same 18 as before:
@@ -28,8 +27,7 @@
 #
 # Needs this worktree's simulator up and signed in (scripts/sim.sh up,
 # signin, seed once). MOTION_GROUP picks the group (else the inbox's
-# newest). MOTION_LIST picks the list: `native` (the default; the binary
-# must have it) or `rn`. Recordings go to .cache/motion/<run>/. Exits 1 if
+# newest). Recordings go to .cache/motion/<run>/. Exits 1 if
 # any scenario is flagged; look at the recording at the times it lists.
 set -u
 cd "$(dirname "$0")/../.."
@@ -42,12 +40,7 @@ if [[ ${1:-} == --android ]]; then
   shift
 fi
 FILTER=${1:-}
-LIST=${MOTION_LIST:-native}
 APPEARANCE=${MOTION_APPEARANCE:-light}
-if [[ $LIST != native && $LIST != rn ]]; then
-  echo "MOTION_LIST is native or rn, not $LIST" >&2
-  exit 2
-fi
 RUN=$ROOT/.cache/motion/$(date +%Y%m%d-%H%M%S)
 mkdir -p "$RUN"
 
@@ -60,12 +53,7 @@ if ! scripts/sim.sh status 2>/dev/null | grep -E "^$PLATFORM: .+" | grep -qv ': 
   exit 2
 fi
 sim relaunch; sleep 2
-shown=$(js "veraDev.nativeList($([[ $LIST == native ]] && echo true || echo false))" | tr -d '"')
 js "veraDev.preference(\"appearance\", \"$APPEARANCE\")" >/dev/null
-if [[ $shown != "$LIST" ]]; then
-  echo "asked for the $LIST list, but conversations show $shown (no native list in this binary?)" >&2
-  exit 2
-fi
 GROUP=${MOTION_GROUP:-$(js 'veraDev.firstGroup()' | tr -d '"')}
 if [[ $GROUP != group:* ]]; then
   echo "no group in the inbox: scripts/sim.sh seed" >&2
@@ -124,7 +112,7 @@ typing() { convex dev:type "{\"conversationId\":\"$GROUP\",\"username\":\"$1\",\
 
 ready() {
   for attempt in {1..20}; do
-    if [[ $(js "veraDev.conversation()?.id === \"$GROUP\" && veraDev.list()?.kind === \"$LIST\" && veraDev.conversation().messages().length > 0") == true ]]; then
+    if [[ $(js "veraDev.conversation()?.id === \"$GROUP\" && veraDev.list() !== undefined && veraDev.conversation().messages().length > 0") == true ]]; then
       sleep 2
       return 0
     fi
@@ -206,15 +194,10 @@ for layout in bubbles stacked; do
     name=${entry%%:*}; rest=${entry#*:}
     fn=${rest%%:*}; rest=${rest#*:}
     needs=${rest%%:*}; analyzer_flags=${rest#*:}
-    label="$PLATFORM-$LIST-$APPEARANCE-$layout-$name"
+    label="$PLATFORM-$APPEARANCE-$layout-$name"
     [[ -n $FILTER && $label != *$FILTER* ]] && continue
     L0=$(wc -l < .cache/sim/metro.log)
     sim relaunch; sleep 2
-    if [[ $(js 'veraDev.nativeList()' | tr -d '"') != "$LIST" ]]; then
-      summary+=("FAIL $label (not showing the $LIST list)")
-      failed=1
-      continue
-    fi
     js "veraDev.preference(\"groupLayout\", \"$layout\")" >/dev/null
     sim open "/conversation/$GROUP"
     if ! ready; then

@@ -5,16 +5,15 @@ import { View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { MessageListProps } from "./list-props";
 import type { Lift, MessageListViewMethods } from "./native";
 import type { TypingHold } from "./typing-hold";
-import type { MessageListProps } from "~/features/conversation/message-list";
 import type { SendCommitStore } from "~/features/conversation/send-commit";
 import type { Message } from "~/features/conversation/types";
 import { newestFirst } from "~/features/conversation/build-rows";
 import { JumpToLatest } from "~/features/conversation/jump-to-latest";
 import {
   MessageActionsProvider,
-  useLiftedMessageId,
   useMessageActions,
 } from "~/features/conversation/message-actions";
 import { useToday } from "~/lib/use-today";
@@ -29,7 +28,6 @@ import {
   V1_BLOCK_TYPES,
   V1_ROW_KINDS,
 } from "./native";
-import { nativeMenu } from "./native-menu";
 import { useComposerInset } from "./send-inset";
 import { BEHAVIOR, useNativeTheme } from "./theme";
 import {
@@ -44,9 +42,6 @@ import {
 } from "./typing-hold";
 import { useAnchorPlacement } from "./use-anchor-placement";
 import { useListEvents } from "./use-list-events";
-
-/** The binary lifts the held message into the menu itself (`lift`). */
-const LIFTS = nativeSupport?.features?.includes("lift") === true;
 
 /** Room above the oldest row, under the header. */
 const HEADER_GAP = 8;
@@ -230,11 +225,7 @@ function NativeRows({
   const { lift, change: changeLift } = useLift(view);
 
   const onEvent = useListEvents({
-    menu: nativeMenu({
-      layout,
-      self,
-      lift: LIFTS ? changeLift : undefined,
-    }),
+    menu: { layout, lift: changeLift, self },
     messageOf,
     // Frozen in the render the menu opens in, before it takes the keyboard.
     openMenu: open,
@@ -248,7 +239,6 @@ function NativeRows({
     viewReactions,
   });
 
-  const lifted = useLiftedMessageId();
   if (MessageListView === null) return null;
   return (
     <>
@@ -269,7 +259,6 @@ function NativeRows({
           keyboard
           keyboardFrozen={keyboardFrozen}
           alignTop={shown.thread !== undefined}
-          liftedRowId={LIFTS ? undefined : lifted}
           lift={lift}
           initialRowId={shown.anchorId}
           onEvent={onEvent}
@@ -295,10 +284,10 @@ function NativeRows({
 }
 
 /**
- * The conversation in the native message list (see
- * .plans/native-message-list.md), with the same props as `MessageList`,
- * so a screen can use either (see `ConversationList`). The menu, reactions
- * sheet, and actions are the React Native list's own.
+ * A conversation's or thread's messages, newest at the bottom, in the
+ * native message list (see .plans/native-message-list.md), with the glass
+ * menu, the reactions sheet, and a button back down to the latest message.
+ * Opens on `anchorId` when given.
  */
 export function NativeMessageList({
   ref,

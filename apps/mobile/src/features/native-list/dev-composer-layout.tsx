@@ -193,7 +193,7 @@ export function DevComposerLayout() {
         offset={{ closed: 0, opened: safe.bottom }}
         style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
       >
-        <ComposerLayout enabled owner={owner} sequence={pair.sequence}>
+        <ComposerLayout owner={owner} sequence={pair.sequence}>
           <View
             testID="dev-composer-bar"
             style={{ height: pair.height, backgroundColor: "#eee" }}

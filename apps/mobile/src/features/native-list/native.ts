@@ -21,8 +21,9 @@ const module = requireOptionalNativeModule<{
 }>("MessageList");
 
 /**
- * What the installed binary can draw, or null when it has no native list
- * (an older build): the app keeps the React Native list then.
+ * What the installed binary can draw, or null without the module (tests).
+ * Updates only reach binaries with the same native fingerprint, so a
+ * binary running this JavaScript has the list it was built with.
  */
 export const nativeSupport =
   Platform.OS === "web" ? null : (module?.support ?? null);

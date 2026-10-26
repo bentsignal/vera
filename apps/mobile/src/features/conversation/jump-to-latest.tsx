@@ -47,33 +47,28 @@ export function JumpToLatest({
   /** The floating composer's height, which it sits `GAP` above. */
   above: SharedValue<number>;
   /**
-   * Over a list with nothing of its own lifting it with the keyboard (the
-   * native list): it rises with the keyboard as the composer does
-   * (`composerTop`), from the composer's `bottomInset`, and holds while
-   * `frozen` (the long-press menu has the keyboard, see `useMenuKeyboard`).
+   * It rises with the keyboard as the composer does (`composerTop`), from
+   * the composer's `bottomInset`, and holds while `frozen` (the long-press
+   * menu has the keyboard, see `useMenuKeyboardHold`).
    */
-  keyboard?: { bottomInset: number; frozen?: SharedValue<boolean> };
+  keyboard: { bottomInset: number; frozen: SharedValue<boolean> };
   onPress: () => void;
 }) {
   const { height, progress } = useReanimatedKeyboardAnimation();
-  const bottomInset = keyboard?.bottomInset;
-  const frozen = keyboard?.frozen;
+  const { bottomInset, frozen } = keyboard;
   /** How far it rises, held while the keyboard is frozen. */
   const risen = useSharedValue(0);
   useAnimatedReaction(
     () => ({
       // Watched too, so it catches up when the menu lets go with the
       // keyboard somewhere else (closing into a sheet leaves it down).
-      held: frozen?.get() === true,
-      to:
-        bottomInset === undefined
-          ? above.get()
-          : composerTop({
-              bottomInset,
-              composer: above.get(),
-              keyboardHeight: height.get(),
-              progress: progress.get(),
-            }),
+      held: frozen.get(),
+      to: composerTop({
+        bottomInset,
+        composer: above.get(),
+        keyboardHeight: height.get(),
+        progress: progress.get(),
+      }),
     }),
     ({ held, to }) => {
       if (!held) risen.set(to);

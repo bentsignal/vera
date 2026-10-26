@@ -4,12 +4,13 @@ import { Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import type { ComposerHandle } from "~/features/conversation/composer";
-import type { MessageListHandle } from "~/features/conversation/message-list";
 import type { OutgoingDraft } from "~/features/messaging/outbox";
+import type { MessageListHandle } from "~/features/native-list/list-props";
 import type { MessageLayout } from "~/features/preferences/store";
 import { Pending } from "~/components/pending";
 import { useAfterSend } from "~/features/conversation/after-send";
 import { useComposerBottomInset } from "~/features/conversation/composer";
+import { useComposerHeight } from "~/features/conversation/composer-height";
 import {
   CONVERSATION_HEADER_HEIGHT,
   ConversationHeader,
@@ -28,10 +29,7 @@ import { useMarkRead, useMessages } from "~/features/messaging/messages";
 import { useStayLive } from "~/features/messaging/stay-live";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
 import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
-import {
-  ConversationList,
-  useConversationComposerHeight,
-} from "~/features/native-list/conversation-list";
+import { NativeMessageList } from "~/features/native-list/native-message-list";
 import { useActiveConversation } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 import { useAccountPending } from "~/features/saved/offline-pill";
@@ -193,7 +191,7 @@ function Conversation({
   const typing = useConversationTyping(conversationId, shownMessages);
   // Not laid out yet: the list leaves room for it under the newest
   // message, so it waits rather than shift once it knows.
-  const { composerHeight, report } = useConversationComposerHeight();
+  const { composerHeight, report } = useComposerHeight();
   const list = useRef<MessageListHandle>(null);
   useWhileOpen(conversationId, messages);
 
@@ -223,7 +221,7 @@ function Conversation({
       <ConversationGestureArea>
         <Pending phase={pending} />
         {shown && pending === "ready" && (
-          <ConversationList
+          <NativeMessageList
             ref={list}
             key={messages.viewKey}
             messages={shownMessages}

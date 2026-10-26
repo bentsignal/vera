@@ -34,30 +34,22 @@ test("the native binding explicitly transports the shared gap once", () => {
   expect(composerBinding("owner", 4)).toBeUndefined();
 });
 
-test.each(["old binary", "RN list"])(
-  "%s keeps the original bar without a native host",
-  async (fallback) => {
-    mockSupported = fallback !== "old binary";
-    const view = await render(
-      <ComposerLayout
-        enabled={fallback !== "RN list"}
-        owner="owner"
-        sequence={0}
-      >
-        <Text>Existing bar</Text>
-      </ComposerLayout>,
-    );
-    expect(view.getByText("Existing bar")).toBeTruthy();
-    expect(view.queryByTestId("native-composer")).toBeNull();
-    expect(mockHost).not.toHaveBeenCalled();
-  },
-);
+test("an old binary keeps the original bar without a native host", async () => {
+  mockSupported = false;
+  const view = await render(
+    <ComposerLayout owner="owner" sequence={0}>
+      <Text>Existing bar</Text>
+    </ComposerLayout>,
+  );
+  expect(view.getByText("Existing bar")).toBeTruthy();
+  expect(view.queryByTestId("native-composer")).toBeNull();
+  expect(mockHost).not.toHaveBeenCalled();
+});
 
 test("child-local clear uses the current store snapshot even with stale parent sends", async () => {
   const commit = createSendCommit("same-composer");
   const report = {
     sendCommit: commit,
-    roomCloses: false,
     bar: {
       current: { getBoundingClientRect: () => ({ height: 76 }) },
     },
@@ -68,11 +60,7 @@ test("child-local clear uses the current store snapshot even with stale parent s
     const current = useComposerCommit(report, draft.clear, []);
     return (
       <>
-        <ComposerLayout
-          enabled
-          owner={commit.owner}
-          sequence={current.sequence}
-        >
+        <ComposerLayout owner={commit.owner} sequence={current.sequence}>
           <Text testID="draft">{draft.text}</Text>
         </ComposerLayout>
         <Pressable

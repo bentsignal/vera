@@ -1,9 +1,14 @@
 import type { MessageRow } from "../conversation/build-rows.ts";
-import type { Newest } from "../conversation/typing-change.ts";
 
 // Someone who stops typing stays in the typing row a moment, until their
 // message arrives (see `holdTypists`), so the native list can grow it out
 // of their typing bubble.
+
+/** A recent row: its key, and who wrote it when it's a message. */
+export interface Newest {
+  key: string;
+  authorId: string | undefined;
+}
 
 /** How long someone who stopped typing stays, waiting for their message. */
 export const TYPING_HOLD_MS = 1000;

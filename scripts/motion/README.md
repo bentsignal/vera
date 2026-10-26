@@ -14,13 +14,8 @@ than on a phone.
 scripts/sim.sh up && scripts/sim.sh signin   # and scripts/sim.sh seed, once
 scripts/motion/check.sh                      # every scenario, bubbles and stacked
 scripts/motion/check.sh react                # only scenarios whose name matches
-MOTION_LIST=rn scripts/motion/check.sh       # the React Native list (default: native)
 scripts/motion/check.sh --android           # this worktree's Android emulator
 ```
-
-It checks the native message list unless `MOTION_LIST=rn`, turning the
-switch (`veraDev.nativeList`) to that list first, and fails a scenario
-that shows the other one.
 
 Native builds and measurements share a lock across the platform threads:
 
@@ -30,20 +25,10 @@ scripts/sim.sh up # outside the lock, so a device queue wait can't block builds
 scripts/bench/with-lock.sh scripts/motion/check.sh
 ```
 
-The real-app comparison is `scripts/bench/head-to-head.sh`, with
-`BENCH_GROUP` set to a busy media conversation. Serve a production bundle
-with `VERA_METRO_PROFILE=1` when starting Metro. Both lists use a UI-thread
-scroll at 5,500 points per second, then 150 arrivals over 15 seconds.
-Both flings run before either burst adds messages to the conversation.
-`BENCH_LAYOUT` selects `stacked` or `bubbles`. Results include UI frame
-timing, JS stalls, distance travelled, and time waiting at the loaded edge.
-Android also reports main-thread work from `gfxinfo`, separately from
-the emulator's frame rate. Run it under `scripts/bench/with-lock.sh`.
-
 It takes about ten minutes for everything. Run it after changing anything
-under `apps/mobile/src/features/conversation` that moves: `moves.ts`,
-`grow.tsx`, `arrive*.ts*`, `leave*`, reactions, `typing-*`, `entrance.tsx`,
-`appearing.tsx`, `leaving.ts`. Recordings are kept in
+that moves in the message list: the native module
+(`apps/mobile/modules/message-list`) or the rows and timings it gets from
+`apps/mobile/src/features/native-list`. Recordings are kept in
 `.cache/motion/<run>/` to look at the times it lists.
 
 ## What it flags
@@ -101,14 +86,3 @@ reads the screen as it taps, which can stall the app for a moment, so look at
 the recording as well as the flags. Typing to the first arrival is
 `typing-reply` (`--android` for Android). Whether the new row fades in is
 judged from the frames: the analyzer follows positions, not opacity.
-
-## Why the moves land together
-
-See the comments on `IN_COMMIT`, `afterCommit`, `ease`, and `land` in
-`moves.ts`. In short: Reanimated waits to commit layout while React is
-committing, but transforms can still reach the screen. So moves start two
-frames after the React commit that brought the change, they ease only once
-the change is laid out, and the app's own React renders (`useHeldHeight`,
-`useLeaving`, `Entrance`) wait until the rows have stopped. Parts that come
-in or go out use animated styles, not layout animations (`entering`,
-`exiting`), which hold up the commit their space is in.

@@ -39,11 +39,10 @@ jest.mock("expo-image", () => {
 // Native modules nothing here calls: just importable.
 jest.mock("expo-web-browser", () => ({ openBrowserAsync: jest.fn() }));
 jest.mock("expo-video-thumbnails", () => ({ getThumbnailAsync: jest.fn() }));
-jest.mock("expo-router", () => ({ useRouter: () => ({ push: jest.fn() }) }));
-// The device benchmark owns a display-link callback. These tests measure
-// row renders, with no UI runtime or scrolling; keep the list's callbacks.
-jest.mock("~/features/conversation/dev-fling", () => ({
-  useDevFling: (_ref: unknown, callbacks: unknown) => callbacks,
+jest.mock("expo-router", () => ({
+  useFocusEffect: jest.fn(),
+  useIsFocused: () => true,
+  useRouter: () => ({ push: jest.fn() }),
 }));
 jest.mock("expo-file-system/legacy", () => ({
   cacheDirectory: "file:///cache/",
