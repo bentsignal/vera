@@ -6,12 +6,11 @@ import { current, decide, STRIKES_PER_DAY } from "../assistant-limits";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { botName } from "./schema";
 
-// How fast one person can use each of Vera's assistants, counted
-// separately per assistant (`LIMITS` in assistant-limits.ts):
+// How fast one person can use each of Vera's assistants (`LIMITS` in
+// assistant-limits.ts):
 //
-// - 300 replies an hour from each, counted separately. Rolling: a token
-//   bucket per person and assistant that holds an hour's replies and
-//   refills one every 12 seconds.
+// - 300 replies an hour. Rolling: a token bucket per person and assistant
+//   that holds an hour's replies and refills one every 12 seconds.
 // - Each separate time they run the hour's allowance dry is a strike. Five
 //   strikes within a day (a fixed window from the first) pause that
 //   assistant for them until the day is up, so someone can't sit at the

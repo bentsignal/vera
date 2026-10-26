@@ -1,0 +1,21 @@
+diff --git a/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm b/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
+index 917dc6d88e2840351f6ca1a3c697ffc467dec933..887b291c43b76ab0c7f00af772862f88d8d04d5c 100644
+--- a/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
++++ b/React/Fabric/Mounting/ComponentViews/TextInput/RCTTextInputComponentView.mm
+@@ -870,8 +870,14 @@ - (BOOL)_textOf:(NSAttributedString *)newText equals:(NSAttributedString *)oldTe
+                      }
+                    }];
+ 
+-  BOOL shouldFallbackToBareTextComparison =
+-      [_backedTextInputView.textInputMode.primaryLanguage isEqualToString:@"dictation"] ||
++  // Since iOS 16 dictation runs beside the keyboard and `primaryLanguage` stays the keyboard's, so also check
++  // `dictationRecognizing`, set while the dictation placeholder (the spinner) is in the text, as the old
++  // architecture's RCTBaseTextInputView does (facebook/react-native#37188). [vera: dictation-recognizing]
++  BOOL isDictating = [_backedTextInputView.textInputMode.primaryLanguage isEqualToString:@"dictation"];
++  if (@available(iOS 16.0, *)) {
++    isDictating = isDictating || _backedTextInputView.dictationRecognizing;
++  }
++  BOOL shouldFallbackToBareTextComparison = isDictating ||
+       [_backedTextInputView.textInputMode.primaryLanguage isEqualToString:@"ko-KR"] ||
+       _backedTextInputView.markedTextRange || _backedTextInputView.isSecureTextEntry || fontHasBeenUpdatedBySystem;
+ 

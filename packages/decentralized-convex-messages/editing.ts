@@ -3,6 +3,7 @@ import type { OperationArgs } from "@decentralized-convex/plugin";
 import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { LinkCard, messagesProtocol, Quote } from "./protocol.ts";
+import { mentionedBy } from "./alerts.ts";
 import { markChanged } from "./changes.ts";
 import { previewedUrls } from "./links.ts";
 import { recordMentions, validMentions } from "./mentions.ts";
@@ -93,10 +94,23 @@ async function rewriteQuotes(
   }
 }
 
-/** Forgets the accounts a message mentioned, for their activity. */
-async function forgetMentions(ctx: MutationCtx, message: Doc<"messages">) {
+/**
+ * Forgets the accounts a message mentioned, for their activity; with
+ * `saidTo`, those it said the words of as well. Words stay through edits,
+ * like the push they sent.
+ */
+async function forgetMentions(
+  ctx: MutationCtx,
+  message: Doc<"messages">,
+  { saidTo }: { saidTo: boolean },
+) {
+  const noted = new Set(message.saidTo);
   const mentioned = new Set(
-    (message.mentions ?? []).map(({ accountId }) => accountId),
+    saidTo
+      ? mentionedBy(message)
+      : (message.mentions ?? [])
+          .map(({ accountId }) => accountId)
+          .filter((accountId) => !noted.has(accountId)),
   );
   for (const accountId of mentioned) {
     const rows = await ctx.db
@@ -180,7 +194,7 @@ export async function editMessage(
     mentions,
   });
   await markChanged(ctx, access, now);
-  await forgetMentions(ctx, message);
+  await forgetMentions(ctx, message, { saidTo: false });
   await recordMentions(ctx, edited);
   await rewriteQuotes(ctx, message, (quote) => ({
     ...quote,
@@ -286,7 +300,7 @@ export async function deleteMessage(
   if (found === null) return null;
   if (found.deletedAt !== undefined && found.authorId === self) return null;
   const message = await ownMessage(ctx, self, args);
-  await forgetMentions(ctx, message);
+  await forgetMentions(ctx, message, { saidTo: true });
   await deleteReactions(ctx, message);
   await deleteLinkWaits(ctx, message.messageId);
   await rewriteQuotes(ctx, message, ({ authorId }) => ({
@@ -310,6 +324,7 @@ export async function deleteMessage(
       linkPreview: undefined,
       linkPreviews: undefined,
       mentions: undefined,
+      saidTo: undefined,
     });
   } else {
     await ctx.db.delete(message._id);

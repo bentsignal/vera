@@ -35,6 +35,42 @@ messages keep Hide Alerts (everything or nothing).
   …"), taken out of its conversation's messages row so nothing counts
   twice.
 
+## Your name and keywords
+
+Settings > Notifications > Notify Me About Messages That Say has a My
+Name switch (on until turned off) and a Keywords screen: a field that stays focused, so
+you can type a word and press return, then the next, and the list below
+it, each row with its delete control showing (iOS's editing list, swipe
+too; a remove button on Android); scrolling the list at all puts the keyboard away. A message in a group or channel that
+says your display name, with the switch on, or one of your keywords
+counts as @mentioning you: whole words, any case ("Maya" matches "maya!"
+but not "Mayans"; "deploy" doesn't match "deployed"). So it follows the
+alert levels like a mention: one push where you'd hear mentions (never a
+second one where you hear every message anyway), nothing at nothing, and
+an Activity row of its own ("Maya said your name in …", "Maya said
+“deploy” in …") that counts in the badge. Direct messages already reach
+you whole, so they're left out.
+
+- The settings are the same for every signed-in account, like the rest;
+  each account's server matches that account's own name, so with two
+  accounts either name notifies (as that account). Per-account settings
+  are for later. The screen reads an account whose server has these
+  settings, and they're sent only to servers that do.
+- Keywords are stored trimmed and once each whatever their case, at most
+  `MAX_KEYWORDS` of `MAX_KEYWORD_LENGTH` characters.
+- The push works it out once, before sending (`notifications.send`):
+  `wordCandidates` finds whose keyword the message says and who wants
+  their name, the action checks those names (they live in Accounts,
+  which the messages Component reads over HTTP, `accountProfile`), and
+  `noteWords` records the matches on the message (`saidTo`, never sent
+  to apps) and as `mentions` rows with `said`. From then on `alerts`
+  treats `saidTo` as @mentions, so pushes, Activity, and the badge need
+  nothing else. Members at `none` aren't looked up; everyone else is,
+  one `getProfile` each (Accounts has no batch lookup; Convex caches the
+  query). An edit keeps them, like the push they sent; deleting
+  the message forgets them.
+- No highlight in the message itself.
+
 ## Later
 
 - @everyone (decided against for now).
