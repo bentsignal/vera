@@ -600,3 +600,39 @@ The app builds each account's Inbox from its list and rows
 (`useInboxes`), in the shape it had, for the Inbox, Home's badge, the app
 icon's, and what's saved on the device (the list and each row are saved).
 Optimistic updates that add or drop a conversation change the list too.
+
+### 15. Pointless removed, needed made smart
+
+Shawn's rule for the pass: if something is pointless, remove it; if it's
+needed, make it smart. Beyond D (#278):
+
+- **Typing with the first view (#282):** pressing a row now loads who's
+  typing along with the latest pages, so someone already typing shows with
+  the messages even when the conversation was cached from the Inbox.
+- **A channel's members, everywhere they went unused** (a channel's
+  `members` is everyone in its space):
+  - Activity described each channel item with its whole member list, read
+    and sent every run; nothing shows it (a channel's title is its name,
+    in this app and older ones). Channels' items now say no members.
+  - The Inbox subscribed to the profile of every member of every
+    conversation, channels included, to have them ready for conversations
+    opened from it. Channels' members are left out: a channel's screen
+    gets the people it shows with its pages.
+  - A channel's screen subscribed to every member's profile for @mentions.
+    They now load once something is typed in its composer
+    (`useMentionNames`), a moment before an @ could need them.
+
+| Activity, one run (seeded account, spaces of 5) |             Before |              After |
+| ----------------------------------------------- | -----------------: | -----------------: |
+| Documents read                                  |                683 |                673 |
+| Sent (older apps; compact)                      | 143.9 KB; 120.4 KB | 137.1 KB; 118.6 KB |
+
+In a space of 200, each channel item drops about 200 member reads and
+6 KB, and the Inbox and an opened channel no longer start 200 profile
+subscriptions each.
+
+Kept, because something uses them: Activity's message counts ("12 new
+messages"), a conversation's `changedAt` (what's saved on the device
+catches up by it), DM and group unread numbers (the badge), the Spaces
+tab's channel numbers (shown), and a channel's members on its
+`conversation` query (the @mention list).

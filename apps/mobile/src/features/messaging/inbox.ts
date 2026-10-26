@@ -138,7 +138,9 @@ export function useInbox({ account }: { account?: string } = {}) {
   );
   const profiles = useProfileState(
     conversations.flatMap(({ conversation, shows }) => [
-      ...conversation.members,
+      // A channel's members are everyone in its space: they load when
+      // someone starts typing in it (for @mentions), not for the Inbox.
+      ...(conversation.kind === "channel" ? [] : conversation.members),
       ...shows,
     ]),
   );

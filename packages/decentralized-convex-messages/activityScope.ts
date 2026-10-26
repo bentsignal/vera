@@ -42,9 +42,11 @@ export async function seenState(
 export function conversationDescriber(ctx: QueryCtx, spaces: SpaceReads) {
   const described = new Map<string, Promise<ActivityConversation>>();
   async function describe(conversation: Doc<"conversations">) {
-    const { spaceId } = conversation;
+    const { kind, spaceId } = conversation;
     const [members, space] = await Promise.all([
-      memberAddresses(ctx, conversation, spaces),
+      // A channel's members are everyone in its space, and nothing shows
+      // them: its title is its name.
+      kind === "channel" ? [] : memberAddresses(ctx, conversation, spaces),
       spaceId === undefined ? null : spaces.space(spaceId),
     ]);
     return {
