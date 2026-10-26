@@ -42,7 +42,8 @@ Shawn starts each feature or fix in its own T3 Code worktree and thread
 - Verify in this worktree's own simulator (`scripts/sim.sh`), never another
   worktree's or a shared one. Load the `vera-simulator` skill before any
   simulator or emulator use: devices start only through `scripts/sim.sh`,
-  which queues them so many worktrees can share the Mac. Open a device in
+  which queues them so many worktrees can share the Mac: up to three run
+  at once, and a boot never overlaps a performance measurement. Open a device in
   T3's Device panel (`device_open`) at most once, and close it
   (`device_close`) before `scripts/sim.sh down`. Shut the device down as
   soon as you have your evidence, and always before you end your turn;
@@ -53,15 +54,19 @@ Shawn starts each feature or fix in its own T3 Code worktree and thread
   them in the PR description. Never commit PR assets.
 - Keep each pull request to one coherent change, with a description covering
   the summary, the evidence, and the validation that was run.
+- A fix for a GitHub issue says `Fixes #<issue>` in its PR description (one
+  line per issue) and targets `main`. That link is how Vera Support tells
+  the person who reported it that a fix is in progress, merged, and live.
 - Open the PR, review your own diff, wait for CI to pass, start the dev
   server (`scripts/phone.sh up`), then tell Shawn it is ready to test and
   **stop**. Shawn tests every change on his phone in its worktree before it
   merges, and you refine it on the branch until he's happy; the release
   doesn't re-test each change. The dev server stays up through the rounds
-  of feedback and comes down when the work is closed out.
+  of feedback and comes down when the PR merges or Shawn drops the work.
 - Merge only after Shawn approves that PR in the thread ("merge it", "ship
-  it", "approved"), with a merge commit, deleting the branch. Approval of
-  one PR is not approval of another.
+  it", "approved"), following the `merge` skill: a merge commit,
+  deleting the branch, then the dev server and devices down and the
+  thread settled. Approval of one PR is not approval of another.
 - After merging a PR that changed the backend (Convex functions, schema, or
   a plugin's server code; anything that got an isolated backend), push
   main's backend to the shared dev deployment right away
@@ -78,7 +83,9 @@ main, as above). When Shawn asks for a release, follow the
 `vera-release` skill ([docs/releasing.md](docs/releasing.md) explains the
 model): list what changed since the last release, and what to test where
 those changes overlap (each one was already tested on its own before it
-merged), get main onto his phone, and ship only after he approves.
+merged), run those tests yourself first in the iOS simulator and Android
+emulator, get main onto his phone for what only he can check, and ship
+only after he approves.
 Over-the-air updates are the default; a store build happens only when
 native code changed or Apple requires one.
 
@@ -101,20 +108,29 @@ See [apps/mobile/README.md](apps/mobile/README.md#vera-dev).
 
 - **Day to day, Vera Dev is main's dev client.** When your worktree's work
   is ready to test, run `scripts/phone.sh up` (`--android` for his Android
-  phone) in it. It serves the worktree's Metro on the Mac's Wi-Fi address
-  (the phone must be on the same network). Tell him the **server address**
-  it prints (`server: http://<IP>:<port>`), first and on its own line: he
-  opens Vera Dev and picks that one from its list, where several worktrees'
-  servers can show up at once. Don't send QR codes or the open link unless
-  he asks. JavaScript changes then hot-reload on his phone with no build.
+  phone) in it. One Metro serves the Mac's Wi-Fi address and, through a
+  Tailscale proxy, his tailnet for when he's away from home. It prints a
+  block to send him as it is, first in your message, every time: the two
+  **open links** as a Markdown list (one tap on his iPhone opens Vera Dev
+  on this worktree's server, at home or over Tailscale), then the home and
+  Tailscale server addresses, each in its own code block so he can copy it
+  in one tap. **Keep it exactly as printed**: the links as list items in
+  `[label](url)` form, never in backticks, never bare, never the
+  `vera-dev://` URL the page opens (his chat only makes http and https
+  links tappable), and each address in its own fenced block. On Android
+  he pastes an address into Vera Dev, because the open links crash it
+  there (an Expo bug, see apps/mobile/README.md), so the block is the same
+  for both phones; send it once. Don't send QR codes unless he asks.
+  JavaScript changes then hot-reload on his phone with no build.
 - **Native builds only when native code changed.** `phone.sh up` compares
   the worktree's native fingerprint with main's. A worktree that changed
   native code gets its own dev client (built once, about 15 minutes, and
   cached); he installs it from the install link, and when he's done,
   `phone.sh down` prints main's install link to put main's dev client back
-  (`phone.sh main` any time). Tell Shawn when he has to install something;
-  otherwise he only picks the server. `phone.sh list` shows every cached
-  dev client.
+  (`phone.sh main` any time). Tell Shawn when he has to install something,
+  with the install link `phone.sh` prints (a list item too, labeled by
+  phone); otherwise he only taps the open link. `phone.sh list` shows every
+  cached dev client.
 - **Releases are tested in the dev client too**, serving `main` (the
   `vera-release` skill), so fixes reach his phone without a build. The real
   app gets tested in TestFlight.
@@ -124,7 +140,10 @@ See [apps/mobile/README.md](apps/mobile/README.md#vera-dev).
   or to check update or channel behavior, which a dev client can't show.
   It replaces the dev client in the Vera Dev slot; he reinstalls main's
   from `scripts/phone.sh main`.
-- Keep it up until the work is closed out, then `scripts/phone.sh down`.
+- Keep it up until the PR merges or Shawn drops the work, then
+  `scripts/phone.sh down`. A server the phone hasn't loaded from in 24
+  hours stops on its own (any worktree's `phone.sh up`, `sim.sh up`, or
+  an agent's turn ending checks); `phone.sh up` brings it back.
 
 ## Required validation after changes
 

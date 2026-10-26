@@ -131,7 +131,7 @@ void test("a deleted message is gone, with its reactions and mentions", async (t
   );
   assert.equal(rows("reactions").length, 0);
   assert.equal(rows("mentions").length, 0);
-  assert.equal((await latestMessage(ctx, GROUP))?.messageId, "first");
+  assert.equal((await latestMessage(ctx, GROUP)).shown?.messageId, "first");
   // Deleting it again does nothing.
   await deleteMessage(ctx, ME, { conversationId: GROUP, messageId: "oops" });
 });
@@ -155,7 +155,7 @@ void test("a deleted original with replies stays, emptied, for its thread", asyn
     messageId: "root",
   });
   // The inbox shows the reply, not the emptied original.
-  assert.equal((await latestMessage(ctx, GROUP))?.messageId, "reply");
+  assert.equal((await latestMessage(ctx, GROUP)).shown?.messageId, "reply");
   await rejects(
     editMessage(ctx, ME, {
       body: "back",

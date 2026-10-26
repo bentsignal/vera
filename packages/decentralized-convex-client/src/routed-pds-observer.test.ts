@@ -97,6 +97,37 @@ void test("passes on included results the home PDS answers completely", async ()
   await client.close();
 });
 
+void test("publishes each update from home once while its routes stay the same", async () => {
+  const connections = new Map<string, ControlledConnection>();
+  const client = new DecentralizedConvexClient({
+    connectionFactory: (url) => {
+      const connection = new ControlledConnection();
+      connections.set(url, connection);
+      return connection;
+    },
+    pds: {
+      discover: (domain) => Promise.resolve(discoveredPds(domain)),
+      home: discoveredPds("a.test"),
+    },
+  });
+  const observer = client.watchPdsQuery(listNotesRequest);
+  const shown: unknown[] = [];
+  observer.subscribe(() => shown.push(observer.getSnapshot().data));
+  const home = connections.get("https://a.test");
+  home?.emit([{ body: "a" }], []);
+  await wait(0);
+  const settled = shown.length;
+  home?.emit([{ body: "a" }, { body: "b" }], []);
+  await wait(0);
+  home?.emit([{ body: "a" }, { body: "b" }, { body: "c" }], []);
+  await wait(0);
+  assert.equal(shown.length - settled, 2);
+  assert.deepEqual(shown.at(-1), [{ body: "a" }, { body: "b" }, { body: "c" }]);
+
+  observer.close();
+  await client.close();
+});
+
 const listNotesRequest = {
   lastChanged: corePackage.lastChanged,
   operation: { args: {}, type: "list" },

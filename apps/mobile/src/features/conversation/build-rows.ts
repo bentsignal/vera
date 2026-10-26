@@ -1,6 +1,6 @@
 import type { MemberNotice, Message } from "./types";
 import type { MessageLayout } from "~/features/preferences/store";
-import { isSameDay } from "~/lib/format";
+import { isSameDay } from "../../lib/format.ts";
 
 /** Bubbles get a time header after a pause this long, like iMessage. */
 const HEADER_GAP_MS = 60 * 60 * 1000;
@@ -8,8 +8,25 @@ const HEADER_GAP_MS = 60 * 60 * 1000;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 export type MessageRow =
-  | { type: "day"; key: string; date: Date }
-  | { type: "time"; key: string; date: Date }
+  /**
+   * A header over the messages of a day (stacked) or after a pause
+   * (bubbles). `opensThread` over a thread's original, with nothing above;
+   * `author` is then the original's sender.
+   */
+  | {
+      type: "day";
+      key: string;
+      date: Date;
+      opensThread: boolean;
+      author?: string;
+    }
+  | {
+      type: "time";
+      key: string;
+      date: Date;
+      opensThread: boolean;
+      author?: string;
+    }
   /** In a thread, between its original and the replies. */
   | { type: "replies"; key: string; date: Date; count: number }
   /** Someone joining or leaving a group. */
@@ -111,10 +128,20 @@ function messageRow(
   } satisfies MessageRowOf;
 }
 
-function headerRow(message: Message, type: HeaderRow["type"]) {
+function headerRow(
+  message: Message,
+  type: HeaderRow["type"],
+  opensThread: boolean,
+) {
   const last = built.get(message)?.header;
-  if (last?.type === type) return last;
-  return { date: message.sentAt, key: `${type}-${message.id}`, type };
+  if (last?.type === type && last.opensThread === opensThread) return last;
+  return {
+    author: opensThread ? message.authorId : undefined,
+    date: message.sentAt,
+    key: `${type}-${message.id}`,
+    opensThread,
+    type,
+  };
 }
 
 /** Each notice's rows from the last build, like `built`. */
@@ -148,7 +175,12 @@ function noticeRows(
   const above =
     last?.header?.type === header
       ? last.header
-      : { date: notice.at, key: `${header}-${notice.id}`, type: header };
+      : {
+          date: notice.at,
+          key: `${header}-${notice.id}`,
+          opensThread: false,
+          type: header,
+        };
   builtNotices.set(notice, { header: above, row });
   return [above, row];
 }
@@ -225,7 +257,7 @@ export function buildMessageRows(
       built.set(message, { row });
       return [row, ...divider];
     }
-    const header = headerRow(message, headerType);
+    const header = headerRow(message, headerType, message.id === root?.id);
     built.set(message, { header, row });
     return [header, row, ...divider];
   });
@@ -241,23 +273,6 @@ function dateOfRow(row: Exclude<MessageRow, { type: "replies" }>) {
   if (row.type === "message") return row.message.sentAt;
   if (row.type === "notice") return row.notice.at;
   return row.date;
-}
-
-/**
- * Where a row sits in the list, oldest first, as a number a worklet can
- * compare: its message's time, or just before it for the header above it.
- */
-export function rowOrder(date: Date, header = false) {
-  return date.getTime() - (header ? 0.5 : 0);
-}
-
-/** Where a row sits in the list (see `rowOrder`). */
-export function orderOfRow(row: MessageRow) {
-  if (row.type === "message") return rowOrder(row.message.sentAt);
-  if (row.type === "notice") return rowOrder(row.notice.at);
-  // A thread's divider sits just after its original.
-  if (row.type === "replies") return rowOrder(row.date) + 0.25;
-  return rowOrder(row.date, true);
 }
 
 /**

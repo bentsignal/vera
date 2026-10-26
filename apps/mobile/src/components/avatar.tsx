@@ -5,6 +5,7 @@ import { withUniwind } from "uniwind";
 
 import { SymbolIcon } from "~/components/symbol-icon";
 import { cn } from "~/lib/cn";
+import { initials } from "~/lib/initials";
 
 const StyledImage = withUniwind(Image);
 
@@ -24,19 +25,6 @@ const SIZES = {
 
 /** A symbol standing in for initials, such as `#` for a channel. */
 export type AvatarGlyph = SymbolViewProps["name"];
-
-function initials(name: string) {
-  // Words only, so a group titled "Maya, Leo & Priya" reads "ML", and a
-  // name like "Maya (climbing)" reads "MC".
-  const letters = name
-    .split(/[\s,&]+/)
-    .map((part) => part.replace(/^[^\p{L}\p{N}]+/u, ""))
-    .filter((part) => part !== "")
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-  return letters === "" ? (Array.from(name.trim())[0] ?? "") : letters;
-}
 
 export function Avatar({
   name,

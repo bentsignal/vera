@@ -1,7 +1,20 @@
 {
   "extends": "./convex/tsconfig.json",
   "include": [
+    "./assistant-limits.ts",
+    "./assistant-limits.test.ts",
+    "./assistant-models.ts",
+    "./assistant-models.test.ts",
+    "./bug-reports.ts",
+    "./bug-reports.test.ts",
+    "./issue-closures.ts",
+    "./known-bugs.ts",
+    "./known-bugs.test.ts",
     "./pds.ts",
+    "./reply-outcome.ts",
+    "./reply-outcome.test.ts",
+    "./send-limits.ts",
+    "./send-limits.test.ts",
     "./upload-limits.ts",
     "./upload-limits.test.ts",
     "./convex/**/*"

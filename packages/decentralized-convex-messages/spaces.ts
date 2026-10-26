@@ -18,6 +18,7 @@ import {
   normalizeName,
 } from "./model.ts";
 import { channelName } from "./naming.ts";
+import { readAt } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
 import { deleteThreads } from "./threads.ts";
 
@@ -263,7 +264,12 @@ export async function toSpace(
           ctx,
           conversation.conversationId,
           accountId,
-          member?.lastReadAt ?? self._creationTime,
+          await readAt(
+            ctx,
+            conversation.conversationId,
+            accountId,
+            member?.lastReadAt ?? self._creationTime,
+          ),
         ),
       };
     }),

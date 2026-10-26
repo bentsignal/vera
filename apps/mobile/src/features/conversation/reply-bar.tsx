@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
+import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
 
 /** Who and what the next message replies to, shown over the field. */
@@ -40,19 +41,19 @@ function FieldBar({
           {text}
         </Text>
       </View>
-      <Pressable
+      <GesturePressable
         accessibilityRole="button"
         accessibilityLabel={cancelLabel}
         hitSlop={8}
         onPress={onCancel}
-        className="active:opacity-60"
+        pressedClassName="opacity-60"
       >
         <SymbolIcon
           name={{ android: "close", ios: "xmark.circle.fill" }}
           size={18}
           tintColorClassName="accent-subtle"
         />
-      </Pressable>
+      </GesturePressable>
     </Animated.View>
   );
 }

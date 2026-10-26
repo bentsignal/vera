@@ -13,6 +13,7 @@ the release with the `vera-release` skill and
 | ---------------- | -------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
 | Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
 | Play build       | Vera     | `production` (app bundle, Play signing) | `vera.chat`     | `production`   | Play internal testing ("Vera testers")          |
+| Private preview  | Vera     | `preview` (ad hoc iOS, signed APK)      | `vera.chat`     | `preview`      | Shawn only, installed from an install page     |
 | Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, for update and channel checks    |
 | Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone, the same                 |
 | Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
@@ -37,6 +38,20 @@ Google's key, whose SHA-256 is in the passkey variables and
 TestFlight and the App Store run the same binary: Apple promotes a TestFlight
 build to the App Store, so there is one store profile and one production
 channel.
+
+Private production tests use `eas build --local --profile preview`, then
+`scripts/install-page.sh` with its fourth argument `production`, so its
+page names Vera and explains the replacement. This profile inherits
+production configuration,
+uses an empty, separate preview update channel, and submits to no store.
+It can build the integration branch before Shawn approves merging it.
+
+The iOS preview uses the production bundle ID and signing team. Install it
+over TestFlight without deleting Vera to keep its app data and keychain;
+reinstall from TestFlight to return. Android's APK uses EAS's production
+key, while Play uses Google's key, so switching in either direction needs
+uninstalling Vera and signing in again. Check the APK certificate against
+the live passkey and invite-link association files before distributing it.
 
 Each binary accepts over-the-air updates (EAS Update, `expo-updates`) only
 for its **runtime version**, which is the native fingerprint (`runtimeVersion:
@@ -75,6 +90,13 @@ it behind a splash-colored screen and reopens on the screen it was on:
   keyboard down, and no photo or video open. Someone typing, scrolling, or
   watching a video is never interrupted; someone reading sees a blink.
 
+A launch of the bundle built into the binary (a new install from TestFlight
+or the store, which may be dozens of updates behind) keeps the splash up
+while it checks and downloads, for up to 6 seconds, so it opens straight
+into the latest update. If the download takes longer, the app shows and the
+update goes in as soon as it lands, with the keyboard down and no photo or
+video open, without waiting for a pause.
+
 It never restarts while a message is sending or failed, or a change is still
 on its way to a server, since a restart would lose them. A launch always
 starts on the newest downloaded update. So within about a minute of an
@@ -101,6 +123,24 @@ So the update has to be out seconds after the deploy:
 deploys the backend, and publishes the update straight after, about 15–20
 seconds of "Updating Vera…" for anyone in the app. `pnpm release plan`
 says when the number went up.
+
+### Native-list update policy
+
+The October 25 native-list release uses voluntary store updates. Keep
+`OUTDATED_RUNTIMES` empty unless Shawn explicitly approves a different policy.
+Old binaries retain their React Native list and compatible server access;
+new native binaries use their own runtime and cannot reach old binaries as
+an OTA. No old-runtime gate prelude or automatic deny-list activation is
+required. A future forced-update rollout needs its own approval and runtime
+review. The release kept `BREAKING_VERSION` at 3.
+
+The native list is now the app's only message list: the React Native list
+and its Settings → Experimental switch are removed. Binaries from before
+the native-list release (iOS build 9, Android build 6) keep the React
+Native list in the JavaScript they already have: updates match the native
+fingerprint, so newer JavaScript never reaches them. The detailed acceptance and deferred Android camera preview cosmetics
+are recorded in
+[the native-list release record](../.plans/native-list-release-20261025.md).
 
 ## Release history in git
 
@@ -142,7 +182,10 @@ the release a PR removes the finished steps.
    only what merging could have broken: places where the changes overlap
    or interact (shared files and screens, the same flow from two ends,
    backend changes against the app and against old app versions, native
-   changes together in one store build). Send both to Shawn.
+   changes together in one store build). The agent runs that list itself
+   first, in the iOS simulator and Android emulator, and fixes what fails.
+   Then it sends Shawn the notes, what it checked (with evidence), and the
+   steps left for him: what a simulator can't settle.
 2. **Test in the dev client.** Push `main`'s backend to the shared dev
    deployment (`pnpm release backend dev`; usually already current, since
    backend PRs push it when they merge), then serve `main` to Vera Dev
@@ -150,8 +193,8 @@ the release a PR removes the finished steps.
    changes work together: JavaScript fixes reach the phone without a build. The
    real app gets tested in TestFlight. An internal build or internal OTA is
    only for checking update or channel behavior, or when Shawn asks.
-3. **Shawn tests** that list, plus his own quick use of the app, and
-   approves, or asks for fixes (straight to `main` when small, feature PRs
+3. **Shawn tests** the steps left for him, plus his own quick use of the
+   app, and approves, or asks for fixes (straight to `main` when small, feature PRs
    when not, then back to step 1).
 4. **Ship.**
    - If the backend changed, ship it together with the app:

@@ -9,7 +9,7 @@ import { parsePart } from "~/features/messaging/reactions";
  * long-press menu or by holding one of its reactions.
  */
 export default function ReactionsScreen() {
-  const { account, conversationId, emoji, messageId, part } =
+  const { account, conversationId, emoji, messageId, part, since } =
     useLocalSearchParams<{
       account?: string;
       conversationId: string;
@@ -18,6 +18,8 @@ export default function ReactionsScreen() {
       messageId: string;
       /** The part reacted to (see `ReactionPart`); the message's if absent. */
       part?: string;
+      /** The query by time with the message's reactions (see `ReactionsSheet`). */
+      since?: string;
     }>();
   return (
     <AccountScope address={account}>
@@ -26,6 +28,7 @@ export default function ReactionsScreen() {
         messageId={messageId}
         part={parsePart(part ?? "message")}
         emoji={emoji}
+        since={since === undefined ? undefined : Number(since)}
       />
     </AccountScope>
   );

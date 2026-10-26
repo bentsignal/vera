@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { Button, ContextMenu, Host, List, RNHostView } from "@expo/ui/swift-ui";
 import {
+  accessibilityLabel,
   alignmentGuide,
   buttonStyle,
   frame,
@@ -19,12 +20,14 @@ import type { RowAction } from "./row-actions";
 import type { ConversationSummary, ThreadSummaryRow } from "./types";
 import { useRunAs } from "~/features/messaging/account";
 import { usePrefetchConversation } from "~/features/messaging/prefetch";
+import { usernameOf } from "~/features/messaging/profiles";
 import { ConversationRowContent, INBOX_ROW_HEIGHT } from "./conversation-row";
 import {
   afterMenuCloses,
   inboxMenuActions,
   threadMenuActions,
 } from "./row-actions";
+import { conversationLabel, threadLabel } from "./row-label";
 import { conversationHref, threadHref } from "./thread-links";
 import { ThreadRowContent } from "./thread-row";
 
@@ -67,14 +70,23 @@ function ActionButtons({
  * own press highlight and separator, with `actions` in its long-press
  * menu. `children` is the shared React Native look, hosted inside and
  * ignoring touches so SwiftUI handles taps and presses.
+ *
+ * The hosted look is hidden from accessibility, and the button reads
+ * `label` instead. Left in, React Native views inside the SwiftUI button
+ * broke the Inbox's accessibility tree: XCTest couldn't read any of the
+ * app while the Inbox was mounted (`kAXErrorIllegalArgument` on the app
+ * itself), so simulator taps failed everywhere on it.
  */
 function NativeRow({
   actions,
+  label,
   onPress,
   onPressIn,
   children,
 }: {
   actions: readonly RowAction[];
+  /** What VoiceOver reads for the row (see `row-label.ts`). */
+  label: string;
   onPress: () => void;
   /** As a finger lands on the row, before it's known to be a tap. */
   onPressIn?: () => void;
@@ -109,6 +121,7 @@ function NativeRow({
                   buttonStyle("plain"),
                   frame({ height: INBOX_ROW_HEIGHT, maxWidth: Infinity }),
                   alignmentGuide("listRowSeparatorLeading", TEXT_INSET),
+                  accessibilityLabel(label),
                 ]}
                 onPress={onPress}
               >
@@ -119,6 +132,7 @@ function NativeRow({
                     photo and unread dot centered on its top edge. */}
                   <View
                     pointerEvents="none"
+                    accessibilityElementsHidden
                     className="flex-row"
                     style={{ height: INBOX_ROW_HEIGHT }}
                   >
@@ -160,6 +174,10 @@ export function InboxRow({
   return (
     <NativeRow
       actions={inboxMenuActions(runAs, conversation)}
+      label={conversationLabel(
+        conversation,
+        showAccount ? usernameOf(account) : null,
+      )}
       onPress={open}
       onPressIn={() => prefetch(account, id)}
     >
@@ -188,6 +206,10 @@ export function ThreadInboxRow({
   return (
     <NativeRow
       actions={actions}
+      label={threadLabel(
+        thread,
+        showAccount ? usernameOf(thread.account) : null,
+      )}
       onPress={() => router.push(threadHref(thread))}
     >
       <ThreadRowContent

@@ -1,9 +1,11 @@
 import type { SharedValue } from "react-native-reanimated";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
+import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
+  useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -11,9 +13,12 @@ import { scheduleOnRN } from "react-native-worklets";
 import { GlassSurface } from "~/components/glass-surface";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { cn } from "~/lib/cn";
+import { composerTop } from "./jump-lift";
 
 /** The jump button's size. */
 const JUMP_SIZE = 40;
+/** How far above the composer it sits. */
+const GAP = 12;
 
 function JumpChevron() {
   return (
@@ -34,14 +39,45 @@ function JumpChevron() {
  */
 export function JumpToLatest({
   visible,
-  bottom,
+  above,
+  keyboard,
   onPress,
 }: {
   visible: SharedValue<boolean>;
-  /** Distance from the bottom edge, above the floating composer. */
-  bottom: number;
+  /** The floating composer's height, which it sits `GAP` above. */
+  above: SharedValue<number>;
+  /**
+   * It rises with the keyboard as the composer does (`composerTop`), from
+   * the composer's `bottomInset`, and holds while `frozen` (the long-press
+   * menu has the keyboard, see `useMenuKeyboardHold`).
+   */
+  keyboard: { bottomInset: number; frozen: SharedValue<boolean> };
   onPress: () => void;
 }) {
+  const { height, progress } = useReanimatedKeyboardAnimation();
+  const { bottomInset, frozen } = keyboard;
+  /** How far it rises, held while the keyboard is frozen. */
+  const risen = useSharedValue(0);
+  useAnimatedReaction(
+    () => ({
+      // Watched too, so it catches up when the menu lets go with the
+      // keyboard somewhere else (closing into a sheet leaves it down).
+      held: frozen.get(),
+      to: composerTop({
+        bottomInset,
+        composer: above.get(),
+        keyboardHeight: height.get(),
+        progress: progress.get(),
+      }),
+    }),
+    ({ held, to }) => {
+      if (!held) risen.set(to);
+    },
+  );
+  // Moved, not laid out again, as the composer changes height.
+  const lift = useAnimatedStyle(() => ({
+    transform: [{ translateY: -risen.get() }],
+  }));
   const [shown, setShown] = useState(false);
   useAnimatedReaction(
     () => visible.value,
@@ -56,15 +92,19 @@ export function JumpToLatest({
     ],
   }));
   return (
-    <View
+    <Animated.View
       pointerEvents={shown ? "box-none" : "none"}
       className="absolute right-4"
-      style={{ bottom }}
+      style={[{ bottom: GAP }, lift]}
     >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Jump to latest"
-        accessibilityElementsHidden={!shown}
+        // Hidden, it's out of VoiceOver and TalkBack too: `aria-hidden` sets
+        // iOS's `accessibilityElementsHidden` and Android's
+        // `importantForAccessibility="no-hide-descendants"` (the first was
+        // iOS only, so TalkBack still offered the invisible button).
+        aria-hidden={!shown}
         onPress={onPress}
         hitSlop={6}
       >
@@ -83,6 +123,6 @@ export function JumpToLatest({
           </Animated.View>
         </GlassSurface>
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }

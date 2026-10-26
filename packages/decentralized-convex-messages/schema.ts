@@ -11,6 +11,7 @@ import {
   linkPreview,
   mention,
   quote,
+  said,
   spaceRole,
 } from "./protocol.ts";
 
@@ -18,17 +19,39 @@ export default defineSchema({
   conversations: defineTable({
     conversationId: v.string(),
     createdBy: v.string(),
-    // When anything a conversation shows last changed: a message, a reply,
-    // an edit, a deletion, or a reaction. Absent until one has.
+    // When anything a conversation shows last changed, before
+    // `conversationChanges`; no longer written.
     changedAt: v.optional(v.number()),
     kind: conversationKind,
     name: v.optional(v.string()),
     position: v.optional(v.number()),
     spaceId: v.optional(v.string()),
+    // When it was created, renamed, or last messaged before messages
+    // stopped writing here; its newest message counts too (see
+    // `toConversation`).
     updatedAt: v.number(),
   })
     .index("by_conversation", ["conversationId"])
     .index("by_space", ["spaceId"]),
+  // When a conversation's reactions, edits, or deletions last changed it
+  // (see `markChanged`), apart from the conversation itself, which every
+  // query reads to check access and which a busy conversation would
+  // otherwise rewrite many times a second. New messages aren't recorded
+  // here: they're the newest message, which is read instead.
+  conversationChanges: defineTable({
+    changedAt: v.number(),
+    conversationId: v.string(),
+  }).index("by_conversation", ["conversationId"]),
+  // How far each account has read each conversation, apart from its member
+  // row: every message moves the sender's, and the member rows are read by
+  // every query in the conversation (for its routes). Absent until first
+  // read since this table was added; `members.lastReadAt` (or, in a
+  // channel, joining its space) stands in until then.
+  readStates: defineTable({
+    accountId: v.string(),
+    conversationId: v.string(),
+    lastReadAt: v.number(),
+  }).index("by_conversation_account", ["conversationId", "accountId"]),
   // Direct and group members, plus per-account read state and settings for
   // channels.
   members: defineTable({
@@ -43,6 +66,7 @@ export default defineSchema({
     conversationId: v.string(),
     // A channel left out of the inbox; it still appears in its space.
     hiddenFromInbox: v.optional(v.boolean()),
+    // How far it had read before `readStates`; no longer written.
     lastReadAt: v.number(),
     muted: v.boolean(),
     // When the account pinned the conversation to the top of its inbox.
@@ -73,6 +97,10 @@ export default defineSchema({
     linkPreviews: v.optional(v.array(linkCard)),
     mentions: v.optional(v.array(mention)),
     messageId: v.string(),
+    // Who it counts as @mentioning because it says their name or a keyword
+    // (see `noteWords`), set once its push works that out. Only for this
+    // PDS's activity and pushes, never in what's sent.
+    saidTo: v.optional(v.array(v.string())),
     // A reply's quote of the message it answers, its thread (the original's
     // ID), and whether it stays out of the conversation (one sent in the
     // thread). See `message` in the protocol.
@@ -88,11 +116,13 @@ export default defineSchema({
     .index("by_thread_sent", ["threadId", "sentAt"])
     // Replies to an account's messages, so their activity finds them.
     .index("by_quote_author_sent", ["quote.authorId", "sentAt"]),
-  // One per account a message @mentions, so their activity finds it.
+  // One per account a message @mentions, or says the name or a keyword
+  // of (`said`), so their activity finds it.
   mentions: defineTable({
     accountId: v.string(),
     conversationId: v.string(),
     messageId: v.string(),
+    said: v.optional(said),
     sentAt: v.number(),
     // The thread of a reply kept there, which shows it instead of the
     // conversation.
@@ -164,7 +194,9 @@ export default defineSchema({
   })
     .index("by_message", ["messageId"])
     .index("by_message_account", ["messageId", "accountId"])
-    .index("by_author_reacted", ["messageAuthorId", "reactedAt"]),
+    .index("by_author_reacted", ["messageAuthorId", "reactedAt"])
+    // Reactions since a time, for the newest messages (see `reactions`).
+    .index("by_conversation_reacted", ["conversationId", "reactedAt"]),
   // Who among this PDS's accounts is typing, one row per account and
   // conversation, left behind once it times out (see `TYPING_TIMEOUT`).
   typing: defineTable({
@@ -225,8 +257,9 @@ export default defineSchema({
     .index("by_code", ["code"])
     .index("by_space", ["spaceId"]),
   // Kinds of pushes an account turned off; absent fields are on. Default
-  // alerts for groups and channels are `groupAlerts` and `channelAlerts`,
-  // or else `none` where `groups` or `channels` is false, else `all`.
+  // alerts for groups and channels are `groupAlerts`
+  // and `channelAlerts`, or else `none` where `groups` or `channels` is
+  // false, else `all`.
   notificationSettings: defineTable({
     accountId: v.string(),
     channelAlerts: v.optional(alertLevel),
@@ -236,9 +269,13 @@ export default defineSchema({
     groupAlerts: v.optional(alertLevel),
     groups: v.optional(v.boolean()),
     invites: v.optional(v.boolean()),
+    // Words that alert the account when a message says one.
+    keywords: v.optional(v.array(v.string())),
     reactions: v.optional(v.boolean()),
     replies: v.optional(v.boolean()),
     threadReplies: v.optional(v.boolean()),
+    // Pushes for messages that say the account's name: off until turned on.
+    yourName: v.optional(v.boolean()),
   }).index("by_account", ["accountId"]),
   // People each account added, with its own name and photo for them.
   contacts: defineTable({

@@ -3,13 +3,16 @@
 # up while he reads holds 2 to 4 GB of the Mac every worktree shares. If
 # this worktree's simulator or emulator is still up, send the agent back
 # once to shut it down (the vera-simulator skill, "Shutting down").
+# It also stops phone servers, in any worktree, that the phone hasn't
+# loaded from in a day (`scripts/phone.sh sweep`).
 set -euo pipefail
 input="$(cat)"
+root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
+"$root/scripts/phone.sh" sweep >/dev/null 2>&1 || true
 # Already sent back once this turn; let it end rather than loop.
 if printf '%s' "$input" | grep -Eq '"stop_hook_active"[[:space:]]*:[[:space:]]*true'; then
   exit 0
 fi
-root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
 up=()
 for platform in ios android; do
   if grep -Eq '^DEVICE=.+' "$root/.cache/sim/$platform" 2>/dev/null; then

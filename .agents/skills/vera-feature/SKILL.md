@@ -18,6 +18,16 @@ package READMEs, `apps/mobile/README.md`, `.plans/`). If the request is
 ambiguous in a way that changes what you build, ask before building.
 Otherwise pick the sensible default and say so in the PR.
 
+**Fixing a GitHub issue.** Read it first (`gh issue view <n>`). Issues
+labeled "user report" were filed by Vera Support for a real person, who
+gets messages as the fix moves along, all driven by the PR's link to the
+issue. So the PR description must say `Fixes #<n>`, one line per issue
+(`Closes` and `Resolves` work too; a bare `#<n>` doesn't link). GitHub only
+links PRs that target `main`, so a stacked fix doesn't link until it's
+retargeted. Assigning yourself the issue (`gh issue edit <n> --add-assignee
+@me`) tells the reporter someone picked it up. Its screenshots are
+described in words, never attached; reproduce from the steps.
+
 For a change to an existing screen, bring the simulator up (step 4) and take
 the "before" screenshots now, before you edit anything. Then `down` it while
 you build; `up` again when you're ready to verify.
@@ -97,6 +107,12 @@ scripts/sim.sh frames start
 scripts/sim.sh frames stop   # {"frames":…,"hz":60,"slow":0,"dropped":0,"worst":[]}
 ```
 
+`frames start` waits until no device on the Mac is booting, and no device
+boots until your `frames stop`, so stop as soon as you have the
+interaction. `frames stop` ends with a `mac:` line: if it says a device
+booted during the recording, or the Mac was busy and the report shows slow
+frames, measure again.
+
 `slow` must be 0 while things move (one slow frame as something mounts,
 before anything moves, is the most to accept). Measure before and after
 your change, and put both reports in the PR. A slow animation usually
@@ -112,13 +128,16 @@ dev variant, `chat.vera.app.dev`, amber icon; the TestFlight app stays
 beside it).
 
 **Serve it as soon as the work is ready to test** (step 7), and keep it up
-through every round of feedback. It comes down when Shawn closes the work
-out (the `close-it-out` skill).
+through every round of feedback. It comes down when the PR merges (the
+`merge` skill) or Shawn drops the work. A server the phone hasn't
+loaded from in 24 hours stops on its own; `phone.sh up` brings it back,
+so run it again at the start of each feedback round and when Shawn says
+the link doesn't load.
 
 ```sh
 scripts/phone.sh up             # iPhone; --android for his Android phone
-scripts/phone.sh link           # the server address and links again
-scripts/phone.sh down           # when the work is closed out
+scripts/phone.sh link           # the links again
+scripts/phone.sh down           # when the PR merges or the work is dropped
 scripts/phone.sh main           # main's dev client, to put back on his phone
 scripts/phone.sh list           # every cached dev client, marking main's
 ```
@@ -128,21 +147,63 @@ scripts/phone.sh list           # every cached dev client, marking main's
 - Vera Dev on his phone is normally **main's dev client**, which runs every
   worktree that hasn't changed native code. `up` compares this worktree's
   native fingerprint with main's and says which case it is:
-  - **Main's dev client:** he only picks the server in Vera Dev.
+  - **Main's dev client:** he only taps the open link.
   - **This worktree's own dev client** (native code changed): `up` builds
     it if needed (about 15 minutes, cached for every worktree) and he
     installs it first. Afterwards he needs main's back (see `down`).
   - **A new dev client for main** (main's native code changed since he last
     installed one): he installs it once; it serves every worktree after.
-- `up` starts the worktree's Metro (the same one the simulators use),
-  served over the Mac's Wi-Fi (the phone must be on the same network), and
-  prints its **server** address (`server: http://<IP>:<port>`), an
-  **install** link, and an **open** link. Shawn opens Vera Dev himself and
-  picks the server from its list, where every running worktree's Metro
-  shows up by address, so the address is what he needs. Put it first, on
-  its own line, port included (`http://10.0.0.152:8892`). Add the install
-  link only when he has to install, and say plainly whether he does. Don't
-  send QR codes or the open link unless he asks for them.
+- `up` starts the worktree's Metro (the same one the simulators use). One
+  Metro serves both the Mac's Wi-Fi, for when Shawn is home, and his
+  tailnet, for when he's out: `up` puts `tailscale serve` (HTTPS, tailnet
+  only) in front of it, so there's no second server. An open link is an
+  https page that opens Vera Dev on this worktree's server in one tap.
+  `up` prints what to send him between the `----` lines:
+
+  ````
+  ---- send Shawn this as it is ----
+  - [Open in Vera Dev on iPhone](https://vera-evidence.b-cdn.net/dev-client/open-cfde0a5324fd.html?url=http%3A%2F%2F10.0.0.124%3A8651)
+  - [Open in Vera Dev on iPhone over Tailscale](https://vera-evidence.b-cdn.net/dev-client/open-cfde0a5324fd.html?url=https%3A%2F%2Fairshawn.tailf45482.ts.net%3A8651)
+
+  Home Wi-Fi:
+
+  ```text
+  http://10.0.0.124:8651
+  ```
+
+  Tailscale:
+
+  ```text
+  https://airshawn.tailf45482.ts.net:8651
+  ```
+  ---- end ----
+  add when he has to install first:
+  - [Install Vera Dev on iPhone](https://vera-evidence.b-cdn.net/dev-client/ios/…/index.html)
+  ````
+
+  Put it first in your message, every time, copied exactly as printed
+  (without the `----` lines). He's usually home; the Tailscale link and
+  address are for when he isn't, and need Tailscale on on his phone. Each
+  part has to keep its form, or he's back to copying and pasting by hand:
+  - **The open links are a Markdown list of clickable links.** One `- `
+    item per line (lines without it run together into one paragraph),
+    each `[label](url)`. Never in backticks or a code block, never the
+    bare URL, and never the `vera-dev://` URL: his chat only makes http
+    and https links tappable, and the page opens `vera-dev://` for him.
+    Don't edit a URL; a space or line break inside the parentheses breaks
+    it.
+  - **Each server address is in its own fenced code block** (` ```text `),
+    which T3 gives a copy button. Inline code has none.
+
+  The open links are for his iPhone. On Android they crash Vera Dev for
+  now (an Expo bug, see `apps/mobile/README.md`), so there he copies an
+  address and pastes it into Vera Dev. That makes the block the same for
+  both phones (`phone.sh --android up` prints it too); send it once. If
+  Tailscale isn't running on the Mac, `up` prints no Tailscale link or
+  address; say so. Add the install link (for the phone that needs it) only
+  when he has to install, and say plainly whether he does. Don't send QR
+  codes unless he asks.
+
 - JavaScript edits hot-reload on his phone. Re-run `up` after native
   changes, `app.config.ts`, or `.env.local`.
 - With an isolated backend, Vera Dev talks to this worktree's domain, which
@@ -162,6 +223,7 @@ scripts/phone.sh list           # every cached dev client, marking main's
   signs in (or adds the account if he's already signed in elsewhere). The
   page works in any browser; a bare `vera-dev://` link only works pasted
   into Safari.
+
 - Leave it up while you work on his feedback. If this worktree has its own
   dev client, `down` at close-out prints main's install link: send it so
   he can put main's dev client back.
@@ -231,7 +293,8 @@ gh pr create --base main --title "<title>" --body-file <body.md>
 
 Follow `.github/pull_request_template.md`: summary, evidence, how it was
 tested, the backend used, whether native code changed, whether it's a
-breaking backend change, and extra release steps.
+breaking backend change, and extra release steps. A fix for an issue says
+`Fixes #<n>` (step 1).
 
 **Extra release steps.** If the next release has to do anything for this
 change beyond `pnpm release` (deploy something outside Convex such as
@@ -253,7 +316,8 @@ with `--with-backend`, and open apps on older versions will show "Updating
 Vera…" for a few seconds when it does.
 
 Then start the dev server (step 4b) and tell Shawn it's ready to test:
-the server address first, then (with an isolated backend) the iPhone and
+the block `phone.sh up` prints first (the open links as a list of
+clickable links, then each address in its own code block, step 4b), then (with an isolated backend) the iPhone and
 Android sign-in links (step 4b), then the PR link, a two-line summary, what
 to try on his phone (concrete steps for this change), whether he has to
 install its own dev client, and anything he should look at closely. **Stop there.**
@@ -263,16 +327,20 @@ Don't merge.
 
 - Feedback: make the changes on the same branch with the dev server still
   up (JavaScript hot-reloads on his phone; re-run `phone.sh up` after
-  native changes). `scripts/sim.sh up` again, refresh the evidence if the
+  native changes, or if it stopped for being idle). `scripts/sim.sh up` again, refresh the evidence if the
   UI changed, `scripts/sim.sh down`, push, and report again. Expect a few
   rounds; refining the change here is cheaper than finding it in the
   release.
-- Merge only when Shawn approves this PR in the thread ("close it out",
-  "merge it", "approved", "ship it"), normally after testing it on his
-  phone. Then follow the `close-it-out` skill: it merges, tears down an
+- Merge only when Shawn approves this PR in the thread ("merge it",
+  "approved", "ship it"), normally after testing it on his phone. Then
+  follow the `merge` skill: it merges, tears down an
   isolated backend, pushes main's backend to the shared dev deployment,
   stops the dev server and devices, and settles the thread. Merging does
   not release anything; releases are separate (the `vera-release` skill).
+- If Shawn drops the work instead (closes the PR, abandons it, or replaces
+  it with another thread), wind it down the same way without merging: the
+  `merge` skill's steps 1 and 5, plus `scripts/backend.sh teardown`
+  if the worktree has an isolated backend.
 
 ## Troubleshooting
 

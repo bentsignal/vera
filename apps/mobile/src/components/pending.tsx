@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
-import { anyUnanswered } from "~/features/saved/unanswered";
+import { anyShownOffline } from "~/features/saved/unanswered";
 import { cn } from "~/lib/cn";
 
 /** How long a screen shows nothing while it loads, before a spinner. */
@@ -19,8 +19,8 @@ const TROUBLE_MS = 6000;
  * Whether a loading screen is ready to show its content, and if not, what
  * shows meanwhile (`Pending`): nothing at first, since most screens load
  * within `PENDING_MS`; then a spinner, kept for at least `PENDING_MIN_MS`;
- * then word that it can't connect. That comes with the spinner if a screen
- * has already given up on its server (`unanswered.ts`), and never while
+ * then word that it can't connect. That comes with the spinner if screens
+ * already say an account can't connect (`unanswered.ts`), and never while
  * the screen's own `OfflinePill` says it (`offline`).
  */
 export function usePending(loading: boolean, offline = false) {
@@ -30,7 +30,7 @@ export function usePending(loading: boolean, offline = false) {
   const showSpinner = useEffectEvent(() => {
     setSpinnerAt(Date.now());
     setHolding(true);
-    if (anyUnanswered()) setTrouble(true);
+    if (anyShownOffline()) setTrouble(true);
   });
   // eslint-disable-next-line no-restricted-syntax -- How long a screen has been loading only a timer started as it starts can measure.
   useEffect(() => {

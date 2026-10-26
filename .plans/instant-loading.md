@@ -33,9 +33,10 @@ live result arrives. Most opens never show saved data. An underglow under
 the header was tried and dropped (unclear, showy, it covered the top
 message, and it lagged on Android).
 
-**Saying it can't connect** (`features/saved/offline-pill.tsx`): while the
-account's server counts as not answering, a glass "Can't connect ·
-Retrying…" pill shows at the top of Home (the list makes room for it) and
+**Saying it can't connect** (`features/saved/offline-pill.tsx`): once the
+account's server has counted as not answering for 4 s more (about 6 s
+after a screen opens; a slow answer is common, and saved data already
+shows at 2 s), a glass "Can't connect · Retrying…" pill shows at the top of Home (the list makes room for it) and
 under the name in a conversation or thread, held at least a second so it
 never flickers. A thread still loading at the deadline counts too. A query
 that timed out counts as still loading, not as empty, so Activity shows
@@ -46,7 +47,7 @@ the spinner instead of "All Caught Up".
 still loading, a spinner fades in and stays at least a second, so it never
 flickers. Lists show it at the top, where their rows start; conversations
 in the middle. Still nothing at 6 s, "Can't Connect / Retrying…" fades in
-below it (at once if the server is already known not to answer), unless
+below it (at once if screens already say the server can't connect), unless
 the screen's pill already says so. On every `ScreenList`, conversations,
 and threads.
 

@@ -1,4 +1,4 @@
-import { Keyboard, Pressable, Text, View } from "react-native";
+import { Keyboard, Text, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -12,6 +12,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 
 import type { StagedFile } from "~/features/messaging/attachments";
+import { GesturePressable } from "~/components/gesture-pressable";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { formatBytes, formatDuration } from "~/lib/format";
 
@@ -28,12 +29,13 @@ function RemoveButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <GesturePressable
       accessibilityRole="button"
       accessibilityLabel={`Remove ${file.name}`}
       onPress={onPress}
       hitSlop={8}
-      className="absolute top-1 right-1 size-[22px] items-center justify-center rounded-full bg-black/60 active:opacity-70"
+      className="absolute top-1 right-1 size-[22px] items-center justify-center rounded-full bg-black/60"
+      pressedClassName="opacity-70"
     >
       <SymbolIcon
         name={{ android: "close", ios: "xmark" }}
@@ -41,7 +43,7 @@ function RemoveButton({
         weight="bold"
         tintColorClassName="accent-white"
       />
-    </Pressable>
+    </GesturePressable>
   );
 }
 
@@ -50,7 +52,7 @@ function MediaTile({ file }: { file: StagedFile }) {
   const router = useRouter();
   const preview = file.kind === "video" ? file.poster?.uri : file.uri;
   return (
-    <Pressable
+    <GesturePressable
       accessibilityRole="imagebutton"
       accessibilityLabel={file.kind === "video" ? "Video" : "Photo"}
       onPress={() => {
@@ -66,7 +68,8 @@ function MediaTile({ file }: { file: StagedFile }) {
           pathname: "/media",
         });
       }}
-      className="bg-fill overflow-hidden rounded-xl active:opacity-90"
+      className="bg-fill overflow-hidden rounded-xl"
+      pressedClassName="opacity-90"
       style={{ borderCurve: "continuous", height: TILE, width: TILE }}
     >
       {preview !== undefined && (
@@ -90,7 +93,7 @@ function MediaTile({ file }: { file: StagedFile }) {
           )}
         </View>
       )}
-    </Pressable>
+    </GesturePressable>
   );
 }
 

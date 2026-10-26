@@ -1,11 +1,17 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
+import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { messagesProtocol } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
+import { markChanged } from "./changes.ts";
 import { MAX_LINK_PREVIEWS } from "./links.ts";
-import { fail, markChanged, memberAddresses, requireAccess } from "./model.ts";
-import { MAX_ATTACHMENTS, MAX_REACTION_MESSAGES } from "./protocol.ts";
+import { fail, memberAddresses, requireAccess } from "./model.ts";
+import {
+  MAX_ATTACHMENTS,
+  MAX_REACTION_MESSAGES,
+  MAX_SINCE_RESULTS,
+} from "./protocol.ts";
 
 /** How long a new reaction waits before its push, in case it's undone. */
 const REACTION_PUSH_DELAY_MS = 3000;
@@ -118,9 +124,60 @@ export async function react(
   return null;
 }
 
+function shownReaction({
+  accountId,
+  attachment,
+  emoji,
+  link,
+  messageId,
+  reactedAt,
+}: Doc<"reactions">) {
+  return { accountId, attachment, emoji, link, messageId, reactedAt };
+}
+
+/** Reactions stored here to the given messages. */
+async function reactionsTo(
+  ctx: QueryCtx,
+  conversationId: string,
+  messageIds: readonly string[],
+) {
+  if (messageIds.length > MAX_REACTION_MESSAGES) fail("TOO_MANY_MESSAGES");
+  // Each message's reactions are read concurrently; one at a time, a page
+  // of them took a few hundred milliseconds.
+  const found = await Promise.all(
+    [...new Set(messageIds)].map(async (messageId) => {
+      const rows = await ctx.db
+        .query("reactions")
+        .withIndex("by_message", (index) => index.eq("messageId", messageId))
+        .collect();
+      return rows
+        .filter((row) => row.conversationId === conversationId)
+        .map(shownReaction);
+    }),
+  );
+  return found.flat();
+}
+
+/** Reactions stored here made after `since`, newest first. */
+async function reactionsSince(
+  ctx: QueryCtx,
+  conversationId: string,
+  since: number,
+) {
+  const rows = await ctx.db
+    .query("reactions")
+    .withIndex("by_conversation_reacted", (index) =>
+      index.eq("conversationId", conversationId).gt("reactedAt", since),
+    )
+    .order("desc")
+    .take(MAX_SINCE_RESULTS);
+  return rows.map(shownReaction);
+}
+
 /**
- * Reactions stored here to the given messages, plus the conversation's
- * member addresses so the client also asks every member's PDS.
+ * Reactions stored here to the given messages, or made after `since`,
+ * plus the conversation's member addresses so the client also asks every
+ * member's PDS.
  */
 export async function reactions(
   ctx: QueryCtx,
@@ -128,31 +185,12 @@ export async function reactions(
   args: Args<"reactions">,
 ) {
   const { conversation } = await requireAccess(ctx, args.conversationId, self);
-  if (args.messageIds.length > MAX_REACTION_MESSAGES) {
-    fail("TOO_MANY_MESSAGES");
-  }
-  // Each message's reactions are read concurrently; one at a time, a page
-  // of them took a few hundred milliseconds.
+  const { conversationId, messageIds, since } = args;
   const [found, routes] = await Promise.all([
-    Promise.all(
-      [...new Set(args.messageIds)].map(async (messageId) => {
-        const rows = await ctx.db
-          .query("reactions")
-          .withIndex("by_message", (index) => index.eq("messageId", messageId))
-          .collect();
-        return rows
-          .filter((row) => row.conversationId === args.conversationId)
-          .map(({ accountId, attachment, emoji, link, reactedAt }) => ({
-            accountId,
-            attachment,
-            emoji,
-            link,
-            messageId,
-            reactedAt,
-          }));
-      }),
-    ),
+    since === undefined
+      ? reactionsTo(ctx, conversationId, messageIds ?? [])
+      : reactionsSince(ctx, conversationId, since),
     memberAddresses(ctx, conversation),
   ]);
-  return { reactions: found.flat(), routes };
+  return { reactions: found, routes };
 }

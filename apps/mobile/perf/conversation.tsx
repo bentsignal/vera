@@ -1,6 +1,9 @@
 // The conversation's list, as the conversation screen renders it.
+import { makeMutable } from "react-native-reanimated";
+
 import type { Message } from "~/features/conversation/types";
-import { MessageList } from "~/features/conversation/message-list";
+import { createSendCommit } from "~/features/conversation/send-commit";
+import { NativeMessageList } from "~/features/native-list/native-message-list";
 import { SELF } from "./messages";
 
 /** The same profile object each time, as `useProfileState` gives. */
@@ -8,12 +11,20 @@ const profile = { avatarUrl: null, displayName: "Maya" };
 function profileOf() {
   return profile;
 }
+/** A composer laid out once, as on iOS. */
+const COMPOSER = {
+  bar: { current: null },
+  sendCommit: createSendCommit(),
+  laidOut: 56,
+  live: makeMutable(56),
+  sends: 0,
+};
 /** Nobody typing, the same array each time. */
 const NOBODY = Object.freeze<string[]>([]);
 
 export function Conversation({ messages }: { messages: readonly Message[] }) {
   return (
-    <MessageList
+    <NativeMessageList
       messages={messages}
       self={SELF}
       layout="bubbles"
@@ -25,7 +36,7 @@ export function Conversation({ messages }: { messages: readonly Message[] }) {
       onJumpToLatest={() => undefined}
       bottomInset={0}
       topInset={0}
-      composerHeight={56}
+      composerHeight={COMPOSER}
       typists={NOBODY}
       onToggleReaction={() => undefined}
       onViewReactions={() => undefined}

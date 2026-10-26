@@ -290,3 +290,14 @@ are gone. What his recordings showed, and the fixes:
       on its own. Everything that fades a bubble (`SendingFade`, `Opening`,
       the typing indicator, a leaving row) now sets
       `needsOffscreenAlphaCompositing`, so it fades as one.
+
+## Round 10: under load
+
+A burst of 300 messages in 83 seconds broke the list: sends hidden, a
+blank screen, an old point on reopening, seconds of lag. The audit, the
+fixes, and before-and-after numbers are in
+[message-list-high-load.md](message-list-high-load.md). In short: the
+window follows new messages page by page on its own (`window-model.ts`),
+reactions and threads of new messages come by time (`since`), sends no
+longer write shared documents on the PDS, rows are memoized, and others'
+messages arriving faster than they can rise in wait and rise together.

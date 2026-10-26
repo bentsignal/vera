@@ -8,7 +8,8 @@
     "./pds": "./pds.ts",
     "./dataModel": "./convex/_generated/dataModel.d.ts",
     "./upload-limits": "./upload-limits.ts",
-    "./breaking-version": "./breaking-version.ts"
+    "./breaking-version": "./breaking-version.ts",
+    "./dev-mixed-lines": "./dev-mixed-lines.ts"
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo node_modules",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@better-auth/expo": "~1.6.33",
     "@better-auth/passkey": "~1.6.33",
+    "@convex-dev/ai-sdk-provider": "^0.3.0",
     "@convex-dev/better-auth": "0.12.5",
     "@decentralized-convex/accounts": "workspace:0.1.0",
     "@decentralized-convex/address": "workspace:0.1.0",
@@ -31,6 +33,7 @@
     "@decentralized-convex/core": "workspace:0.1.0",
     "@decentralized-convex/messages": "workspace:0.1.0",
     "@decentralized-convex/server": "workspace:0.1.0",
+    "ai": "catalog:",
     "aws4fetch": "^1.0.20",
     "better-auth": "~1.6.33",
     "convex": "catalog:",

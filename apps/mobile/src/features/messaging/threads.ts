@@ -3,7 +3,7 @@ import type {
   ThreadSummary,
 } from "@decentralized-convex/messages";
 import type { PdsOptimisticLocalStore } from "@decentralized-convex/tanstack-query";
-import { useEffect, useRef } from "react";
+import type { QueryClient } from "@tanstack/react-query";
 import { Alert } from "react-native";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
@@ -13,13 +13,10 @@ import { pds } from "@vera/backend/pds";
 import type { ThreadInfo } from "~/features/conversation/types";
 import { selectionTick } from "~/lib/native-extras";
 import { useAccount } from "./account";
-import { useHeldBatches } from "./held-batches";
 import { chunks } from "./reactions";
-import { pdsResult, pdsResultOr } from "./results";
+import { useMarkUpTo } from "./read-marks";
+import { cachedSelected, pdsResult, pdsResultOr } from "./results";
 import { showThreadFollowed, showThreadRead } from "./thread-lists";
-
-/** No IDs, the same array each time. */
-const NONE = Object.freeze<string[]>([]);
 
 /**
  * Each thread's replies across every PDS that stores some: their counts
@@ -78,39 +75,90 @@ export function summariesQuery(
   });
 }
 
+/** Every thread replied to after `since`: the newest messages' (see `windowParts`). */
+export function summariesSinceQuery(
+  session: string,
+  conversationId: string,
+  since: number,
+) {
+  return pdsQuery({
+    args: { conversationId, since },
+    options: { select: (result) => pdsResultOr(result, [])?.flat() },
+    query: pds.messages.threadSummaries,
+    session,
+  });
+}
+
+/** Whether the queries `sources` asks for have answers in the cache. */
+export function summariesCached(
+  queryClient: QueryClient,
+  session: string,
+  conversationId: string,
+  { threadIds, since }: Pick<ThreadSources, "since" | "threadIds">,
+) {
+  const queries = [
+    ...threadIds
+      .flatMap(chunks)
+      .map((ids) => summariesQuery(session, conversationId, ids)),
+    ...(since === undefined
+      ? []
+      : [summariesSinceQuery(session, conversationId, since)]),
+  ];
+  return queries.every(
+    (query) => cachedSelected(queryClient, query) !== undefined,
+  );
+}
+
+/** Where a window's thread summaries come from (see `windowParts`). */
+export interface ThreadSources {
+  /** Batches of threads, each a fixed set, by page. */
+  readonly threadIds: readonly (readonly string[])[];
+  /** Every thread replied to after this, when set. */
+  readonly since: number | undefined;
+  /** The loaded messages' threads `since` covers. */
+  readonly liveThreadIds: readonly string[];
+}
+
 /**
- * How many replies the loaded messages' threads have, one query per page
- * like reactions. `threadOf` is undefined for a message without replies,
- * and `isLoaded` says whether that's known yet.
+ * How many replies the loaded messages' threads have, asked for like
+ * reactions (see `useReactions`). `threadOf` is undefined for a message
+ * without replies, and `isLoaded` says whether that's known yet.
  */
 export function useThreadSummaries(
   session: string,
   conversationId: string,
-  pageThreadIds: readonly (readonly string[])[],
+  { liveThreadIds, since, threadIds }: ThreadSources,
+  /** The window opening instead, if any (see `useReactions`). */
+  ahead?: Pick<ThreadSources, "since" | "threadIds">,
 ) {
-  const batches = pageThreadIds.flatMap(chunks);
-  const held = useHeldBatches();
-  function summaries(messageIds: readonly string[]) {
-    return summariesQuery(session, conversationId, messageIds);
+  const batches = threadIds.flatMap(chunks);
+  function queriesFor(ids: readonly (readonly string[])[], after?: number) {
+    return [
+      ...ids.map((batch) => summariesQuery(session, conversationId, batch)),
+      ...(after === undefined
+        ? []
+        : [summariesSinceQuery(session, conversationId, after)]),
+    ];
   }
-  const { loaded, ownLoaded, threads } = useQueries({
-    queries: batches.map(summaries),
+  const { loaded, threads } = useQueries({
+    queries: [
+      ...queriesFor(batches, since),
+      ...queriesFor(ahead?.threadIds.flatMap(chunks) ?? [], ahead?.since),
+    ],
     combine: (results) => {
-      const answers = batches.map((messageIds, index) =>
-        held.answer(messageIds, results[index]?.data, summaries),
-      );
+      const sinceAnswer =
+        since === undefined ? undefined : results[batches.length]?.data;
       return {
-        loaded: batches.flatMap((messageIds, index) =>
-          answers[index] === undefined ? NONE : messageIds,
-        ),
-        ownLoaded: batches.filter(
-          (_, index) => results[index]?.data !== undefined,
-        ),
-        threads: combine(answers.flatMap((answer) => answer ?? [])),
+        loaded: [
+          ...batches.flatMap((ids, index) =>
+            results[index]?.data === undefined ? [] : ids,
+          ),
+          ...(sinceAnswer === undefined ? [] : liveThreadIds),
+        ],
+        threads: combine(results.flatMap((result) => result.data ?? [])),
       };
     },
   });
-  held.remember(ownLoaded);
   const loadedIds = new Set(loaded);
   return {
     isLoaded: (threadId: string) => loadedIds.has(threadId),
@@ -185,20 +233,16 @@ export function useMarkThreadRead(
   newestSentAt?: number,
 ) {
   const { address } = useAccount();
-  const { mutate } = useMutation(
-    pdsMutation({
+  const { mutate } = useMutation({
+    ...pdsMutation({
       mutation: pds.messages.markThreadRead,
       optimisticUpdate: showThreadRead,
       session: address,
     }),
+    // Not something you did (see `useMarkRead`).
+    meta: { background: true },
+  });
+  useMarkUpTo(newestSentAt, (readAt) =>
+    mutate({ conversationId, readAt, threadId }),
   );
-  const lastMarked = useRef(0);
-  // eslint-disable-next-line no-restricted-syntax -- Read state lives on the server and must follow replies arriving while the thread is open.
-  useEffect(() => {
-    if (newestSentAt === undefined || newestSentAt <= lastMarked.current) {
-      return;
-    }
-    lastMarked.current = newestSentAt;
-    mutate({ conversationId, readAt: newestSentAt, threadId });
-  }, [conversationId, mutate, newestSentAt, threadId]);
 }

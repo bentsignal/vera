@@ -1,6 +1,6 @@
 ---
 name: vera-release
-description: Run a Vera mobile release end to end, covering changes since the last release, the interactions between them worth testing, testing main in the Vera Dev dev client on Shawn's phone, then the over-the-air update or TestFlight store build, and an App Store submission when asked. Use when Shawn asks to release, ship, cut a build, push an update, put something on TestFlight, or submit to the App Store, or asks what changed since the last release.
+description: Run a Vera mobile release end to end, covering changes since the last release, the interactions between them worth testing, a first pass of those tests in the iOS simulator and Android emulator, testing main in the Vera Dev dev client on Shawn's phone, then the over-the-air update or TestFlight store build, and an App Store submission when asked. Use when Shawn asks to release, ship, cut a build, push an update, put something on TestFlight, or submit to the App Store, or asks what changed since the last release.
 ---
 
 # Releasing Vera
@@ -32,7 +32,7 @@ git fetch origin && git checkout --detach origin/main && pnpm install --frozen-l
 `pnpm release build` and `ota` refuse to run unless `HEAD` is `origin/main`
 and the tree is clean.
 
-## 1. Plan and tell Shawn
+## 1. Plan, run the test list yourself, and tell Shawn
 
 ```sh
 pnpm release plan
@@ -46,7 +46,7 @@ Backend" (or `plan` saying BREAKING) means this release ships with
 `--with-backend`, and open apps on older versions show "Updating Vera…" for
 a few seconds; tell Shawn so he can time it.
 
-Send Shawn:
+Write up for Shawn:
 
 - **Kind:** over the air (`kind: ota`) or a store build (`kind: store-build`),
   and why.
@@ -77,6 +77,30 @@ Send Shawn:
 
   If nothing overlaps, say so; the list can be short or empty.
 
+### Run the list yourself first
+
+Before sending Shawn anything, run every step of that list yourself, in
+this checkout's iOS simulator and its Android emulator (the
+`vera-simulator` skill), against the dev PDS with `main`'s backend
+(`pnpm release backend dev`). Sign in as the checkout's `wt…` user and
+`scripts/sim.sh seed` for bots to talk to; a second account
+(`scripts/sim.sh signin <name>`) or the dev bots play the other side of a
+two-person step, and Developer tools (Server Answers, the seeds) set up
+slow or offline states. Take a screenshot of each result, or a video for
+motion, and upload them with `scripts/evidence.sh`.
+
+Fix what fails before Shawn sees it (the same way as fixes in step 3) and
+run that step again. `sim.sh down` each device when you're done with it.
+
+Send Shawn the write-up with the list in two parts:
+
+- **Checked:** each step you ran, on which platforms, what you saw, any
+  fix, and its evidence.
+- **For you:** only what the simulators can't settle, each with why: how
+  motion and gestures feel on a real phone, real push notifications, the
+  camera and photo library, a real network dropping, two physical phones
+  at once, and anything you ran but couldn't judge.
+
 Then go straight to step 2 unless he says otherwise.
 
 ## 2. Put main on his phone in the dev client
@@ -94,10 +118,14 @@ scripts/phone.sh up             # and again with --android for his Android phone
 
 Run `phone.sh up` from the release checkout (detached at `origin/main`, no
 isolated backend). It builds a dev client only when `main`'s native
-fingerprint has none yet (about 15 minutes); otherwise Shawn just picks the
-server in Vera Dev. Tell him the server address `phone.sh` prints
-(`server: http://<IP>:<port>`), first and on its own line, plus the install
-link when he needs one. No QR codes or open link unless he asks.
+fingerprint has none yet (about 15 minutes); otherwise Shawn just taps the
+open link. Send him the block `phone.sh up` prints, first and exactly as
+printed: the two open links (home and Tailscale) as a Markdown list of
+clickable links, then the home and Tailscale addresses, each in its own
+code block so he can copy it (on Android he pastes one into Vera Dev). Add
+the install link when he needs one. Never put a link in backticks, send it
+bare, or send the `vera-dev://` URL (the `vera-feature` skill, step 4b). No
+QR codes unless he asks.
 
 Make an internal build (`pnpm release build internal`, `--android`) or an
 internal OTA (`pnpm release ota internal "<summary>"`) only when Shawn asks
@@ -107,9 +135,9 @@ Vera Dev slot; he gets main's dev client back from `scripts/phone.sh main`.
 
 ## 3. Wait for Shawn
 
-He tests and either approves ("ship it", "release it", "looks good, send
-it") or asks for fixes. He works through the list at his own pace; don't
-send it again item by item.
+He tests the "For you" part of the list and either approves ("ship it",
+"release it", "looks good, send it") or asks for fixes. He works through
+the list at his own pace; don't send it again item by item.
 
 Fixes found during the release test happen in the release thread, not new
 T3 threads. Small batches go straight to `main` from the release checkout:
@@ -119,8 +147,9 @@ fixes are many or large; subagents in their own worktrees can take
 independent pieces in parallel. A fix that changes native code needs new
 dev clients (`phone.sh up` builds them). A backend fix goes to the dev PDS
 (`pnpm release backend dev`) before he retests. Once the fixes are in,
-update the release notes and the list (step 1). Don't ship without an
-explicit approval of this release. `scripts/phone.sh down` once he's done.
+update the release notes and the list (step 1), running new or changed
+steps in the simulators first. Don't ship without an explicit approval of
+this release. `scripts/phone.sh down` once he's done.
 
 ## 4. Ship
 
@@ -196,10 +225,16 @@ Every command tags the release (`mobile/build/<n>`,
 the tag. Report what shipped, the tag, and anything that didn't
 work.
 
-Then tell the people who reported what shipped: for each released PR whose
-description has a "Support reports" section, send each listed conversation
-the "fixed" message from the `support-inbox` skill. Do it after the
-production OTA or store build is out, never after only the internal build.
+Then make sure the people who reported what shipped hear about it. Bug
+reports Vera Support filed itself (GitHub issues labeled "user report")
+tell their reporters on their own: a cron checks every 10 minutes whether
+each fix's commit is in the newest production tags. Run it right away so
+they hear now: `npx convex run supportReports:track --prod` (from
+`services/backend`). For a released PR whose description has a "Support
+reports" section listing conversations instead (reports from before
+support filed issues), send each one the "fixed" message from the
+`support-inbox` skill. Do it after the production OTA or store build is
+out, never after only the internal build.
 
 ## 5. App Store (only when Shawn asks)
 

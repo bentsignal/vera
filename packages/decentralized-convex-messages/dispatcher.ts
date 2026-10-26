@@ -15,6 +15,7 @@ import {
   contactIncludes,
   conversationIncludes,
   inboxIncludes,
+  liveCursor,
   memberEventIncludes,
   pageIncludes,
   threadPageIncludes,
@@ -187,6 +188,7 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
               ctx,
               args.conversationId,
               page.messages,
+              liveCursor(args, page),
             ),
             routes,
           });
@@ -239,6 +241,7 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
               args,
               found.page.root,
               found.page.messages,
+              liveCursor(args, found.page),
             ),
             routes: found.routes,
           });
