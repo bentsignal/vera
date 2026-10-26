@@ -163,9 +163,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   groupAlerts?: "all" | "mentions" | "none";
                   groups?: boolean;
                   invites?: boolean;
+                  keywords?: Array<string>;
                   reactions?: boolean;
                   replies?: boolean;
                   threadReplies?: boolean;
+                  yourName?: boolean;
                 };
                 type: "setNotificationSettings";
               }
@@ -892,6 +894,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                           threadId?: string;
                           threadOnly?: boolean;
                         };
+                        said?:
+                          | { kind: "name" }
+                          | { keyword: string; kind: "keyword" };
                         seenAt?: number;
                         seenThrough?: number;
                       }
@@ -1399,6 +1404,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                             threadId?: string;
                             threadOnly?: boolean;
                           };
+                          said?:
+                            | { kind: "name" }
+                            | { keyword: string; kind: "keyword" };
                           seenAt?: number;
                           seenThrough?: number;
                         }
@@ -1670,9 +1678,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 groupAlerts?: "all" | "mentions" | "none";
                 groups: boolean;
                 invites: boolean;
+                keywords?: Array<string>;
                 reactions: boolean;
                 replies?: boolean;
                 threadReplies?: boolean;
+                yourName?: boolean;
               };
             }
           | {
@@ -3146,6 +3156,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                         threadId?: string;
                         threadOnly?: boolean;
                       };
+                      said?:
+                        | { kind: "name" }
+                        | { keyword: string; kind: "keyword" };
                       seenAt?: number;
                       seenThrough?: number;
                     }
@@ -3644,6 +3657,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                           threadId?: string;
                           threadOnly?: boolean;
                         };
+                        said?:
+                          | { kind: "name" }
+                          | { keyword: string; kind: "keyword" };
                         seenAt?: number;
                         seenThrough?: number;
                       }
@@ -3906,9 +3922,11 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               groupAlerts?: "all" | "mentions" | "none";
               groups: boolean;
               invites: boolean;
+              keywords?: Array<string>;
               reactions: boolean;
               replies?: boolean;
               threadReplies?: boolean;
+              yourName?: boolean;
             };
           }
         | {
@@ -4883,6 +4901,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       >;
     };
     history: {
+      deleteConversation: FunctionReference<
+        "mutation",
+        "internal",
+        { conversationId: string },
+        { done: boolean },
+        Name
+      >;
       importHistory: FunctionReference<
         "mutation",
         "internal",
@@ -4903,6 +4928,36 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             authorId: string;
             authorName: string;
             body: string;
+            editedAt?: number;
+            linkPreview?: {
+              description?: string;
+              imageUrl?: string;
+              siteName?: string;
+              title?: string;
+              url: string;
+              video?: {
+                durationMs?: number;
+                height?: number;
+                url: string;
+                width?: number;
+              };
+            };
+            linkPreviews?: Array<{
+              link: string;
+              preview?: null | {
+                description?: string;
+                imageUrl?: string;
+                siteName?: string;
+                title?: string;
+                url: string;
+                video?: {
+                  durationMs?: number;
+                  height?: number;
+                  url: string;
+                  width?: number;
+                };
+              };
+            }>;
             messageId: string;
             sentAt: number;
           }>;

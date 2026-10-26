@@ -1,10 +1,15 @@
 import { useRef, useState } from "react";
+import { Alert } from "react-native";
 
 import { useAccount } from "~/features/messaging/account";
 import { useMyProfile } from "~/features/messaging/directory";
 import { usePhotoChange } from "./use-photo-change";
 
 const SAVE_DELAY_MS = 800;
+
+function saveFailed() {
+  Alert.alert("Couldn't Update Profile", "Try again in a moment.");
+}
 
 /** The signed-in profile, saving name edits after typing pauses. */
 export function useProfileEditor() {
@@ -16,7 +21,7 @@ export function useProfileEditor() {
   const avatarUrl = profile?.avatarUrl ?? null;
   const photo = usePhotoChange({
     avatarUrl,
-    save: (url) => update({ avatarUrl: url, displayName: savedName }),
+    save: (url) => update({ avatarUrl: url }),
   });
 
   function changeName(value: string) {
@@ -25,7 +30,7 @@ export function useProfileEditor() {
     const name = value.trim();
     if (name.length === 0 || name === savedName) return;
     saveTimer.current = setTimeout(() => {
-      void update({ avatarUrl, displayName: name });
+      void update({ displayName: name }).catch(saveFailed);
     }, SAVE_DELAY_MS);
   }
 
@@ -40,7 +45,7 @@ export function useProfileEditor() {
     displayName: draftName?.trim() ? draftName.trim() : savedName,
     removePhoto: () => {
       photo.forget();
-      return update({ avatarUrl: null, displayName: savedName });
+      return update({ avatarUrl: null }).catch(saveFailed);
     },
     savedName,
   };

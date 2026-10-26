@@ -63,14 +63,14 @@ export function AttachMenu({
         ]}
       >
         <Button
-          label="Photos & Videos"
-          systemImage="photo.on.rectangle"
-          onPress={() => onPick("library")}
-        />
-        <Button
           label="Camera"
           systemImage="camera"
           onPress={() => onPick("camera")}
+        />
+        <Button
+          label="Photos & Videos"
+          systemImage="photo.on.rectangle"
+          onPress={() => onPick("library")}
         />
         <Button
           label="Files"
