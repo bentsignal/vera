@@ -44,6 +44,17 @@
         "buildType": "apk"
       }
     },
+    "preview": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "preview",
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "extends": "base",
       "distribution": "store",

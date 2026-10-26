@@ -1,7 +1,7 @@
 import type { Turn } from "./agentTools";
 import type { Reporter } from "./supportReporters";
 
-// What has to be true before Vera Support puts anything in public: the
+// What has to be true before Vera puts a bug report in public: the
 // person was told reports are public, and answered after. Whether
 // something is worth filing at all (not a joke, a test, or spam) is the
 // model's call; the hourly limit (rateLimits.ts) bounds the rest.
@@ -12,7 +12,7 @@ export const PRIVACY_NOTICE =
 
 /**
  * Whether they've had the privacy notice. Once they've seen it and gone
- * ahead, that consent carries over to later reports (#179): support
+ * ahead, that consent carries over to later reports (#179): Vera
  * doesn't ask again.
  */
 export function noticeShared(reporter: Reporter) {

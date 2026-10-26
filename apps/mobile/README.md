@@ -55,7 +55,8 @@ amber icon (`assets/icons/vera-dev.icon`), and its own Firebase app
 It installs next to Vera, so Shawn's phone keeps the TestFlight or App Store
 app on production while Vera Dev runs against the dev PDS. Every
 development binary is Vera Dev (the simulator and phone dev clients and
-internal builds); only store builds are Vera. Store fingerprints don't
+internal builds). Store builds and private production previews are Vera.
+Store fingerprints don't
 depend on the variant: Vera's config is unchanged without `APP_VARIANT`.
 
 The phone holds one Vera Dev at a time:
@@ -120,11 +121,16 @@ Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 | `development`           | Vera Dev | Phone dev client (`scripts/phone.sh`)      | `dev.vera.chat`           |
 | `development-simulator` | Vera Dev | Dev client for the iOS simulator (EAS)     | `dev.vera.chat`           |
 | `internal`              | Vera Dev | Update and channel checks (`pnpm release`) | `dev.vera.chat`           |
+| `preview`               | Vera     | Private ad hoc iOS and Android APK tests   | `vera.chat`               |
 | `production`            | Vera     | TestFlight and store builds                | `vera.chat`               |
 
 Each profile has the update channel of the same name; releases (internal
 builds, store builds, and over-the-air updates) go through `pnpm release`.
 See [docs/releasing.md](../../docs/releasing.md).
+
+Private production previews use `eas build --local --profile preview` and
+`scripts/install-page.sh` with the fourth argument `production`. They use a
+separate preview update channel and are never submitted to a store.
 
 Local runs default to `dev.vera.chat`; read the domain through `~/env`. A
 worktree with an isolated backend (`scripts/backend.sh isolate`) sets its

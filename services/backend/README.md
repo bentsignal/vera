@@ -59,43 +59,48 @@ so on) plus Vera's own (`vera`, `vera_support`, ...) in `convex/auth.ts`. The
 check ignores case, dots, dashes, underscores, and trailing digits, so
 `Help_Desk2` is reserved too, and a reserved name fails with
 `USERNAME_TAKEN`. Nobody can sign up with one. Accounts that need one, such as
-`support`, are created on the server (`npx convex run support:setup`).
+`vera`, are created on the server (`npx convex run vera:setup`).
 
-Accounts that speak for Vera, such as `support@vera.chat`, can be marked
+Accounts that speak for Vera, such as `vera@vera.chat`, can be marked
 affiliated. The app then shows a verified check next to their names, and
 tapping it explains that the account is an official account of the domain.
 Only accounts on this deployment's `FEDERATION_DOMAIN` can be affiliated.
 
 ```sh
-npx convex run affiliations:add '{"address":"support@vera.chat"}'
-npx convex run affiliations:remove '{"address":"support@vera.chat"}'
+npx convex run affiliations:add '{"address":"vera@vera.chat"}'
+npx convex run affiliations:remove '{"address":"vera@vera.chat"}'
 npx convex run affiliations:list
 ```
 
-## Assistants: Support and Vera
+## Vera, the assistant
 
-Two verified accounts answer direct messages with a model:
+`vera@<account domain>` is a verified account that answers direct messages
+with a model: short, direct answers in plain text. It remembers how each
+person wants it to answer when they ask it to (`botNotes`), searches the
+web through Parallel (`webSearch.ts`), and remembers the whole conversation
+(`memory.ts`).
 
-- `support@<account domain>` helps people report bugs. It asks for what's
-  missing (what happened, where, how to repeat it, a screenshot), tells them
-  reports are public and waits for their answer, checks GitHub for an
-  existing issue or fix (following that issue instead of filing a
-  duplicate), then files an anonymized GitHub issue labeled "user report"
-  with the app version and device the app reported. Screenshots never go in
-  an issue: support describes what they show in words, without personal
-  details. A cron (`crons.ts`, every 10 minutes) follows each issue and
-  tells the reporter, in plain words, when it's picked up (assigned), being
-  worked on (an open PR that says `Fixes #N`), fixed (merged), and out:
-  "live now" when an over-the-air update or backend deploy shipped it, or
-  "update it from TestFlight or the App Store" (Google Play on Android, from
-  the OS their app reported) when it took a store build. A PR labeled
-  "📱 Native Change" only counts as out once that phone's store build has
-  it. People who say they're developers also get the links.
-  See the `support-inbox` agent skill for the operator commands.
-- `vera@<account domain>` is a general assistant: short, direct answers in
-  plain text. It remembers how each person wants it to answer when they ask
-  it to (`botNotes`), searches the web through Parallel (`webSearch.ts`), and
-  remembers the whole conversation (`memory.ts`).
+It also takes bug reports and ideas for the app (`supportAgent.ts`). It
+asks for what's missing (what happened, where, how to repeat it, a
+screenshot), tells them reports are public and waits for their answer,
+checks GitHub for an existing issue or fix (following that issue instead of
+filing a duplicate), then files an anonymized GitHub issue labeled "user
+report" with the app version and device the app reported. Screenshots never
+go in an issue: Vera describes what they show in words, without personal
+details. A cron (`crons.ts`, every 10 minutes) follows each issue and tells
+the reporter, in plain words, when it's picked up (assigned), being worked
+on (an open PR that says `Fixes #N`), fixed (merged), and out: "live now"
+when an over-the-air update or backend deploy shipped it, or "update it
+from TestFlight or the App Store" (Google Play on Android, from the OS
+their app reported) when it took a store build. A PR labeled "📱 Native
+Change" only counts as out once that phone's store build has it. People who
+say they're developers also get the links. See the `support-inbox` agent
+skill for the operator commands.
+
+Until October 2026 bug reports went to a separate account, Vera Support
+(`support@<account domain>`). `npx convex run mergeSupport:run` moves each
+person's conversation with it into their conversation with Vera and
+deletes the support account (`convex/mergeSupport.ts`).
 
 Assistants text like people: usually one short message, two when it helps,
 at most 3 per reply, spaced 1.2 to 4 seconds apart by length. They don't
@@ -116,7 +121,7 @@ that searched cost about 1.3¢ and one that didn't about 0.4¢.
 Vera's memory: every exchange (2 messages) becomes a passage with an
 embedding (OpenAI text-embedding-3-small at 512 dimensions, through the
 gateway), in Convex vector search. Before each reply, the closest distinct
-passages older than the 40 messages it sees (similarity 0.25 or more, up to 3) are added to its instructions oldest first, so a fact that changed reads
+passages older than the messages it sees (similarity 0.25 or more, up to 3) are added after the conversation, oldest first, so a fact that changed reads
 in order; `search_memory` looks further. Editing or deleting a message
 rebuilds its passage. In benchmarks on 320- and 500-message conversations
 with facts that changed (a budget, a move, a new job), it answered 35 of 35
@@ -124,59 +129,113 @@ recall questions correctly, including saying it didn't know things that
 were never said. Passages of 10 and 4 messages matched worse, and larger
 embedding models didn't do better.
 
-`npx convex run usage:summary '{"bot":"vera"}'` totals what replies cost
-(tokens, dollars, searches), from the gateway's own numbers.
+Photo-only messages skip the automatic memory lookup because there is no
+text to embed. The model still sees the photo and the recent conversation.
+Empty or whitespace-only memory searches return no matches without calling
+the embedding provider.
 
-When an issue is closed without a fix, support follows the original issue
+`npx convex run usage:summary '{"bot":"vera"}'` totals what replies cost
+(tokens, dollars, searches), from the gateway's own numbers, how much of
+the input came from the prompt cache (`cacheHitRate`), and how often a
+reply's instructions or tools changed since the one before it in its
+conversation (`cachedPartChangeRate`; see "Keeping replies cheap" below).
+
+When an issue is closed without a fix, Vera follows the original issue
 if it was marked as a duplicate. If the team left a comment when closing
-it, support's model explains that comment to the reporter in plain words
+it, Vera's model explains that comment to the reporter in plain words
 (`convex/supportClosures.ts`). Otherwise the reporter gets a fixed message.
 Whether a report is worth filing at all (not a joke or spam) is the model's
 call, with no daily cap.
 
-Both welcome every new account (a Better Auth `user.create` hook schedules
-`support:welcome` and `vera:welcome`) and create themselves the first time
-they're needed. `npx convex run vera:welcomeEveryone` says hello to
-accounts made before Vera existed.
+Vera welcomes every new account (a Better Auth `user.create` hook schedules
+`vera:welcome`) and creates itself the first time it's needed.
+`npx convex run vera:welcomeEveryone` says hello to accounts made before
+Vera existed.
 
 How it works (`convex/bots.ts`, `convex/agent.ts`):
 
 - The PDS router's `afterMutation` sees each message someone on this PDS
   sends. A direct message to an assistant schedules its reply 1.5 seconds
   later; another message pushes it back, so a burst gets one answer.
-- One reply runs per conversation at a time. It reads the latest 40
-  messages and calls the model with the assistant's instructions and tools.
+- One reply runs per conversation at a time. It reads the recent messages
+  (the latest 40 to 80, `assistant-history.ts`) and calls the model with
+  the assistant's instructions and tools. A reply whose action dies
+  without finishing (out of memory, say) is noticed within 15 seconds
+  (`agent:watch` asks the scheduler about its job): the next message's
+  reply takes over, or with nothing new the person hears that something
+  went wrong. Before, the conversation stayed locked for 10 minutes.
   The model answers only through `send_message`, which can write to that
   one conversation and nowhere else; no tool takes an account or
   conversation, so nothing can reach another person's messages. Text it
   writes outside a tool is never sent: a reply that ends with neither a
   message nor `stay_quiet` is an error, and the model gets one more try,
   told why (`reply-outcome.ts`). At most 3 messages per reply, not
-  counting canned ones like support's privacy notice. Messages that
+  counting canned ones like the bug-report privacy notice. Messages that
   arrive during a reply get the next one.
 - Models run through the Convex AI Gateway (`@convex-dev/ai-sdk-provider`
   and the AI SDK), billed on the Convex bill, with zero-data-retention
-  routing: Grok 4.7, which sees the newest few images in the conversation.
-- The app sends the device's time zone after a message to an assistant
-  (`timeZones:report`), so they know the person's date and time.
-- Each person gets at most 300 replies an hour from Vera and another 300
-  from Support, counted separately, on a rolling basis (a token bucket per
-  assistant that refills continuously). Each separate time they run one
-  dry is a strike; 5 strikes within a day pause that assistant for them
-  until the day is up. Over a limit, the assistant
-  says so once, without calling the model. The rules are plain functions in
+  routing (`assistant-models.ts`). Grok 4.7 answers, and Gemini 4 Argon
+  takes over when it fails: each model gets two tries, or one when the
+  error says retrying won't help (a rejected request), before the next.
+  The model sees the newest few images in the conversation, in the formats
+  it reads. The gateway fetches each by its URL; nothing is sent inside
+  the request, which ran replies out of Convex's 64 MB (a 2.4 MB iPhone
+  photo did, 2026-10-26). HEIC photos (how iPhones save them) are
+  converted once to a JPEG of at most 1568 pixels a side, in a Node
+  action (`assistantImagesNode.ts`, about a second), kept in Convex file
+  storage, and reused (`assistant-images.ts`). Grok can't read GIF, so
+  Gemini answers first while one is among them; a format neither reads
+  shows as a note. One image a model can't read fails the whole request,
+  which is what took both assistants down on 2026-10-23.
+- The app sends the device's time zone after a message to Vera
+  (`timeZones:report`), so it knows the person's date and time.
+- Each person gets at most 300 replies an hour from Vera, on a rolling
+  basis (a token bucket that refills continuously). Each separate time
+  they run it dry is a strike; 5 strikes within a day pause Vera for them
+  until the day is up. Over a limit, Vera says so once, without calling
+  the model. The rules are plain functions in
   `assistant-limits.ts` (tested); `convex/rateLimits.ts` stores them, with
   `rateLimits:status` and `rateLimits:reset` for operators. (Convex's rate
   limiter Component doesn't fit: it installs a Component of its own, which
   breaks importing `convex.config.ts` outside Convex, as `http.ts` and
   `pds.ts` do.)
-- They only hear from people on this PDS: a message from another PDS is
+- Vera only hears from people on this PDS: a message from another PDS is
   stored there and never reaches this one.
 - The app reports its version and device to `supportReporters:reportClient`
-  after a message to support, and nowhere else.
+  after a message to Vera, for bug reports, and nowhere else.
 
 The AI Gateway needs the Convex team on a paid plan. It works on cloud
 dev and production deployments without any key.
+
+### Keeping replies cheap
+
+Every model call sends the whole prompt again: tools, instructions, and
+the conversation. The provider's prompt cache bills what it has seen
+before at a quarter of the price (Grok 4.7: $0.50 per million input tokens
+against $2), but only while the prompt stays the same at the start and
+the conversation only grows at the end. Measured through the gateway
+(2026-10-26): appending messages reused everything before them; changing
+the end of the instructions reused what came before the change; changing
+or dropping any message in the conversation, even the first, reused
+nothing. So, when changing an assistant or adding a tool:
+
+- **Instructions and tools change only when something happens.** An
+  assistant's `prepare` (agent.ts `Prompt`) returns `instructions` (its
+  rules, then what it knows about this person and the world) and `latest`.
+  Anything that differs from one reply to the next (the time, memories
+  recalled for what they just said, a lookup for this reply) goes in
+  `latest`, which comes after the conversation, with the time and the
+  team's note. Tool names and descriptions never change.
+- **The conversation only grows at the end.** The window of messages the
+  model sees moves in jumps (`assistant-history.ts`), and images go by
+  URL, with converted ones reused (`assistant-images.ts`). The newest four
+  images are shown; a fifth turns the oldest into a note, which costs one
+  full-price reply.
+- **Check the numbers after a change.** `usage:summary` gives
+  `cacheHitRate` and `cachedPartChangeRate`. Filing a report or saving a
+  note changes the instructions, so the change rate isn't 0, but it should
+  stay low; one near 1 means something in the instructions or tools
+  changes every reply.
 
 ## Deployments
 
@@ -208,8 +267,8 @@ Environment variables on each deployment:
 | `BUNNY_S3_SECRET`             | secret                               | Storage zone password                         |
 | `BUNNY_CDN_URL`               | `https://media.vera.chat`            | Public base URL for media                     |
 | `BUNNY_PATH_PREFIX`           | `prod`                               | Folder for this deployment's uploads          |
-| `GITHUB_TOKEN`                | secret                               | Files and follows support's bug reports       |
-| `GITHUB_REPOSITORY`           | `bentsignal/vera`                    | Where support files bug reports               |
+| `GITHUB_TOKEN`                | secret                               | Files and follows Vera's bug reports          |
+| `GITHUB_REPOSITORY`           | `bentsignal/vera`                    | Where Vera files bug reports                  |
 | `PARALLEL_API_KEY`            | secret                               | Vera's web search (Parallel)                  |
 
 Attachment size limits (videos 500 MB, photos 50 MB, other files 100 MB) and

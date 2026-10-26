@@ -24,6 +24,27 @@ export const setAffiliated = mutation({
   },
 });
 
+/**
+ * Deletes an account's profile and affiliation, for a host retiring one of
+ * its own accounts (Vera folding its support account into its assistant).
+ * The host deletes the account itself.
+ */
+export const removeAccount = mutation({
+  args: { accountId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const accountId = args.accountId.trim().toLowerCase();
+    const affiliation = await findAffiliation(ctx, accountId);
+    if (affiliation !== null) await ctx.db.delete(affiliation._id);
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_account", (index) => index.eq("accountId", accountId))
+      .unique();
+    if (profile !== null) await ctx.db.delete(profile._id);
+    return null;
+  },
+});
+
 export const listAffiliated = query({
   args: {},
   returns: v.array(v.string()),

@@ -4,7 +4,7 @@ import { api } from "@vera/backend/api";
 import { useAccount } from "~/features/messaging/account";
 
 /** Vera's assistant accounts, by username on the account's own domain. */
-const ASSISTANTS = ["support", "vera"];
+const ASSISTANTS = ["vera"];
 
 /** The time zone each account last sent this session, so it's sent once. */
 const sent = new Map<string, string>();

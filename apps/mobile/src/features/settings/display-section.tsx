@@ -67,7 +67,7 @@ export function DisplaySection() {
   );
 }
 
-/** Opt-in options people can try, off until they switch them on. */
+/** Experimental options. */
 export function ExperimentalSection() {
   const reversed = usePreference("reverseTabBar");
   return (
