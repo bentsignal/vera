@@ -6,6 +6,7 @@
 #   scripts/sim.sh [--android] <command>     (iOS without --android)
 #
 #   up               build or reuse the dev client, boot, start Metro, open the app
+#   build            cache the dev client without entering the device queue
 #   signin [user]    dev sign-in (default: this worktree's test user)
 #   seed             bot DMs, a group, a space, and a space invite for the signed-in account
 #   open <path>      go to a route, such as `/more` or `/conversation/<id>`
@@ -231,13 +232,38 @@ ensure_android_device() {
   if [ -n "$SERIAL" ] && adb_device get-state >/dev/null 2>&1; then
     return
   fi
-  local console=$((5560 + 2 * ($(hash_of "$ROOT") % 50)))
-  while "$ADB" devices | grep -q "emulator-$console"; do console=$((console + 2)); done
+  # adb auto-discovers only the standard console ports. Outside this range
+  # a server reconnect can lose a live emulator, which the queue reclaims.
+  local console start=$(( $(hash_of "$ROOT") % 13 )) available=0
+  for offset in $(seq 0 12); do
+    console=$((5560 + 2 * ((start + offset) % 13)))
+    if ! lsof -nP -iTCP:"$console" -sTCP:LISTEN >/dev/null 2>&1 &&
+      ! "$ADB" devices | grep -q "emulator-$console"; then
+      available=1
+      break
+    fi
+  done
+  if [ "$available" != 1 ]; then
+    echo "no standard Android emulator console port is free" >&2
+    exit 1
+  fi
   SERIAL="emulator-$console"
-  nohup "$ANDROID_HOME/emulator/emulator" -avd "$name" -port "$console" \
-    -no-window -no-snapshot -no-boot-anim -no-audio </dev/null \
-    >"$STATE_DIR/emulator.log" 2>&1 &
-  EMULATOR_PID=$!
+  # A separate session survives the launching tool's process-group cleanup.
+  # nohup alone ignores SIGHUP but still dies when that group is terminated.
+  EMULATOR_PID="$(node - "$ANDROID_HOME/emulator/emulator" "$name" "$console" "$STATE_DIR/emulator.log" <<'JS'
+const { spawn } = require("node:child_process");
+const { openSync, closeSync } = require("node:fs");
+const [emulator, name, port, log] = process.argv.slice(2);
+const output = openSync(log, "w");
+const child = spawn(emulator, ["-avd", name, "-port", port, "-no-window", "-no-snapshot", "-no-boot-anim", "-no-audio"], {
+  detached: true,
+  stdio: ["ignore", output, output],
+});
+child.unref();
+closeSync(output);
+console.log(child.pid);
+JS
+)"
   "$ADB" -s "$SERIAL" wait-for-device
   until [ "$(adb_device shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do
     sleep 2
@@ -299,10 +325,13 @@ launch() {
     xcrun simctl terminate "$DEVICE" "$BUNDLE_ID" 2>/dev/null || true
     xcrun simctl launch "$DEVICE" "$BUNDLE_ID" --initialUrl "http://127.0.0.1:$PORT" >/dev/null
   else
+    # RN's native inspector can still use the loopback packager address.
     adb_device reverse "tcp:$PORT" "tcp:$PORT" >/dev/null
     adb_device shell am force-stop "$BUNDLE_ID"
+    # The emulator's host alias survives adb transport reconnects, unlike
+    # reverse forwarding, which can disappear while the app keeps running.
     adb_device shell am start -a android.intent.action.VIEW \
-      -d "vera-dev://expo-development-client/?url=$(node -p "encodeURIComponent('http://127.0.0.1:$PORT')")" \
+      -d "vera-dev://expo-development-client/?url=$(node -p "encodeURIComponent('http://10.0.2.2:$PORT')")" \
       "$BUNDLE_ID" >/dev/null
   fi
   for _ in $(seq 1 120); do
@@ -362,12 +391,23 @@ shot() {
 record() {
   require_up
   local name="$1"
-  if [ "$PLATFORM" = ios ]; then
-    xcrun simctl io "$DEVICE" recordVideo --codec h264 --force "$EVIDENCE/$name.mp4" >/dev/null 2>&1 &
-  else
-    adb_device shell screenrecord --bit-rate 8000000 "/sdcard/$name.mp4" >/dev/null 2>&1 &
-  fi
-  RECORD_PID=$!
+  RECORD_PID="$(node - "$PLATFORM" "$DEVICE" "$ADB" "$SERIAL" "$name" "$EVIDENCE" "$STATE_DIR" "$(hash_of "$ROOT")" <<'JS'
+const { spawn } = require("node:child_process");
+const { openSync, closeSync } = require("node:fs");
+const [platform, device, adb, serial, name, evidence, state, owner] = process.argv.slice(2);
+const output = openSync(`${state}/${platform}.recording.log`, "w");
+const command = platform === "ios" ? "xcrun" : adb;
+const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+const androidCommand = `screenrecord --bit-rate 8000000 ${quote(`/sdcard/${name}.mp4`)} & recording_pid=$!; echo "$recording_pid" > /data/local/tmp/vera-recording-${owner}.pid; wait "$recording_pid"`;
+const args = platform === "ios"
+  ? ["simctl", "io", device, "recordVideo", "--codec", "h264", "--force", `${evidence}/${name}.mp4`]
+  : ["-s", serial, "shell", androidCommand];
+const child = spawn(command, args, { detached: true, stdio: ["ignore", output, output] });
+child.unref();
+closeSync(output);
+console.log(child.pid);
+JS
+)"
   echo "$name" >"$STATE_DIR/$PLATFORM.recording"
   save
   sleep 1
@@ -378,17 +418,45 @@ stop() {
   require_up
   if [ -n "$RECORD_PID" ]; then
     if [ "$PLATFORM" = android ]; then
-      adb_device shell pkill -INT screenrecord >/dev/null 2>&1 || true
+      local remote_pid
+      remote_pid="$(adb_device shell cat "/data/local/tmp/vera-recording-$(hash_of "$ROOT").pid" 2>/dev/null | tr -d '\r' || true)"
+      # Leave the Device panel's separate screenrecord process alone.
+      if [[ "$remote_pid" =~ ^[0-9]+$ ]]; then
+        adb_device shell kill -INT "$remote_pid" >/dev/null 2>&1 || true
+      fi
+      # Let screenrecord write its MP4 index before closing its adb shell.
+      # Interrupting both at once can leave a large, unplayable file.
+    else
+      kill -INT "$RECORD_PID" 2>/dev/null || true
     fi
-    kill -INT "$RECORD_PID" 2>/dev/null || true
     while kill -0 "$RECORD_PID" 2>/dev/null; do sleep 0.2; done
   fi
+  # A transfer retry must not signal an old process ID again.
+  RECORD_PID=""
+  save
   local name
   name="$(cat "$STATE_DIR/$PLATFORM.recording" 2>/dev/null || true)"
   if [ "$PLATFORM" = android ] && [ -n "$name" ]; then
     sleep 1
-    adb_device pull "/sdcard/$name.mp4" "$EVIDENCE/$name.mp4" >/dev/null
+    # Stream the completed file through the shell. The emulator's adb sync
+    # transfer can disconnect just after screenrecord exits.
+    local transferred=0
+    for attempt in 1 2 3; do
+      local expected actual
+      expected="$(adb_device shell stat -c %s "/sdcard/$name.mp4" 2>/dev/null | tr -d '\r' || true)"
+      if adb_device exec-out cat "/sdcard/$name.mp4" >"$EVIDENCE/$name.mp4.partial"; then
+        actual="$(wc -c <"$EVIDENCE/$name.mp4.partial" | tr -d ' ')"
+        if [ "$actual" = "$expected" ] && [ "$actual" != 0 ]; then
+          mv "$EVIDENCE/$name.mp4.partial" "$EVIDENCE/$name.mp4"
+          transferred=1
+          break
+        fi
+      fi
+      sleep 2
+    done
+    [ "$transferred" = 1 ] || return 1
     adb_device shell rm "/sdcard/$name.mp4"
+    adb_device shell rm -f "/data/local/tmp/vera-recording-$(hash_of "$ROOT").pid"
   fi
   rm -f "$STATE_DIR/$PLATFORM.recording"
   RECORD_PID=""
@@ -428,6 +496,7 @@ case "$command" in
   *) [ -f "$STATE_DIR/$PLATFORM" ] && touch "$STATE_DIR/$PLATFORM" ;;
 esac
 case "$command" in
+  build) ensure_client && echo "$CLIENT" ;;
   up) up ;;
   signin) require_up && open_path "/dev-sign-in?username=${1:-$(default_user)}" ;;
   seed) require_up && open_path "/dev-seed" ;;
@@ -438,16 +507,25 @@ case "$command" in
     case "${1:-}" in
       start)
         queue perf-start "$PLATFORM"
-        app_eval "globalThis.veraDev.frames.start()" >/dev/null && echo "recording frames"
+        if app_eval "globalThis.veraDev.frames.start()" >/dev/null; then
+          echo "recording frames"
+        else
+          queue perf-stop "$PLATFORM" || true
+          exit 1
+        fi
         ;;
       stop)
-        app_eval "globalThis.veraDev.frames.stop()" >/dev/null
-        for _ in $(seq 1 20); do
-          report="$(app_eval "globalThis.veraDev.frames.report()")"
-          [ -n "$report" ] && echo "$report" && break
-          sleep 0.25
-        done
+        report=""
+        if app_eval "globalThis.veraDev.frames.stop()" >/dev/null; then
+          for _ in $(seq 1 20); do
+            report="$(app_eval "globalThis.veraDev.frames.report()")" || break
+            [ -n "$report" ] && echo "$report" && break
+            sleep 0.25
+          done
+        fi
+        # A crashed app must still release its measurement slot.
         queue perf-stop "$PLATFORM" || true
+        [ -n "$report" ] || exit 1
         ;;
       *) echo "usage: scripts/sim.sh frames start|stop" >&2 && exit 2 ;;
     esac

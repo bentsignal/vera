@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'chat.vera'
+version = '1.0.0'
+
+android {
+  namespace "chat.vera.networking"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  testImplementation 'junit:junit:4.13.2'
+  // Exercise the version resolved by the full app without changing its deps.
+  testImplementation 'com.squareup.okhttp3:okhttp:4.12.0'
+}

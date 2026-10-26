@@ -1,0 +1,29 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'chat.vera'
+version = '1.0.0'
+
+android {
+  namespace "chat.vera.messagelist"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  testOptions {
+    unitTests.includeAndroidResources = true
+  }
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  implementation 'androidx.recyclerview:recyclerview:1.4.0'
+  implementation 'androidx.core:core-ktx:1.13.1'
+  // The same Glide expo-image bundles (and configures, with OkHttp), so
+  // photos share its caches.
+  implementation 'com.github.bumptech.glide:glide:5.0.5'
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.15.1'
+}

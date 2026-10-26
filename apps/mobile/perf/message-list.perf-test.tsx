@@ -1,8 +1,8 @@
 // Reassure measurements: how long React takes to render the conversation
-// and its common updates, and how many renders they take, compared with the
-// PR's base in CI (`pnpm perf`; see README.md). Timings in Jest are React's
-// work only, not drawing, so they flag regressions rather than measure
-// frames.
+// (the rows it hands the native list) and its common updates, and how many
+// renders they take, compared with the PR's base in CI (`pnpm perf`; see
+// README.md). Timings in Jest are React's work only, not drawing, so they
+// flag regressions rather than measure frames.
 import { useState } from "react";
 import { Pressable } from "react-native";
 import { act, fireEvent, screen } from "@testing-library/react-native";
@@ -11,6 +11,23 @@ import { measureRenders } from "reassure";
 import type { Message } from "~/features/conversation/types";
 import { Conversation } from "./conversation";
 import { message, OLDER, OTHER, PAGE, withReaction } from "./messages";
+
+// The binary's list, drawn as nothing: what's measured is React's work
+// building its rows.
+jest.mock("~/features/native-list/native", () => ({
+  ...jest.requireActual<object>("~/features/native-list/contract"),
+  MessageListComposer: null,
+  MessageListRow: null,
+  MessageListView: () => null,
+  nativeSupport: null,
+}));
+
+// A fixed day: `useToday` re-arms a timer for each midnight, which
+// `runAllTimers` would chase forever.
+jest.mock("~/lib/use-today", () => {
+  const today = new Date(Date.UTC(2026, 9, 2));
+  return { useToday: () => today };
+});
 
 beforeEach(() => {
   jest.useFakeTimers();

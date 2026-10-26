@@ -3,6 +3,18 @@ const timeFormat = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "long" });
+const shortWeekdayFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+});
+const monthDayFormat = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+});
+const monthDayYearFormat = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 const shortDateFormat = new Intl.DateTimeFormat(undefined, {
   month: "numeric",
   day: "numeric",
@@ -34,6 +46,30 @@ export function isSameDay(a: Date, b: Date) {
 
 export function formatTime(date: Date) {
   return timeFormat.format(date);
+}
+
+/**
+ * A message's own time: the time alone today, then the day before it,
+ * "Yesterday · 9:14 PM", "Thu · 3:05 PM" within the week, "Oct 12 · 11:30
+ * AM", and the year once it isn't this year's. VoiceOver and TalkBack get
+ * `separator` ", " instead of the dot.
+ */
+export function formatMessageTime(
+  date: Date,
+  now = new Date(),
+  separator = " · ",
+) {
+  const days = daysBefore(date, now);
+  if (days <= 0) return formatTime(date);
+  const day =
+    days === 1
+      ? "Yesterday"
+      : days < 7
+        ? shortWeekdayFormat.format(date)
+        : date.getFullYear() === now.getFullYear()
+          ? monthDayFormat.format(date)
+          : monthDayYearFormat.format(date);
+  return `${day}${separator}${formatTime(date)}`;
 }
 
 /** Inbox timestamps: time today, then "Yesterday", weekday, and date. */

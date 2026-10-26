@@ -2,12 +2,12 @@ import type { DiscoveredPds } from "@decentralized-convex/client";
 import type { ReactNode } from "react";
 import { createContext, use, useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
-import * as SplashScreen from "expo-splash-screen";
 import { useQueries } from "@tanstack/react-query";
 
 import type { AccountSession } from "./account-session";
 import type { StoredAccount } from "./account-store";
 import { env } from "~/env";
+import { hideSplashWhenReady } from "~/features/updates/launch-splash";
 import { accountSession, verifyAccountSession } from "./account-session";
 import { useStoredAccounts } from "./account-store";
 import { discoverHome, savedHome } from "./home";
@@ -150,7 +150,7 @@ function VerifySessions({ accounts }: { accounts: readonly AccountSession[] }) {
 function HideSplash() {
   // eslint-disable-next-line no-restricted-syntax -- The native splash screen hides once, when the first real screen mounts.
   useEffect(() => {
-    void SplashScreen.hideAsync();
+    hideSplashWhenReady();
   }, []);
   return null;
 }
