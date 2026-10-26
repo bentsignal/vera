@@ -8,11 +8,10 @@ import type { Reporter } from "./supportReporters";
 import type { PublicReport } from "./supportReports";
 import { anonymize, issueFor } from "../bug-reports";
 import { SUPPORT_COMMENT } from "../issue-closures";
-import { briefOf } from "../known-bugs";
 import { internal } from "./_generated/api";
 import { conversationTools, sharedInstructions } from "./agentTools";
 import { commentOnIssue, createIssue, githubConfig } from "./github";
-import { lookupTools, newCheck } from "./supportLookup";
+import { filedSince, lookupTools, newCheck } from "./supportLookup";
 import { noticeShared, PRIVACY_NOTICE, whyNotFile } from "./supportRules";
 
 // Vera Support's model: it helps someone describe a bug well, files it as a
@@ -77,7 +76,7 @@ Privacy, before anything is filed:
 - In everything you file, never include their name or username, anyone else's name, message contents, faces, addresses, phone numbers, or links, including what you read in a screenshot. Describe instead ("a message from a friend", "a link to a video").
 
 Checking what the team already knows:
-- Once you understand the problem, search_known_bugs first, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Search again in the reply you file in. It lists every open bug and idea; read them all and compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "messages out of order when opening a chat" and "an older message shows at the bottom"). Keywords only find older, closed, and fixed ones; try another set if those matter and the first finds nothing.
+- Once you understand the problem, search_known_bugs first, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Search again in the reply you file in. It searches the team's issues on GitHub by your keywords and lists everything filed in the last day. Compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "messages out of order when opening a chat" and "an older message shows at the bottom"). Keywords match words, so if nothing matches, try another set or two before deciding it's new.
 - A known bug that matches, open or fixed but not out yet: follow_known_bug instead of filing a new one, adding anything new they told you. Then tell them someone already reported it, where it stands, and that you'll message them here when it's fixed.
 - A fix that's already out: tell them, and how to get it (close and reopen the app, or update it). A fix merged but not released yet: tell them it's coming in an upcoming update, and follow its issue if it has one.
 - Judge by what the bug or fix actually says, and by dates: a fix from before they reported it didn't fix their problem.
@@ -178,8 +177,8 @@ interface BugReportInput {
 }
 
 /**
- * Files a report as a public, anonymized issue, keeps it to follow, and
- * makes it a known bug for the next person who reports it.
+ * Files a report as a public, anonymized issue, which the next person who
+ * reports it finds on GitHub, and keeps it to follow.
  */
 async function fileBugReport(
   turn: Turn,
@@ -192,7 +191,7 @@ async function fileBugReport(
   );
   const blocked = whyNotFile(turn, reporter);
   if (blocked !== null) return blocked;
-  const unchecked = await uncheckedBugs(turn, check);
+  const unchecked = await uncheckedBugs(check);
   if (unchecked !== null) return unchecked;
   const issue = issueFor(input, turn.accountId, reporter.client);
   const title = input.kind === "idea" ? `Idea: ${issue.title}` : issue.title;
@@ -203,16 +202,10 @@ async function fileBugReport(
     summary: input.summary.trim().slice(0, 120),
     title,
   };
-  const bug = await turn.ctx.runMutation(internal.supportKnownBugs.record, {
-    ...filed,
-    description: issue.body,
-    kind: input.kind,
-  });
-  check.seen.add(bug);
+  if (created !== null) check.seen.add(created.number);
   const reportId = await turn.ctx.runMutation(internal.supportReports.insert, {
     ...filed,
     accountId: turn.accountId,
-    bug,
     conversationId: turn.conversationId,
   });
   return {
@@ -229,29 +222,28 @@ async function fileBugReport(
 const CHECK_OVERLAP = 60_000;
 
 /**
- * Why filing has to wait for a look at the known bugs, or null when it's
- * had one: none yet in this reply, or bugs reported since (by someone
- * else, moments ago) that it hasn't seen.
+ * Why filing has to wait for a look at GitHub, or null when it's had one:
+ * none yet in this reply, or issues filed since (by someone else, moments
+ * ago) that it hasn't seen.
  */
-async function uncheckedBugs(turn: Turn, check: KnownBugCheck) {
+async function uncheckedBugs(check: KnownBugCheck) {
   if (check.at === null) {
-    return "Not filed: call search_known_bugs first, and follow a known bug instead if one matches.";
+    return "Not filed: call search_known_bugs first, and follow an issue instead if one matches.";
   }
-  const recent = await turn.ctx.runQuery(internal.supportKnownBugs.knownSince, {
-    since: check.at - CHECK_OVERLAP,
-  });
-  const unseen = recent.filter((bug) => !check.seen.has(bug._id));
+  const config = githubConfig();
+  if (config === null) return null;
+  const recent = await filedSince(config, check.at - CHECK_OVERLAP);
+  const unseen = recent.filter((issue) => !check.seen.has(issue.number));
   if (unseen.length === 0) return null;
-  for (const bug of unseen) check.seen.add(bug._id);
+  for (const issue of unseen) check.seen.add(issue.number);
   return {
     filed: false,
     reason:
       "Someone just reported these while you were checking. If one is the same problem, follow_known_bug it instead; otherwise call file_bug_report again.",
-    justReported: unseen.map((bug) => ({
-      id: bug._id,
-      issue: bug.issueNumber ?? null,
-      title: bug.title,
-      about: briefOf(bug.description),
+    justReported: unseen.map((issue) => ({
+      issue: issue.number,
+      title: issue.title,
+      about: issue.about,
     })),
   };
 }

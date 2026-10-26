@@ -13,3 +13,22 @@ the heading and intro so the file stays in place for the next release).
 
 Adding steps: any PR whose release needs something beyond `pnpm release`
 adds a section here in that PR (see AGENTS.md → Releases).
+
+## Support: clear the old known-bugs copy (after the backend deploy)
+
+PR #307 made GitHub's issues the only record of bugs and removed the
+`knownBugs` table, which held a copy of every issue. Production still has
+its rows, and bug reports still point to them in an unused `bug` field. Once
+the backend with #307 is deployed, from `services/backend`:
+
+```sh
+npx convex run supportReports:forgetKnownBugs --prod
+printf '' > /tmp/empty.jsonl
+npx convex import --prod --table knownBugs --replace -y /tmp/empty.jsonl
+```
+
+**Verify:** the first command returns `cleared` equal to `reports` or
+fewer, and running it again returns `"cleared": 0`;
+`npx convex data knownBugs --prod` says there are no documents. A later PR
+drops the `bug` field from the schema.
+
