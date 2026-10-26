@@ -11,13 +11,26 @@ import { useAccount } from "./account";
 import { pdsResultOr } from "./results";
 import { lastSentByAuthor, shownTypists } from "./typing-state";
 
-/** The key `useTypists` asks for who's typing in a conversation by. */
-export function typingQueryKey(session: string, conversationId: string) {
+/** Who's typing in a conversation, or with `threadId`, in that thread. */
+export function typingQuery(
+  session: string,
+  conversationId: string,
+  threadId?: string,
+) {
   return pdsQuery({
-    args: { conversationId, threadId: undefined },
+    args: { conversationId, threadId },
+    options: {
+      // A PDS that predates typing shows nobody typing.
+      select: (result) => pdsResultOr(result, [])?.flat(),
+    },
     query: pds.messages.typing,
     session,
-  }).queryKey;
+  });
+}
+
+/** The key `useTypists` asks for who's typing in a conversation by. */
+export function typingQueryKey(session: string, conversationId: string) {
+  return typingQuery(session, conversationId).queryKey;
 }
 
 /** Nobody, the same array each time so the list doesn't redraw. */
@@ -41,21 +54,13 @@ export function useTypists(
   },
 ) {
   const { address } = useAccount();
-  // Asked for when the screen opens, alongside the conversation and its
-  // pages, so it's there when the messages are. (It isn't included with
+  // Asked for when the screen opens (or its row is pressed, see
+  // `usePrefetchConversation`), alongside the conversation and its pages,
+  // so it's there when the messages are. (It isn't included with
   // them: it changes every few seconds while someone types, and would
   // rerun them each time.)
-  const { data, dataUpdatedAt } = useQuery(
-    pdsQuery({
-      args: { conversationId, threadId },
-      options: {
-        // A PDS that predates typing shows nobody typing.
-        select: (result) => pdsResultOr(result, [])?.flat(),
-      },
-      query: pds.messages.typing,
-      session: address,
-    }),
-  );
+  const query = typingQuery(address, conversationId, threadId);
+  const { data, dataUpdatedAt } = useQuery({ ...query, select: query.select });
   const [now, setNow] = useState(Date.now);
   const shown = shownTypists({
     arrivedAt: dataUpdatedAt,
