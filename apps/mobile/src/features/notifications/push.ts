@@ -210,35 +210,66 @@ export function useNotificationRouting() {
     // so an old notification stays useful.
     const account = stringField(data, "accountId");
     const threadId = stringField(data, "threadId");
-    if (threadId !== undefined) {
-      const thread = {
+    if (threadId === undefined) {
+      openConversation(router, conversationId, {
+        ...(account === undefined ? {} : { account }),
+        ...(messageId === undefined ? {} : { messageId }),
+      });
+    } else {
+      openThread(router, threadId, {
         ...(account === undefined ? {} : { account }),
         conversationId,
-      };
-      if (threadId === activeThreadId) router.setParams(thread);
-      else {
-        router.push({
-          params: { ...thread, threadId },
-          pathname: "/thread/[threadId]",
-        });
-      }
-      void Notifications.clearLastNotificationResponseAsync();
-      return;
-    }
-    const params = {
-      ...(account === undefined ? {} : { account }),
-      ...(messageId === undefined ? {} : { messageId }),
-    };
-    if (conversationId === activeConversationId) {
-      // Already on screen: pushing would stack a second copy, so swiping
-      // back would land on the same conversation.
-      router.setParams(params);
-    } else {
-      router.push({
-        params: { conversationId, ...params },
-        pathname: "/conversation/[conversationId]",
       });
     }
     void Notifications.clearLastNotificationResponseAsync();
   }, [response, router]);
+}
+
+type Router = ReturnType<typeof useRouter>;
+
+function openConversation(
+  router: Router,
+  conversationId: string,
+  params: { account?: string; messageId?: string },
+) {
+  if (conversationId === activeConversationId) {
+    // Already on screen: pushing would stack a second copy, so swiping
+    // back would land on the same conversation.
+    router.setParams(params);
+    return;
+  }
+  dismissOpenChat(router);
+  router.push({
+    params: { conversationId, ...params },
+    pathname: "/conversation/[conversationId]",
+  });
+}
+
+function openThread(
+  router: Router,
+  threadId: string,
+  params: { account?: string; conversationId: string },
+) {
+  if (threadId === activeThreadId) {
+    router.setParams(params);
+    return;
+  }
+  // A reply in the open conversation's thread stacks on it, where the
+  // thread belongs; any other chat goes back to the main screen.
+  if (params.conversationId !== activeConversationId) dismissOpenChat(router);
+  router.push({
+    params: { ...params, threadId },
+    pathname: "/thread/[threadId]",
+  });
+}
+
+/**
+ * Closes the chat on screen before a notification opens another, so the new
+ * one replaces it and swiping back lands on the main screen rather than the
+ * previous chat.
+ */
+function dismissOpenChat(router: Router) {
+  if (activeConversationId !== undefined || activeThreadId !== undefined) {
+    router.dismissAll();
+  }
 }
