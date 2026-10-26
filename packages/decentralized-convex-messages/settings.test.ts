@@ -10,7 +10,7 @@ import {
 
 const ME = "me@vera.chat";
 
-void test("every kind of push is on until turned off", async () => {
+void test("every kind of push but your name and keywords is on until turned off", async () => {
   const { ctx } = fakeCtx({});
   assert.deepEqual(await notificationSettings(ctx, ME), {
     channelAlerts: "all",
@@ -20,9 +20,11 @@ void test("every kind of push is on until turned off", async () => {
     groupAlerts: "all",
     groups: true,
     invites: true,
+    keywords: [],
     reactions: true,
     replies: true,
     threadReplies: true,
+    yourName: true,
   });
   assert.equal(await wantsPush(ctx, ME, "reactions"), true);
 });

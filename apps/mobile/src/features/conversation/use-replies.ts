@@ -3,8 +3,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 
 import type { ComposerHandle } from "./composer";
-import type { ProfileOf } from "./message-row";
-import type { Message, ReplyTarget } from "./types";
+import type { Message, ProfileOf, ReplyTarget } from "./types";
 import { useAccount } from "~/features/messaging/account";
 import { quoteOf } from "~/features/messaging/messages";
 import { draftKey, readDraft, saveDraftReply } from "./drafts";

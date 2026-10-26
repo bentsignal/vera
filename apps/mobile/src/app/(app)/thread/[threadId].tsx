@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import { Text, View } from "react-native";
-import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import {
   Stack,
   useLocalSearchParams,
@@ -10,13 +9,12 @@ import {
 
 import type { ComposerHandle } from "~/features/conversation/composer";
 import type { ComposerHeight } from "~/features/conversation/composer-height";
-import type { MessageListHandle } from "~/features/conversation/message-list";
+import type { MessageListHandle } from "~/features/native-list/list-props";
 import { Pending } from "~/components/pending";
 import { useComposerBottomInset } from "~/features/conversation/composer";
 import { useComposerHeight } from "~/features/conversation/composer-height";
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
-import { MessageList } from "~/features/conversation/message-list";
 import { usePacedMessages } from "~/features/conversation/paced-messages";
 import {
   THREAD_HEADER_HEIGHT,
@@ -35,6 +33,8 @@ import {
   useThreadState,
 } from "~/features/messaging/threads";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
+import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
+import { NativeMessageList } from "~/features/native-list/native-message-list";
 import { useActiveThread } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 import { useAccountPending } from "~/features/saved/offline-pill";
@@ -126,7 +126,7 @@ function useWhileOpen(
   thread: ReturnType<typeof useMessages>,
 ) {
   useMarkThreadRead(conversationId, threadId, thread.newestSentAt);
-  useActiveThread(threadId);
+  useActiveThread(threadId, conversationId);
   useStayLive(conversationId, threadId);
   useDevConversation(conversationId, thread, threadId);
 }
@@ -161,19 +161,23 @@ function useThreadTyping(
  * comments, and a composer for the next reply. Its bell turns its
  * notifications off or back on.
  */
+interface ThreadProps {
+  conversationId: string;
+  threadId: string;
+  initialTitle?: string;
+  target: { readonly anchor?: string; readonly anchorSentAt?: number };
+}
+
 function Thread({
   conversationId,
   threadId,
   initialTitle,
-}: {
-  conversationId: string;
-  threadId: string;
-  initialTitle?: string;
-}) {
+  target,
+}: ThreadProps) {
   const composerBottomInset = useComposerBottomInset();
   const { address } = useAccount();
   const devTools = useDevTools();
-  const thread = useMessages(conversationId, { threadId });
+  const thread = useMessages(conversationId, { ...target, threadId });
   const viewReactions = useReactionsSheet(conversationId, thread);
   const { conversation, profileOf, profilesLoaded, title } = useConversation(
     conversationId,
@@ -212,12 +216,13 @@ function Thread({
           </Text>
         </View>
       )}
-      <KeyboardGestureArea interpolator="ios" offset={60} style={{ flex: 1 }}>
+      <ConversationGestureArea>
         <Pending phase={pending} />
         {shown !== null && pending === "ready" && (
-          <MessageList
+          <NativeMessageList
             ref={list}
             key={thread.viewKey}
+            anchorId={thread.anchor}
             thread={{ replyCount: thread.replyCount, root: shown.root }}
             messages={replies}
             self={address}
@@ -237,7 +242,7 @@ function Thread({
             onViewReactions={viewReactions}
           />
         )}
-      </KeyboardGestureArea>
+      </ConversationGestureArea>
       <ThreadHeader
         title={heading}
         following={state.following}
@@ -254,9 +259,10 @@ function Thread({
           report={report}
           onChangeText={typing.report}
           onSend={(draft) => {
-            thread.sendMessage(draft);
+            const messageId = thread.sendMessage(draft);
             list.current?.scrollToLatest();
             devTools.replyToMe(conversationId, threadId);
+            return messageId;
           }}
         />
       )}
@@ -265,21 +271,29 @@ function Thread({
 }
 
 export default function ThreadScreen() {
-  const { account, conversationId, threadId, title } = useLocalSearchParams<{
-    /** The signed-in account this thread is opened as. */
-    account?: string;
-    conversationId: string;
-    threadId: string;
-    /** The conversation's name, shown until it loads. */
-    title?: string;
-  }>();
+  const { account, conversationId, threadId, title, messageId, targetSentAt } =
+    useLocalSearchParams<{
+      /** The signed-in account this thread is opened as. */
+      account?: string;
+      conversationId: string;
+      threadId: string;
+      /** The conversation's name, shown until it loads. */
+      title?: string;
+      messageId?: string;
+      targetSentAt?: string;
+    }>();
   return (
     <AccountScope address={account}>
       <Thread
-        key={`${account ?? ""}:${conversationId}:${threadId}`}
+        key={`${account ?? ""}:${conversationId}:${threadId}:${messageId ?? ""}:${targetSentAt ?? ""}`}
         conversationId={conversationId}
         threadId={threadId}
         initialTitle={title}
+        target={{
+          anchor: messageId,
+          anchorSentAt:
+            targetSentAt === undefined ? undefined : Number(targetSentAt),
+        }}
       />
     </AccountScope>
   );

@@ -31,12 +31,17 @@ function showSetting(
   if (settings != null) store.setQuery(request, { ...settings, ...change });
 }
 
+/** The settings older servers don't have, sent only to those that do. */
+const WORD_SETTINGS = new Set(["keywords", "yourName"]);
+
 /**
  * Which notifications you get. They're set the same for every signed-in
- * account (each account's server sends its own pushes), so the screen
- * shows the first account's and a change goes to all of them. Accounts on
- * servers without these settings are left out; `settings` is null when no
- * account has them.
+ * account (each account's server sends its own pushes, and matches its
+ * own account's name), so the screen shows one account's and a change
+ * goes to all of them: the first account's, unless another's server has
+ * your name and keywords and its doesn't. Accounts on servers without
+ * these settings are left out; `settings` is null when no account has
+ * them.
  */
 export function useNotificationSettings() {
   const accounts = useAccounts();
@@ -56,22 +61,41 @@ export function useNotificationSettings() {
       }),
     ),
   });
-  const supported = accounts.filter((_, index) => results[index]?.data != null);
-  const settings = results.find((result) => result.data != null)?.data;
+  const found = accounts.flatMap((account, index) => {
+    const data = results[index]?.data;
+    return data == null ? [] : [{ account, settings: data }];
+  });
+  const settings = (
+    found.find((each) => each.settings.keywords !== undefined) ?? found[0]
+  )?.settings;
   const answered = results.every((result) => result.data !== undefined);
   function save(change: Partial<NotificationSettings>) {
     return Promise.all(
-      supported.map((account) =>
-        account.pds.mutate(pds.messages.setNotificationSettings(change), {
-          optimisticUpdate: (store) => showSetting(store, change),
-        }),
-      ),
+      found.flatMap(({ account, settings: current }) => {
+        const sent =
+          current.keywords === undefined
+            ? Object.fromEntries(
+                Object.entries(change).filter(
+                  ([key]) => !WORD_SETTINGS.has(key),
+                ),
+              )
+            : change;
+        if (Object.keys(sent).length === 0) return [];
+        return [
+          account.pds.mutate(pds.messages.setNotificationSettings(sent), {
+            optimisticUpdate: (store) => showSetting(store, sent),
+          }),
+        ];
+      }),
     );
   }
   return {
     settings: settings ?? (answered ? null : undefined),
     /** Turns one kind on or off for every account, showing it right away. */
     set: (kind: NotificationKind, on: boolean) => save({ [kind]: on }),
+    /** Replaces the words that alert you, showing them right away. */
+    setKeywords: (keywords: readonly string[]) =>
+      save({ keywords: [...keywords] }),
     /** Sets what groups or channels alert about unless they say otherwise. */
     setDefault: (kind: AlertDefault, level: AlertLevel) => {
       // Older apps read the switch, so it changes with the level.
