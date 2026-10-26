@@ -95,7 +95,7 @@ it behind a splash-colored screen and reopens on the screen it was on:
 
 A launch of the bundle built into the binary (a new install from TestFlight
 or the store, which may be dozens of updates behind) keeps the splash up
-while it checks and downloads, for up to 10 seconds, so it opens straight
+while it checks and downloads, for up to 6 seconds, so it opens straight
 into the latest update. If the download takes longer, the app shows and the
 update goes in as soon as it lands, with the keyboard down and no photo or
 video open, without waiting for a pause.

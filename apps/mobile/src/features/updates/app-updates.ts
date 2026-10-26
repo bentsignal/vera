@@ -22,7 +22,7 @@ import { canRestartForUpdate } from "./restart-policy";
 //
 // A launch of the bundle built into the binary (a new install from the
 // store or TestFlight) may be dozens of updates behind. It keeps the splash
-// up while it checks and downloads, for up to 10 seconds, so it opens on
+// up while it checks and downloads, for up to 6 seconds, so it opens on
 // the latest update; if the download takes longer, the update goes in as
 // soon as it lands, without waiting for a pause.
 //
@@ -38,7 +38,7 @@ type RootState = NonNullable<Parameters<NavigationRef["resetRoot"]>[0]>;
 /** How often an app in the foreground checks for an update. */
 const CHECK_EVERY_MS = 60_000;
 /** How long a launch of the built-in bundle holds the splash for an update. */
-const EMBEDDED_SPLASH_MS = 10_000;
+const EMBEDDED_SPLASH_MS = 6_000;
 /** How often the foreground timer runs: checks, and watching for a pause. */
 const TICK_MS = 1_000;
 /** While an update is required, how often to look for it. */
