@@ -65,6 +65,17 @@ void test("stacked rows get day separators", () => {
   assert.equal(header.label, "Today");
 });
 
+void test("stacked rows date yesterday's messages; bubbles keep the time", () => {
+  const nextDay = { now: new Date(START + 24 * 60 * 60_000) };
+  const stacked = only(
+    messageRows(rowsOf([message("a", 0)], { ...nextDay, layout: "stacked" })),
+  );
+  assert.match(stacked.timeLabel, /^Yesterday · /);
+  assert.match(stacked.accessibilityLabel, /Yesterday, /);
+  const bubbles = only(messageRows(rowsOf([message("a", 0)], nextDay)));
+  assert.doesNotMatch(bubbles.timeLabel, /Yesterday/);
+});
+
 void test("runs: the first starts the group, the last ends it", () => {
   const rows = messageRows(
     rowsOf([message("a", 0), message("b", 1), message("c", 2)]),
