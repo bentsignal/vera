@@ -2,13 +2,12 @@ import type { Message } from "@decentralized-convex/messages";
 import type { ModelMessage, UserContent } from "ai";
 
 import type { AssistantModel } from "../assistant-models";
+import { historyWindow } from "../assistant-history";
 import { LIMIT_NOTICE_START } from "../assistant-limits";
 
 // How an assistant's conversation reaches the model (agent.ts): in the
 // order it got the messages, with the newest images attached.
 
-/** Recent messages the model sees; older ones it can read with a tool. */
-const HISTORY = 40;
 /** The newest images the model sees; older ones it only knows were sent. */
 const VISIBLE_IMAGES = 4;
 
@@ -32,7 +31,7 @@ export function inAnswerOrder(
 }
 
 /** The person's newest images, the ones the model is shown. */
-function visibleImages(history: readonly Message[], self: string) {
+export function visibleImages(history: readonly Message[], self: string) {
   return history
     .filter((message) => message.authorId !== self)
     .flatMap((message) => message.attachments)
@@ -40,9 +39,26 @@ function visibleImages(history: readonly Message[], self: string) {
     .slice(-VISIBLE_IMAGES);
 }
 
+/**
+ * How each visible image reaches the model, by its URL: a URL the gateway
+ * fetches and its format, or null when it can't be shown
+ * (assistantImages.ts `imageUrls`).
+ */
+export type ShownImages = ReadonlyMap<
+  string,
+  { mimeType: string; url: string } | null
+>;
+
 /** The formats of the images the model is shown, to pick a model that reads them. */
-export function visibleImageTypes(history: readonly Message[], self: string) {
-  return visibleImages(history, self).map((image) => image.mimeType);
+export function visibleImageTypes(
+  history: readonly Message[],
+  self: string,
+  shown: ShownImages,
+) {
+  return visibleImages(history, self).flatMap((image) => {
+    const url = shown.get(image.url);
+    return url === undefined || url === null ? [] : [url.mimeType];
+  });
 }
 
 /**
@@ -55,6 +71,7 @@ export function toModelMessages(
   history: readonly Message[],
   self: string,
   model: AssistantModel,
+  shown: ShownImages,
 ) {
   const messages: ModelMessage[] = [];
   let pendingCalls: { body: string; id: string }[] = [];
@@ -103,7 +120,11 @@ export function toModelMessages(
     }
     const attached: Exclude<UserContent, string> = [];
     for (const attachment of message.attachments) {
-      const part = attachmentPart(attachment, visible.has(attachment), model);
+      const part = attachmentPart(
+        attachment,
+        visible.has(attachment) && shownAs(shown, attachment.url),
+        model,
+      );
       if (typeof part === "string") lines.push(part);
       else attached.push(part);
     }
@@ -120,25 +141,31 @@ export function toModelMessages(
   return messages;
 }
 
+/** How a visible image is shown: by a URL and format, or null when it can't be. */
+function shownAs(shown: ShownImages, url: string) {
+  return shown.get(url) ?? null;
+}
+
 /**
  * An attachment as the model gets it: an image it's shown and can read,
- * or a note saying what was sent.
+ * by a URL the gateway fetches (`shown`: false when it's too old to be
+ * shown, null when it can't be), or a note saying what was sent.
  */
 function attachmentPart(
   attachment: Message["attachments"][number],
-  visible: boolean,
+  shown: { mimeType: string; url: string } | false | null,
   model: AssistantModel,
 ) {
   if (attachment.kind !== "image") {
     return `[${attachment.kind}: ${attachment.name}]`;
   }
-  if (!visible) return "[an older image, no longer visible]";
-  if (!model.images.includes(attachment.mimeType.toLowerCase())) {
+  if (shown === false) return "[an older image, no longer visible]";
+  if (shown === null || !model.images.includes(shown.mimeType.toLowerCase())) {
     return "[an image in a format you can't open]";
   }
   return {
-    data: new URL(attachment.url),
-    mediaType: attachment.mimeType,
+    data: new URL(shown.url),
+    mediaType: shown.mimeType,
     type: "file" as const,
   };
 }
@@ -154,27 +181,38 @@ function sentLabel(sentAt: number) {
 }
 
 /**
- * The recent conversation to answer, or null when the person hasn't
- * written since the last reply saw their messages (unless
- * `evenIfAnswered`, for a reply the team asked for).
+ * The recent conversation to answer (assistant-history.ts: the messages
+ * since `from`, the window's start as of the last reply, from the newest
+ * ones in `messages`), with the window's start now; or null when the
+ * person hasn't written since the last reply saw their messages (unless
+ * `evenIfAnswered`, for a reply the team asked for). Older messages the
+ * model can read with a tool.
  */
 export function toAnswer(
   messages: readonly Message[],
   self: string,
-  answeredThrough: number | null,
-  evenIfAnswered: boolean,
+  {
+    answeredThrough,
+    evenIfAnswered,
+    from,
+  }: {
+    answeredThrough: number | null;
+    evenIfAnswered: boolean;
+    from: number | null;
+  },
 ) {
-  const recent = messages
-    .filter((message) => message.deletedAt === undefined)
-    .slice(-HISTORY);
+  const window = historyWindow(
+    messages.filter((message) => message.deletedAt === undefined),
+    from,
+  );
   const history =
     answeredThrough === null
-      ? recent
-      : inAnswerOrder(recent, self, answeredThrough);
+      ? window.messages
+      : inAnswerOrder(window.messages, self, answeredThrough);
   const newest = history.findLast((message) => message.authorId !== self);
   if (newest === undefined) return null;
   if (!evenIfAnswered && newest.sentAt <= (answeredThrough ?? 0)) return null;
-  return history;
+  return { from: window.from, history };
 }
 
 /** What the team asked this reply to cover (supportClosures.ts). */

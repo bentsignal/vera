@@ -33,8 +33,16 @@ export default defineSchema({
      * issue was closed (supportClosures.ts).
      */
     note: v.optional(v.string()),
+    /** The first message the model sees, as of the last reply (assistant-history.ts). */
+    historyFrom: v.optional(v.number()),
+    /** The last reply's agent.ts `cachedPartHash`. */
+    cachedPart: v.optional(v.string()),
     /** A message arrived while a reply was running: answer it next. */
     rerun: v.optional(v.boolean()),
+    /** The scheduled reply for `wakeAt`. */
+    runId: v.optional(v.id("_scheduled_functions")),
+    /** The reply running since `runningSince`, to tell if it died (agent.ts `watch`). */
+    running: v.optional(v.id("_scheduled_functions")),
     runningSince: v.optional(v.number()),
     /** When the reply started waiting for them to stop typing. */
     waitingSince: v.optional(v.number()),
@@ -127,12 +135,23 @@ export default defineSchema({
     inputTokens: v.number(),
     /** Of `inputTokens`, those read from the provider's prompt cache. */
     cachedInputTokens: v.optional(v.number()),
+    /**
+     * Whether the instructions or tools changed since the conversation's
+     * last reply (usage.ts `record`); unset on its first.
+     */
+    cachedPartChanged: v.optional(v.boolean()),
     memoryLookups: v.number(),
     ms: v.number(),
     outputTokens: v.number(),
     searches: v.number(),
     steps: v.number(),
   }).index("by_bot", ["bot"]),
+  /** Photos converted for assistants to see (assistantImages.ts), by their URL. */
+  assistantImages: defineTable({
+    source: v.string(),
+    /** The JPEG; none when it couldn't be converted. */
+    storageId: v.optional(v.id("_storage")),
+  }).index("by_source", ["source"]),
   /** Each person's device time zone, from the app, for assistants' sense of time. */
   timeZones: defineTable({
     accountId: v.string(),

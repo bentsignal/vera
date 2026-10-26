@@ -7,7 +7,12 @@ import type { GitHubConfig } from "./github";
 import type { Releases } from "./githubReleases";
 import type { SearchedBug } from "./supportKnownBugs";
 import { releaseNeeds } from "../bug-reports";
-import { briefOf, keywordMatches, statusOf } from "../known-bugs";
+import {
+  briefOf,
+  isOpenBug,
+  keywordMatches,
+  statusOf,
+} from "../known-bugs";
 import { internal } from "./_generated/api";
 import { githubConfig, pullRequestFix, searchRepository } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";
@@ -17,35 +22,33 @@ import { followKnownBug } from "./supportFollow";
 // reported or fixed before, and following a known bug instead of filing a
 // duplicate (supportFollow.ts). Known bugs live in Convex (supportKnownBugs.ts), so one filed
 // a minute ago is there; GitHub's search is only a fallback, for merged
-// fixes and anything the sync hasn't read yet.
+// fixes and anything the sync hasn't read yet. The open ones are in
+// support's instructions (supportAgent.ts), which the prompt cache keeps
+// from reply to reply; a tool's results are sent anew, at full price,
+// every reply that needs them.
 
 /** Merged pull requests checked for whether they've shipped, per search. */
 const CHECKED_FIXES = 3;
 
 /**
- * This reply's look at the known bugs, which filing needs first
- * (supportAgent.ts): when it was, and which bugs it showed.
+ * What this reply has seen of the known bugs, which filing checks against
+ * (supportAgent.ts): the open ones in its instructions, as of `at`, and
+ * any it found since.
  */
 export interface KnownBugCheck {
-  at: number | null;
+  readonly at: number;
   readonly seen: Set<string>;
-}
-
-export function newCheck(): KnownBugCheck {
-  return { at: null, seen: new Set() };
 }
 
 export function lookupTools(turn: Turn, check: KnownBugCheck) {
   return {
     search_known_bugs: tool({
       description:
-        "Check what the team already knows, before filing: every open bug and idea (compare each with this problem by meaning, not wording), plus closed and fixed ones and merged fixes that match your keywords. Required in the same reply as file_bug_report.",
+        "Search older bugs by keywords: closed and fixed ones, and merged fixes. The open ones are already in your instructions.",
       inputSchema: z.object({
         query: z
           .string()
-          .describe(
-            "A few keywords for older and fixed bugs, like 'photo sideways group'.",
-          ),
+          .describe("A few keywords, like 'photo sideways group'."),
       }),
       execute: ({ query }) => searchKnownBugs(turn.ctx, check, query),
     }),
@@ -83,32 +86,20 @@ async function searchKnownBugs(
   check: KnownBugCheck,
   query: string,
 ) {
-  const at = Date.now();
   const bugs: SearchedBug[] = await ctx.runQuery(
     internal.supportKnownBugs.forSearch,
     {},
   );
-  const open = bugs.filter(isOpen);
-  const settled = bugs.filter((bug) => !isOpen(bug));
-  const matches = keywordMatches(settled, query);
-  for (const bug of [...open, ...matches]) check.seen.add(bug._id);
-  check.at = at;
+  const matches = keywordMatches(
+    bugs.filter((bug) => !isOpenBug(bug)),
+    query,
+  );
+  for (const bug of matches) check.seen.add(bug._id);
   const known = new Set(bugs.map((bug) => bug.issueNumber));
   return {
-    open: open.map(describe),
     olderMatches: matches.map(describe),
     github: await searchGitHub(query, known),
-    howToJudge:
-      "Compare by what goes wrong, not by wording: the same symptom in the same place is the same bug, however differently it's described. When one matches, follow_known_bug it instead of filing.",
   };
-}
-
-/**
- * Open on GitHub, or a fix still on its way (`active`), but not one that
- * just closed and is waiting for its check.
- */
-function isOpen(bug: SearchedBug) {
-  return bug.active && bug.stage !== "closed";
 }
 
 /** A known bug as the model sees it. */

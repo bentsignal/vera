@@ -78,9 +78,10 @@ Two verified accounts answer direct messages with a model:
 
 - `support@<account domain>` helps people report bugs. It asks for what's
   missing (what happened, where, how to repeat it, a screenshot), tells them
-  reports are public and waits for their answer, checks GitHub for an
-  existing issue or fix (following that issue instead of filing a
-  duplicate), then files an anonymized GitHub issue labeled "user report"
+  reports are public and waits for their answer, checks the team's known
+  bugs (the open ones are in its instructions; older ones and merged fixes
+  it searches for) and follows a match instead of filing a duplicate, then
+  files an anonymized GitHub issue labeled "user report"
   with the app version and device the app reported. Screenshots never go in
   an issue: support describes what they show in words, without personal
   details. A cron (`crons.ts`, every 10 minutes) follows each issue and
@@ -116,7 +117,7 @@ that searched cost about 1.3¢ and one that didn't about 0.4¢.
 Vera's memory: every exchange (2 messages) becomes a passage with an
 embedding (OpenAI text-embedding-3-small at 512 dimensions, through the
 gateway), in Convex vector search. Before each reply, the closest distinct
-passages older than the 40 messages it sees (similarity 0.25 or more, up to 3) are added to its instructions oldest first, so a fact that changed reads
+passages older than the messages it sees (similarity 0.25 or more, up to 3) are added after the conversation, oldest first, so a fact that changed reads
 in order; `search_memory` looks further. Editing or deleting a message
 rebuilds its passage. In benchmarks on 320- and 500-message conversations
 with facts that changed (a budget, a move, a new job), it answered 35 of 35
@@ -130,8 +131,10 @@ Empty or whitespace-only memory searches return no matches without calling
 the embedding provider.
 
 `npx convex run usage:summary '{"bot":"vera"}'` totals what replies cost
-(tokens, dollars, searches), from the gateway's own numbers, and how much
-of the input came from the prompt cache (`cacheHitRate`).
+(tokens, dollars, searches), from the gateway's own numbers, how much of
+the input came from the prompt cache (`cacheHitRate`), and how often a
+reply's instructions or tools changed since the one before it in its
+conversation (`cachedPartChangeRate`; see "Keeping replies cheap" below).
 
 When an issue is closed without a fix, support follows the original issue
 if it was marked as a duplicate. If the team left a comment when closing
@@ -150,8 +153,13 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
 - The PDS router's `afterMutation` sees each message someone on this PDS
   sends. A direct message to an assistant schedules its reply 1.5 seconds
   later; another message pushes it back, so a burst gets one answer.
-- One reply runs per conversation at a time. It reads the latest 40
-  messages and calls the model with the assistant's instructions and tools.
+- One reply runs per conversation at a time. It reads the recent messages
+  (the latest 40 to 80, `assistant-history.ts`) and calls the model with
+  the assistant's instructions and tools. A reply whose action dies
+  without finishing (out of memory, say) is noticed within 15 seconds
+  (`agent:watch` asks the scheduler about its job): the next message's
+  reply takes over, or with nothing new the person hears that something
+  went wrong. Before, the conversation stayed locked for 10 minutes.
   The model answers only through `send_message`, which can write to that
   one conversation and nowhere else; no tool takes an account or
   conversation, so nothing can reach another person's messages. Text it
@@ -166,18 +174,15 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   takes over when it fails: each model gets two tries, or one when the
   error says retrying won't help (a rejected request), before the next.
   The model sees the newest few images in the conversation, in the formats
-  it reads. Grok can't read HEIC (how iPhones save photos) or GIF, so
-  Gemini answers first while one of those is among them; a format neither
-  reads shows as a note. One image a model can't read fails the whole
-  request, which is what took both assistants down on 2026-10-23.
-- Replies are built so the providers' prompt cache can reuse them: cached
-  input costs a quarter of the full price (Grok 4.7: $0.50 per million
-  tokens against $2). The cache only reuses a request's unchanged start,
-  so the instructions, tools, and conversation come first and what
-  changes every reply (the time, the tool list, the team's note) comes
-  last. Each conversation's requests carry a `session_id` (a hash of its
-  ID) so the gateway sends them where its cache is; without one, most
-  replies missed it.
+  it reads. The gateway fetches each by its URL; nothing is sent inside
+  the request, which ran replies out of Convex's 64 MB (a 2.4 MB iPhone
+  photo did, 2026-10-26). HEIC photos (how iPhones save them) are
+  converted once to a JPEG of at most 1568 pixels a side, in a Node
+  action (`assistantImagesNode.ts`, about a second), kept in Convex file
+  storage, and reused (`assistant-images.ts`). Grok can't read GIF, so
+  Gemini answers first while one is among them; a format neither reads
+  shows as a note. One image a model can't read fails the whole request,
+  which is what took both assistants down on 2026-10-23.
 - The app sends the device's time zone after a message to an assistant
   (`timeZones:report`), so they know the person's date and time.
 - Each person gets at most 300 replies an hour from Vera and another 300
@@ -198,6 +203,41 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
 
 The AI Gateway needs the Convex team on a paid plan. It works on cloud
 dev and production deployments without any key.
+
+### Keeping replies cheap
+
+Every model call sends the whole prompt again: tools, instructions, and
+the conversation. The provider's prompt cache bills what it has seen
+before at a quarter of the price (Grok 4.7: $0.50 per million input tokens
+against $2), but only while the prompt stays the same at the start and
+the conversation only grows at the end. Measured through the gateway
+(2026-10-26): appending messages reused everything before them; changing
+the end of the instructions reused what came before the change; changing
+or dropping any message in the conversation, even the first, reused
+nothing. So, when changing an assistant or adding a tool:
+
+- **Instructions and tools change only when something happens.** An
+  assistant's `prepare` (agent.ts `Prompt`) returns `instructions` (its
+  rules, then what it knows about this person and the world) and `latest`.
+  Anything that differs from one reply to the next (the time, memories
+  recalled for what they just said, a lookup for this reply) goes in
+  `latest`, which comes after the conversation, with the time and the
+  team's note. Tool names and descriptions never change.
+- **What the model needs on most replies goes in the instructions, not
+  behind a tool.** A tool's results are part of only the reply that calls
+  it, so every reply that needs them pays for them in full again. Support's
+  open bugs were a tool, about 8,000 tokens a search; they're in its
+  instructions now, where the cache keeps them.
+- **The conversation only grows at the end.** The window of messages the
+  model sees moves in jumps (`assistant-history.ts`), and images go by
+  URL, with converted ones reused (`assistant-images.ts`). The newest four
+  images are shown; a fifth turns the oldest into a note, which costs one
+  full-price reply.
+- **Check the numbers after a change.** `usage:summary` gives
+  `cacheHitRate` and `cachedPartChangeRate`. Filing a report or saving a
+  note changes the instructions, so the change rate isn't 0, but it should
+  stay low; one near 1 means something in the instructions or tools
+  changes every reply.
 
 ## Deployments
 

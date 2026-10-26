@@ -29,6 +29,8 @@ export interface Turn {
   readonly lastHeardAt: number;
   /** Older passages of this conversation that match what they just said. */
   readonly recalled: readonly string[];
+  /** The assistant's own address, the author of its messages. */
+  readonly self: string;
   /** Their device's time zone, when the app has sent it. */
   readonly timeZone: string | null;
   /** The oldest message the model was given, for `read_earlier_messages`. */

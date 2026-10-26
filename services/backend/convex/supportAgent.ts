@@ -1,18 +1,19 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 
-import type { Assistant } from "./agent";
+import type { Doc } from "./_generated/dataModel";
+import type { Assistant } from "./agentReply";
 import type { Turn } from "./agentTools";
 import type { KnownBugCheck } from "./supportLookup";
 import type { Reporter } from "./supportReporters";
 import type { PublicReport } from "./supportReports";
 import { anonymize, issueFor } from "../bug-reports";
 import { SUPPORT_COMMENT } from "../issue-closures";
-import { briefOf } from "../known-bugs";
+import { briefOf, openBugLines } from "../known-bugs";
 import { internal } from "./_generated/api";
 import { conversationTools, sharedInstructions } from "./agentTools";
 import { commentOnIssue, createIssue, githubConfig } from "./github";
-import { lookupTools, newCheck } from "./supportLookup";
+import { lookupTools } from "./supportLookup";
 import { noticeShared, PRIVACY_NOTICE, whyNotFile } from "./supportRules";
 
 // Vera Support's model: it helps someone describe a bug well, files it as a
@@ -30,35 +31,54 @@ const STAGE_WORDS = {
 } as const;
 
 export const supportAssistant: Assistant = {
-  instructions: async (turn) => {
-    const [reporter, reports]: [Reporter, PublicReport[]] = await Promise.all([
-      turn.ctx.runQuery(internal.supportReporters.reporter, {
-        accountId: turn.accountId,
-      }),
-      turn.ctx.runQuery(internal.supportReports.reportsOf, {
-        accountId: turn.accountId,
-      }),
-    ]);
-    const app =
-      reporter.client === null
-        ? "Unknown. If it matters, ask them to open More > About and tell you the Version and Update lines."
-        : `Version ${reporter.client.appVersion}, update ${reporter.client.update} (${reporter.client.channel}), ${reporter.client.device}, ${reporter.client.os}. This is attached to reports automatically; don't ask for it.`;
-    const developer =
-      reporter.developer === null
-        ? "unknown"
-        : reporter.developer
-          ? "yes"
-          : "no";
-    const reportList =
-      reports.length === 0
-        ? "None."
-        : reports
-            .map(
-              (report) =>
-                `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}${reporter.developer === true ? `. ${linksOf(report)}` : ""}`,
-            )
-            .join("\n");
-    return `${sharedInstructions(turn)}
+  prepare: async (turn) => {
+    const at = Date.now();
+    const open: Doc<"knownBugs">[] = await turn.ctx.runQuery(
+      internal.supportKnownBugs.open,
+      {},
+    );
+    // Filing checks for bugs reported since this list (`uncheckedBugs`).
+    const check: KnownBugCheck = {
+      at,
+      seen: new Set(open.map((bug) => bug._id)),
+    };
+    return {
+      instructions: await instructions(turn, openBugLines(open)),
+      tools: tools(turn, check),
+    };
+  },
+};
+
+/**
+ * Support's rules, then what it knows about this person and their reports,
+ * then the open bugs and ideas: all of it changes only when something
+ * happens, such as a report filed (agent.ts `Prompt`).
+ */
+async function instructions(turn: Turn, openBugs: string) {
+  const [reporter, reports]: [Reporter, PublicReport[]] = await Promise.all([
+    turn.ctx.runQuery(internal.supportReporters.reporter, {
+      accountId: turn.accountId,
+    }),
+    turn.ctx.runQuery(internal.supportReports.reportsOf, {
+      accountId: turn.accountId,
+    }),
+  ]);
+  const app =
+    reporter.client === null
+      ? "Unknown. If it matters, ask them to open More > About and tell you the Version and Update lines."
+      : `Version ${reporter.client.appVersion}, update ${reporter.client.update} (${reporter.client.channel}), ${reporter.client.device}, ${reporter.client.os}. This is attached to reports automatically; don't ask for it.`;
+  const developer =
+    reporter.developer === null ? "unknown" : reporter.developer ? "yes" : "no";
+  const reportList =
+    reports.length === 0
+      ? "None."
+      : reports
+          .map(
+            (report) =>
+              `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}${reporter.developer === true ? `. ${linksOf(report)}` : ""}`,
+          )
+          .join("\n");
+  return `${sharedInstructions(turn)}
 
 You are Vera Support. People message you when something in the Vera app isn't working. Your job: understand the problem well enough for the team to fix it, file it, and keep them in the loop. Be warm, brief, and plain-spoken.
 
@@ -68,13 +88,13 @@ Getting a good report:
 - Never ask for their messages, contacts, passwords, or other personal information. You only need to know what the app did.
 
 Privacy, before anything is filed:
-- Reports are public. The first time, call share_privacy_notice when you ask for a screenshot, or, once you have enough and search_known_bugs found nothing that matches, before filing; it sends the notice for you, so don't repeat it in your own words. Ask whether they're OK with you sending the report to the team and wait for their answer: you can only file after they've replied to the notice.
+- Reports are public. The first time, call share_privacy_notice when you ask for a screenshot, or, once you have enough and no known bug matches, before filing; it sends the notice for you, so don't repeat it in your own words. Ask whether they're OK with you sending the report to the team and wait for their answer: you can only file after they've replied to the notice.
 - Once they've seen the notice and gone ahead, that's their consent for later reports too. Don't share it or ask permission again; just file when you have enough.
 - Screenshots never go in a report. Describe what each one shows about the app instead, precisely enough that a developer could picture it: which screen, what's on it, what looks wrong.
 - In everything you file, never include their name or username, anyone else's name, message contents, faces, addresses, phone numbers, or links, including what you read in a screenshot. Describe instead ("a message from a friend", "a link to a video").
 
 Checking what the team already knows:
-- Once you understand the problem, search_known_bugs first, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Search again in the reply you file in. It lists every open bug and idea; read them all and compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "messages out of order when opening a chat" and "an older message shows at the bottom"). Keywords only find older, closed, and fixed ones; try another set if those matter and the first finds nothing.
+- Once you understand the problem, check it against the open bugs and ideas listed at the end, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Read them all and compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "messages out of order when opening a chat" and "an older message shows at the bottom"). For older, closed, and fixed ones, and fixes the team merged, search_known_bugs with keywords; try another set if those matter and the first finds nothing.
 - A known bug that matches, open or fixed but not out yet: follow_known_bug instead of filing a new one, adding anything new they told you. Then tell them someone already reported it, where it stands, and that you'll message them here when it's fixed.
 - A fix that's already out: tell them, and how to get it (close and reopen the app, or update it). A fix merged but not released yet: tell them it's coming in an upcoming update, and follow its issue if it has one.
 - Judge by what the bug or fix actually says, and by dates: a fix from before they reported it didn't fix their problem.
@@ -98,72 +118,73 @@ Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or as
 Their app: ${app}
 
 Their reports (newest first):
-${reportList}`;
-  },
-  tools: (turn: Turn) => {
-    const check = newCheck();
-    return {
-      ...conversationTools(turn),
-      ...lookupTools(turn, check),
-      share_privacy_notice: tool({
-        description:
-          "Send the notice that reports are public and screenshots are described, not posted. Required before file_bug_report.",
-        inputSchema: z.object({}),
-        execute: async () => {
-          await turn.send(PRIVACY_NOTICE, { canned: true });
-          await turn.ctx.runMutation(internal.supportReporters.updateReporter, {
-            accountId: turn.accountId,
-            noticeShared: true,
-          });
-          return "Sent.";
-        },
+${reportList}
+
+Open bugs and ideas the team knows about (newest first; the ID in brackets is for follow_known_bug):
+${openBugs}`;
+}
+
+function tools(turn: Turn, check: KnownBugCheck) {
+  return {
+    ...conversationTools(turn),
+    ...lookupTools(turn, check),
+    share_privacy_notice: tool({
+      description:
+        "Send the notice that reports are public and screenshots are described, not posted. Required before file_bug_report.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        await turn.send(PRIVACY_NOTICE, { canned: true });
+        await turn.ctx.runMutation(internal.supportReporters.updateReporter, {
+          accountId: turn.accountId,
+          noticeShared: true,
+        });
+        return "Sent.";
+      },
+    }),
+    set_developer: tool({
+      description:
+        "Record whether this person is a developer who wants technical details.",
+      inputSchema: z.object({ developer: z.boolean() }),
+      execute: async ({ developer }) => {
+        await turn.ctx.runMutation(internal.supportReporters.updateReporter, {
+          accountId: turn.accountId,
+          developer,
+        });
+        return "Saved.";
+      },
+    }),
+    file_bug_report: tool({
+      description:
+        "File a bug report (or idea) for the team. It becomes a public, anonymized GitHub issue with their app version attached.",
+      inputSchema: z.object({
+        kind: z.enum(["bug", "idea"]),
+        title: z.string().describe("A short, specific title for developers."),
+        summary: z
+          .string()
+          .describe(
+            "A short everyday phrase for the reporter, like 'photos showing sideways in group chats'.",
+          ),
+        details: z
+          .string()
+          .describe(
+            "What happened, for developers, including what any screenshots show about the app, in words.",
+          ),
+        steps: z.string().optional().describe("How to make it happen."),
+        expected: z.string().optional(),
+        actual: z.string().optional(),
       }),
-      set_developer: tool({
-        description:
-          "Record whether this person is a developer who wants technical details.",
-        inputSchema: z.object({ developer: z.boolean() }),
-        execute: async ({ developer }) => {
-          await turn.ctx.runMutation(internal.supportReporters.updateReporter, {
-            accountId: turn.accountId,
-            developer,
-          });
-          return "Saved.";
-        },
+      execute: (input) => fileBugReport(turn, check, input),
+    }),
+    add_to_bug_report: tool({
+      description: "Add details to one of their reports that's already filed.",
+      inputSchema: z.object({
+        reportId: z.string(),
+        details: z.string(),
       }),
-      file_bug_report: tool({
-        description:
-          "File a bug report (or idea) for the team. It becomes a public, anonymized GitHub issue with their app version attached.",
-        inputSchema: z.object({
-          kind: z.enum(["bug", "idea"]),
-          title: z.string().describe("A short, specific title for developers."),
-          summary: z
-            .string()
-            .describe(
-              "A short everyday phrase for the reporter, like 'photos showing sideways in group chats'.",
-            ),
-          details: z
-            .string()
-            .describe(
-              "What happened, for developers, including what any screenshots show about the app, in words.",
-            ),
-          steps: z.string().optional().describe("How to make it happen."),
-          expected: z.string().optional(),
-          actual: z.string().optional(),
-        }),
-        execute: (input) => fileBugReport(turn, check, input),
-      }),
-      add_to_bug_report: tool({
-        description:
-          "Add details to one of their reports that's already filed.",
-        inputSchema: z.object({
-          reportId: z.string(),
-          details: z.string(),
-        }),
-        execute: (input) => addToBugReport(turn, input),
-      }),
-    };
-  },
-};
+      execute: (input) => addToBugReport(turn, input),
+    }),
+  };
+}
 
 interface BugReportInput {
   readonly actual?: string;
@@ -227,14 +248,11 @@ async function fileBugReport(
 const CHECK_OVERLAP = 60_000;
 
 /**
- * Why filing has to wait for a look at the known bugs, or null when it's
- * had one: none yet in this reply, or bugs reported since (by someone
- * else, moments ago) that it hasn't seen.
+ * Why filing has to wait for another look at the known bugs, or null:
+ * bugs reported since the reply's list (by someone else, moments ago) that
+ * it hasn't seen.
  */
 async function uncheckedBugs(turn: Turn, check: KnownBugCheck) {
-  if (check.at === null) {
-    return "Not filed: call search_known_bugs first, and follow a known bug instead if one matches.";
-  }
   const recent = await turn.ctx.runQuery(internal.supportKnownBugs.knownSince, {
     since: check.at - CHECK_OVERLAP,
   });

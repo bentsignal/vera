@@ -4,9 +4,11 @@ import { test } from "node:test";
 import {
   briefOf,
   importedStage,
+  isOpenBug,
   keywordMatches,
   keywordsOf,
   kindOf,
+  openBugLines,
   statusOf,
 } from "./known-bugs.ts";
 
@@ -168,4 +170,41 @@ void test("keyword matches break ties by the newest and stop at the limit", () =
     found.map((bug) => bug.title),
     ["Older messages pile at the bottom when opening a chat"],
   );
+});
+
+void test("support counts a bug open until it closes", () => {
+  assert.equal(isOpenBug({ active: true, stage: "reported" }), true);
+  assert.equal(isOpenBug({ active: true, stage: "fixed" }), true);
+  assert.equal(isOpenBug({ active: true, stage: "closed" }), false);
+  assert.equal(isOpenBug({ active: false, stage: "live" }), false);
+});
+
+void test("open bugs are listed one line each, without follower counts", () => {
+  const lines = openBugLines([
+    {
+      _id: "k1",
+      description: "## What happened\n\nThe screen goes **white**.\n\n## Steps\n\n1. Open it",
+      issueNumber: 311,
+      kind: "bug",
+      reportedAt: Date.parse("2026-10-26T14:06:19Z"),
+      stage: "inProgress",
+      title: "Notification settings freeze",
+    },
+    {
+      _id: "k2",
+      description: "Bigger attachment menu.",
+      kind: "idea",
+      reportedAt: Date.parse("2026-10-25T00:00:00Z"),
+      stage: "reported",
+      title: "Idea: Larger attachment menu",
+    },
+  ]);
+  assert.equal(
+    lines,
+    [
+      "- [k1] #311 Notification settings freeze (bug, being fixed, reported 2026-10-26): The screen goes white.",
+      "- [k2] Idea: Larger attachment menu (idea, open, reported 2026-10-25): Bigger attachment menu.",
+    ].join("\n"),
+  );
+  assert.equal(openBugLines([]), "None.");
 });

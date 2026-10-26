@@ -60,7 +60,10 @@ export const record = internalMutation({
   args: {
     accountId: v.string(),
     bot: botName,
+    /** agent.ts `cachedPartHash`. */
+    cachedPart: v.string(),
     cachedInputTokens: v.number(),
+    conversationId: v.string(),
     cost: v.number(),
     inputTokens: v.number(),
     memoryLookups: v.number(),
@@ -69,8 +72,23 @@ export const record = internalMutation({
     searches: v.number(),
     steps: v.number(),
   },
-  handler: async (ctx, usage) => {
-    await ctx.db.insert("assistantUsage", usage);
+  handler: async (ctx, { cachedPart, conversationId, ...usage }) => {
+    const conversation = await ctx.db
+      .query("botConversations")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", conversationId),
+      )
+      .unique();
+    const previous = conversation?.cachedPart;
+    if (conversation !== null && previous !== cachedPart) {
+      await ctx.db.patch(conversation._id, { cachedPart });
+    }
+    await ctx.db.insert("assistantUsage", {
+      ...usage,
+      ...(previous !== undefined && {
+        cachedPartChanged: previous !== cachedPart,
+      }),
+    });
   },
 });
 
@@ -93,6 +111,8 @@ export const summary = internalQuery({
     const searched = rows.filter((row) => row.searches > 0);
     // Rows from before cached tokens were recorded don't count toward the rate.
     const measured = rows.filter((row) => row.cachedInputTokens !== undefined);
+    // Nor do first replies, with nothing before them to compare.
+    const followUps = rows.filter((row) => row.cachedPartChanged !== undefined);
     return {
       replies: rows.length,
       totalCost: total((row) => row.cost),
@@ -104,6 +124,13 @@ export const summary = internalQuery({
           1,
           measured.reduce((sum, row) => sum + row.inputTokens, 0),
         ),
+      // Replies whose instructions or tools changed since the last one in
+      // their conversation, which the cache can't reuse past them. Filing a
+      // report or saving a note does it; a high rate means something
+      // changes every reply that belongs in `latest` (agent.ts `Prompt`).
+      cachedPartChangeRate:
+        followUps.filter((row) => row.cachedPartChanged === true).length /
+        Math.max(1, followUps.length),
       averageSeconds: total((row) => row.ms) / replies / 1000,
       repliesThatSearched: searched.length,
       searches: total((row) => row.searches),

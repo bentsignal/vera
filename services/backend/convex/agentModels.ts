@@ -4,7 +4,7 @@ import { APICallError, generateText, wrapLanguageModel } from "ai";
 
 import type { AssistantModel } from "../assistant-models";
 import type { BotAccount } from "./bots";
-import { GATEWAY_URL_IMAGES } from "../assistant-models";
+import { GATEWAY_URL_IMAGES } from "../assistant-images";
 import { NO_TOOL_CALL, replyOutcome } from "../reply-outcome";
 
 // Calling the models for a reply (agent.ts), with Gemini taking over when
@@ -19,8 +19,9 @@ type ReplyOptions = Omit<
 >;
 
 /**
- * The model through the gateway. Images in formats the gateway can't fetch
- * from a URL (HEIC) are downloaded and sent inline instead.
+ * The model through the gateway, which fetches images from their URLs.
+ * Only those formats reach it (agentHistory.ts), so the AI SDK never
+ * downloads one to send inline, which can run a reply out of memory.
  */
 function gatewayModel(model: AssistantModel) {
   return wrapLanguageModel({

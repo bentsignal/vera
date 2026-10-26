@@ -37,6 +37,8 @@
     "aws4fetch": "^1.0.20",
     "better-auth": "~1.6.33",
     "convex": "catalog:",
+    "heic-decode": "2.1.0",
+    "jpeg-js": "0.4.4",
     "zod": "catalog:"
   },
   "devDependencies": {

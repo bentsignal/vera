@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { isFinalStage } from "../bug-reports";
+import { isOpenBug } from "../known-bugs";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { reportStage } from "./schema";
 
@@ -76,6 +77,20 @@ async function followerCount(ctx: QueryCtx, bug: Id<"knownBugs">) {
     .take(100);
   return followers.length;
 }
+
+/**
+ * The open bugs and ideas (known-bugs.ts `isOpenBug`), most recently
+ * reported first, for support's instructions.
+ */
+export const open = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const bugs = await ctx.db.query("knownBugs").take(2000);
+    return bugs
+      .filter(isOpenBug)
+      .sort((a, b) => b.reportedAt - a.reportedAt);
+  },
+});
 
 /** Bugs that became known after `since`, such as one filed during a check. */
 export const knownSince = internalQuery({
