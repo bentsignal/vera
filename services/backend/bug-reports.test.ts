@@ -237,7 +237,7 @@ void test("the closing comment is the team's, around when it closed", () => {
     closingCommentOf([comment("OWNER", "2026-10-20T11:59:00Z")], closedAt),
     "Works as intended: reactions stay in Activity.",
   );
-  // Not someone outside the team, not support itself, not long before.
+  // Not someone outside the team, not Vera itself, not long before.
   assert.equal(
     closingCommentOf([comment("NONE", "2026-10-20T11:59:00Z")], closedAt),
     null,
@@ -249,6 +249,20 @@ void test("the closing comment is the team's, around when it closed", () => {
           "OWNER",
           "2026-10-20T11:59:00Z",
           `${SUPPORT_COMMENT.another}\n\nsame here`,
+        ),
+      ],
+      closedAt,
+    ),
+    null,
+  );
+  // Nor its comments from when it was Vera Support.
+  assert.equal(
+    closingCommentOf(
+      [
+        comment(
+          "OWNER",
+          "2026-10-20T11:59:00Z",
+          "Someone else reported this through Vera Support:\n\nsame here",
         ),
       ],
       closedAt,

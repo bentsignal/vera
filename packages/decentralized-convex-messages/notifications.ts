@@ -10,9 +10,10 @@ import {
 import { badgeCount } from "./badges.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
 import { listeners } from "./listeners.ts";
+import { noteWordsSaid, saysWord, wordCandidates } from "./mentions.ts";
 import { getConversation, getSpace, memberAddresses } from "./model.ts";
 import { listNames } from "./naming.ts";
-import { inboxKind } from "./protocol.ts";
+import { inboxKind, said } from "./protocol.ts";
 import {
   accountProfile,
   ANDROID_DELIVERY,
@@ -52,6 +53,12 @@ export const targets = internalQuery({
     }
     return {
       body: previewText(message),
+      recipients,
+      // Who it may say the words of, which `send` notes before it pushes.
+      words: {
+        ...(await wordCandidates(ctx, message, conversation, members)),
+        text: message.body,
+      },
       conversationId: conversation.conversationId,
       conversationName: await conversationName(ctx, conversation),
       messageId: message.messageId,
@@ -62,13 +69,46 @@ export const targets = internalQuery({
           ? members
           : null,
       kind: conversation.kind,
-      recipients,
       senderId: message.authorId,
       senderName: message.authorName,
       threadId: message.threadId ?? null,
       threadOnly: message.threadOnly === true,
     };
   },
+});
+
+/**
+ * What a message says of the candidates' words (see `wordCandidates`):
+ * their keywords, and the display names of those who want to hear of
+ * theirs. A name that can't be looked up says nothing.
+ */
+async function wordsSaid(words: {
+  keywords: readonly { accountId: string; keyword: string }[];
+  names: readonly string[];
+  text: string;
+}) {
+  const profiles = await Promise.all(words.names.map(accountProfile));
+  return [
+    ...words.keywords.map(({ accountId, keyword }) => ({
+      accountId,
+      said: { keyword, kind: "keyword" as const },
+    })),
+    ...words.names.flatMap((accountId, index) => {
+      const name = profiles[index]?.displayName;
+      return name !== undefined && saysWord(words.text, name)
+        ? [{ accountId, said: { kind: "name" as const } }]
+        : [];
+    }),
+  ];
+}
+
+/** Counts a message as @mentioning those whose words it says. */
+export const noteWords = internalMutation({
+  args: {
+    messageId: v.string(),
+    said: v.array(v.object({ accountId: v.string(), said })),
+  },
+  handler: (ctx, args) => noteWordsSaid(ctx, args.messageId, args.said),
 });
 
 /** A reply push's body: what it is, then the reply. */
@@ -135,13 +175,29 @@ export const inviteTargets = internalQuery({
 export const send = internalAction({
   args: { messageId: v.string() },
   handler: async (ctx, { messageId }) => {
-    const target = await ctx.runQuery(internal.notifications.targets, {
+    const first = await ctx.runQuery(internal.notifications.targets, {
       messageId,
     });
-    if (target === null || target.recipients.length === 0) return;
+    if (first === null) return;
+    // A message that says someone's name or keyword counts as @mentioning
+    // them, so they hear of it as they would a mention, once.
+    const words = await wordsSaid(first.words);
+    if (words.length > 0) {
+      await ctx.runMutation(internal.notifications.noteWords, {
+        messageId,
+        said: words,
+      });
+    }
+    const target =
+      words.length === 0
+        ? first
+        : await ctx.runQuery(internal.notifications.targets, { messageId });
+    if (target === null) return;
+    const { recipients } = target;
+    if (recipients.length === 0) return;
     const [sender, badges, memberNames] = await Promise.all([
       accountProfile(target.senderId),
-      badgeCounts(ctx, target.recipients),
+      badgeCounts(ctx, recipients),
       displayNames([...(target.unnamedGroupMembers ?? [])].sort()),
     ]);
     const senderName = sender?.displayName ?? target.senderName;
@@ -156,7 +212,7 @@ export const send = internalAction({
 
     await deliver(
       ctx,
-      target.recipients.map((recipient) => {
+      recipients.map((recipient) => {
         const { accountId, reply, token } = recipient;
         const conversationName = conversationNameFor(accountId);
         // A reply kept in its thread opens the thread. Its `messageId` is

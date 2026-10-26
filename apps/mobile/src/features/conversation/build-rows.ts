@@ -1,6 +1,6 @@
 import type { MemberNotice, Message } from "./types";
 import type { MessageLayout } from "~/features/preferences/store";
-import { isSameDay } from "~/lib/format";
+import { isSameDay } from "../../lib/format.ts";
 
 /** Bubbles get a time header after a pause this long, like iMessage. */
 const HEADER_GAP_MS = 60 * 60 * 1000;
@@ -273,23 +273,6 @@ function dateOfRow(row: Exclude<MessageRow, { type: "replies" }>) {
   if (row.type === "message") return row.message.sentAt;
   if (row.type === "notice") return row.notice.at;
   return row.date;
-}
-
-/**
- * Where a row sits in the list, oldest first, as a number a worklet can
- * compare: its message's time, or just before it for the header above it.
- */
-export function rowOrder(date: Date, header = false) {
-  return date.getTime() - (header ? 0.5 : 0);
-}
-
-/** Where a row sits in the list (see `rowOrder`). */
-export function orderOfRow(row: MessageRow) {
-  if (row.type === "message") return rowOrder(row.message.sentAt);
-  if (row.type === "notice") return rowOrder(row.notice.at);
-  // A thread's divider sits just after its original.
-  if (row.type === "replies") return rowOrder(row.date) + 0.25;
-  return rowOrder(row.date, true);
 }
 
 /**

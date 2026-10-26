@@ -39,7 +39,11 @@ jest.mock("expo-image", () => {
 // Native modules nothing here calls: just importable.
 jest.mock("expo-web-browser", () => ({ openBrowserAsync: jest.fn() }));
 jest.mock("expo-video-thumbnails", () => ({ getThumbnailAsync: jest.fn() }));
-jest.mock("expo-router", () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock("expo-router", () => ({
+  useFocusEffect: jest.fn(),
+  useIsFocused: () => true,
+  useRouter: () => ({ push: jest.fn() }),
+}));
 jest.mock("expo-file-system/legacy", () => ({
   cacheDirectory: "file:///cache/",
   downloadAsync: jest.fn(),

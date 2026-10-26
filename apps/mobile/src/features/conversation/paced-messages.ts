@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 
 import type { Message } from "./types";
-import { GROW_MS } from "./moves";
 import { onlyOthersArrived, sameMessages } from "./pace";
 
 // How fast the list takes new messages from other people. Each one that
-// arrives redraws the list and rises in over `GROW_MS`; in a busy
+// arrives redraws the list and rises in over `PACE_MS`; in a busy
 // conversation they came faster than that, each a separate redraw, and
 // the list fell seconds behind. Now a message arriving during another's
 // rise waits for it to finish, and the ones that waited rise in together.
 // At a normal pace nothing waits: the first after a pause shows at once.
 
-/** The least time between two redraws for others' new messages. */
-export const PACE_MS = GROW_MS;
+/**
+ * The least time between two redraws for others' new messages: as long as
+ * the list takes to move one in (its `moveMs`).
+ */
+export const PACE_MS = 420;
 
 /**
  * `messages`, with others' new ones paced (see `onlyOthersArrived`). The
