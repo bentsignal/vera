@@ -1,7 +1,7 @@
 import { defineOperation } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
 
-import { activityItem } from "./activityShapes.ts";
+import { activityItem, compactActivity } from "./activityShapes.ts";
 import {
   conversation,
   linkCard,
@@ -42,15 +42,18 @@ export const queries = {
    * Each conversation shows what it alerts you about, and channels left
    * out of the inbox show only mentions and replies. An item lasts until a
    * day after you saw it (see `markActivitySeen`), and nothing older than
-   * `ACTIVITY_HORIZON` shows.
+   * `ACTIVITY_HORIZON` shows. With `compact`, each conversation is listed
+   * once (`compactActivity`) and its items point at it, rather than each
+   * repeating it.
    */
   activity: defineOperation({
     args: v.object({
       aboutYou: v.optional(v.boolean()),
+      compact: v.optional(v.boolean()),
       mentions: v.optional(v.boolean()),
       threads: v.optional(v.boolean()),
     }),
-    returns: v.array(activityItem),
+    returns: v.union(v.array(activityItem), compactActivity),
   }),
   /** Which pushes you get (see `setNotificationSettings`). */
   notificationSettings: defineOperation({

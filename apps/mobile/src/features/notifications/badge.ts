@@ -7,6 +7,7 @@ import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { ACTIVITY_ARGS, isUnseen } from "~/features/activity/activity";
+import { activityItems } from "~/features/activity/activity-result";
 import { useHomeQueries } from "~/features/home/home-badge";
 import { countedChats, countsOnItsOwn } from "~/features/home/home-count";
 import { useAccounts } from "~/features/messaging/account";
@@ -124,7 +125,12 @@ export function useAppBadge() {
     queries: accounts.map((session) =>
       pdsQuery({
         args: ACTIVITY_ARGS,
-        options: { select: (result) => pdsResultOr(result, null) },
+        options: {
+          select: (result) => {
+            const found = pdsResultOr(result, null);
+            return found == null ? found : activityItems(found);
+          },
+        },
         query: pds.messages.activity,
         session,
       }),

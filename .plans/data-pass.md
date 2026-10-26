@@ -513,3 +513,20 @@ once, as the message; the Activity tab itself still lists and counts it.
 A mention or reply kept in a thread isn't one of the chat's messages, so
 its item still counts. Older apps (whose Activity has conversation items)
 keep their badge.
+
+### 12. Activity lists each conversation once (C)
+
+Current apps ask for `activity({ …, compact: true })` and get
+`{ conversations, items }`: each conversation described once, each item
+pointing at it by ID. Items stay separate and in order (five threads with
+activity in one channel are five items); the app puts each item's
+conversation back, so the Activity screen gets the same items as before.
+Older apps don't send `compact` and get the list as before.
+
+| Activity, one run (seeded account) |   Before |  After |
+| ---------------------------------- | -------: | -----: |
+| Sent                               | 143.5 KB | 120 KB |
+
+The seed's spaces have 5 members. A channel's `members` is its whole
+space, so in a space of 200 every channel item repeated about 6 KB of
+addresses: 50 such items were about 300 KB a run, now listed once.

@@ -142,8 +142,14 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           push.unregisterPushToken(ctx, requireAccountId(identity), args.token),
       },
       queries: {
-        activity: (ctx, { args, identity }) =>
-          activity.activity(ctx, requireAccountId(identity), args),
+        activity: async (ctx, { args, identity }) => {
+          const items = await activity.activity(
+            ctx,
+            requireAccountId(identity),
+            args,
+          );
+          return args.compact === true ? activity.compacted(items) : items;
+        },
         conversation: async (ctx, { args, identity }) => {
           const self = requireAccountId(identity);
           const found = await conversations.conversation(ctx, self, args);

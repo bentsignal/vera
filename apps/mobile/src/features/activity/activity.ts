@@ -13,6 +13,7 @@ import { useProfileState } from "~/features/messaging/profiles";
 import { pdsResultOr } from "~/features/messaging/results";
 import { useSpaceInvites } from "~/features/messaging/spaces";
 import { liveSession } from "~/features/session/account-session";
+import { activityItems, mapActivity } from "./activity-result";
 
 /** One row of the Activity tab. */
 export interface ActivityEntry {
@@ -52,7 +53,13 @@ export type ActivityListRow =
  * messages to the Inbox. Thread replies, and each message that @mentions
  * you or replies to yours, are items of their own.
  */
-export const ACTIVITY_ARGS = { aboutYou: true, mentions: true, threads: true };
+export const ACTIVITY_ARGS = {
+  aboutYou: true,
+  // Each conversation once, not repeated in each of its items.
+  compact: true,
+  mentions: true,
+  threads: true,
+};
 
 export function isUnseen(item: ActivityItem) {
   return item.seenThrough === undefined || item.at > item.seenThrough;
@@ -93,7 +100,12 @@ function useActivityQueries(accounts: readonly string[]) {
       pdsQuery({
         args: ACTIVITY_ARGS,
         // A server without activity (an older one) has nothing to show.
-        options: { select: (result) => pdsResultOr(result, []) },
+        options: {
+          select: (result) => {
+            const found = pdsResultOr(result, []);
+            return found === undefined ? undefined : activityItems(found);
+          },
+        },
         query: pds.messages.activity,
         session,
       }),
@@ -177,11 +189,11 @@ function showSeen(
   seenAt: number,
 ) {
   const request = pds.messages.activity(ACTIVITY_ARGS);
-  const items = store.getQuery(request);
-  if (items == null) return;
+  const result = store.getQuery(request);
+  if (result == null) return;
   store.setQuery(
     request,
-    items.map((item) => {
+    mapActivity(result, (item) => {
       const sighting = sightings.find(({ key }) => key === item.key);
       if (sighting === undefined) return item;
       if (

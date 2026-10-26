@@ -202,6 +202,27 @@ async function threadItems(ctx: QueryCtx, scope: Scope) {
   );
 }
 
+/**
+ * Activity with each conversation listed once and its items pointing at
+ * it (see `compact` in the protocol). Items keep their order and stay
+ * separate.
+ */
+export function compacted(items: readonly ActivityItem[]) {
+  const conversations = new Map(
+    items.map(({ conversation }) => [
+      conversation.conversationId,
+      conversation,
+    ]),
+  );
+  return {
+    conversations: [...conversations.values()],
+    items: items.map(({ conversation, ...item }) => ({
+      ...item,
+      conversationId: conversation.conversationId,
+    })),
+  };
+}
+
 /** What the app asking for activity shows (see `activity`). */
 export interface ActivityOptions {
   readonly aboutYou?: boolean;
