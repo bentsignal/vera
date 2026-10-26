@@ -4,12 +4,18 @@ import { router } from "expo-router";
 
 import type { Preferences } from "~/features/preferences/store";
 import { env } from "~/env";
+import { inboxQuery } from "~/features/messaging/inbox";
+import { cachedSelected } from "~/features/messaging/results";
 import { setPreference } from "~/features/preferences/store";
+import { queryClient } from "~/features/session/account-session";
 import { storedAccounts } from "~/features/session/account-store";
 import { devConversation } from "./dev-conversation";
+import { devList, startStalls, stopStalls } from "./dev-list";
 import { devSignInPath } from "./dev-sign-in-path";
 import { frameReport, startFrames, stopFrames } from "./frames";
 import { openTimings, timeOpening } from "./open-timing";
+import { photoTiming } from "./photo-timing";
+import { sendTiming } from "./send-timing";
 
 function isAppPath(path: string): path is Href & string {
   return path.startsWith("/");
@@ -42,10 +48,31 @@ export function installDevAutomation() {
       },
       /** The open conversation, to react and send without tapping. */
       conversation: devConversation,
+      /** The open conversation's list, to fling it at a constant speed. */
+      list: devList,
+      /** The JavaScript thread's stalls: `start()`, then `stop()`. */
+      stalls: { start: startStalls, stop: stopStalls },
       /** How long screens took to show, since opening: see open-timing.ts. */
       timings: openTimings,
       /** `scripts/sim.sh frames start` and `stop`: see frames.ts. */
       frames: { report: frameReport, start: startFrames, stop: stopFrames },
+      /** Opening a photo from the list, timed: see photo-timing.ts. */
+      photoTiming,
+      /** Committed composer geometry versus later height reports. */
+      sendTiming,
+      /**
+       * The newest group the signed-in account is in, once the inbox has
+       * loaded, for scripts that need one (scripts/motion).
+       */
+      firstGroup() {
+        const account = storedAccounts()[0];
+        if (account === undefined) return null;
+        const inbox = cachedSelected(queryClient, inboxQuery(account.address));
+        return (
+          inbox?.find((conversation) => conversation.kind === "group")
+            ?.conversationId ?? null
+        );
+      },
     },
   });
 }

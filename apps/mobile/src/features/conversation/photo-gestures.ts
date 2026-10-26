@@ -9,7 +9,7 @@ import type {
 import { Gesture } from "react-native-gesture-handler";
 
 import type { Point } from "./photo-transform";
-import type { Mode, Viewer } from "./photo-viewer-state";
+import type { Mode, Pager, Viewer } from "./photo-viewer-state";
 import {
   addSample,
   bandDrag,
@@ -24,8 +24,11 @@ import {
   velocity,
 } from "./photo-transform";
 import {
+  catchPage,
+  dragPage,
   IDLE,
   release,
+  releasePage,
   settle,
   show,
   shownOf,
@@ -35,8 +38,19 @@ import {
 /** How far a finger moves before a touch counts as a drag. */
 const SLOP = 6;
 
-/** The touches still down, from the center of the frame. */
-function fingers(viewer: Viewer, event: GestureTouchEvent, lifting: boolean) {
+/**
+ * The touches still down, from the center of the frame. In a group, the
+ * frame slides with its page, so a sideways swipe tracks them in the
+ * window instead (`window`): in the frame's terms, the page's own
+ * movement fed back in, and it followed the finger at half speed and
+ * wobbled.
+ */
+function fingers(
+  viewer: Viewer,
+  event: GestureTouchEvent,
+  lifting: boolean,
+  window = false,
+) {
   "worklet";
   const frame = viewer.frame.get();
   // A lift's event still lists the lifted touches among all of them.
@@ -46,8 +60,8 @@ function fingers(viewer: Viewer, event: GestureTouchEvent, lifting: boolean) {
   return event.allTouches
     .filter((touch) => !lifted.has(touch.id))
     .map((touch) => ({
-      x: touch.x - frame.width / 2,
-      y: touch.y - frame.height / 2,
+      x: (window ? touch.absoluteX : touch.x) - frame.width / 2,
+      y: (window ? touch.absoluteY : touch.y) - frame.height / 2,
     }));
 }
 
@@ -106,6 +120,8 @@ function onTouchesDown(
   }
   const points = fingers(viewer, event, false);
   const { mode } = viewer.track.get();
+  // A sideways swipe stays one, whatever lands after it.
+  if (mode === "page") return;
   if (mode === "idle") {
     manager.activate();
     // Caught while springing back from a swipe to close: keep swiping.
@@ -121,30 +137,106 @@ function onTouchesDown(
   rebase(viewer, next === "idle" ? "pending" : next, points);
 }
 
-function onTouchesMove(viewer: Viewer, event: GestureTouchEvent) {
+/**
+ * Starts a sideways swipe through a group (`pager`) when one finger has
+ * moved more across than down; true if it did. From here it's tracked in
+ * the window (`inWindow`, see `fingers`).
+ */
+function startsPage(
+  viewer: Viewer,
+  points: Point[],
+  inWindow: Point[],
+  pager?: Pager,
+) {
+  "worklet";
+  const track = viewer.track.get();
+  const focal = centroid(points);
+  const across = Math.abs(focal.x - track.origin.x);
+  const down = Math.abs(focal.y - track.origin.y);
+  if (pager === undefined || points.length !== 1 || across <= down) {
+    return false;
+  }
+  rebase(viewer, "page", inWindow);
+  // Caught mid-spring, it carries on from where it's drawn.
+  viewer.track.set({ ...viewer.track.get(), pageFrom: catchPage(pager) });
+  return true;
+}
+
+/** Moves a sideways swipe through a group with the finger, in the window. */
+function movePage(viewer: Viewer, focal: Point, pager?: Pager) {
+  "worklet";
+  const track = viewer.track.get();
+  if (pager === undefined) return;
+  const dx = focal.x - track.origin.x;
+  dragPage(pager, track.pageFrom, dx, viewer.frame.get().width);
+  viewer.track.set({
+    ...track,
+    focal,
+    samples: addSample(track.samples, { t: Date.now(), x: dx, y: 0 }),
+  });
+}
+
+/** Lets go of a sideways swipe: on to the next photo, or back. */
+function endPage(viewer: Viewer, pager?: Pager) {
+  "worklet";
+  const track = viewer.track.get();
+  const speed = velocity(liftSamples(track.samples, Date.now()));
+  viewer.track.set(IDLE);
+  if (pager === undefined) return;
+  releasePage(pager, {
+    dx: track.focal.x - track.origin.x,
+    from: track.pageFrom,
+    speedX: speed.x,
+    width: viewer.frame.get().width,
+  });
+}
+
+/**
+ * A finger that has moved far enough starts a drag: at fit, it swipes the
+ * photo away (or sideways, to the next one of a group); zoomed in, it
+ * moves the photo.
+ */
+function startDrag(
+  viewer: Viewer,
+  points: Point[],
+  inWindow: Point[],
+  pager?: Pager,
+) {
+  "worklet";
+  const track = viewer.track.get();
+  const focal = centroid(points);
+  const moved = Math.hypot(focal.x - track.origin.x, focal.y - track.origin.y);
+  if (moved < SLOP) return;
+  const dismissing = viewer.scale.get() <= MIN_SCALE + 0.01;
+  if (dismissing && startsPage(viewer, points, inWindow, pager)) return;
+  if (dismissing) {
+    viewer.anchor.set(track.origin);
+    viewer.track.set({ ...track, raw: { scale: 1, x: 0, y: 0 } });
+  }
+  // The drag starts here, so the slop doesn't show as a jump.
+  rebase(viewer, dismissing ? "dismiss" : "zoom", points);
+}
+
+function onTouchesMove(
+  viewer: Viewer,
+  event: GestureTouchEvent,
+  pager: Pager | undefined,
+) {
   "worklet";
   const points = fingers(viewer, event, false);
   const track = viewer.track.get();
   if (points.length === 0 || track.mode === "idle") return;
   const focal = centroid(points);
   if (track.mode === "pending") {
-    const moved = Math.hypot(
-      focal.x - track.origin.x,
-      focal.y - track.origin.y,
-    );
-    if (moved < SLOP) return;
-    // At fit, a drag swipes the photo away; zoomed in, it moves the photo.
-    const dismissing = viewer.scale.get() <= MIN_SCALE + 0.01;
-    if (dismissing) {
-      viewer.anchor.set(track.origin);
-      viewer.track.set({ ...track, raw: { scale: 1, x: 0, y: 0 } });
-    }
-    // The drag starts here, so the slop doesn't show as a jump.
-    rebase(viewer, dismissing ? "dismiss" : "zoom", points);
+    startDrag(viewer, points, fingers(viewer, event, false, true), pager);
     return;
   }
   const now = Date.now();
   const frame = viewer.frame.get();
+  if (track.mode === "page") {
+    movePage(viewer, centroid(fingers(viewer, event, false, true)), pager);
+    return;
+  }
   if (track.mode === "dismiss") {
     const raw = {
       scale: 1,
@@ -186,12 +278,18 @@ function onTouchesUp(
   viewer: Viewer,
   event: GestureTouchEvent,
   manager: GestureStateManager,
-  onClose: () => void,
+  { onClose, pager }: { onClose: () => void; pager?: Pager },
 ) {
   "worklet";
   const points = fingers(viewer, event, true);
   const track = viewer.track.get();
   if (track.mode === "idle") return;
+  if (track.mode === "page") {
+    // A sideways swipe ends with its first finger.
+    manager.end();
+    endPage(viewer, pager);
+    return;
+  }
   if (points.length > 0) {
     // Fewer fingers: carry on from here with the ones still down.
     rebase(viewer, track.mode, points);
@@ -210,19 +308,23 @@ function onTouchesUp(
  * keeps the photo continuous when fingers land or lift mid-gesture, the same
  * way on both platforms.
  */
-export function touchGesture(viewer: Viewer, onClose: () => void) {
+export function touchGesture(
+  viewer: Viewer,
+  onClose: () => void,
+  pager?: Pager,
+) {
   return Gesture.Manual()
     .onTouchesDown((event, manager) => onTouchesDown(viewer, event, manager))
-    .onTouchesMove((event) => onTouchesMove(viewer, event))
+    .onTouchesMove((event) => onTouchesMove(viewer, event, pager))
     .onTouchesUp((event, manager) =>
-      onTouchesUp(viewer, event, manager, onClose),
+      onTouchesUp(viewer, event, manager, { onClose, pager }),
     )
     .onTouchesCancelled((event, manager) =>
       onTouchesUp(
         viewer,
         { ...event, changedTouches: event.allTouches },
         manager,
-        onClose,
+        { onClose, pager },
       ),
     );
 }

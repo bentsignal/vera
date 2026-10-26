@@ -1,9 +1,12 @@
+import type { PdsQueryData } from "@decentralized-convex/tanstack-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { ConvexError } from "convex/values";
 
 import type { PageCursor, PageData, View } from "./window-model";
 import type { Page, WindowSource } from "./window-pages";
+import { fieldOf } from "~/features/saved/fields";
 import { isLive } from "./stay-live";
 import {
   anchoredView,
@@ -14,6 +17,7 @@ import {
   pageKey,
   pagesAhead,
   reusable,
+  threadAnchoredView,
   windowParts,
   withPage,
 } from "./window-model";
@@ -161,6 +165,48 @@ function pagesOf(view: View, results: readonly { data?: Page }[], offset = 0) {
 type WindowState = ReturnType<typeof follow>;
 type SetWindowState = (update: (current: WindowState) => WindowState) => void;
 
+function isMissingMessage(error: Error) {
+  return (
+    error instanceof ConvexError &&
+    fieldOf(error.data, "code") === "MESSAGE_NOT_FOUND"
+  );
+}
+
+/** A deleted notification target opens at the latest messages instead. */
+function missingAnchorAt({
+  queryClient,
+  session,
+  source,
+  view,
+  results,
+}: {
+  queryClient: QueryClient;
+  session: string;
+  source: WindowSource;
+  view: View;
+  results: readonly { dataUpdatedAt: number }[];
+}) {
+  if (view.anchor === undefined || source.threadId !== undefined)
+    return undefined;
+  // Subscribe to answers even when select still returns undefined for an error.
+  const answeredAt =
+    results[view.pages.indexOf(view.opened)]?.dataUpdatedAt ?? 0;
+  if (answeredAt === 0) return undefined;
+  const data = queryClient.getQueryData<PdsQueryData<unknown>>(
+    pageQuery(session, source, view.opened).queryKey,
+  );
+  // A timeout or a PDS still answering does not prove the target is gone.
+  const missing =
+    data?.status === "error" &&
+    (data.federation.sources.length === 0
+      ? isMissingMessage(data.error)
+      : data.federation.sources.every(
+          (source) =>
+            source.status === "error" && isMissingMessage(source.error),
+        ));
+  return missing ? answeredAt : undefined;
+}
+
 /**
  * The window's view and the one it's opening instead, following new
  * messages as they arrive (see `follow`), and opening again at the latest
@@ -170,6 +216,7 @@ function useWindowState(
   session: string,
   source: WindowSource,
   anchor: string | undefined,
+  anchorSentAt: number | undefined,
 ) {
   const queryClient = useQueryClient();
   const [openedAt] = useState(Date.now);
@@ -181,9 +228,12 @@ function useWindowState(
   const [state, setState] = useState<WindowState>(() => ({
     next: undefined,
     view:
-      anchor === undefined || source.threadId !== undefined
-        ? openLatest(queryClient, session, source, openedAt)
-        : anchoredView(anchor),
+      (anchor === undefined
+        ? undefined
+        : source.threadId === undefined
+          ? anchoredView(anchor)
+          : threadAnchoredView(anchor, anchorSentAt)) ??
+      openLatest(queryClient, session, source, openedAt),
   }));
   const { next, view } = state;
   remember(windowKeyOf(session, source), view);
@@ -204,11 +254,17 @@ function useWindowState(
           };
     });
   }
-  const followed = follow(
-    state,
-    resultsOf(view, 0),
-    resultsOf(next, view.pages.length),
-  );
+  const missingAt = missingAnchorAt({
+    queryClient,
+    session,
+    source,
+    view,
+    results,
+  });
+  const followed =
+    missingAt === undefined
+      ? follow(state, resultsOf(view, 0), resultsOf(next, view.pages.length))
+      : { next: undefined, view: latestView(Math.max(openedAt, missingAt)) };
   if (followed !== state) setState(followed);
   return { results, setState, state };
 }
@@ -310,8 +366,14 @@ export function useMessageWindow(
   session: string,
   source: WindowSource,
   anchor?: string,
+  anchorSentAt?: number,
 ) {
-  const { results, setState, state } = useWindowState(session, source, anchor);
+  const { results, setState, state } = useWindowState(
+    session,
+    source,
+    anchor,
+    anchorSentAt,
+  );
   const { next, view } = state;
   const shown = shownPages(view, results.slice(0, view.pages.length));
   usePagesAhead(

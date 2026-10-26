@@ -56,8 +56,26 @@ start_metro() {
       profile=(--no-dev --minify)
       export EXPO_PUBLIC_PROFILE_BUNDLE=1
     fi
-    nohup npx expo start --dev-client --port "$PORT" ${clear[@]+"${clear[@]}"} ${profile[@]+"${profile[@]}"} </dev/null >"$STATE_DIR/metro.log" 2>&1 &
-    echo $! >"$STATE_DIR/metro.pid"
+    # A separate session survives the launching terminal/tool closing.
+    # nohup alone leaves Expo in that terminal's process group.
+    node - "$STATE_DIR/metro.log" "$PORT" "$ROOT/scripts/bench/metro-uncompressed-inspector.cjs" ${clear[@]+"${clear[@]}"} ${profile[@]+"${profile[@]}"} >"$STATE_DIR/metro.pid" <<'JS'
+const { spawn } = require("node:child_process");
+const { openSync, closeSync } = require("node:fs");
+const [log, port, inspectorPreload, ...flags] = process.argv.slice(2);
+const output = openSync(log, "w");
+const env = { ...process.env };
+if (flags.includes("--no-dev")) {
+  env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --require ${JSON.stringify(inspectorPreload)}`;
+}
+const child = spawn("npx", ["expo", "start", "--dev-client", "--port", port, ...flags], {
+  detached: true,
+  stdio: ["ignore", output, output],
+  env,
+});
+child.unref();
+closeSync(output);
+console.log(child.pid);
+JS
   )
   METRO_PID="$(cat "$STATE_DIR/metro.pid")"
   for _ in $(seq 1 60); do

@@ -226,13 +226,13 @@ the tag. Report what shipped, the tag, and anything that didn't
 work.
 
 Then make sure the people who reported what shipped hear about it. Bug
-reports Vera Support filed itself (GitHub issues labeled "user report")
+reports Vera filed itself (GitHub issues labeled "user report")
 tell their reporters on their own: a cron checks every 10 minutes whether
 each fix's commit is in the newest production tags. Run it right away so
 they hear now: `npx convex run supportReports:track --prod` (from
 `services/backend`). For a released PR whose description has a "Support
 reports" section listing conversations instead (reports from before
-support filed issues), send each one the "fixed" message from the
+Vera filed issues), send each one the "fixed" message from the
 `support-inbox` skill. Do it after the production OTA or store build is
 out, never after only the internal build.
 

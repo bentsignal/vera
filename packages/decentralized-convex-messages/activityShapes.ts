@@ -1,7 +1,7 @@
 import type { Infer } from "convex/values";
 import { v } from "convex/values";
 
-import { activityConversation, message, reaction } from "./shapes.ts";
+import { activityConversation, message, reaction, said } from "./shapes.ts";
 
 // What `activity` lists, and how seeing it is recorded.
 
@@ -53,6 +53,11 @@ export const activityItem = v.union(
     kind: v.literal("mention"),
     /** The message that @mentions the caller. */
     message,
+    /**
+     * When it doesn't, the caller's name or keyword it says instead
+     * (absent from older PDSs, which have only @mentions).
+     */
+    said: v.optional(said),
   }),
   /** Only for apps that ask for activity about you (see `activity`). */
   v.object({

@@ -99,6 +99,11 @@ function find(messageId: string) {
   return outbox.find((message) => message.messageId === messageId);
 }
 
+/** Whether a local submission remains queued, failed, or retained as sent. */
+export function outgoingExists(messageId: string) {
+  return find(messageId) !== undefined;
+}
+
 function update(
   messageId: string,
   change: (message: OutgoingMessage) => OutgoingMessage | undefined,
@@ -329,6 +334,7 @@ export function sendOutgoing(
   pruneSent();
   emit();
   void deliver(messageId);
+  return messageId;
 }
 
 /** Tries a failed message again, re-uploading only what failed. */
