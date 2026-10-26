@@ -1,5 +1,6 @@
 import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
+import { numberedUnread } from "./sequences.ts";
 
 // What a conversation itself shows: every message but the replies kept in
 // their threads.
@@ -70,7 +71,24 @@ function countsAsUnread(message: Doc<"messages">, accountId: string) {
   return message.authorId !== accountId && message.deletedAt === undefined;
 }
 
+/**
+ * How many messages others sent after `lastReadAt` that still show: from
+ * the conversation's numbers (see sequences.ts), or until it's numbered,
+ * read one by one, at most `MAX_UNREAD`.
+ */
 export async function unreadCount(
+  ctx: QueryCtx,
+  conversationId: string,
+  accountId: string,
+  lastReadAt: number,
+) {
+  return (
+    (await numberedUnread(ctx, conversationId, accountId, lastReadAt)) ??
+    scannedUnread(ctx, conversationId, accountId, lastReadAt)
+  );
+}
+
+async function scannedUnread(
   ctx: QueryCtx,
   conversationId: string,
   accountId: string,

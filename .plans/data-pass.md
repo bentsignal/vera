@@ -437,3 +437,37 @@ page as the app does:
 Pages of 10 take a few more calls (66 against 61 here, one first answer
 per page). A window reopened more than 10 messages behind opens afresh at
 the latest, as a cold open would.
+
+### 9. Real unread numbers, counted without reading the messages
+
+Unread counts were capped at 99 and read every unread message to count
+them. Each message a conversation shows now gets a number in sent order
+(`chatSequence`, `sequences.ts`), so a count is the newest number less the
+number at the reader's place, less the ones deleted since (marked on their
+number), plus the few too new to be numbered yet (read one by one). A send
+moves its author's place to it, so none of the reader's own numbered
+messages are after their place.
+
+Numbers are given out after the fact, not by `send`: a send that read the
+newest number would conflict with every other send to the conversation
+(what the high-load pass removed), and a number written onto the message
+would rerun every page showing it. Each send schedules a look 30 s later;
+a look numbers the waiting messages when no later look is coming or the
+oldest has waited a minute, deciding from two reads. A busy conversation
+is numbered about once a minute, which reruns what counts it once more.
+Conversations from before this are numbered by a backfill the first
+numbering run starts (no release step), and any conversation as soon as
+someone reads it; until then they count the old way.
+
+The busy group, for an account that never reads it (469 unread):
+
+|                                 |       Before |                        After |
+| ------------------------------- | -----------: | ---------------------------: |
+| Its unread count                | 100 (capped) | 469 (checked by a full scan) |
+| `conversation`, documents a run |          119 |                           21 |
+| `inbox`, documents a run        |          253 |                          173 |
+
+30 messages in 15 s with that account's inbox and conversation open,
+then 70 s: numbering took 30 looks (148 documents, about 5 a message) and
+numbered all 30 in one go; the conversation reran 31 times (30 messages,
+one numbering) at 29 documents each, against about 119 before.

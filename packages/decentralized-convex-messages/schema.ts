@@ -121,6 +121,26 @@ export default defineSchema({
       "conversationId",
       "sentAt",
     ]),
+  // Each message a conversation shows (not one kept in its thread), with
+  // its number in sent order, so unread messages are counted without
+  // reading them (see sequences.ts).
+  chatSequence: defineTable({
+    conversationId: v.string(),
+    // Deleted since it was numbered: no longer counted.
+    deleted: v.optional(v.boolean()),
+    messageId: v.string(),
+    sentAt: v.number(),
+    seq: v.number(),
+  })
+    .index("by_conversation_seq", ["conversationId", "seq"])
+    .index("by_conversation_sent", ["conversationId", "sentAt"])
+    .index("by_conversation_deleted_seq", ["conversationId", "deleted", "seq"])
+    .index("by_message", ["messageId"]),
+  // One-time work's progress, by key (see sequences.ts).
+  sequencing: defineTable({ done: v.boolean(), key: v.string() }).index(
+    "by_key",
+    ["key"],
+  ),
   // One per account a message @mentions, or says the name or a keyword
   // of (`said`), so their activity finds it.
   mentions: defineTable({

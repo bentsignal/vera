@@ -11,6 +11,12 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_account_key: ["accountId", "key", "seenAt"],
     by_account_seen: ["accountId", "seenAt"],
   },
+  chatSequence: {
+    by_conversation_deleted_seq: ["conversationId", "deleted", "seq"],
+    by_conversation_sent: ["conversationId", "sentAt"],
+    by_conversation_seq: ["conversationId", "seq"],
+    by_message: ["messageId"],
+  },
   conversationChanges: { by_conversation: ["conversationId"] },
   conversations: {
     by_conversation: ["conversationId"],
@@ -158,6 +164,10 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
       },
       gt: (field: string, value: number) => {
         filters.push((row) => Number(valueAt(row, field)) > value);
+        return builder;
+      },
+      gte: (field: string, value: number) => {
+        filters.push((row) => Number(valueAt(row, field)) >= value);
         return builder;
       },
       lt: (field: string, value: number) => {

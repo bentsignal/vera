@@ -22,6 +22,7 @@ import {
 import { directConversationId } from "./naming.ts";
 import { around, pageOf } from "./paging.ts";
 import { markReadUpTo } from "./readStates.ts";
+import { numberIfUnnumbered } from "./sequences.ts";
 import { notificationSettings } from "./settings.ts";
 import { MAX_MEMBER_EVENTS } from "./shapes.ts";
 import { seeConversationActivity } from "./sightings.ts";
@@ -201,6 +202,7 @@ export async function markRead(
   const access = await requireAccess(ctx, args.conversationId, self);
   const readAt = Math.min(args.readAt, Date.now());
   await markReadUpTo(ctx, access, self, readAt);
+  await numberIfUnnumbered(ctx, args.conversationId);
   // Reading a conversation sees its activity too.
   await seeConversationActivity(ctx, self, args.conversationId, readAt);
   return null;

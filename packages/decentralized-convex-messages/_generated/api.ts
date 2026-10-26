@@ -47,6 +47,7 @@ import type * as reactionPush from "../reactionPush.js";
 import type * as reactions from "../reactions.js";
 import type * as readStates from "../readStates.js";
 import type * as sending from "../sending.js";
+import type * as sequences from "../sequences.js";
 import type * as settings from "../settings.js";
 import type * as shapes from "../shapes.js";
 import type * as sightings from "../sightings.js";
@@ -106,6 +107,7 @@ const fullApi: ApiFromModules<{
   reactions: typeof reactions;
   readStates: typeof readStates;
   sending: typeof sending;
+  sequences: typeof sequences;
   settings: typeof settings;
   shapes: typeof shapes;
   sightings: typeof sightings;
