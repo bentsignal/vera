@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAccount, useVisibleAccounts } from "~/features/messaging/account";
-import { inboxQuery } from "~/features/messaging/inbox";
+import { inboxListQuery } from "~/features/messaging/inbox-rows";
 import { typingQueryKey } from "~/features/messaging/typing";
 import { hasResult, liveResult, showSaved } from "./saved-cache";
 import { conversationFile, inboxFile, readSaved } from "./saved-files";
@@ -34,7 +34,7 @@ export function useSavedHome() {
       accounts.flatMap(({ address, storagePrefix }) => {
         const query = queryClient
           .getQueryCache()
-          .find({ exact: true, queryKey: inboxQuery(address).queryKey });
+          .find({ exact: true, queryKey: inboxListQuery(address).queryKey });
         if (liveResult(query) !== undefined) return [];
         if (!hasResult(query?.state.data)) {
           showSavedHome(queryClient, storagePrefix);

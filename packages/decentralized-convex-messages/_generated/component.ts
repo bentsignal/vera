@@ -486,6 +486,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Array<
           | null
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -581,6 +591,37 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
+              include?: Array<{
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              }>;
+              routes?: Array<string>;
+              type: "inboxConversations";
+              value: Array<string>;
+            }
+          | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1611,6 +1652,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                   };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1635,6 +1686,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1730,6 +1791,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1814,6 +1885,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1831,6 +1912,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1849,6 +1940,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -1865,6 +1966,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2019,6 +2130,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2035,6 +2156,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2128,6 +2259,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2296,6 +2437,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2307,6 +2458,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               value: { following: boolean; lastReadAt: null | number };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2333,6 +2494,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2363,6 +2534,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2393,6 +2574,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2410,6 +2601,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2426,6 +2627,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               }>;
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -2461,6 +2672,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           lastChanged: "0.1.0";
           operation:
             | { args: { channels?: boolean }; type: "inbox" }
+            | { args: { channels?: boolean }; type: "inboxConversations" }
             | {
                 args: {
                   aboutYou?: boolean;
@@ -2536,6 +2748,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           version: string;
         },
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -2631,6 +2853,37 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
+            include?: Array<{
+              lastChanged: string;
+              operation: { args: any; type: string };
+              plugin: string;
+              version: string;
+            }>;
+            routes?: Array<string>;
+            type: "inboxConversations";
+            value: Array<string>;
+          }
+        | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3643,6 +3896,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3667,6 +3930,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3762,6 +4035,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3846,6 +4129,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3863,6 +4156,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3881,6 +4184,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -3897,6 +4210,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4051,6 +4374,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4067,6 +4400,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4160,6 +4503,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4328,6 +4681,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4339,6 +4702,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             value: { following: boolean; lastReadAt: null | number };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4365,6 +4738,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4395,6 +4778,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4425,6 +4818,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4442,6 +4845,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -4458,6 +4871,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             }>;
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };

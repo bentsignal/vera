@@ -67,12 +67,23 @@ export type OperationReturn<
 
 export type OperationResponse<Operations extends OperationMap> = {
   readonly [Name in keyof Operations & string]: {
+    readonly answered?: readonly AnsweredQuery[];
     readonly include?: readonly QueryRequest[];
     readonly routes?: readonly string[];
     readonly type: Name;
     readonly value: OperationResult<Operations[Name]>;
   };
 }[keyof Operations & string];
+
+/**
+ * A query a result includes with its result already worked out (see
+ * `answered` on a query's response).
+ */
+export interface AnsweredQuery {
+  readonly request: QueryRequest;
+  readonly routes?: readonly string[];
+  readonly value: unknown;
+}
 
 /**
  * A query as a client asks for it: the plugin, the protocol it was built
@@ -94,6 +105,13 @@ export const queryRequestValidator = v.object({
   operation: v.object({ args: v.any(), type: v.string() }),
   plugin: v.string(),
   version: v.string(),
+});
+
+/** An included query with its result, worked out by the query including it. */
+export const answeredQueryValidator = v.object({
+  request: queryRequestValidator,
+  routes: v.optional(v.array(v.string())),
+  value: v.any(),
 });
 
 /**
@@ -201,7 +219,14 @@ function responseValidator<const Operations extends OperationMap>(
   const members = Object.entries(operations).map(([type, operation]) =>
     v.object({
       ...(includes
-        ? { include: v.optional(v.array(queryRequestValidator)) }
+        ? {
+            /**
+             * Included queries the query already answered while working
+             * out its own result, so the PDS doesn't answer them again.
+             */
+            answered: v.optional(v.array(answeredQueryValidator)),
+            include: v.optional(v.array(queryRequestValidator)),
+          }
         : {}),
       routes: v.optional(v.array(v.string())),
       type: v.literal(type),

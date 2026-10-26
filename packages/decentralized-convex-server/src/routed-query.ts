@@ -1,4 +1,4 @@
-import type { QueryRequest } from "@decentralized-convex/plugin";
+import type { AnsweredQuery, QueryRequest } from "@decentralized-convex/plugin";
 import type { Value } from "convex/values";
 
 const RoutedQueryResultMarker = Symbol("RoutedQueryResult");
@@ -9,8 +9,15 @@ const RoutedQueryResultMarker = Symbol("RoutedQueryResult");
  * `include` on the router) doesn't read what only they need.
  */
 export type IncludedQueries =
-  | readonly QueryRequest[]
-  | (() => Promise<readonly QueryRequest[]> | readonly QueryRequest[]);
+  | readonly IncludedQuery[]
+  | (() => Promise<readonly IncludedQuery[]> | readonly IncludedQuery[]);
+
+/**
+ * A query a result includes: a request the PDS answers, or one the query
+ * already answered while working out its own result (so it isn't worked
+ * out twice).
+ */
+export type IncludedQuery = AnsweredQuery | QueryRequest;
 
 export interface RoutedQueryResult<Result> {
   readonly [RoutedQueryResultMarker]: true;

@@ -1,4 +1,5 @@
 import type {
+  AnsweredQuery,
   OperationMap,
   OperationRequest,
   OperationResult,
@@ -12,7 +13,7 @@ import type {
   DispatcherIdentity,
   QueryOperationHandlers,
 } from "./dispatcher.ts";
-import type { RoutedQueryResult } from "./routed-query.ts";
+import type { IncludedQuery, RoutedQueryResult } from "./routed-query.ts";
 import { isRoutedQueryResult } from "./routed-query.ts";
 
 // Answering queries, and the queries their results include (see
@@ -22,6 +23,10 @@ type MaybePromise<Value> = Promise<Value> | Value;
 
 /** At most this many queries are answered along with another. */
 const MAX_INCLUDED_QUERIES = 200;
+
+function isAnswered(entry: IncludedQuery): entry is AnsweredQuery {
+  return "request" in entry;
+}
 
 /**
  * A query handler's result as its component answers it, with what it
@@ -38,8 +43,11 @@ export async function queryResponse(
     : typeof result.include === "function"
       ? await result.include()
       : result.include;
+  const answered = included.filter(isAnswered);
+  const requests = included.filter((entry) => !isAnswered(entry));
   return {
-    ...(included.length > 0 ? { include: included } : {}),
+    ...(answered.length > 0 ? { answered } : {}),
+    ...(requests.length > 0 ? { include: requests } : {}),
     routes: result.routes,
     type,
     value: result.data,
@@ -83,6 +91,38 @@ export function dispatchRequests<Queries extends OperationMap, Context>(
       }
     }),
   );
+}
+
+/**
+ * What a query's result comes with: the included queries it answered
+ * itself, as it worked out its own, and the PDS's answers to the rest.
+ */
+export async function includedWith(
+  ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">,
+  components: DispatcherComponents,
+  identity: DispatcherIdentity | null,
+  response: {
+    readonly answered?: readonly {
+      readonly request: QueryRequest;
+      readonly routes?: readonly string[];
+      readonly value: unknown;
+    }[];
+    readonly include?: readonly QueryRequest[];
+  },
+) {
+  return [
+    ...(response.answered ?? []).map(({ request, routes, value }) => ({
+      request,
+      routes: routes ?? [],
+      value,
+    })),
+    ...(await answerIncluded(
+      ctx,
+      components,
+      identity,
+      response.include ?? [],
+    )),
+  ];
 }
 
 /**

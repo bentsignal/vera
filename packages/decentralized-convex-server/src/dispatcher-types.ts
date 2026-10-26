@@ -15,6 +15,11 @@ interface ComponentDispatcherRequest {
 }
 
 interface DispatcherResponse {
+  readonly answered?: readonly {
+    readonly request: QueryRequest;
+    readonly routes?: readonly string[];
+    readonly value: Value;
+  }[];
   readonly include?: readonly QueryRequest[];
   readonly routes?: readonly string[];
   readonly type: string;

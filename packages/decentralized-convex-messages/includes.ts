@@ -1,4 +1,5 @@
 import type { QueryRequest } from "@decentralized-convex/plugin";
+import type { IncludedQuery } from "@decentralized-convex/server";
 import { accountsProtocol } from "@decentralized-convex/accounts";
 import { queryRequest } from "@decentralized-convex/plugin";
 
@@ -217,6 +218,27 @@ export function inboxIncludes(
         : [...titled, author];
     }),
   );
+}
+
+/**
+ * What the inbox's list includes: each row, as its `conversation` query
+ * answers it (already worked out, so not again), and the people the rows
+ * show (see `inboxIncludes`).
+ */
+export function inboxRowIncludes(
+  self: string,
+  rows: readonly Conversation[],
+): IncludedQuery[] {
+  return [
+    ...rows.map((row) => ({
+      request: queryRequest(messagesProtocol, "conversation", {
+        conversationId: row.conversationId,
+      }),
+      routes: [],
+      value: row,
+    })),
+    ...inboxIncludes(self, rows),
+  ];
 }
 
 /**

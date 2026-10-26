@@ -10,6 +10,7 @@ import { pdsMutation } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { useAccount } from "./account";
+import { removeFromInboxLists } from "./inbox-rows";
 import { updateSpace } from "./optimistic";
 
 // A channel's own settings (Show in Inbox, its alerts, its name, deleting
@@ -68,6 +69,8 @@ function updateConversation(
   if (conversation != null) {
     const changed = change(conversation);
     if (changed !== null) store.setQuery(request, changed);
+    // Out of the inbox (left, or a channel left out of it).
+    else removeFromInboxLists(store, (id) => id === conversationId);
   }
 }
 

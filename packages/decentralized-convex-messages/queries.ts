@@ -32,6 +32,18 @@ export const queries = {
     returns: v.array(conversation),
   }),
   /**
+   * The conversations in your inbox (as `inbox` lists them), by ID, in no
+   * particular order. It changes only when the list does (joining,
+   * leaving, a rename, a pin); each row is its `conversation` query,
+   * which changes with its messages. Its first answer includes every row,
+   * already worked out, and the people they show, so an inbox opens in
+   * one round trip.
+   */
+  inboxConversations: defineOperation({
+    args: v.object({ channels: v.optional(v.boolean()) }),
+    returns: v.array(v.string()),
+  }),
+  /**
    * What happened while you were away, newest first: messages from others
    * (one item per conversation) and others' reactions to your messages
    * (one per message). With `threads`, also new replies in threads

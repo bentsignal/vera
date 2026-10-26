@@ -3,16 +3,14 @@ import type {
   Message as PdsMessage,
 } from "@decentralized-convex/messages";
 import { useState } from "react";
-import { useQueries } from "@tanstack/react-query";
-import { pdsQuery } from "@decentralized-convex/tanstack-query";
-import { pds } from "@vera/backend/pds";
 
+import type { InboxSnapshot } from "./inbox-rows";
 import type { ConversationSummary } from "~/features/inbox/types";
 import { useVisibleAccounts } from "./account";
 import { conversationAlerts } from "./alerts";
 import { conversationTitle } from "./conversations";
+import { useInboxes } from "./inbox-rows";
 import { useProfileState } from "./profiles";
-import { pdsResult } from "./results";
 
 /** A message's text, or what it sent instead ("Photo", "3 attachments"). */
 export function messageSummary(message: PdsMessage) {
@@ -100,14 +98,15 @@ export function rowProfiles(account: string, conversation: Conversation) {
     : [...titled, author];
 }
 
-/** An account's Inbox: its conversations, with the channels it shows. */
-export function inboxQuery(session: string) {
-  return pdsQuery({
-    args: { channels: true },
-    options: { select: pdsResult },
-    query: pds.messages.inbox,
-    session,
-  });
+/**
+ * Whether the Inboxes can show the first time: some account's has loaded,
+ * and every loaded one has all its rows (which come with its list).
+ */
+function inboxesReady(inboxes: readonly InboxSnapshot[]) {
+  return (
+    inboxes.some((inbox) => inbox.data !== undefined) &&
+    inboxes.every((inbox) => inbox.complete || inbox.data === undefined)
+  );
 }
 
 /**
@@ -126,7 +125,7 @@ export function useInbox({ account }: { account?: string } = {}) {
   const visible = useVisibleAccounts();
   const accounts =
     account === undefined ? visible.map((item) => item.address) : [account];
-  const inboxes = useQueries({ queries: accounts.map(inboxQuery) });
+  const inboxes = useInboxes(accounts);
   const conversations = inboxes.flatMap((inbox, index) =>
     (inbox.data ?? []).map((conversation) => {
       const owner = accounts[index] ?? "";
@@ -155,9 +154,7 @@ export function useInbox({ account }: { account?: string } = {}) {
   );
   // The rows shown so far, by key; null until the first load finishes.
   const [shown, setShown] = useState<ReadonlySet<string> | null>(null);
-  const loading =
-    inboxes.every((inbox) => inbox.data === undefined) ||
-    !rows.every(({ ready }) => ready);
+  const loading = !inboxesReady(inboxes) || !rows.every(({ ready }) => ready);
   const known =
     shown ?? (loading ? null : new Set(rows.map(({ summary }) => summary.key)));
   const arrived = rows

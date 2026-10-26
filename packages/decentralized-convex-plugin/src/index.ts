@@ -16,10 +16,12 @@ export {
   operationResponseValidator,
   operationValidator,
   queryRequest,
+  answeredQueryValidator,
   queryRequestValidator,
   queryResponseValidator,
 } from "./operations.ts";
 export type {
+  AnsweredQuery,
   AnyOperation,
   AnyPluginProtocol,
   Operation,

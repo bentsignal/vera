@@ -13,6 +13,8 @@ import {
 } from "@decentralized-convex/messages";
 import { pds } from "@vera/backend/pds";
 
+import { addToInboxLists, removeFromInboxLists } from "./inbox-rows";
+
 // Optimistic updates: what each action changes in the home PDS's query
 // results the moment it starts, until the PDS's own result arrives (or rolls
 // back if it fails). See `pdsMutation`'s `optimisticUpdate`.
@@ -51,6 +53,7 @@ function newConversation(
 
 /** Lists a new conversation in every loaded inbox that shows its kind. */
 function addToInboxes(store: Store, conversation: Conversation) {
+  addToInboxLists(store, conversation);
   const { conversationId, kind } = conversation;
   for (const { args, request, value } of store.getAllQueries(
     pds.messages.inbox,
@@ -327,6 +330,12 @@ export function removeSpaceMember(self: string) {
         value.filter((conversation) => conversation.spaceId !== spaceId),
       );
     }
+    removeFromInboxLists(
+      store,
+      (conversationId) =>
+        store.getQuery(pds.messages.conversation({ conversationId }))
+          ?.spaceId === spaceId,
+    );
   };
 }
 

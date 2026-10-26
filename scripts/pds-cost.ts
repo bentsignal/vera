@@ -137,6 +137,8 @@ function printCosts(byOperation: Map<string, Cost>) {
 interface Case {
   readonly account: string;
   readonly args?: unknown;
+  /** False: asked without what it includes, as subscriptions now are. */
+  readonly include?: boolean;
   readonly mutation?: boolean;
   readonly name: string;
   readonly plugin?: string;
@@ -166,9 +168,10 @@ async function once(cases: readonly Case[]) {
         "convex",
         "run",
         fn,
-        JSON.stringify(
-          request(entry.plugin ?? "messages", entry.type, entry.args ?? {}),
-        ),
+        JSON.stringify({
+          ...request(entry.plugin ?? "messages", entry.type, entry.args ?? {}),
+          ...(entry.include === false ? { include: false } : {}),
+        }),
         "--identity",
         JSON.stringify(identity),
         "--typecheck",

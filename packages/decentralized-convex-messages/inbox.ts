@@ -104,13 +104,27 @@ export async function inbox(
   self: string,
   args: OperationArgs<Queries["inbox"]>,
 ) {
-  const settings = await notificationSettings(ctx, self);
   const spaces = spaceReads(ctx);
-  const conversations = await Promise.all(
-    (await inboxAccess(ctx, self, args.channels === true, spaces)).map(
-      (access) =>
-        toConversation(ctx, access, self, alertsFor(access, settings), spaces),
-    ),
+  const conversations = await inboxRows(
+    ctx,
+    self,
+    await inboxAccess(ctx, self, args.channels === true, spaces),
+    spaces,
   );
   return conversations.sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+/** The inbox's rows, each as `conversation` answers it. */
+export async function inboxRows(
+  ctx: QueryCtx,
+  self: string,
+  accesses: readonly ConversationAccess[],
+  spaces: SpaceReads,
+) {
+  const settings = await notificationSettings(ctx, self);
+  return Promise.all(
+    accesses.map((access) =>
+      toConversation(ctx, access, self, alertsFor(access, settings), spaces),
+    ),
+  );
 }

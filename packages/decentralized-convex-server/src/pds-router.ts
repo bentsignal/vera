@@ -9,7 +9,7 @@ import { ConvexError, v } from "convex/values";
 
 import type { DispatcherComponents } from "./dispatcher-types.ts";
 import type { DispatcherIdentity } from "./dispatcher.ts";
-import { answerIncluded } from "./query-dispatch.ts";
+import { includedWith } from "./query-dispatch.ts";
 
 // The host's PDS router: every client request passes through it to the
 // plugin Component that answers it.
@@ -124,12 +124,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
           version: request.version,
         });
         const included = include
-          ? await answerIncluded(
-              ctx,
-              installed,
-              identity,
-              response.include ?? [],
-            )
+          ? await includedWith(ctx, installed, identity, response)
           : [];
         return {
           ...(included.length > 0 ? { included } : {}),

@@ -104,6 +104,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Array<
           | null
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -120,6 +130,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               };
             }
           | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
               include?: Array<{
                 lastChanged: string;
                 operation: { args: any; type: string };
@@ -158,6 +178,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           version: string;
         },
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };
@@ -174,6 +204,16 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             };
           }
         | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
             include?: Array<{
               lastChanged: string;
               operation: { args: any; type: string };

@@ -110,7 +110,7 @@ What it shows, in order of cost:
 5. **Typing reruns the conversation** (`conversation` includes `typing`),
    and every thread page; typing in one thread reruns the others' typing.
 
-## Pull requests, in order of cost
+## Pull requests
 
 Stacked, each on the one before:
 
@@ -120,13 +120,13 @@ Stacked, each on the one before:
 4. #270 The badge counts without reading what only shows.
 5. #271 The next page asked for ahead.
 6. #272 A small live page.
-7. Open timings in a production bundle, and the app opening on the saved
-   Home at once (with the simulator's timings).
-
-The rest needs a decision first (proposals below): pages and the
-conversation without their includes on every rerun (A), the inbox's rows
-apart from its list (B), Activity's shape (C), unread counts (D), and
-pushes (E).
+7. #273 The app opens on the saved Home at once; open timings.
+8. #274 Included queries answered once, on a query's first fetch (A).
+9. #276 Real unread numbers, counted by number.
+10. #278 Dots don't count (D).
+11. #279 The badge rule.
+12. #280 Activity lists each conversation once (C).
+13. #281 The inbox's rows apart from its list (B).
 
 ## Decided with Shawn (2026-10-22)
 
@@ -530,3 +530,73 @@ Older apps don't send `compact` and get the list as before.
 The seed's spaces have 5 members. A channel's `members` is its whole
 space, so in a space of 200 every channel item repeated about 6 KB of
 addresses: 50 such items were about 300 KB a run, now listed once.
+
+### 13. The inbox's rows apart from its list (B): the numbers
+
+Convex's prices (Professional, docs.convex.dev/production/state/limits,
+2026-10): function calls $2 a million past 25 million a month (every
+query a subscription reruns counts); database I/O $0.20 a GB past 50 GB;
+data egress $0.12 a GB, but that's files and backups, not query results.
+So what the server costs is calls and documents read, roughly one call
+for every 10 KB read; what's sent to the phone costs the phone (data,
+battery, the JavaScript thread), not Convex.
+
+Measured on the stack so far (#267–#280), 29 conversations:
+
+|                                             | One inbox (today)                                  | List + a query per row                                                             |
+| ------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Opening                                     | 2 calls (first answer, subscription), ~200 KB read | 1 first answer (list and rows together) + 30 subscriptions: 31 calls, ~205 KB read |
+| A message in any conversation, or your read | 1 call, ~100 KB read, 24 KB to the phone           | 1 call (its row), ~3.6 KB read, ~0.8 KB to the phone                               |
+| A rename, pin, join, or leave               | 1 call, ~100 KB                                    | 1 call (the list), ~10 KB                                                          |
+
+A day, per person (calls, then I/O, then dollars at the prices above):
+
+|        | Opens | Messages and reads while open | One inbox                 | Split                    |
+| ------ | ----: | ----------------------------: | ------------------------- | ------------------------ |
+| Active |    20 |                           250 | 290 calls, 29 MB, $0.0064 | 870 calls, 5 MB, $0.0027 |
+| Light  |    10 |                            20 | 40 calls, 4 MB, $0.0009   | 330 calls, 2 MB, $0.0011 |
+
+Sent to the phone in a day: active 7 MB with one inbox, about 1.2 MB
+split; light about the same either way.
+
+The split costs 2.4 times less for someone active, a fifth more for
+someone who barely uses Vera (who costs little either way), and grows
+better with inbox size: one inbox rereads every row for every message, so
+its cost per message grows with the number of conversations, while a row
+costs the same in an inbox of 10 or 300. For speed, a message updates one
+row (0.8 KB) instead of resending and redrawing the whole inbox (24 KB),
+and opening is still one round trip (the list's first answer brings its
+rows). **Decision: take B.**
+
+How: a new `inboxConversations` query lists the inbox's conversation IDs
+and changes only when the list does (joins, leaves, renames, pins); each
+row is the `conversation` query a conversation's screen already uses. The
+list's first answer includes every row and the profiles they show, already
+worked out (a query can now include results it computed itself, so rows
+aren't worked out twice), so the Inbox still opens in one round trip and
+shows complete.
+
+### 14. The inbox's rows apart from its list (B): built
+
+Headless phone subscribed as the app now is (the list and each of the 29
+rows, without includes) against one inbox subscription; 30 messages into
+one group in 15 s:
+
+|                     | One inbox |                           List + rows |
+| ------------------- | --------: | ------------------------------------: |
+| Server runs (inbox) |  30 inbox | 30 of that group's row; the list none |
+| Documents read      |     7,995 |                                 1,815 |
+| Sent to the phone   |    671 KB |                                 22 KB |
+
+One run of each piece:
+
+|                                                           | Documents |   Sent |
+| --------------------------------------------------------- | --------: | -----: |
+| The list's first answer (with every row and their people) |       259 |  33 KB |
+| The list's subscription                                   |        78 | 2.1 KB |
+| A row's subscription (the busy group)                     |        15 | 0.7 KB |
+
+The app builds each account's Inbox from its list and rows
+(`useInboxes`), in the shape it had, for the Inbox, Home's badge, the app
+icon's, and what's saved on the device (the list and each row are saved).
+Optimistic updates that add or drop a conversation change the list too.

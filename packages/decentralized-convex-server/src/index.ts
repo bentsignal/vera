@@ -43,4 +43,8 @@ export type {
   PdsRouterMutationRequest,
 } from "./pds-router.ts";
 export { queryResult, routedQueryResult } from "./routed-query.ts";
-export type { RoutedQueryResult } from "./routed-query.ts";
+export type {
+  IncludedQueries,
+  IncludedQuery,
+  RoutedQueryResult,
+} from "./routed-query.ts";
