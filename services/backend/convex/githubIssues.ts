@@ -8,10 +8,10 @@ import {
 } from "./github";
 
 // The repository's issues as GitHub's REST API lists them, for Vera
-// Support's known bugs (supportBugSync.ts). Unlike GitHub's search, the
+// Vera's known bugs (supportBugSync.ts). Unlike GitHub's search, the
 // list has an issue the moment it's filed.
 
-/** An issue as the REST API lists it, for support's known bugs. */
+/** An issue as the REST API lists it, for Vera's known bugs. */
 export interface GitHubIssue {
   readonly body: string;
   readonly closedAt: number | null;

@@ -15,7 +15,15 @@ export const reportStage = v.union(
 );
 
 /** Vera's assistant accounts by username (bots.ts). */
-export const botName = v.union(v.literal("support"), v.literal("vera"));
+export const botName = v.literal("vera");
+
+/**
+ * `botName` as some tables still hold it: Vera Support answered people
+ * until it became part of Vera (mergeSupport.ts). The merge removes
+ * support's conversations and limits; its usage stays, for the bill's
+ * history.
+ */
+export const storedBotName = v.union(v.literal("support"), botName);
 
 export default defineSchema({
   /**
@@ -26,7 +34,7 @@ export default defineSchema({
     accountId: v.string(),
     /** The newest message of theirs a finished reply has seen. */
     answeredThrough: v.optional(v.number()),
-    bot: botName,
+    bot: storedBotName,
     conversationId: v.string(),
     /**
      * Something the team wants the next reply to cover, such as why an
@@ -48,7 +56,7 @@ export default defineSchema({
     text: v.string(),
   }).index("by_bot_account", ["bot", "accountId"]),
   /**
-   * The app version and device an account last wrote to support from,
+   * The app version and device an account last wrote to Vera from,
    * reported by the app, for bug reports. Nothing else about the device.
    */
   clientInfo: defineTable({
@@ -102,7 +110,7 @@ export default defineSchema({
   /** Each person's hourly allowance of each assistant's replies (rateLimits.ts). */
   rateLimits: defineTable({
     accountId: v.string(),
-    bot: botName,
+    bot: storedBotName,
     /** At the hourly limit since their last reply (one strike per stretch). */
     limited: v.optional(v.boolean()),
     lockNoticeSent: v.optional(v.boolean()),
@@ -121,7 +129,7 @@ export default defineSchema({
   /** What each assistant reply cost, for keeping an eye on the bill (usage.ts). */
   assistantUsage: defineTable({
     accountId: v.string(),
-    bot: botName,
+    bot: storedBotName,
     /** Dollars, as the AI Gateway reports them, plus Parallel's search fee. */
     cost: v.number(),
     inputTokens: v.number(),

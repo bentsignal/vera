@@ -2,7 +2,7 @@ import type { ProviderMetadata } from "ai";
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery } from "./_generated/server";
-import { botName } from "./schema";
+import { botName, storedBotName } from "./schema";
 
 // What assistant replies cost: tokens and dollars per reply, from the AI
 // Gateway's own numbers, plus Parallel's fee per search.
@@ -69,10 +69,11 @@ export const record = internalMutation({
 
 /**
  * Operator command: `npx convex run usage:summary '{"bot":"vera"}'`. Totals
- * and averages for the latest replies (500 by default).
+ * and averages for the latest replies (500 by default); `"support"` reads
+ * Vera Support's, from before it became part of Vera.
  */
 export const summary = internalQuery({
-  args: { bot: botName, last: v.optional(v.number()) },
+  args: { bot: storedBotName, last: v.optional(v.number()) },
   handler: async (ctx, { bot, last }) => {
     const rows = await ctx.db
       .query("assistantUsage")

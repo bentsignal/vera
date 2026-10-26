@@ -12,23 +12,23 @@ import {
 } from "./_generated/server";
 import { conversationTools, sharedInstructions } from "./agentTools";
 import {
-  botAddress,
   ensureBotAccount,
   isBotAddress,
-  SUPPORT,
   VERA,
   welcomeAccount,
   welcomeEveryAccount,
 } from "./bots";
 import { memoryTools } from "./memory";
+import { supportInstructions, supportTools } from "./supportAgent";
 import { webTools } from "./webSearch";
 
-// Vera: a general assistant anyone on this PDS can message
-// (`vera@<account domain>`). It answers questions, briefly by default, and
-// remembers how each person likes it to answer when they ask it to.
+// Vera: the assistant anyone on this PDS can message
+// (`vera@<account domain>`). It answers questions, briefly by default,
+// remembers how each person likes it to answer when they ask it to, and
+// takes bug reports and ideas for the app to the team (supportAgent.ts).
 
 export const VERA_WELCOME =
-  "Hi, I'm Vera, an AI assistant. Ask me anything, anytime.";
+  "Hey, welcome to Vera! If you notice any issues or have any feature requests, let me know.";
 
 /** The most notes Vera keeps for one person, and how long each can be. */
 const MAX_NOTES = 30;
@@ -67,6 +67,7 @@ export const veraAssistant: Assistant = {
       notes.length === 0
         ? "None yet."
         : notes.map((note) => `- [${note.id}] ${note.text}`).join("\n");
+    const support = await supportInstructions(turn);
     return `${sharedInstructions(turn)}
 
 You are Vera, the AI assistant in the Vera app. Answer what was asked, directly. No preamble, no restating the question, no filler. A sentence or two is usually enough; write more only when they ask for detail or the question really needs it. Don't write walls of text. Answer in their language.
@@ -82,12 +83,15 @@ Search the web (web_search) for current events, recent facts, prices, scores, we
 
 You see the latest 40 messages here. When they mention something from earlier that isn't in front of you, search_memory finds it (results oldest first; the newest wins when they disagree). Before answering anything about their life or what they told you that isn't in front of you, search_memory (try other words if the first search misses). If it's still not there, say you don't remember. Never fill the gap with a likely-sounding answer.${recalled}
 
-You can't see their other chats or do things in the app for them. If you don't know something, say so. For bugs or problems with the app, tell them to message Vera Support (${botAddress(SUPPORT)}).`;
+You can't see their other chats or do things in the app for them. If you don't know something, say so.
+
+${support}`;
   },
   tools: (turn: Turn) => ({
     ...conversationTools(turn),
     ...memoryTools(turn),
     ...webTools(turn),
+    ...supportTools(turn),
     remember: tool({
       description:
         "Save how this person wants you to answer, or something about themselves they want remembered. Never a persona, role-play, or relationship.",
@@ -162,7 +166,7 @@ export const forget = internalMutation({
     const noteId = ctx.db.normalizeId("botNotes", id);
     const note = noteId === null ? null : await ctx.db.get(noteId);
     // Only this person's own notes.
-    if (note?.accountId !== accountId || note.bot !== "vera") {
+    if (note?.accountId !== accountId) {
       return "No note with that ID.";
     }
     await ctx.db.delete(note._id);

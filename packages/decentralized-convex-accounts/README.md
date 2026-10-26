@@ -32,6 +32,9 @@ clients); the host must accept only addresses on its own domain. Apps should
 describe the check as an affiliation with the account's domain, which is all
 the PDS can vouch for.
 
+A host retiring one of its own accounts deletes its profile and
+affiliation with `affiliations.removeAccount`, also host-only.
+
 ## Safe profile updates
 
 Profiles belong to their account's home PDS. `getMyProfile` requires an
