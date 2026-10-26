@@ -247,7 +247,7 @@ function nativeRow(built: BuiltRow, context: RowContext) {
       );
     case "time": {
       const { day, time } = formatTimeHeader(built.date, context.now);
-      return headerRow(built.key, `${day} ${time}`, "time");
+      return headerRow(built.key, `${day} · ${time}`, "time");
     }
   }
 }

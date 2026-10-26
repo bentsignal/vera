@@ -117,7 +117,7 @@ function extrasAbove(
     extras.push({
       id: `h${index}`,
       kind: "header",
-      label: `Today ${message.timeLabel}`,
+      label: `Today · ${message.timeLabel}`,
       style: layout === "bubbles" ? "time" : "day",
     });
   }

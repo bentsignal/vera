@@ -35,7 +35,7 @@ void test("rows come newest first, with a header over the oldest", () => {
   );
   const header = rowAt(rows, 3, "header");
   assert.equal(header.style, "time");
-  assert.match(header.label, /^Today /);
+  assert.match(header.label, /^Today · /);
 });
 
 void test("a thread's divider sits under its original", () => {

@@ -6,6 +6,7 @@ import { useCSSVariable } from "uniwind";
 
 import { cn } from "~/lib/cn";
 import { formatDaySeparator, formatTimeHeader } from "~/lib/format";
+import { useToday } from "~/lib/use-today";
 
 /** How strong a rule is beside the text, so it stays faint. */
 const PEAK = 0.6;
@@ -94,18 +95,19 @@ export function DaySeparator({
   /** Over a thread's original (see `Header`). */
   opensThread?: boolean;
 }) {
+  const today = useToday();
   return (
     <Header
       stacked={stacked}
       opensThread={opensThread}
       bubbles={opensThread ? "pt-1 pb-3" : "py-3"}
     >
-      <Text className="font-semibold">{formatDaySeparator(date)}</Text>
+      <Text className="font-semibold">{formatDaySeparator(date, today)}</Text>
     </Header>
   );
 }
 
-/** iMessage's header after a pause: "Today 9:41 AM", day in bold. */
+/** iMessage's header after a pause: "Today · 9:41 AM", day in bold. */
 export function TimeHeader({
   date,
   stacked = false,
@@ -119,7 +121,8 @@ export function TimeHeader({
   /** Over a thread's original that shows its sender's name. */
   named?: boolean;
 }) {
-  const { day, time } = formatTimeHeader(date);
+  const today = useToday();
+  const { day, time } = formatTimeHeader(date, today);
   const thread = named ? "pt-1 pb-1" : "pt-1 pb-2";
   return (
     <Header
@@ -127,7 +130,7 @@ export function TimeHeader({
       opensThread={opensThread}
       bubbles={opensThread ? thread : "pt-4 pb-1.5"}
     >
-      <Text className="font-semibold">{day}</Text> {time}
+      <Text className="font-semibold">{day}</Text> · {time}
     </Header>
   );
 }
