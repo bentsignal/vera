@@ -1,6 +1,9 @@
 import type { MessageRow as BuiltRow } from "../conversation/build-rows.ts";
-import type { ProfileOf } from "../conversation/message-row";
-import type { Message, MemberNotice as Notice } from "../conversation/types.ts";
+import type {
+  Message,
+  MemberNotice as Notice,
+  ProfileOf,
+} from "../conversation/types.ts";
 import type {
   Block,
   FooterLine,
@@ -317,8 +320,8 @@ export function supported(row: Row, support: Support) {
 }
 
 /**
- * The native list's rows, newest first: who's typing, then `rows` (the
- * React Native list's, from `newestFirst`).
+ * The native list's rows, newest first: who's typing, then `rows` (from
+ * `newestFirst`).
  */
 export function nativeRows(
   rows: readonly BuiltRow[],

@@ -302,7 +302,11 @@ brought over unchanged) on an isolated backend.
 
 ### The switch
 
-- Current October25 policy, explicitly requested after private phone testing:
+Superseded October 25: the React Native list, the switch and
+`veraDev.nativeList` are removed, and conversations always use the native
+list. What follows is the record of how the switch worked.
+
+- October 25 policy, explicitly requested after private phone testing:
   on by default in every build, with a persisted explicit opt-out using the
   existing `vera.nativeList` key. Unsupported/older binaries keep the RN list
   through the unchanged `nativeListInstalled` check.
@@ -316,8 +320,8 @@ brought over unchanged) on an isolated backend.
 ### Motion check
 
 `scripts/motion/check.sh` (from `t3/message-list-performance`) tests the
-native list by default and the React Native one with `MOTION_LIST=rn`. It
-flips the switch first and fails a scenario that shows the other list.
+native list. (It tested the React Native one with `MOTION_LIST=rn` until
+that list was removed.)
 
 ### Contract additions from the integration
 

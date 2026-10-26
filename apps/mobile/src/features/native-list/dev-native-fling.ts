@@ -8,9 +8,9 @@ import { registerDevList } from "~/features/dev/dev-list";
 import { nativeSupport } from "./native";
 
 /**
- * Hands the native list to benchmark scripts (`veraDev.list()`): its
+ * Hands the list to benchmark scripts (`veraDev.list()`): its
  * constant-speed fling is the binary's `benchFling`, driven on the display
- * link, as the React Native list's is (`useDevFling`).
+ * link.
  */
 export function useDevNativeFling(
   view: RefObject<MessageListViewMethods | null>,
@@ -26,7 +26,6 @@ export function useDevNativeFling(
         if (!flings || list === null || !("benchFling" in list)) return null;
         return (await list.benchFling?.(speed, ms)) ?? null;
       },
-      kind: "native",
     });
   }, [focused, view]);
 }

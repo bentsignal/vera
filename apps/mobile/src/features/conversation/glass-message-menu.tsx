@@ -1,9 +1,7 @@
-import type { ReactNode } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { Modal, Pressable, useWindowDimensions } from "react-native";
 import Animated, {
   clamp,
-  LayoutAnimationConfig,
   useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -51,8 +49,6 @@ export interface MenuTarget {
   readonly rect: Rect;
   readonly align: TargetAlign;
   readonly shape: PreviewShape;
-  /** The held element as drawn in the list, lifted above the blur. */
-  readonly preview: ReactNode;
   /** The link whose card was held, which the menu is about. */
   readonly link?: string;
   /** The photo, video, or file that was held, which the menu can save. */
@@ -63,12 +59,12 @@ export interface MenuTarget {
    */
   readonly mode: "actions" | "reactions";
   /**
-   * The native list lifts the held message itself (its `lift`), so the
-   * menu draws no copy of it: it says where the message goes as it opens
-   * (`onLift`), and `onLand` as it starts closing, when the message plays
-   * back into place with it.
+   * The list lifts the held message itself, so the menu draws no copy of
+   * it: it says where the message goes as it opens (`onLift`), and
+   * `onLand` as it starts closing, when the message plays back into place
+   * with it.
    */
-  readonly lift?: {
+  readonly lift: {
     readonly onLift: (layout: MenuLayout) => void;
     readonly onLand: () => void | Promise<void>;
   };
@@ -133,62 +129,6 @@ function Backdrop({
   );
 }
 
-function Lifted({
-  target,
-  layout,
-  progress,
-}: {
-  target: MenuTarget;
-  layout: MenuLayout;
-  progress: SharedValue<number>;
-}) {
-  const rect = frameOf(target);
-  const card = target.shape === "card";
-  const { scale, shift } = layout;
-  // Its top corner on its side stays put, so it lines up with the bar and
-  // the actions however much it grows or shrinks. One as wide as the
-  // conversation grows from its middle, staying on screen.
-  const corner = target.align === "end" ? "right" : "left";
-  const origin = `${layout.fromMiddle ? "center" : corner} top`;
-  const style = useAnimatedStyle(() => ({
-    shadowOpacity: clamp(progress.value, 0, 1) * 0.22,
-    transform: [
-      { translateY: shift * progress.value },
-      { scale: 1 + (scale - 1) * progress.value },
-    ],
-    transformOrigin: origin,
-  }));
-  return (
-    <Animated.View
-      pointerEvents="none"
-      className={cn(
-        "absolute",
-        card && "bg-background-elevated rounded-[16px]",
-      )}
-      style={[
-        {
-          height: rect.height,
-          left: rect.x,
-          shadowOffset: { height: 8, width: 0 },
-          shadowRadius: 18,
-          top: rect.y,
-          width: rect.width,
-        },
-        card && {
-          paddingHorizontal: CARD_INSET.x,
-          paddingVertical: CARD_INSET.y,
-        },
-        style,
-      ]}
-    >
-      {/* Shown as it is in the list, without fading in again. */}
-      <LayoutAnimationConfig skipEntering>
-        {target.preview}
-      </LayoutAnimationConfig>
-    </Animated.View>
-  );
-}
-
 /** The size of what goes under the lifted message: who reacted, or actions. */
 function belowSize(target: MenuTarget, actions: number, reactorsMax: number) {
   if (target.mode === "reactions") {
@@ -204,21 +144,17 @@ function belowSize(target: MenuTarget, actions: number, reactorsMax: number) {
 }
 
 /**
- * How far open the menu is, springing open as it mounts. A message the
- * native list lifts itself (`onLift`) is sent where to go then, so it
- * springs there with the menu.
+ * How far open the menu is, springing open as it mounts. The held message
+ * is sent where to go then (`onLift`), so it springs there with the menu.
  */
-function useOpening(
-  layout: MenuLayout,
-  onLift: ((layout: MenuLayout) => void) | undefined,
-) {
+function useOpening(layout: MenuLayout, onLift: (layout: MenuLayout) => void) {
   const progress = useSharedValue(0);
   useAnimatedReaction(
     () => true,
     (_, previous) => {
       if (previous !== null) return;
       progress.set(withSpring(1, OPEN_SPRING));
-      if (onLift !== undefined) scheduleOnRN(onLift, layout);
+      scheduleOnRN(onLift, layout);
     },
   );
   return progress;
@@ -268,7 +204,7 @@ export function GlassMessageMenu({
     menu: belowSize(target, actions.length, reactorsMax),
     screen,
   });
-  const progress = useOpening(layout, target.lift?.onLift);
+  const progress = useOpening(layout, target.lift.onLift);
   const menuClose = useMenuClosing(progress, target, onClosing, onClosed);
   const { closing } = menuClose;
 
@@ -288,9 +224,6 @@ export function GlassMessageMenu({
       onRequestClose={() => close()}
     >
       <Backdrop progress={progress} onPress={() => close()} />
-      {target.lift === undefined && (
-        <Lifted target={target} layout={layout} progress={progress} />
-      )}
       <ReactionBar
         target={target}
         progress={progress}
@@ -299,8 +232,7 @@ export function GlassMessageMenu({
         onPick={(emoji) => {
           selectionTick();
           // Once the message is back in place, so its reaction animates in
-          // where you can see it, and the lifted copy never covers the
-          // message while the row makes room for the reaction.
+          // where you can see it.
           close(() => onReact(emoji), true);
         }}
       />

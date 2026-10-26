@@ -5,10 +5,9 @@ import type { MessageLayout } from "~/features/preferences/store";
 import { heldPart } from "./held-part.ts";
 import { parseReactionKey } from "./map-blocks.ts";
 
-// What a tap or hold on a reaction does, as the React Native list's
-// reactions do: a stacked chip toggles when tapped and shows who reacted
-// when held (`PartChips`); a bubble's tapbacks show who reacted either
-// way, lifting their part into the glass menu (`Tapbacks`).
+// What a tap or hold on a reaction does: a stacked chip toggles when tapped
+// and shows who reacted when held; a bubble's tapbacks show who reacted
+// either way, lifting their part into the glass menu.
 
 type Event = Extract<ListEvent, { type: "hold" | "press" }>;
 

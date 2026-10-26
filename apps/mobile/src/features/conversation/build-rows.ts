@@ -276,23 +276,6 @@ function dateOfRow(row: Exclude<MessageRow, { type: "replies" }>) {
 }
 
 /**
- * Where a row sits in the list, oldest first, as a number a worklet can
- * compare: its message's time, or just before it for the header above it.
- */
-export function rowOrder(date: Date, header = false) {
-  return date.getTime() - (header ? 0.5 : 0);
-}
-
-/** Where a row sits in the list (see `rowOrder`). */
-export function orderOfRow(row: MessageRow) {
-  if (row.type === "message") return rowOrder(row.message.sentAt);
-  if (row.type === "notice") return rowOrder(row.notice.at);
-  // A thread's divider sits just after its original.
-  if (row.type === "replies") return rowOrder(row.date) + 0.25;
-  return rowOrder(row.date, true);
-}
-
-/**
  * Rows newest first, as the inverted list lays them out from the bottom.
  * A thread's original comes before its replies.
  */

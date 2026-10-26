@@ -9,9 +9,10 @@ import {
 
 import type { ComposerHandle } from "~/features/conversation/composer";
 import type { ComposerHeight } from "~/features/conversation/composer-height";
-import type { MessageListHandle } from "~/features/conversation/message-list";
+import type { MessageListHandle } from "~/features/native-list/list-props";
 import { Pending } from "~/components/pending";
 import { useComposerBottomInset } from "~/features/conversation/composer";
+import { useComposerHeight } from "~/features/conversation/composer-height";
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
 import { usePacedMessages } from "~/features/conversation/paced-messages";
@@ -33,10 +34,7 @@ import {
 } from "~/features/messaging/threads";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
 import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
-import {
-  ConversationList,
-  useConversationComposerHeight,
-} from "~/features/native-list/conversation-list";
+import { NativeMessageList } from "~/features/native-list/native-message-list";
 import { useActiveThread } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 import { useAccountPending } from "~/features/saved/offline-pill";
@@ -190,7 +188,7 @@ function Thread({
   // Others' new replies, paced in a busy thread (see `usePacedMessages`).
   const replies = usePacedMessages(thread.messages, address);
   const typing = useThreadTyping(conversationId, threadId, replies);
-  const { composerHeight, report } = useConversationComposerHeight();
+  const { composerHeight, report } = useComposerHeight();
   const list = useRef<MessageListHandle>(null);
   const { composer, draftId, editing } = useDraft(conversationId, threadId);
   useWhileOpen(conversationId, threadId, thread);
@@ -221,7 +219,7 @@ function Thread({
       <ConversationGestureArea>
         <Pending phase={pending} />
         {shown !== null && pending === "ready" && (
-          <ConversationList
+          <NativeMessageList
             ref={list}
             key={thread.viewKey}
             anchorId={thread.anchor}

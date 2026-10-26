@@ -6,11 +6,6 @@ import type { Preferences } from "~/features/preferences/store";
 import { env } from "~/env";
 import { inboxQuery } from "~/features/messaging/inbox";
 import { cachedSelected } from "~/features/messaging/results";
-import {
-  nativeListInstalled,
-  nativeListOn,
-  setNativeList,
-} from "~/features/native-list/switch";
 import { setPreference } from "~/features/preferences/store";
 import { queryClient } from "~/features/session/account-session";
 import { storedAccounts } from "~/features/session/account-store";
@@ -61,14 +56,6 @@ export function installDevAutomation() {
       photoTiming,
       /** Committed composer geometry versus later height reports. */
       sendTiming,
-      /**
-       * Turns the native message list on or off, and says which list
-       * conversations show: "native", or "rn" (off, or not in this binary).
-       */
-      nativeList(on?: boolean) {
-        if (on !== undefined) setNativeList(on);
-        return nativeListOn() && nativeListInstalled ? "native" : "rn";
-      },
       /**
        * The newest group the signed-in account is in, once the inbox has
        * loaded, for scripts that need one (scripts/motion).

@@ -1,8 +1,6 @@
-import type { ReactNode } from "react";
 import { useRef } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 
-import type { HeldPart } from "./held-part";
 import type { Frame, Lift, ListEvent } from "./native";
 import type { ReactionAction } from "./reaction-events";
 import type { MenuTarget } from "~/features/conversation/glass-message-menu";
@@ -124,21 +122,19 @@ interface MenuPlace {
 interface MenuOptions {
   readonly layout: MessageLayout;
   readonly self: string;
-  readonly preview: (message: Message, held: HeldPart) => ReactNode;
-  /** Set on binaries with the `lift` feature. */
-  readonly lift?: (lift: Lift | undefined) => void | Promise<void>;
+  /** Lifts the held part into the menu, or (undefined) lands it back. */
+  readonly lift: (lift: Lift | undefined) => void | Promise<void>;
 }
 
 /**
  * The glass menu over a held part: its actions, or with `mode`
- * "reactions", who reacted to it. On a binary that lifts the message
- * itself (`lift`), the menu draws no copy and says where it goes; on older
- * ones, it lifts a React copy as the React Native list does.
+ * "reactions", who reacted to it. The list lifts the message itself
+ * (`lift`): the menu draws no copy and says where it goes.
  */
 function menuTarget(
   event: MenuPlace,
   message: Message,
-  { layout, self, preview, lift }: MenuOptions,
+  { layout, self, lift }: MenuOptions,
   mode: MenuTarget["mode"],
 ) {
   const held = heldPart(message, event);
@@ -152,23 +148,19 @@ function menuTarget(
     message,
     mode,
     part: held.part,
-    lift:
-      lift === undefined
-        ? undefined
-        : {
-            onLand: () => lift(undefined),
-            onLift: (place) => {
-              void lift({
-                index: event.index,
-                origin: place.fromMiddle ? "middle" : align,
-                part: event.part,
-                rowId: event.rowId,
-                scale: place.scale,
-                shift: place.shift,
-              });
-            },
-          },
-    preview: lift === undefined ? preview(message, held) : null,
+    lift: {
+      onLand: () => lift(undefined),
+      onLift: (place) => {
+        void lift({
+          index: event.index,
+          origin: place.fromMiddle ? "middle" : align,
+          part: event.part,
+          rowId: event.rowId,
+          scale: place.scale,
+          shift: place.shift,
+        });
+      },
+    },
     rect: event.frame,
     // Text without a bubble (stacked, jumbo emoji) lifts on a card, as the
     // native list draws it; everything else as it is.
@@ -194,8 +186,8 @@ function useOpenMedia() {
     opening.current = press.opening;
     if (!press.opens) return;
     const { attachment } = item;
-    // A video opens playing, in the video player, as the React Native
-    // list's did, not on its poster in the group.
+    // A video opens playing, in the video player, not on its poster in
+    // the group.
     if (attachment.kind === "video") {
       router.push({
         params: { kind: "video", url: attachment.localUrl ?? attachment.url },
@@ -321,7 +313,7 @@ export function useListEvents({
         return;
       case "visible":
         // Read marks follow the newest message while it's open
-        // (`useMarkRead`), as with the React Native list.
+        // (`useMarkRead`).
         return;
       case "press":
       case "hold":

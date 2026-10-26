@@ -45,9 +45,6 @@ page names Vera and explains the replacement. This profile inherits
 production configuration,
 uses an empty, separate preview update channel, and submits to no store.
 It can build the integration branch before Shawn approves merging it.
-Native lists default on in compatible new binaries. The persisted opt-out is
-Settings → Experimental → Native Message List; unsupported older binaries
-continue using the React Native list.
 
 The iOS preview uses the production bundle ID and signing team. Install it
 over TestFlight without deleting Vera to keep its app data and keychain;
@@ -130,10 +127,12 @@ an OTA. No old-runtime gate prelude or automatic deny-list activation is
 required. A future forced-update rollout needs its own approval and runtime
 review. The release kept `BREAKING_VERSION` at 3.
 
-Native lists default on in compatible new builds. Settings → Experimental →
-Native Message List is the persisted opt-out. Unsupported older binaries keep
-the React Native fallback. The detailed acceptance and deferred Android camera
-preview cosmetics are recorded in
+The native list is now the app's only message list: the React Native list
+and its Settings → Experimental switch are removed. Binaries from before
+the native-list release (iOS build 9, Android build 6) keep the React
+Native list in the JavaScript they already have: updates match the native
+fingerprint, so newer JavaScript never reaches them. The detailed acceptance and deferred Android camera preview cosmetics
+are recorded in
 [the native-list release record](../.plans/native-list-release-20261025.md).
 
 ## Release history in git
