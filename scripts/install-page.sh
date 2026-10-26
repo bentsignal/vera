@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Uploads an iOS or Android build of Vera Dev with an install page to
+# Uploads an iOS or Android build of Vera or Vera Dev with an install page to
 # bunny.net (the `vera-evidence` zone, under an unlisted path) and prints
 # the page's URL. scripts/phone.sh (dev clients) and `pnpm release build
 # internal` use it instead of `eas upload`, because EAS's free plan caps
@@ -12,12 +12,27 @@
 # stays. scripts/phone.sh re-uploads a cached dev client whose page was
 # deleted.
 #
-#   scripts/install-page.sh <ipa|apk> <path prefix> "<description>"
+#   scripts/install-page.sh <ipa|apk> <path prefix> "<description>" [production]
 set -euo pipefail
 
 artifact="${1:?ipa or apk}"
 prefix="${2:?path prefix}-$(openssl rand -hex 6)"
 description="${3:-}"
+variant="${4:-development}"
+app_name="Vera Dev"
+artifact_name="vera-dev"
+page_title="$app_name"
+button_color="#ec8a1e"
+replacement="Replaces whichever Vera Dev is installed. The TestFlight app stays."
+if [ "$variant" = production ]; then
+  app_name="Vera"
+  artifact_name="vera"
+  page_title="Vera preview"
+  button_color="#248a3d"
+elif [ "$variant" != development ]; then
+  echo "variant must be development or production" >&2
+  exit 2
+fi
 ZONE="vera-evidence"
 CDN="https://vera-evidence.b-cdn.net"
 work="$(mktemp -d)"
@@ -55,7 +70,10 @@ case "$artifact" in
     bundle_id="$(plutil -extract CFBundleIdentifier raw "$work/Info.plist")"
     version="$(plutil -extract CFBundleShortVersionString raw "$work/Info.plist")"
     build="iOS build $(plutil -extract CFBundleVersion raw "$work/Info.plist")"
-    put "$artifact" vera-dev.ipa application/octet-stream
+    if [ "$variant" = production ]; then
+      replacement="Replaces Vera on this iPhone. Install over it without deleting it to keep your sign-in and data. Return by reinstalling from TestFlight."
+    fi
+    put "$artifact" "$artifact_name.ipa" application/octet-stream
     cat >"$work/manifest.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -68,7 +86,7 @@ case "$artifact" in
       <array>
         <dict>
           <key>kind</key><string>software-package</string>
-          <key>url</key><string>$CDN/$prefix/vera-dev.ipa</string>
+          <key>url</key><string>$CDN/$prefix/$artifact_name.ipa</string>
         </dict>
       </array>
       <key>metadata</key>
@@ -76,7 +94,7 @@ case "$artifact" in
         <key>bundle-identifier</key><string>$bundle_id</string>
         <key>bundle-version</key><string>$version</string>
         <key>kind</key><string>software</string>
-        <key>title</key><string>Vera Dev</string>
+        <key>title</key><string>$app_name</string>
       </dict>
     </dict>
   </array>
@@ -88,8 +106,11 @@ PLIST
     ;;
   *.apk)
     build="Android"
-    put "$artifact" vera-dev.apk application/vnd.android.package-archive
-    link="$CDN/$prefix/vera-dev.apk"
+    if [ "$variant" = production ]; then
+      replacement="Uninstall the Play copy of Vera before installing, then sign in again. Server messages remain; local drafts, unsent messages, and cached data are removed. To return, uninstall this build and reinstall Vera from Play."
+    fi
+    put "$artifact" "$artifact_name.apk" application/vnd.android.package-archive
+    link="$CDN/$prefix/$artifact_name.apk"
     ;;
   *)
     echo "not an ipa or apk: $artifact" >&2
@@ -100,13 +121,13 @@ esac
 cat >"$work/index.html" <<HTML
 <!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vera Dev</title>
+<title>$page_title</title>
 <body style="font: 17px -apple-system, system-ui, sans-serif; margin: 3em 1.5em; text-align: center">
-<h1>Vera Dev</h1>
+<h1>$page_title</h1>
 <p>$description</p>
 <p style="color: #888">$build</p>
-<p><a href="$link" style="display: inline-block; padding: .8em 1.6em; border-radius: 12px; background: #ec8a1e; color: white; text-decoration: none; font-weight: 600">Install</a></p>
-<p style="color: #888">Replaces whichever Vera Dev is installed. The TestFlight app stays.</p>
+<p><a href="$link" style="display: inline-block; padding: .8em 1.6em; border-radius: 12px; background: $button_color; color: white; text-decoration: none; font-weight: 600">Install</a></p>
+<p style="color: #888">$replacement</p>
 HTML
 put "$work/index.html" index.html text/html
 echo "$CDN/$prefix/index.html"

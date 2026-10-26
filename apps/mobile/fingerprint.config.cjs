@@ -15,6 +15,14 @@ const config = {
       filePath: "plugins/notification-service",
       reasons: ["notificationServiceExtension"],
     },
+    // pnpm's patches to dependencies are in the repo's root, not this
+    // project's `patches`, which is all the default sources read. A patch
+    // to native code (react-native's, for dictation) needs a new build.
+    {
+      type: "dir",
+      filePath: "../../patches",
+      reasons: ["pnpmPatches"],
+    },
     // Reanimated compiles its static feature flags in from package.json's
     // "reanimated" key, which the default sources don't read.
     {

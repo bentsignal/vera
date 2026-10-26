@@ -8,7 +8,8 @@
     "./pds": "./pds.ts",
     "./dataModel": "./convex/_generated/dataModel.d.ts",
     "./upload-limits": "./upload-limits.ts",
-    "./breaking-version": "./breaking-version.ts"
+    "./breaking-version": "./breaking-version.ts",
+    "./dev-mixed-lines": "./dev-mixed-lines.ts"
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo node_modules",
@@ -36,12 +37,15 @@
     "aws4fetch": "^1.0.20",
     "better-auth": "~1.6.33",
     "convex": "catalog:",
+    "heic-decode": "2.1.0",
+    "jpeg-js": "0.4.4",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",
     "@acme/prettier-config": "workspace:*",
     "@acme/tsconfig": "workspace:*",
+    "@types/heic-decode": "2.0.0",
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",

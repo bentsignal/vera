@@ -12,7 +12,6 @@ import {
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const vera = { accountId: "a@vera.chat", bot: "vera" } as const;
-const support = { accountId: "a@vera.chat", bot: "support" } as const;
 const empty: Bucket = { ...vera, tokens: 0, updatedAt: 0 };
 
 void test("a new person has the full hour", () => {
@@ -65,18 +64,4 @@ void test("five strikes in a day pause the assistant until the day is up", () =>
   const tomorrow = current({ ...paused.bucket, tokens: 50 }, vera, DAY);
   assert.equal(tomorrow.strikes, undefined);
   assert.equal(decide(tomorrow, DAY).ok, true);
-});
-
-void test("support has its own hour, separate from Vera's", () => {
-  const bucket = current(null, support, 0);
-  assert.equal(bucket.tokens, LIMITS.support.perHour);
-  const dry = decide({ ...bucket, tokens: 0 }, 0);
-  assert.match(
-    dry.notice ?? "",
-    /limit of 300 messages an hour with Vera Support\. Try again in a minute\./,
-  );
-  assert.match(
-    decide({ ...empty, strikes: STRIKES_PER_DAY - 1 }, 0).notice ?? "",
-    /Vera is paused/,
-  );
 });

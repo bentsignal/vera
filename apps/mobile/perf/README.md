@@ -11,11 +11,6 @@ build.
 
 ## In `pnpm test` (CI fails on these)
 
-- **Render budgets** (`message-list.perf.tsx`): a new message, a reaction, and
-  an older page each re-render only the messages they change. When every
-  message on screen redraws for one update, sending and scrolling stutter on a
-  slow phone. A budget that fails means something shared lost its identity: a
-  prop, a profile, or a context value now new on every render.
 - **The React Compiler compiles everything** (`compiler.perf.ts`): every
   component and hook in `src/` compiles with the compiler Metro uses. When it
   can't compile a function, it leaves it as written, with nothing memoized,
@@ -26,10 +21,11 @@ build.
 ## `pnpm perf` (a report in CI)
 
 [Reassure](https://github.com/callstack/reassure) measures how long React
-takes to render a conversation and each update (`message-list.perf-test.tsx`),
-and how many commits each takes, over ten runs. The CI job `performance`
-measures the PR's base and then the PR with the same tests and dependencies,
-and writes the comparison to the job's summary. It doesn't fail the build: the
+takes to build a conversation's rows for the native list and to update them
+(`message-list.perf-test.tsx`), and how many commits each takes, over ten
+runs. The CI job `performance` measures the PR's base and then the PR with
+the same tests and dependencies, and writes the comparison to the job's
+summary. It doesn't fail the build: the
 timings are React's work in Jest (in development mode, with nothing drawn), so
 they vary from run to run and only show what changed relative to the base.
 
@@ -68,7 +64,7 @@ sees it. Two checks cover it:
   `transitionProperty`), or a CSS animation of one. Move things with
   `transform` and fade with `opacity`. When layout has to change, change it
   once and draw what moved back where it was with a transform that eases to
-  zero (`GrowingSpace` in `src/features/conversation/grow.tsx`).
+  zero.
 - **Frames on a device (`scripts/sim.sh frames start` and `stop`):** records
   every frame the UI thread draws in this worktree's simulator or emulator,
   and reports the slow ones (over 1.5 refreshes). Measure any change to what

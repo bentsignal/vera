@@ -1,17 +1,13 @@
 // The decisions behind assistant rate limits (convex/rateLimits.ts), as
 // plain functions so they can be tested without Convex.
 
-export type AssistantName = "support" | "vera";
+export type AssistantName = "vera";
 
-/**
- * Each assistant's allowance, per person and counted separately, so
- * reporting bugs never eats into time with Vera or the other way around.
- */
+/** Each assistant's allowance, per person. */
 export const LIMITS: Record<
   AssistantName,
   { readonly name: string; readonly perHour: number }
 > = {
-  support: { name: "Vera Support", perHour: 300 },
   vera: { name: "Vera", perHour: 300 },
 };
 
@@ -40,7 +36,7 @@ function refill(bot: AssistantName) {
 
 /** The person's bucket now: refilled, and with yesterday's strikes cleared. */
 export function current(
-  bucket: Bucket | null,
+  bucket: Omit<Bucket, "bot"> | null,
   { accountId, bot }: { accountId: string; bot: AssistantName },
   now: number,
 ): Bucket {
