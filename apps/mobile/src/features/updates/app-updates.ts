@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { AppState, Keyboard } from "react-native";
 import { File, Paths } from "expo-file-system";
 import { useNavigationContainerRef } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import * as Updates from "expo-updates";
 import { BREAKING_VERSION } from "@vera/backend/breaking-version";
 import { Uniwind } from "uniwind";
@@ -9,6 +10,7 @@ import { Uniwind } from "uniwind";
 import { saveDraftsNow } from "~/features/conversation/drafts";
 import { hasUnsentMessages } from "~/features/messaging/outbox";
 import { queryClient } from "~/features/session/account-session";
+import { canContinue, GIVE_UP_MS, launchStep } from "./launch-gate";
 import { releaseSplash } from "./launch-splash";
 import { canRestartForUpdate } from "./restart-policy";
 
@@ -20,11 +22,13 @@ import { canRestartForUpdate } from "./restart-policy";
 // on the same screen: at once while it's still opening, otherwise at the
 // first quiet moment (see `restart-policy.ts`).
 //
-// A launch of the bundle built into the binary (a new install from the
-// store or TestFlight) may be dozens of updates behind. It keeps the splash
-// up while it checks and downloads, for up to 6 seconds, so it opens on
-// the latest update; if the download takes longer, the update goes in as
-// soon as it lands, without waiting for a pause.
+// A launch (not a return from the background) waits for its update
+// instead, so it opens on the latest one: a new install from the store or
+// TestFlight may be dozens of updates behind. The splash stays up while
+// expo-updates checks and downloads; past 1.5 seconds "Updating Vera…"
+// shows, and the app restarts into the update when it lands. A stall, the
+// "Continue Without Updating" button, or a time limit always opens the app
+// (see `launch-gate.ts`).
 //
 // A backend deploy that raises the breaking version (see
 // services/backend/breaking-version.ts) can't wait for that: the moment its
@@ -37,8 +41,8 @@ type RootState = NonNullable<Parameters<NavigationRef["resetRoot"]>[0]>;
 
 /** How often an app in the foreground checks for an update. */
 const CHECK_EVERY_MS = 60_000;
-/** How long a launch of the built-in bundle holds the splash for an update. */
-const EMBEDDED_SPLASH_MS = 6_000;
+/** How often a launch waiting for its update looks at how it's going. */
+const GATE_TICK_MS = 250;
 /** How often the foreground timer runs: checks, and watching for a pause. */
 const TICK_MS = 1_000;
 /** While an update is required, how often to look for it. */
@@ -68,22 +72,58 @@ let navigation: NavigationRef | undefined;
  */
 let required: "store" | "updating" | undefined;
 let requiredSince = 0;
-const requiredListeners = new Set<() => void>();
+
+/** The launch's wait for its update, while it lasts. */
+let gate:
+  | {
+      readonly startedAt: number;
+      heardAt: number;
+      coverShownAt: number | undefined;
+      readonly stop: () => void;
+    }
+  | undefined;
+/**
+ * What the launch's wait shows over the app: nothing, "Updating Vera…", or
+ * that with "Continue Without Updating".
+ */
+let launchCover: "continue" | "hidden" | "updating" = "hidden";
+
+const listeners = new Set<() => void>();
+
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 function setRequired(next: typeof required) {
   if (required === next) return;
   required = next;
-  for (const listener of requiredListeners) listener();
+  notify();
 }
 
-function subscribeRequired(listener: () => void) {
-  requiredListeners.add(listener);
-  return () => requiredListeners.delete(listener);
+function setLaunchCover(next: typeof launchCover) {
+  if (launchCover === next) return;
+  launchCover = next;
+  notify();
 }
 
 /** Whether the backend needs a newer app than this one; `UpdateCover` shows it. */
 export function useRequiredUpdate() {
-  return useSyncExternalStore(subscribeRequired, () => required);
+  return useSyncExternalStore(subscribe, () => required);
+}
+
+/** What the launch's wait for its update shows; `UpdateCover` shows it. */
+export function useLaunchCover() {
+  return useSyncExternalStore(subscribe, () => launchCover);
+}
+
+/** "Continue Without Updating": the update goes in later instead. */
+export function continueWithoutUpdating() {
+  openApp();
 }
 
 /** Takes the backend's breaking version from its live query. */
@@ -108,14 +148,11 @@ export function noteServerBreakingVersion(version: number) {
  * every minute in the foreground.
  */
 export function installAppUpdates() {
-  if (__DEV__ || !Updates.isEnabled || !Updates.isEmbeddedLaunch) {
+  if (__DEV__ || !Updates.isEnabled) {
     releaseSplash();
-  } else {
-    setTimeout(() => {
-      if (!restarting) releaseSplash();
-    }, EMBEDDED_SPLASH_MS);
+    return;
   }
-  if (__DEV__ || !Updates.isEnabled) return;
+  waitForLaunchUpdate();
   // "inactive" (Control Center, Face ID, a system alert) isn't an open; only
   // coming back from the background is. A launch in the background, as for a
   // notification, waits for the app to open too.
@@ -166,8 +203,6 @@ async function check() {
   downloaded = await download().catch(() => false);
   checking = false;
   if (downloaded) await restartIfUnnoticed();
-  // A restart keeps the splash up; otherwise the app shows.
-  if (!restarting) releaseSplash();
 }
 
 /** Downloads a newer update, if there is one. */
@@ -187,7 +222,6 @@ async function restartIfUnnoticed() {
     required !== undefined ||
     canRestartForUpdate({
       active: AppState.currentState === "active",
-      embeddedLaunch: Updates.isEmbeddedLaunch,
       keyboardVisible: Keyboard.isVisible(),
       now,
       openedAt,
@@ -196,10 +230,16 @@ async function restartIfUnnoticed() {
       unsentMessages: hasUnsentMessages(),
       viewingMedia: focusedScreen() === "media",
     });
-  if (!ready || restarting) return;
+  // While the launch waits for its update, it restarts on its own terms.
+  if (!ready || gate !== undefined) return;
+  await restart();
+}
+
+async function restart() {
+  if (restarting) return;
   restarting = true;
   saveDraftsNow();
-  saveScreen(now);
+  saveScreen(Date.now());
   try {
     await Updates.reloadAsync({
       reloadScreenOptions: {
@@ -214,8 +254,84 @@ async function restartIfUnnoticed() {
     // The update goes in on the next launch instead; `restarting` stays set
     // so this launch doesn't keep trying.
     forgetScreen();
-    releaseSplash();
+    openApp();
   }
+}
+
+/**
+ * Keeps a launch on the splash, then "Updating Vera…", while expo-updates
+ * checks for and downloads an update, and restarts into it when it lands.
+ * Only a launch in the foreground waits, and only while expo-updates is
+ * still working on its launch check: not after a restart into an update, or
+ * after a downloaded update failed and the app fell back to the built-in one.
+ */
+function waitForLaunchUpdate() {
+  const context = Updates.latestContext;
+  if (
+    AppState.currentState === "background" ||
+    Updates.isEmergencyLaunch ||
+    context.restartCount > 0 ||
+    !(context.isStartupProcedureRunning || context.isUpdatePending)
+  ) {
+    releaseSplash();
+    return;
+  }
+  const startedAt = Date.now();
+  const subscription = Updates.addUpdatesStateChangeListener(() => {
+    if (gate !== undefined) gate.heardAt = Date.now();
+    stepLaunch();
+  });
+  const interval = setInterval(stepLaunch, GATE_TICK_MS);
+  // The backstop: it needs nothing above to work, and opening twice is fine.
+  const backstop = setTimeout(openApp, GIVE_UP_MS);
+  gate = {
+    coverShownAt: undefined,
+    heardAt: startedAt,
+    startedAt,
+    stop: () => {
+      subscription.remove();
+      clearInterval(interval);
+      clearTimeout(backstop);
+    },
+  };
+  stepLaunch();
+}
+
+function stepLaunch() {
+  if (gate === undefined) return;
+  const now = Date.now();
+  const state = {
+    coverShownAt: gate.coverShownAt,
+    heardAt: gate.heardAt,
+    now,
+    running: Updates.latestContext.isStartupProcedureRunning,
+    startedAt: gate.startedAt,
+    updateReady: Updates.latestContext.isUpdatePending,
+  };
+  const step = launchStep(state);
+  if (step === "cover") {
+    if (gate.coverShownAt === undefined) {
+      gate.coverShownAt = now;
+      // The cover is the splash's color, so the words fade in over it.
+      void SplashScreen.hideAsync();
+    }
+    setLaunchCover(canContinue(state) ? "continue" : "updating");
+  } else if (step === "open") {
+    openApp();
+  } else if (step === "restart") {
+    // The cover, if it's up, stays until the app restarts.
+    gate.stop();
+    gate = undefined;
+    void restart();
+  }
+}
+
+/** Ends the launch's wait for its update and shows the app as it is. */
+function openApp() {
+  gate?.stop();
+  gate = undefined;
+  setLaunchCover("hidden");
+  releaseSplash();
 }
 
 function screenFile() {
