@@ -2,7 +2,7 @@ import type { GitHubConfig } from "./github";
 import { githubResponse, read, stringOrNull } from "./github";
 
 // The repository's issues as GitHub's REST API lists them, for what Vera
-// Support checks before filing (supportLookup.ts). Unlike GitHub's search,
+// checks before filing (supportLookup.ts). Unlike GitHub's search,
 // the list has an issue the moment it's filed.
 
 /** An issue as the REST API lists it. */

@@ -19,13 +19,13 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { sendAsBot, SUPPORT } from "./bots";
+import { sendAsBot, VERA } from "./bots";
 import { githubConfig, issueStates } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";
 import { reportStage } from "./schema";
 import { explainClosure } from "./supportClosures";
 
-// The bug reports Vera Support files (supportAgent.ts) and how they're
+// The bug reports Vera files (supportAgent.ts) and how they're
 // going. A cron (crons.ts) reads each open report's GitHub issue and tells
 // the reporter, in plain words, when someone picks it up, when a fix is
 // being worked on, when it's fixed, and when the fix is out. "Out" means
@@ -36,7 +36,7 @@ import { explainClosure } from "./supportClosures";
 // after, all hear the same updates.
 
 /**
- * A report to follow: a new issue support filed, or (with `stage`) an
+ * A report to follow: a new issue Vera filed, or (with `stage`) an
  * existing one someone else reported first, which they hear about from
  * where it is now.
  */
@@ -213,7 +213,7 @@ async function tellReporter(
     summary: report.summary,
   });
   if (message !== null) {
-    await sendAsBot(ctx, SUPPORT, report.conversationId, message);
+    await sendAsBot(ctx, VERA, report.conversationId, message);
   }
 }
 

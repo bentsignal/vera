@@ -1,7 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 
-import type { Assistant } from "./agentReply";
 import type { Turn } from "./agentTools";
 import type { KnownBugCheck } from "./supportLookup";
 import type { Reporter } from "./supportReporters";
@@ -9,15 +8,15 @@ import type { PublicReport } from "./supportReports";
 import { anonymize, issueFor } from "../bug-reports";
 import { SUPPORT_COMMENT } from "../issue-closures";
 import { internal } from "./_generated/api";
-import { conversationTools, sharedInstructions } from "./agentTools";
 import { commentOnIssue, createIssue, githubConfig } from "./github";
 import { filedSince, lookupTools, newCheck } from "./supportLookup";
 import { noticeShared, PRIVACY_NOTICE, whyNotFile } from "./supportRules";
 
-// Vera Support's model: it helps someone describe a bug well, files it as a
-// public, anonymized GitHub issue, and answers questions about their
-// reports. Updates as a fix moves along come from supportReports.ts, not
-// the model.
+// Vera's bug reports (vera.ts adds these to its instructions and tools):
+// it helps someone describe a bug well, files it as a public, anonymized
+// GitHub issue, and answers questions about their reports. Updates as a fix
+// moves along come from supportReports.ts, not the model. Until 2026-10
+// this was its own account, Vera Support (mergeSupport.ts).
 
 const STAGE_WORDS = {
   closed: "closed (not being changed, or the same as another report)",
@@ -28,15 +27,8 @@ const STAGE_WORDS = {
   reported: "reported, waiting for someone to pick it up",
 } as const;
 
-export const supportAssistant: Assistant = {
-  prepare: async (turn) => ({
-    instructions: await instructions(turn),
-    tools: tools(turn),
-  }),
-};
-
-/** Support's rules, then what it knows about this person and their reports. */
-async function instructions(turn: Turn) {
+/** What Vera knows and does about bug reports, for its instructions. */
+export async function supportInstructions(turn: Turn) {
   const [reporter, reports]: [Reporter, PublicReport[]] = await Promise.all([
     turn.ctx.runQuery(internal.supportReporters.reporter, {
       accountId: turn.accountId,
@@ -60,9 +52,7 @@ async function instructions(turn: Turn) {
               `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}${reporter.developer === true ? `. ${linksOf(report)}` : ""}`,
           )
           .join("\n");
-  return `${sharedInstructions(turn)}
-
-You are Vera Support. People message you when something in the Vera app isn't working. Your job: understand the problem well enough for the team to fix it, file it, and keep them in the loop. Be warm, brief, and plain-spoken.
+  return `Bugs and ideas: when something in the Vera app isn't working for them, or they have an idea for it, understand the problem well enough for the team to fix it, file it, and keep them in the loop. Be kind about it; something broken is frustrating.
 
 Getting a good report:
 - Find out what went wrong, where in the app it happened, what they expected instead, and how to make it happen again (or whether it keeps happening). A screenshot or screen recording helps a lot; ask for one when it would.
@@ -103,10 +93,10 @@ Their reports (newest first):
 ${reportList}`;
 }
 
-function tools(turn: Turn) {
+/** Filing and following bug reports. */
+export function supportTools(turn: Turn) {
   const check = newCheck();
   return {
-    ...conversationTools(turn),
     ...lookupTools(turn, check),
     share_privacy_notice: tool({
       description:

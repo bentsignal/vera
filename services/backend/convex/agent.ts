@@ -63,13 +63,8 @@ export const run = internalAction({
 export const claim = internalMutation({
   args: { conversationId: v.string(), wakeAt: v.number() },
   handler: async (ctx, { conversationId, wakeAt }) => {
-    const row = await ctx.db
-      .query("botConversations")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", conversationId),
-      )
-      .unique();
-    if (row?.wakeAt !== wakeAt) return null;
+    const row = await dueRow(ctx, conversationId, wakeAt);
+    if (row === null) return null;
     const now = Date.now();
     // A reply that died is taken over: this one answers its messages too.
     if ((await runState(ctx, row, now)) === "running") {
@@ -109,6 +104,22 @@ export const claim = internalMutation({
     };
   },
 });
+
+/** The conversation's reply state, if this wake-up is the one it's waiting for. */
+async function dueRow(
+  ctx: MutationCtx,
+  conversationId: string,
+  wakeAt: number,
+) {
+  const row = await ctx.db
+    .query("botConversations")
+    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+    .unique();
+  if (row?.wakeAt !== wakeAt) return null;
+  // Vera Support's rows wait for the merge (mergeSupport.ts) to remove them.
+  if (row.bot === "support") return null;
+  return { ...row, bot: row.bot };
+}
 
 /** Ends a reply, and starts the next if messages came in meanwhile. */
 export const finish = internalMutation({
@@ -166,7 +177,9 @@ export const watch = internalMutation({
       return;
     }
     console.error(`${row.bot}'s reply in ${conversationId} died`);
-    if (row.rerun !== true) {
+    // Vera Support's rows wait for the merge (mergeSupport.ts); its account
+    // can't write any more.
+    if (row.rerun !== true && row.bot === "vera") {
       await sendAsBot(ctx, botAccount(row.bot), conversationId, FAILURE_NOTICE);
     }
     await endRun(ctx, row, {});

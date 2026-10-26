@@ -31,6 +31,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         Array<string>,
         Name
       >;
+      removeAccount: FunctionReference<
+        "mutation",
+        "internal",
+        { accountId: string },
+        null,
+        Name
+      >;
       setAffiliated: FunctionReference<
         "mutation",
         "internal",

@@ -4,14 +4,7 @@ import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
 import { internal } from "./_generated/api";
-import {
-  ASSISTANTS,
-  botAccount,
-  botAddress,
-  field,
-  queryAsBot,
-  VERA,
-} from "./bots";
+import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
@@ -157,7 +150,7 @@ export async function waitWhileTyping(
   ) {
     return false;
   }
-  const response = await queryAsBot(ctx, botAccount(row.bot), {
+  const response = await queryAsBot(ctx, VERA, {
     args: { conversationId: row.conversationId },
     type: "typing",
   });

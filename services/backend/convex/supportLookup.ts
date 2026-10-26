@@ -17,8 +17,8 @@ import { issuesChangedSince } from "./githubIssues";
 import { delivered, lazyReleases } from "./githubReleases";
 import { followKnownBug } from "./supportFollow";
 
-// Support's tools for what the team already knows. GitHub's issues are the
-// one record of bugs: support searches them before filing and follows a
+// Vera's tools for what the team already knows. GitHub's issues are the
+// one record of bugs: Vera searches them before filing and follows a
 // match instead of filing a duplicate (supportFollow.ts). GitHub's search
 // can take a while to see a new issue, so ones filed in the last day come
 // from the issue list too, which has them at once.

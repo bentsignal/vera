@@ -12,7 +12,6 @@ import { cachedPartHash, replyRequest } from "./agentRequest";
 import { keepTyping, messageSender } from "./agentTools";
 import { botAddress } from "./bots";
 import { recallOlder } from "./memory";
-import { supportAssistant } from "./supportAgent";
 import { usageOf } from "./usage";
 import { veraAssistant } from "./vera";
 
@@ -51,7 +50,6 @@ export interface Prompt {
 }
 
 const ASSISTANTS: Record<BotAccount["username"], Assistant> = {
-  support: supportAssistant,
   vera: veraAssistant,
 };
 

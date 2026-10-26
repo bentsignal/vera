@@ -33,8 +33,8 @@ import type * as devReleaseTest from "../devReleaseTest.js";
 import type * as devSeed from "../devSeed.js";
 import type * as devSignIn from "../devSignIn.js";
 import type * as devSignInPage from "../devSignInPage.js";
-import type * as devSupport from "../devSupport.js";
 import type * as devThreads from "../devThreads.js";
+import type * as devVera from "../devVera.js";
 import type * as files from "../files.js";
 import type * as github from "../github.js";
 import type * as githubIssues from "../githubIssues.js";
@@ -44,11 +44,11 @@ import type * as joinPage from "../joinPage.js";
 import type * as lib from "../lib.js";
 import type * as memory from "../memory.js";
 import type * as memoryBuild from "../memoryBuild.js";
+import type * as mergeSupport from "../mergeSupport.js";
 import type * as pds from "../pds.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as release from "../release.js";
 import type * as sendLimits from "../sendLimits.js";
-import type * as support from "../support.js";
 import type * as supportAgent from "../supportAgent.js";
 import type * as supportClosures from "../supportClosures.js";
 import type * as supportFollow from "../supportFollow.js";
@@ -59,6 +59,7 @@ import type * as supportRules from "../supportRules.js";
 import type * as timeZones from "../timeZones.js";
 import type * as usage from "../usage.js";
 import type * as vera from "../vera.js";
+import type * as veraInbox from "../veraInbox.js";
 import type * as webSearch from "../webSearch.js";
 
 import type {
@@ -93,8 +94,8 @@ declare const fullApi: ApiFromModules<{
   devSeed: typeof devSeed;
   devSignIn: typeof devSignIn;
   devSignInPage: typeof devSignInPage;
-  devSupport: typeof devSupport;
   devThreads: typeof devThreads;
+  devVera: typeof devVera;
   files: typeof files;
   github: typeof github;
   githubIssues: typeof githubIssues;
@@ -104,11 +105,11 @@ declare const fullApi: ApiFromModules<{
   lib: typeof lib;
   memory: typeof memory;
   memoryBuild: typeof memoryBuild;
+  mergeSupport: typeof mergeSupport;
   pds: typeof pds;
   rateLimits: typeof rateLimits;
   release: typeof release;
   sendLimits: typeof sendLimits;
-  support: typeof support;
   supportAgent: typeof supportAgent;
   supportClosures: typeof supportClosures;
   supportFollow: typeof supportFollow;
@@ -119,6 +120,7 @@ declare const fullApi: ApiFromModules<{
   timeZones: typeof timeZones;
   usage: typeof usage;
   vera: typeof vera;
+  veraInbox: typeof veraInbox;
   webSearch: typeof webSearch;
 }>;
 

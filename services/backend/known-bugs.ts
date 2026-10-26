@@ -1,10 +1,10 @@
-// How Vera Support shows the model the team's issues on GitHub, which it
+// How Vera shows its model the team's issues on GitHub, which it
 // checks before filing a report (convex/supportLookup.ts). Plain functions,
 // so they can be tested without Convex.
 
 import type { ReportStage } from "./bug-reports.ts";
 
-/** Where a known bug stands, in the words support's model sees. */
+/** Where a known bug stands, in the words Vera's model sees. */
 export type KnownBugStatus =
   | "open"
   | "being fixed"

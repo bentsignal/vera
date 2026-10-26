@@ -4,15 +4,15 @@ import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { internalMutation } from "./_generated/server";
 import { scheduleReply } from "./assistantHook";
-import { sendAsBot, SUPPORT } from "./bots";
+import { sendAsBot, VERA } from "./bots";
 
 // When the team closes a report's issue without fixing it (supportReports.ts
 // `track`), the reporter shouldn't just hear "closed":
 //
-// - Closed as a duplicate of another issue: support follows that one for
-//   them instead, from where it is now.
-// - Closed with a comment from the team: support's model explains it in
-//   plain words, and follows another issue if the comment points to one.
+// - Closed as a duplicate of another issue: Vera follows that one for them
+//   instead, from where it is now.
+// - Closed with a comment from the team: Vera's model explains it in plain
+//   words, and follows another issue if the comment points to one.
 // - Otherwise, the fixed message in bug-reports.ts.
 
 /**
@@ -56,7 +56,7 @@ export const followOriginal = internalMutation({
     const developer = await isDeveloper(ctx, report.accountId);
     await sendAsBot(
       ctx,
-      SUPPORT,
+      VERA,
       report.conversationId,
       [
         `Update on the bug you reported (${report.summary}): it turned out to be the same as another report the team is tracking, so I'll follow that one for you and let you know when it's fixed.`,
@@ -66,7 +66,7 @@ export const followOriginal = internalMutation({
   },
 });
 
-/** Has support's model tell the reporter why their report was closed. */
+/** Has Vera's model tell the reporter why their report was closed. */
 export async function explainClosure(
   ctx: MutationCtx,
   report: Doc<"bugReports">,
@@ -78,7 +78,7 @@ export async function explainClosure(
       : "without a change (the team isn't planning to change it for now)";
   await scheduleReply(ctx, {
     accountId: report.accountId,
-    bot: SUPPORT.username,
+    bot: VERA.username,
     conversationId: report.conversationId,
     note: `Their report "${report.summary}" (issue #${String(report.issueNumber)}) was just closed ${how}. The team's closing comment:
 

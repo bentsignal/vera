@@ -55,7 +55,7 @@ Shawn starts each feature or fix in its own T3 Code worktree and thread
 - Keep each pull request to one coherent change, with a description covering
   the summary, the evidence, and the validation that was run.
 - A fix for a GitHub issue says `Fixes #<issue>` in its PR description (one
-  line per issue) and targets `main`. That link is how Vera Support tells
+  line per issue) and targets `main`. That link is how Vera tells
   the person who reported it that a fix is in progress, merged, and live.
 - Open the PR, review your own diff, wait for CI to pass, start the dev
   server (`scripts/phone.sh up`), then tell Shawn it is ready to test and
