@@ -109,7 +109,7 @@ export interface MessageRow extends RowBase {
 export interface HeaderRow extends RowBase {
   readonly kind: "header";
   readonly style: "time" | "day" | "replies";
-  /** The text, already formatted: "Today 9:41 AM". */
+  /** The text, already formatted: "Today · 9:41 AM". */
   readonly label: string;
 }
 

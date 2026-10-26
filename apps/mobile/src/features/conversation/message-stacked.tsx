@@ -6,7 +6,8 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import type { ReplyCard, ThreadReplies } from "./reply-card";
 import type { Message } from "./types";
 import { Avatar } from "~/components/avatar";
-import { formatTime } from "~/lib/format";
+import { formatMessageTime } from "~/lib/format";
+import { useToday } from "~/lib/use-today";
 import { AuthorLink } from "./author-link";
 import { rowOrder } from "./build-rows";
 import { Settle, useChangedSinceMount } from "./grow";
@@ -135,6 +136,7 @@ function AvatarSlot({
 
 /** The sender's name and the time, above the first message of a run. */
 function NameLine({ message, author }: { message: Message; author: Author }) {
+  const today = useToday();
   return (
     <View
       className="flex-row items-baseline gap-2"
@@ -156,7 +158,7 @@ function NameLine({ message, author }: { message: Message; author: Author }) {
           transitionTimingFunction: "ease-out",
         }}
       >
-        {formatTime(message.sentAt)}
+        {formatMessageTime(message.sentAt, today)}
       </Animated.Text>
     </View>
   );

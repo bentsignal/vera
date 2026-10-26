@@ -35,7 +35,7 @@ void test("rows come newest first, with a header over the oldest", () => {
   );
   const header = rowAt(rows, 3, "header");
   assert.equal(header.style, "time");
-  assert.match(header.label, /^Today /);
+  assert.match(header.label, /^Today · /);
 });
 
 void test("a thread's divider sits under its original", () => {
@@ -63,6 +63,17 @@ void test("stacked rows get day separators", () => {
   const header = rowAt(rows, 1, "header");
   assert.equal(header.style, "day");
   assert.equal(header.label, "Today");
+});
+
+void test("stacked rows date yesterday's messages; bubbles keep the time", () => {
+  const nextDay = { now: new Date(START + 24 * 60 * 60_000) };
+  const stacked = only(
+    messageRows(rowsOf([message("a", 0)], { ...nextDay, layout: "stacked" })),
+  );
+  assert.match(stacked.timeLabel, /^Yesterday · /);
+  assert.match(stacked.accessibilityLabel, /Yesterday, /);
+  const bubbles = only(messageRows(rowsOf([message("a", 0)], nextDay)));
+  assert.doesNotMatch(bubbles.timeLabel, /Yesterday/);
 });
 
 void test("runs: the first starts the group, the last ends it", () => {
