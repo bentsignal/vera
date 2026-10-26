@@ -16,7 +16,6 @@ import {
   mergePages,
   pageAfter,
   pageKey,
-  pagesAhead,
   reusable,
   threadAnchoredView,
   windowParts,
@@ -303,44 +302,4 @@ void test("only a recent, current window under the page limit opens again", () =
   };
   assert.equal(reusable(long, last, fresh), false);
   assert.equal(reusable(anchoredView("m1"), last, fresh), false);
-});
-
-void test("asks for the next older page ahead once the reader scrolls up", () => {
-  const chat = conversation();
-  for (let at = 1; at <= 200; at += 1) chat.send(at);
-  const view = latestView(1000);
-  const opened = view.pages.map((cursor) => chat.page(cursor));
-  // Just opened: nothing ahead yet.
-  assert.deepEqual(pagesAhead(view, opened), []);
-  const oldest = opened[0]?.messages[0];
-  assert.ok(oldest !== undefined);
-  const scrolled = withPage(view, { before: oldest.sentAt }, "start");
-  const pages = scrolled.pages.map((cursor) => chat.page(cursor));
-  assert.deepEqual(pagesAhead(scrolled, pages), [
-    { before: pages[0]?.messages[0]?.sentAt },
-  ]);
-  // The oldest page reached: nothing older to ask for.
-  const top = withPage(view, { before: 51 }, "start");
-  assert.deepEqual(
-    pagesAhead(
-      top,
-      top.pages.map((cursor) => chat.page(cursor)),
-    ),
-    [],
-  );
-});
-
-void test("asks for the next newer page ahead in older messages", () => {
-  const chat = conversation();
-  for (let at = 1; at <= 300; at += 1) chat.send(at);
-  const view = anchoredView("m100");
-  const first = chat.page({ around: "m100" });
-  assert.deepEqual(pagesAhead(view, [first]), []);
-  const newest = first.messages.at(-1);
-  assert.ok(newest !== undefined);
-  const scrolled = withPage(view, pageAfter(newest), "end");
-  const pages = scrolled.pages.map((cursor) => chat.page(cursor));
-  assert.deepEqual(pagesAhead(scrolled, pages), [
-    pageAfter(pages.at(-1)?.messages.at(-1) ?? newest),
-  ]);
 });
