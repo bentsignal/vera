@@ -73,6 +73,18 @@ export type Mention = Infer<typeof mention>;
 export const MAX_MENTIONS = 50;
 
 /**
+ * Why a message that doesn't @mention someone counts as if it did: it
+ * says their display name, or one of their keywords (see
+ * `notificationSettings`).
+ */
+export const said = v.union(
+  v.object({ kind: v.literal("name") }),
+  v.object({ keyword: v.string(), kind: v.literal("keyword") }),
+);
+
+export type Said = Infer<typeof said>;
+
+/**
  * What a group or channel alerts its members about: every message, only
  * ones that @mention them, or nothing (it stays out of activity and sends
  * no pushes). Direct messages are `all` or `none`.
@@ -480,12 +492,22 @@ export const notificationSettings = v.object({
   groupAlerts: v.optional(alertLevel),
   groups: v.boolean(),
   invites: v.boolean(),
+  /**
+   * Words that make a message alert the caller as an @mention would, when
+   * it says one (absent from older PDSs).
+   */
+  keywords: v.optional(v.array(v.string())),
   reactions: v.boolean(),
   // Optional so results from PDSs that predate threads still validate.
   /** Replies to the caller's own messages. */
   replies: v.optional(v.boolean()),
   /** New replies in threads the caller is in. */
   threadReplies: v.optional(v.boolean()),
+  /**
+   * Messages that say the caller's display name, heard as @mentions are
+   * (absent from older PDSs).
+   */
+  yourName: v.optional(v.boolean()),
 });
 
 export type NotificationSettings = Infer<typeof notificationSettings>;
@@ -499,7 +521,14 @@ export const notificationSettingsChange = v.object({
   groupAlerts: v.optional(alertLevel),
   groups: v.optional(v.boolean()),
   invites: v.optional(v.boolean()),
+  /** The whole list, replacing the one before. */
+  keywords: v.optional(v.array(v.string())),
   reactions: v.optional(v.boolean()),
   replies: v.optional(v.boolean()),
   threadReplies: v.optional(v.boolean()),
+  yourName: v.optional(v.boolean()),
 });
+
+/** At most this many keywords, each at most `MAX_KEYWORD_LENGTH` long. */
+export const MAX_KEYWORDS = 50;
+export const MAX_KEYWORD_LENGTH = 50;

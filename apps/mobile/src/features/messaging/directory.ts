@@ -26,7 +26,32 @@ export function useMyProfile() {
     }),
   );
   const upsert = useMutation(
-    pdsMutation({ mutation: pds.accounts.upsertMyProfile, session: address }),
+    pdsMutation({
+      mutation: pds.accounts.upsertMyProfile,
+      session: address,
+      optimisticUpdate: (store, args) => {
+        const own = pds.accounts.getMyProfile({});
+        const current = store.getQuery(own);
+        // Initializers are create-only on the PDS, and must not hide a
+        // profile whose subscription is still loading here.
+        if (current == null || args.createOnly === true) return;
+        const profile = {
+          ...current,
+          ...(args.avatarUrl === undefined
+            ? {}
+            : { avatarUrl: args.avatarUrl }),
+          ...(args.displayName === undefined
+            ? {}
+            : { displayName: args.displayName.trim() }),
+        };
+        store.setQuery(own, profile);
+        for (const { args: lookup, request } of store.getAllQueries(
+          pds.accounts.getProfile,
+        )) {
+          if (lookup.accountId === address) store.setQuery(request, profile);
+        }
+      },
+    }),
   );
   return { profile: data, update: upsert.mutateAsync };
 }
@@ -63,7 +88,9 @@ export function useEnsureProfile() {
   // eslint-disable-next-line no-restricted-syntax -- Accounts are created at sign-up without a profile; the server needs one before others can find the account.
   useEffect(() => {
     if (profile === null && username.length > 0) {
-      void update({ avatarUrl: null, displayName: username });
+      void update({ createOnly: true, displayName: username }).catch(
+        () => undefined,
+      );
     }
   }, [profile, update, username]);
 }
