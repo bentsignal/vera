@@ -112,6 +112,7 @@ function useRows({
   RowsProps,
   | "anchorId"
   | "layout"
+  | "members"
   | "messages"
   | "notices"
   | "profileOf"

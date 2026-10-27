@@ -39,8 +39,19 @@ export async function setTyping(
   self: string,
   args: Args<"setTyping">,
 ) {
-  const { conversationId, threadId, typing } = args;
-  await requireAccess(ctx, conversationId, self);
+  await requireAccess(ctx, args.conversationId, self);
+  return writeTyping(ctx, self, args);
+}
+
+/**
+ * `setTyping` once the typist may write there: `setTyping` checks the
+ * caller, and an assistant's host checks its own (assistants.ts).
+ */
+export async function writeTyping(
+  ctx: MutationCtx,
+  self: string,
+  { conversationId, threadId, typing }: Args<"setTyping">,
+) {
   const now = Date.now();
   const existing = await typingRow(ctx, self, conversationId);
   if (!typing) {

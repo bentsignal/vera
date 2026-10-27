@@ -38,6 +38,7 @@ export async function replyRequest(
   turn: Turn,
   history: readonly Message[],
   { instructions, latest, tools }: Prompt,
+  { speakers = false }: { speakers?: boolean } = {},
 ) {
   const closing: ModelMessage[] = [
     ...(latest === undefined
@@ -55,7 +56,10 @@ export async function replyRequest(
   const shown = await imageUrls(ctx, visibleImages(history, self));
   const models = modelOrder(visibleImageTypes(history, self, shown)).map(
     (model) => ({
-      messages: [...toModelMessages(history, self, model, shown), ...closing],
+      messages: [
+        ...toModelMessages(history, self, model, shown, { speakers }),
+        ...closing,
+      ],
       model,
     }),
   );

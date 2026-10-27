@@ -1,3 +1,4 @@
+import type { Conversation } from "@decentralized-convex/messages";
 import type { Ref } from "react";
 
 import type { ThreadHead } from "~/features/conversation/build-rows";
@@ -32,6 +33,8 @@ export interface MessageListProps {
   layout: MessageLayout;
   profileOf: ProfileOf;
   showAuthors: boolean;
+  /** A direct message's members, so anyone else there shows their name. */
+  members?: readonly string[];
   /** The message it opens on, rather than the newest. */
   anchorId?: string;
   hasNewer: boolean;
@@ -55,4 +58,18 @@ export interface MessageListProps {
   onReply?: (message: Message) => void;
   /** The menu's Edit and Delete, on your own messages (`useEditing`). */
   editing?: MessageEdits;
+}
+
+/**
+ * Whose names a conversation's rows show (`showAuthors`, `members`):
+ * everyone's but yours in a group or channel, and in a direct message
+ * only anyone who isn't one of its two, such as an assistant one of them
+ * @mentioned.
+ */
+export function authorsShownIn(
+  conversation: Pick<Conversation, "kind" | "members"> | undefined,
+) {
+  return conversation?.kind === "direct"
+    ? { members: conversation.members, showAuthors: false }
+    : { showAuthors: true };
 }

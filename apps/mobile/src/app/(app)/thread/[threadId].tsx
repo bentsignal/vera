@@ -34,6 +34,7 @@ import {
 } from "~/features/messaging/threads";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
 import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
+import { authorsShownIn } from "~/features/native-list/list-props";
 import { NativeMessageList } from "~/features/native-list/native-message-list";
 import { useActiveThread } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
@@ -228,7 +229,7 @@ function Thread({
             self={address}
             layout={shown.layout}
             profileOf={profileOf}
-            showAuthors={conversation?.kind !== "direct"}
+            {...authorsShownIn(conversation)}
             hasNewer={thread.hasNewer}
             onLoadOlder={thread.loadOlder}
             onLoadNewer={thread.loadNewer}

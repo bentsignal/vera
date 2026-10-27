@@ -3,7 +3,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { ConversationAccess } from "./model.ts";
 import type { Mention, Said } from "./protocol.ts";
 import { alertsFor, mentionedBy } from "./alerts.ts";
-import { fail, findAccess, memberAddresses } from "./model.ts";
+import { fail, findAccess, isAssistant, memberAddresses } from "./model.ts";
 import { MAX_MENTIONS } from "./protocol.ts";
 import { notificationSettings } from "./settings.ts";
 
@@ -33,9 +33,9 @@ export function saysWord(text: string, word: string) {
 }
 
 /**
- * The mentions that hold: of members other than the author whose `@name`
- * is in the body, each once; undefined when none do. Direct messages have
- * none.
+ * The mentions that hold: of members other than the author, or of an
+ * assistant (assistants.ts), whose `@name` is in the body, each once;
+ * undefined when none do. Direct messages have only assistants'.
  */
 export async function validMentions(
   ctx: QueryCtx,
@@ -44,19 +44,23 @@ export async function validMentions(
   body: string,
   mentions: readonly Mention[] | undefined,
 ) {
-  if (mentions === undefined || access.conversation.kind === "direct") {
-    return undefined;
-  }
+  if (mentions === undefined) return undefined;
   if (mentions.length > MAX_MENTIONS) fail("TOO_MANY_MENTIONS");
-  const members = new Set(await memberAddresses(ctx, access.conversation));
+  const members =
+    access.conversation.kind === "direct"
+      ? new Set<string>()
+      : new Set(await memberAddresses(ctx, access.conversation));
   const kept = new Map<string, Mention>();
   for (const { accountId: address, name: written } of mentions) {
     const mention = {
       accountId: address.trim().toLowerCase(),
       name: written.trim(),
     };
-    if (mention.accountId === self || !members.has(mention.accountId)) continue;
-    if (isWritten(mention.name, body)) {
+    if (mention.accountId === self || !isWritten(mention.name, body)) continue;
+    if (
+      members.has(mention.accountId) ||
+      (await isAssistant(ctx, mention.accountId))
+    ) {
       kept.set(`${mention.accountId} ${mention.name}`, mention);
     }
   }

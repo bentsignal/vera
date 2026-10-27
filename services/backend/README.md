@@ -140,6 +140,41 @@ the input came from the prompt cache (`cacheHitRate`), and how often a
 reply's instructions or tools changed since the one before it in its
 conversation (`cachedPartChangeRate`; see "Keeping replies cheap" below).
 
+### Calling Vera into other conversations
+
+Anyone can @mention Vera in a group, a channel, or a direct message with
+someone else (the app's mention picker lists it everywhere), and Vera
+answers that one message (`convex/summons.ts`, `summonReply.ts`,
+`summonPrompt.ts`). It isn't a member: the messages plugin's assistant
+functions let it read what the caller can see before their message and
+answer it (see its README, "Assistants").
+
+- It answers in a thread on their message. Only when their own message
+  explicitly asks for the chat ("reply inline") does it answer there,
+  quoting them. Its first message decides, so an answer isn't split.
+- Nothing else reaches it: not replies in its thread, not other messages.
+  Someone mentions it again to get another answer. Each message is
+  answered once (`botSummons`), even if the app retries the send.
+- It reads the 30 messages before theirs, from the thread they wrote in or
+  from the conversation (with the original their reply quotes), with each
+  message's author named, and can read further back.
+- Everyone there reads the answer, so it knows nothing private about
+  anyone: no notes, no memory of anyone's chats with Vera, no list of
+  anyone's bug reports, and no tools to save or look any of it up. Those
+  live only in each person's direct message with Vera. Asked about
+  someone's memories, it says it can't share that there.
+- It answers only the caller. Other people's messages are context, not
+  requests, and every tool acts for the caller alone and takes no account
+  or conversation, so no one can point it at someone else's data.
+- It can search the web and take bug reports for the caller: searching
+  GitHub, following a known issue, or filing one (the privacy notice
+  first, as in a direct message, posted in the thread; they answer by
+  mentioning Vera again). The report is the caller's: updates on it go to
+  their direct message with Vera, never the group.
+- It shares the caller's hourly limit with their direct messages.
+- Like direct messages, only people on this PDS can call it, and it sees
+  only messages stored here.
+
 When an issue is closed without a fix, Vera follows the original issue
 if it was marked as a duplicate. If the team left a comment when closing
 it, Vera's model explains that comment to the reporter in plain words
