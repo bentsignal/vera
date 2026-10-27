@@ -15,14 +15,15 @@ export function mentionableIn(
 ) {
   if (conversation === undefined) return undefined;
   const { kind, members } = conversation;
-  const assistants = assistantsOf(self);
+  const assistants = new Set(assistantsOf(self));
+  const memberSet = new Set(members);
   // Your direct message with an assistant answers every message anyway.
-  if (kind === "direct" && members.some((id) => assistants.includes(id))) {
+  if (kind === "direct" && members.some((id) => assistants.has(id))) {
     return undefined;
   }
   return [
     ...(kind === "direct" ? [] : members.filter((member) => member !== self)),
-    ...assistants.filter((assistant) => !members.includes(assistant)),
+    ...[...assistants].filter((assistant) => !memberSet.has(assistant)),
   ].map((accountId) => {
     const { avatarUrl, displayName } = profileOf(accountId);
     return { accountId, avatarUrl, displayName };

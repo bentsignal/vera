@@ -38,3 +38,12 @@ void test("its name alone, an address, or a longer word doesn't", () => {
     false,
   );
 });
+
+void test("someone else's mention that starts with its name doesn't", () => {
+  const smith = [{ accountId: "vs@vera.chat", name: "Vera Smith" }];
+  assert.equal(mentionsAssistant(VERA, "@Vera Smith lunch?", smith), false);
+  assert.equal(
+    mentionsAssistant(VERA, "@Vera Smith lunch? @Vera book it", smith),
+    true,
+  );
+});

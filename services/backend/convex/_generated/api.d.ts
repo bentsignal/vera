@@ -50,6 +50,7 @@ import type * as rateLimits from "../rateLimits.js";
 import type * as release from "../release.js";
 import type * as sendLimits from "../sendLimits.js";
 import type * as summonPrompt from "../summonPrompt.js";
+import type * as summonReply from "../summonReply.js";
 import type * as summons from "../summons.js";
 import type * as supportAgent from "../supportAgent.js";
 import type * as supportClosures from "../supportClosures.js";
@@ -113,6 +114,7 @@ declare const fullApi: ApiFromModules<{
   release: typeof release;
   sendLimits: typeof sendLimits;
   summonPrompt: typeof summonPrompt;
+  summonReply: typeof summonReply;
   summons: typeof summons;
   supportAgent: typeof supportAgent;
   supportClosures: typeof supportClosures;
