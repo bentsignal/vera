@@ -33,7 +33,10 @@ function shownHistory(found: {
 }) {
   const recent = found.messages.slice(-CONTEXT);
   const root = found.root;
-  if (root === null || recent.some((shown) => shown.messageId === root.messageId)) {
+  if (
+    root === null ||
+    recent.some((shown) => shown.messageId === root.messageId)
+  ) {
     return recent;
   }
   return [root, ...recent];
@@ -129,4 +132,3 @@ export async function answer(
     await typing.stop();
   }
 }
-

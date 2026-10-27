@@ -7,7 +7,10 @@ const VERA = { address: "vera@vera.chat", username: "vera" };
 
 void test("a written @name mentions it, in any case", () => {
   assert.equal(mentionsAssistant(VERA, "@Vera what's this?", undefined), true);
-  assert.equal(mentionsAssistant(VERA, "hey @vera, report it", undefined), true);
+  assert.equal(
+    mentionsAssistant(VERA, "hey @vera, report it", undefined),
+    true,
+  );
   assert.equal(mentionsAssistant(VERA, "thoughts @VERA?", undefined), true);
   assert.equal(mentionsAssistant(VERA, "(@Vera)", undefined), true);
 });

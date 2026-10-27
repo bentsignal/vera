@@ -140,7 +140,11 @@ export async function storeMessage(
  * A retried send's message, already stored. Another author's ID is
  * taken.
  */
-export async function alreadySent(ctx: MutationCtx, self: string, messageId: string) {
+export async function alreadySent(
+  ctx: MutationCtx,
+  self: string,
+  messageId: string,
+) {
   const existing = await ctx.db
     .query("messages")
     .withIndex("by_message", (index) => index.eq("messageId", messageId))

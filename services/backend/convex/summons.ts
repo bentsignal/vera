@@ -4,13 +4,13 @@ import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
 import type { SummonPlace } from "./summonPrompt";
+import { mentionsAssistant as mentionsWritten } from "../assistant-mentions";
 import { components, internal } from "./_generated/api";
 import {
   internalAction,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { mentionsAssistant as mentionsWritten } from "../assistant-mentions";
 import { botAccount, botAddress, isBotAddress } from "./bots";
 import { takeReply } from "./rateLimits";
 import { botName } from "./schema";

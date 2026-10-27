@@ -18,11 +18,7 @@ function ids(list: ReturnType<typeof mentionableIn>) {
 
 void test("a group lists its members but you, then Vera", () => {
   const group = { kind: "group" as const, members: [ME, MAYA, LEO] };
-  assert.deepEqual(ids(mentionableIn(group, ME, profileOf)), [
-    MAYA,
-    LEO,
-    VERA,
-  ]);
+  assert.deepEqual(ids(mentionableIn(group, ME, profileOf)), [MAYA, LEO, VERA]);
 });
 
 void test("a direct message with someone lists only Vera", () => {
