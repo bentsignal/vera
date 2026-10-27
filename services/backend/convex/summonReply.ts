@@ -25,21 +25,23 @@ const CONTEXT = 30;
 
 /**
  * The messages the model reads: the newest `CONTEXT` before and including
- * theirs, after the thread's original when there is one.
+ * theirs, after the thread's original when there is one; and the oldest of
+ * those it read, where reading earlier picks up.
  */
 function shownHistory(found: {
   messages: readonly Message[];
   root: Message | null;
 }) {
   const recent = found.messages.slice(-CONTEXT);
+  const oldestSentAt = recent.at(0)?.sentAt ?? null;
   const root = found.root;
   if (
     root === null ||
     recent.some((shown) => shown.messageId === root.messageId)
   ) {
-    return recent;
+    return { history: recent, oldestSentAt };
   }
-  return [root, ...recent];
+  return { history: [root, ...recent], oldestSentAt };
 }
 
 /** Reads, asks the model, and posts the answer. */
@@ -52,7 +54,7 @@ export async function answer(
     internal.summons.context,
     summonArgs(summon),
   );
-  const history = shownHistory(found);
+  const { history, oldestSentAt } = shownHistory(found);
   const self = botAddress(summon.bot);
   // Where it answers: a thread unless the model chooses the chat, which
   // it may only when they asked (summonPrompt.ts).
@@ -94,7 +96,7 @@ export async function answer(
       lastHeardAt: found.message.sentAt,
       name: found.message.authorName,
       note: null,
-      oldestSentAt: history.at(0)?.sentAt ?? null,
+      oldestSentAt,
       recalled: [],
       self,
       timeZone: await ctx.runQuery(internal.timeZones.of, {
