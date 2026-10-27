@@ -84,9 +84,10 @@ The phone holds one Vera Dev at a time:
   A new `Intent` has no categories set (`null`), so that copy throws.
   Expo fixed it in SDK 58 (`addCategory` per category). `sim.sh`'s
   `adb shell am start` link has no category, so emulators never hit it.
-  Patching it ourselves changes every native fingerprint (dev and
-  production, both platforms), which means a store build. So it waits for
-  the SDK 58 upgrade, or a release that needs a store build anyway.
+  Patching it ourselves is a native change, so it would reach phones only
+  in the next Android store build (a compatible one: the runtime version
+  stays). It waits for the SDK 58 upgrade, or rides along with a store
+  build.
 
   A worktree with an isolated backend serves
   that backend's domain, which starts with no accounts: sign in there by

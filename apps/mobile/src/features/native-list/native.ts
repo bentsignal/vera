@@ -22,8 +22,9 @@ const module = requireOptionalNativeModule<{
 
 /**
  * What the installed binary can draw, or null without the module (tests).
- * Updates only reach binaries with the same native fingerprint, so a
- * binary running this JavaScript has the list it was built with.
+ * Updates reach every binary on the same runtime version, including ones
+ * built before a compatible native change, so check this before using
+ * anything newer than version 1.
  */
 export const nativeSupport =
   Platform.OS === "web" ? null : (module?.support ?? null);

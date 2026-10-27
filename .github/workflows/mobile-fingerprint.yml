@@ -1,13 +1,18 @@
 name: Mobile fingerprint
 
 # Does this PR change native code (anything in the native fingerprint)? If
-# so, merging it means the next release needs a new store build instead of
-# an over-the-air update, so the PR gets the "📱 Native Change" label and a
-# summary of what changed. Advisory: the label is the signal, the check
-# passes. Both fingerprints come from this one job on one OS, so they compare
-# cleanly (fingerprints differ between macOS and Linux).
+# so, it ships to people in the next store build, so the PR gets the
+# "📱 Native Change" label and a summary of what changed, and its
+# description's "Native change:" line can't say "no". It says "yes,
+# compatible" when older binaries still run this JavaScript (updates keep
+# reaching them), or "yes, new runtime" when the PR raises RUNTIME_VERSION
+# (scripts/check-release-steps.ts checks that part; docs/releasing.md →
+# Runtime versions). Both fingerprints come from this one job on one OS, so
+# they compare cleanly (fingerprints differ between macOS and Linux).
 on:
   pull_request:
+    # Edited: the description's "Native change:" line is checked here too.
+    types: [opened, edited, reopened, synchronize]
     paths:
       - apps/mobile/**
       - packages/**
@@ -76,11 +81,11 @@ jobs:
                 head_hash="$(jq -r .hash "$RUNNER_TEMP/fp/head/$platform.json")"
                 base_hash="$(jq -r .hash "$RUNNER_TEMP/fp/base/$platform.json")"
                 if [ "$head_hash" = "$base_hash" ]; then
-                  echo "- ✅ **$platform** unchanged: over-the-air compatible"
+                  echo "- ✅ **$platform** unchanged"
                   continue
                 fi
                 changed="$changed $platform"
-                echo "- 📱 **$platform** changed: the next release needs a store build"
+                echo "- 📱 **$platform** changed: ships in the next store build"
                 jq -r -n \
                   --slurpfile h "$RUNNER_TEMP/fp/head/$platform.json" \
                   --slurpfile b "$RUNNER_TEMP/fp/base/$platform.json" '
@@ -101,10 +106,24 @@ jobs:
         run: |
           label="📱 Native Change"
           gh label create "$label" --color d93f0b --force \
-            --description "Changes native code; the next release needs a store build, not an OTA update" \
+            --description "Changes native code; it reaches people in the next store build" \
             --repo "$GITHUB_REPOSITORY"
           if [ -n "$CHANGED" ]; then
             gh pr edit "$PR" --add-label "$label" --repo "$GITHUB_REPOSITORY"
           else
             gh pr edit "$PR" --remove-label "$label" --repo "$GITHUB_REPOSITORY" || true
           fi
+
+      - name: Check the description's Native change line
+        if: ${{ steps.compare.outputs.changed != '' }}
+        env:
+          CHANGED: ${{ steps.compare.outputs.changed }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          line="$(printf '%s\n' "$PR_BODY" | tr -d '\r' | grep -iE '^\s*-\s*Native change:' | head -1 \
+            | sed -E 's/<!--.*-->//g; s/^[^:]*:[[:space:]]*//')"
+          if printf '%s' "$line" | grep -qiE '^no\b' || [ -z "$line" ]; then
+            echo "::error::This PR changes the native fingerprint ($CHANGED), so \"Native change:\" can't say no. Say \"yes, compatible\" if binaries without this native change still run this JavaScript, or raise RUNTIME_VERSION in apps/mobile/app.config.ts and say \"yes, new runtime\" (docs/releasing.md → Runtime versions)."
+            exit 1
+          fi
+          echo "native change: $line"

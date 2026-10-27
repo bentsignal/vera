@@ -48,8 +48,18 @@ a few seconds; tell Shawn so he can time it.
 
 Write up for Shawn:
 
-- **Kind:** over the air (`kind: ota`) or a store build (`kind: store-build`),
-  and why.
+- **Kind**, per platform, from `plan`:
+  - over the air (`kind: ota`): the runtime version is unchanged, so the
+    update reaches every binary on it;
+  - native changes waiting: the runtime is unchanged, but merged native
+    changes ("Native change: yes, compatible") reach people only in a
+    store build. The update still goes out to everyone now; the store
+    build is a separate release Shawn times (the same sitting, or later
+    with more native work). Recommend one and say why;
+  - store build required (`kind: store-build`): a merged PR raised the
+    runtime ("yes, new runtime", labeled "⛔ New Runtime"), so the update
+    reaches only the new build, and older binaries keep their last update
+    until people install it.
 - **Backend:** whether production needs `npx convex deploy`.
 - **What's new:** a short list in his words, not PR titles. No internal
   refactors unless they change behavior.
@@ -72,6 +82,14 @@ Write up for Shawn:
     and old app versions still talking to the new backend;
   - native changes: the store build has every native change together for
     the first time, so check each one there;
+  - native changes waiting for a store build: the update also runs on
+    binaries without them. Run main's JavaScript on a dev client built from
+    the last store build's native code: check out its native files from
+    the build's tag into the release checkout
+    (`git checkout mobile/build/<n> -- <native paths>`), `scripts/sim.sh up`
+    (it reuses a cached dev client for that fingerprint if one exists),
+    check the screens those native changes touch, then
+    `git checkout origin/main -- <native paths>`;
   - changes merged without a phone test (a PR Shawn approved from its
     evidence alone): those get their own steps.
 
@@ -181,7 +199,14 @@ pnpm release ota production "<release notes, one paragraph>"
 
 `ota` publishes for each platform whose latest production binary
 (`mobile/build/*` for iOS, `mobile/android/build/*` for Android) has the
-current runtime, and says which it skipped.
+current runtime version (`RUNTIME_VERSION` in `app.config.ts`), and says
+which it skipped. Every older binary on that runtime gets it too.
+
+**OTA now, store build later.** When `plan` says native changes are
+waiting but the runtime is unchanged, the update and the store build are
+separate releases: ship the update, and the store build when Shawn wants
+it, which needs no further OTA, since it carries the same JavaScript. Each
+needs its own go-ahead.
 
 Shawn's TestFlight app gets an OTA at the same moment as everyone else, so
 his check of the real app happens after it's out. Tell him it's live and
@@ -306,15 +331,16 @@ After `ota production`:
   `pnpm release build` sets that up, and builds both kinds with
   `/Applications/Xcode-27.app` (App Store Connect rejects Xcode-beta builds,
   error 90534), so the test build matches what ships. It also checks the
-  built runtime against the checkout's fingerprint before uploading.
+  built runtime against `app.config.ts`'s runtime version before
+  uploading, and records the native fingerprint in the tag.
 - Build numbers come from EAS (remote, auto-incremented), counted per app:
   Vera Dev's internal builds and Vera's store builds each have their own
   sequence, and their tags (`mobile/internal/*`, `mobile/build/*`) never
   mix.
 - Internal builds and internal OTAs use the dev variant
-  (`APP_VARIANT=development`), so their runtime differs from the store
-  build's. `pnpm release` handles it; `plan` compares each channel against
-  its own fingerprint.
+  (`APP_VARIANT=development`), so their fingerprint differs from the store
+  build's. Their runtime version is the same; channels keep the updates
+  apart.
 - Uploads go through `xcrun altool`, because `eas submit --non-interactive`
   refuses an API key from the environment.
 - `ota` sets `VERA_NOTIFICATION_EXTENSION=1` and the channel's
