@@ -14,7 +14,7 @@ import { withDictation } from "./joined";
 // was started in, and keeps going while you look at other conversations
 // or switch apps; that draft's composer shows it whenever it's on screen.
 
-/** The levels the waveform keeps, newest last; more than it can show. */
+/** The levels the waveform keeps; more than it can show. */
 export const LEVEL_COUNT = 72;
 /**
  * The confirm button's spinner shows at least this long, so a quick
@@ -60,8 +60,13 @@ function silence() {
   return Array.from({ length: LEVEL_COUNT }, () => 0);
 }
 
-/** The microphone's recent levels, 0 to 1, newest last. */
+/**
+ * The microphone's recent levels, 0 to 1: the `n`th since dictation
+ * started is at `n % LEVEL_COUNT`, so each new one changes one place.
+ */
 export const levels = makeMutable(silence());
+/** How many levels have come in since dictation started. */
+export const levelCount = makeMutable(0);
 /**
  * How far the waveform is from where the newest level puts it, in bars: 1
  * as a level arrives, easing to 0 by the next, so it moves steadily left.
@@ -85,12 +90,13 @@ function subscribe(listener: () => void) {
 
 function addLevel(level: number) {
   "worklet";
+  const count = levelCount.get();
   levels.modify((list) => {
     "worklet";
-    list.shift();
-    list.push(level);
+    list[count % LEVEL_COUNT] = level;
     return list;
   });
+  levelCount.set(count + 1);
   levelShift.set(1);
   levelShift.set(withTiming(0, { duration: LEVEL_MS, easing: Easing.linear }));
 }
@@ -98,6 +104,7 @@ function addLevel(level: number) {
 function clearLevels() {
   "worklet";
   levels.set(silence());
+  levelCount.set(0);
   levelShift.set(0);
 }
 
