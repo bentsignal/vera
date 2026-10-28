@@ -22,7 +22,8 @@ function WaveBar({ index }: { index: number }) {
   const style = useAnimatedStyle(() => {
     const newest = levelCount.get() - 1;
     // The newest level that's this bar's: one of every LEVEL_COUNT.
-    const behind = (((newest - index) % LEVEL_COUNT) + LEVEL_COUNT) % LEVEL_COUNT;
+    const behind =
+      (((newest - index) % LEVEL_COUNT) + LEVEL_COUNT) % LEVEL_COUNT;
     const level = levels.get()[index] ?? 0;
     return {
       transform: [
@@ -66,7 +67,10 @@ export function Waveform() {
       accessibilityLabel="Listening"
     >
       <Animated.View
-        style={[{ height: HEIGHT, left: 0, position: "absolute", top: 0 }, strip]}
+        style={[
+          { height: HEIGHT, left: 0, position: "absolute", top: 0 },
+          strip,
+        ]}
       >
         {Array.from({ length: LEVEL_COUNT }, (_, index) => (
           <WaveBar key={index} index={index} />
