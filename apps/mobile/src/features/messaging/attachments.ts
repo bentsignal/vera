@@ -1,5 +1,5 @@
 import type { Attachment } from "@decentralized-convex/messages";
-import { Alert, Linking, Platform } from "react-native";
+import { Alert, Linking } from "react-native";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
@@ -16,6 +16,7 @@ import type { AccountSession } from "~/features/session/account-session";
 import type { PastedImage } from "~/lib/paste-images";
 import { formatBytes } from "~/lib/format";
 import { useAccount } from "./account";
+import { cropPhoto, cropsAfterPicking, cropsInPicker } from "./crop-photo";
 import { sendUpload } from "./upload-transports";
 
 /** The most attachments one message can carry (the PDS's limit too). */
@@ -149,25 +150,14 @@ function picked(
   return { files, problem };
 }
 
-/**
- * Whether a profile photo from `source` goes through the square crop
- * editor. Not from the iOS library: there the editor swaps the instant
- * system picker for the old one, which loads the whole library first and
- * takes seconds to appear. Avatars fill their circle from the middle of
- * whatever they're given.
- */
-function cropsPhotos(source: "camera" | "library") {
-  return source === "camera" || Platform.OS === "android";
-}
-
-async function pickMedia(
+function mediaOptions(
   source: "camera" | "library",
   limit: number,
   imagesOnly: boolean,
 ) {
-  const options = {
+  return {
     allowsMultipleSelection: source === "library" && !imagesOnly,
-    allowsEditing: imagesOnly && cropsPhotos(source),
+    allowsEditing: imagesOnly && cropsInPicker(source),
     aspect: [1, 1],
     mediaTypes: imagesOnly ? ["images"] : ["images", "videos"],
     orderedSelection: true,
@@ -175,21 +165,36 @@ async function pickMedia(
     // Turning an HEVC video into H.264 takes many seconds for a long
     // video, and it ran before the app could see the video was too long
     // to send. iPhones and Android 9 or later show HEIC photos and play
-    // HEVC videos. A profile photo's quality is under 1, so it's saved
-    // again as a JPEG.
+    // HEVC videos. A profile photo is saved again as a JPEG, by the crop
+    // screen or, when the picker crops it, by a quality under 1.
     preferredAssetRepresentationMode:
       ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
-    quality: imagesOnly ? 0.7 : 0.8,
+    quality: imagesOnly ? (cropsAfterPicking ? 1 : 0.7) : 0.8,
     selectionLimit: limit,
     // The camera stops recording here.
     videoMaxDuration: MAX_VIDEO_SECONDS,
   } satisfies ImagePicker.ImagePickerOptions;
+}
+
+/** A profile photo, through the crop screen when it has one. */
+async function pickedPhoto(asset: ImagePicker.ImagePickerAsset | undefined) {
+  const kept = asset && (await cropPhoto(asset));
+  return picked(kept ? [await fromMedia(kept)] : []);
+}
+
+async function pickMedia(
+  source: "camera" | "library",
+  limit: number,
+  imagesOnly: boolean,
+) {
   if (source === "camera" && !(await cameraAllowed())) return picked([]);
+  const options = mediaOptions(source, limit, imagesOnly);
   const result =
     source === "camera"
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled) return picked([]);
+  if (imagesOnly) return pickedPhoto(result.assets[0]);
   // Turned away before anything else is read from them, such as a poster
   // frame, so the alert comes up as the picker closes.
   const sendable = result.assets.filter((asset) => !tooLong(asset));
