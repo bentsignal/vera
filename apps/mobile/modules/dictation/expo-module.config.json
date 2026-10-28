@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["DictationModule"]
+  },
+  "android": {
+    "modules": ["chat.vera.dictation.DictationModule"]
+  }
+}

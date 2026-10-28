@@ -16,6 +16,7 @@ import {
   SessionProvider,
   useSession,
 } from "~/features/session/session-provider";
+import { ToastHost } from "~/features/toast/toast";
 import { installAppUpdates, noteTouch } from "~/features/updates/app-updates";
 import { StoreUpdateCover } from "~/features/updates/store-update-cover";
 import { UpdateCover } from "~/features/updates/update-cover";
@@ -75,6 +76,7 @@ export default function RootLayout() {
               <WatchOutdatedRuntimes />
               <Navigator />
             </SessionProvider>
+            <ToastHost />
             <UpdateCover />
             <StoreUpdateCover />
           </QueryClientProvider>

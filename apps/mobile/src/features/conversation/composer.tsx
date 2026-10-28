@@ -1,39 +1,37 @@
 import type { ReactNode, RefObject } from "react";
+import type { TextInput } from "react-native";
 import { useRef, useState } from "react";
-import { Platform, StyleSheet, TextInput, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, {
   interpolate,
   useAnimatedStyle,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { withUniwind } from "uniwind";
 
 import type { ComposerReport } from "./composer-height";
 import type { ComposerProps } from "./composer-props";
 import type { MentionCandidate } from "./mention-text";
-import { GesturePressable } from "~/components/gesture-pressable";
-import { SymbolIcon } from "~/components/symbol-icon";
 import { useSendProbe } from "~/features/dev/send-timing";
 import { ComposerLayout } from "~/features/native-list/composer-layout";
 import { cn } from "~/lib/cn";
-import { PASTE_IMAGES_NATIVE_ID } from "~/lib/paste-images";
-import { AttachMenu } from "./attach-menu";
 import { useComposerCommit } from "./composer-commit";
+import {
+  ComposerAttach,
+  FieldBody,
+  useComposerDictation,
+} from "./composer-dictation";
 import { useComposerInput } from "./composer-input";
 import { composerSubmission } from "./composer-submission";
 import { readDraft, saveDraftText } from "./drafts";
 import { GlassField, useFieldGlass } from "./field-glass";
-import { SEND, useFieldText } from "./field-text";
+import { CONTROL } from "./field-text";
 import { FieldTop } from "./field-top";
 import { MentionPicker } from "./mention-picker";
+import { MessageInput } from "./message-input";
 import { canSendNow } from "./use-editing";
 import { useMentions } from "./use-mentions";
 
-const StyledTextInput = withUniwind(TextInput);
-/** Every control in the composer shares this height so they line up. */
-const CONTROL = 40;
 /** How long after a send the keyboard may still apply an autocorrection. */
 const AUTOCORRECT_WINDOW_MS = 1000;
 /**
@@ -60,52 +58,6 @@ export function useComposerBottomInset() {
   const { bottom } = useSafeAreaInsets();
   if (Platform.OS !== "ios") return bottom;
   return bottom === 0 ? 0 : IOS_EDGE - PADDING;
-}
-
-function SendButton({
-  visible,
-  saves,
-  onPress,
-}: {
-  visible: boolean;
-  /** It saves an edit rather than sending. */
-  saves: boolean;
-  onPress: () => void;
-}) {
-  // Always mounted, so it never pops in below the field or resizes.
-  const style = useAnimatedStyle(() => ({
-    opacity: withTiming(visible ? 1 : 0, { duration: 120 }),
-    transform: [{ scale: withTiming(visible ? 1 : 0.7, { duration: 140 }) }],
-  }));
-  return (
-    <Animated.View
-      pointerEvents={visible ? "auto" : "none"}
-      style={[
-        { bottom: (CONTROL - SEND) / 2, position: "absolute", right: 4 },
-        style,
-      ]}
-    >
-      <GesturePressable
-        accessibilityRole="button"
-        accessibilityLabel={saves ? "Save" : "Send"}
-        onPress={onPress}
-        className="bg-accent items-center justify-center rounded-full"
-        pressedClassName="opacity-80"
-        style={{ height: SEND, width: SEND }}
-      >
-        <SymbolIcon
-          name={
-            saves
-              ? { android: "check", ios: "checkmark" }
-              : { android: "arrow_upward", ios: "arrow.up" }
-          }
-          size={15}
-          weight="bold"
-          tintColorClassName="accent-on-accent"
-        />
-      </GesturePressable>
-    </Animated.View>
-  );
 }
 
 /** The bar's sides, which widen a little while typing on iOS. */
@@ -202,12 +154,19 @@ function useDraft(
       sentAt.current = Date.now();
       return mentions;
     },
+    /** Puts `text` in the field, such as the draft with dictation added. */
+    replace: (text: string) => show(mention.edited(text)),
     /**
      * Who the saved edit mentions. The field then goes back to the draft
      * (a new `draftKey`), so it isn't emptied.
      */
     saved: (text: string) => mention.take(text),
   };
+}
+
+/** The field's placeholder: a caption, once there's something to send or save. */
+function fieldHint(adding: boolean, placeholder: string) {
+  return adding ? "Add a message" : placeholder;
 }
 
 /** What the composer can be asked to do. */
@@ -284,22 +243,24 @@ export function Composer({
 }: ComposerProps) {
   const input = useComposerInput(ref, onPaste);
   const editing = edit?.editing;
-  const { draft, clear, change, mention, pick, sent, saved } = useDraft(
-    editing === undefined || edit === undefined ? draftKey : edit.editDraftKey,
-    input,
-    reportedChanges(onChangeText, editing !== undefined),
-    mentionable,
-  );
+  const key = edit?.editing === undefined ? draftKey : edit.editDraftKey;
+  const { draft, clear, change, mention, pick, sent, saved, replace } =
+    useDraft(
+      key,
+      input,
+      reportedChanges(onChangeText, editing !== undefined),
+      mentionable,
+    );
+  const dictation = useComposerDictation(key, input, replace);
   const { glass, settle, focus } = useFieldGlass(report);
   const submission = useComposerCommit(
     report,
     clear,
     staged.map((file) => file.id),
   );
-  const fieldText = useFieldText(draft);
   const canSend = canSendNow(draft, staged, editing);
   const saves = editing !== undefined;
-  const hint = staged.length > 0 || saves ? "Add a message" : placeholder;
+  const hint = fieldHint(staged.length > 0 || saves, placeholder);
   const probe = useSendProbe(report, glass.field, input, { draft, hint });
 
   const send = composerSubmission(
@@ -311,7 +272,7 @@ export function Composer({
 
   return (
     <View>
-      {mention.people.length > 0 && (
+      {mention.people.length > 0 && dictation.phase === "idle" && (
         <MentionPicker
           people={mention.people}
           inset={Platform.OS === "ios" ? IOS_TYPING_EDGE : ANDROID_EDGE}
@@ -324,35 +285,39 @@ export function Composer({
       >
         <Bar bottomInset={bottomInset} report={probe.report}>
           {/* An edit changes only the text. */}
-          {editing === undefined && <AttachMenu onPick={onPick} />}
+          {editing === undefined && (
+            <ComposerAttach
+              enabled={dictation.phase === "idle"}
+              onPick={onPick}
+            />
+          )}
           <GlassField {...glass} minHeight={CONTROL}>
-            <FieldTop
-              edit={edit}
-              replyingTo={replyingTo}
-              onCancelReply={() => onCancelReply?.()}
-              staged={staged}
-              onRemoveStaged={onRemoveStaged}
-              send={submission.sequence}
-            />
-            <StyledTextInput
-              ref={input}
-              nativeID={PASTE_IMAGES_NATIVE_ID}
-              {...focus}
-              multiline
-              value={draft}
-              onChangeText={change}
-              onSelectionChange={mention.onSelectionChange}
-              placeholder={hint}
-              accessibilityLabel="Message"
-              // A message field never needs AutoFill suggestions.
-              autoComplete="off"
-              textContentType="none"
-              className="text-body text-foreground pl-4"
-              {...fieldText}
-              placeholderTextColorClassName="accent-muted"
-              cursorColorClassName="accent-accent"
-            />
-            <SendButton visible={canSend} saves={saves} onPress={send} />
+            <FieldBody
+              dictationKey={key}
+              dictation={dictation}
+              canSend={canSend}
+              saves={saves}
+              onSend={send}
+            >
+              <FieldTop
+                edit={edit}
+                replyingTo={replyingTo}
+                onCancelReply={() => onCancelReply?.()}
+                staged={staged}
+                onRemoveStaged={onRemoveStaged}
+                send={submission.sequence}
+              />
+              <MessageInput
+                input={input}
+                {...focus}
+                draft={draft}
+                idle={dictation.phase === "idle"}
+                microphone={dictation.available}
+                hint={hint}
+                onChangeText={change}
+                onSelectionChange={mention.onSelectionChange}
+              />
+            </FieldBody>
           </GlassField>
         </Bar>
       </ComposerLayout>

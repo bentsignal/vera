@@ -10,6 +10,7 @@ import {
   useNotificationRouting,
   usePushRegistration,
 } from "~/features/notifications/push";
+import { useShortcuts } from "~/features/shortcuts/shortcuts";
 
 export const unstable_settings = { anchor: "(tabs)" };
 
@@ -48,6 +49,7 @@ function AccountUpkeep() {
 export default function AppLayout() {
   const accounts = useAccounts();
   useNotificationRouting();
+  useShortcuts();
   useAppBadge();
   return (
     <>
