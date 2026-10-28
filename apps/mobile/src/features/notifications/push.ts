@@ -234,7 +234,7 @@ type Router = ReturnType<typeof useRouter>;
 export function openConversation(
   router: Router,
   conversationId: string,
-  params: { account?: string; messageId?: string; title?: string },
+  params: { account?: string; messageId?: string },
 ) {
   if (conversationId === activeConversationId) {
     // Already on screen: pushing would stack a second copy, so swiping

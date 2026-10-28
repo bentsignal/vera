@@ -79,13 +79,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // hosts space invite links (`/join/*`, Vera Dev's `/dev/join/*`).
     associatedDomains: ["webcredentials:vera.chat", "applinks:vera.chat"],
     config: { usesNonExemptEncryption: false },
-    infoPlist: {
-      NSSpeechRecognitionUsageDescription:
-        "Vera turns what you say into text for your messages.",
-      // Dictation keeps listening while you switch to another app; iOS
-      // shows the microphone in the status bar or Dynamic Island.
-      UIBackgroundModes: ["audio"],
-    },
   },
   android: {
     package: BUNDLE_ID,
@@ -134,7 +127,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "./plugins/with-android-websocket-policy.cjs",
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
-    // The App Shortcuts ("Talk to Vera"), in the app target.
+    // App Shortcuts ("Open Chat"), in the app target.
     "./plugins/with-app-intents.cjs",
     // React Native from source on iOS, for the repo's patch to it.
     "./plugins/with-react-native-from-source.cjs",
@@ -144,8 +137,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-image-picker",
       {
         cameraPermission: "Vera uses the camera to send photos and videos.",
-        microphonePermission:
-          "Vera uses the microphone to record videos and dictate messages.",
+        microphonePermission: "Vera uses the microphone to record videos.",
         photosPermission: "Vera uses your photos to send them in messages.",
       },
     ],

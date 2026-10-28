@@ -6,7 +6,6 @@ import { requireOptionalNativeModule } from "expo";
 interface HapticsModule {
   impactAsync: (style: "heavy" | "light" | "medium") => Promise<void>;
   selectionAsync: () => Promise<void>;
-  notificationAsync: (type: "error" | "success" | "warning") => Promise<void>;
 }
 
 interface ClipboardModule {
@@ -32,11 +31,6 @@ export function lightImpact() {
 /** A light tick, as when a choice is made. */
 export function selectionTick() {
   void haptics?.selectionAsync().catch(() => undefined);
-}
-
-/** The buzz of something that can't be done right now. */
-export function errorBuzz() {
-  void haptics?.notificationAsync("error").catch(() => undefined);
 }
 
 /** Whether this build can copy text. */

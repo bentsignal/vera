@@ -314,36 +314,18 @@ simulator: register the simulator's device token with Expo
 (`getExpoPushTokenAsync`, or `POST https://exp.host/--/api/v2/push/getExpoPushToken`
 with `development: true`) and send to that token through the Expo push API.
 
-## Dictation
-
-The composer's microphone turns speech into text on the phone
-(`modules/dictation`, `src/features/dictation`). On iOS 26 and later it
-uses Apple's `SpeechTranscriber` once its model is installed; a phone
-without the model downloads it in the background for next time and uses
-`SFSpeechRecognizer` meanwhile, on the device where the phone supports it.
-Before iOS 26 it's always `SFSpeechRecognizer`. Android uses its speech
-recognizer, on the device from Android 12 where the language is
-downloaded, and the phone's recognition service (asked to stay offline)
-otherwise. Builds without the module, or phones that can't recognize
-speech, show no microphone.
-
-One dictation runs at a time, for the whole app. It belongs to the draft
-it started in and keeps going while you open other conversations or, on
-iOS, other apps: the app has the `audio` background mode, and iOS shows the
-microphone in the status bar or Dynamic Island. Tapping the microphone in
-another conversation meanwhile buzzes and shows a toast
-(`src/features/toast`). In a simulator, `globalThis.veraDev.dictation.fake("words")`
-makes it "hear" `words` instead of the microphone.
-
 ## App Shortcuts
 
-"Talk to Vera" (`plugins/app-intents/VeraIntents.swift`, added to the app
-target by `plugins/with-app-intents.cjs`) shows in the Shortcuts app, Siri,
-Spotlight, and the Action button's Shortcut setting. It opens the app and
-leaves its name in `UserDefaults`; `modules/shortcuts` hands it to
-JavaScript (`src/features/shortcuts`), which opens the conversation with
-`vera@<domain>` and starts dictating there. App Intents need no
-entitlement or App ID capability.
+"Open Chat" (`plugins/app-intents/VeraIntents.swift`, added to the app
+target by `plugins/with-app-intents.cjs`) opens a chat you pick with the
+keyboard up, ready to type or dictate with the keyboard's microphone. It
+shows in the Shortcuts app, Siri, Spotlight, and the Action button's
+Shortcut setting, along with an "Open <chat> in Vera" shortcut for each
+recent chat. The chats come from the Inbox: JavaScript lists its 100 most
+recent in `UserDefaults` (`src/features/shortcuts`, `modules/shortcuts`),
+where the intent's query reads them. Running it opens the app and leaves
+the chat there; JavaScript opens it and focuses the field once its
+messages show. App Intents need no entitlement or App ID capability.
 
 ## Layout
 

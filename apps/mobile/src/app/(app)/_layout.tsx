@@ -10,7 +10,7 @@ import {
   useNotificationRouting,
   usePushRegistration,
 } from "~/features/notifications/push";
-import { useShortcuts } from "~/features/shortcuts/shortcuts";
+import { ShortcutChats, useShortcuts } from "~/features/shortcuts/shortcuts";
 
 export const unstable_settings = { anchor: "(tabs)" };
 
@@ -58,6 +58,7 @@ export default function AppLayout() {
           <AccountUpkeep />
         </AccountScope>
       ))}
+      <ShortcutChats />
       <AppStack />
     </>
   );
