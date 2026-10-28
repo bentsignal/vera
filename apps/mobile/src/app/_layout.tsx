@@ -16,7 +16,7 @@ import {
   SessionProvider,
   useSession,
 } from "~/features/session/session-provider";
-import { ToastHost } from "~/features/toast/toast";
+import { ToastHost } from "~/features/toast/toast-host";
 import { installAppUpdates, noteTouch } from "~/features/updates/app-updates";
 import { StoreUpdateCover } from "~/features/updates/store-update-cover";
 import { UpdateCover } from "~/features/updates/update-cover";

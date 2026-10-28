@@ -5,7 +5,7 @@ import { scheduleOnUI } from "react-native-worklets";
 
 import type { DictationEngine } from "./engine";
 import { readDraft, saveDraftText } from "~/features/conversation/drafts";
-import { showToast } from "~/features/toast/toast";
+import { showToast } from "~/features/toast/store";
 import { errorBuzz, selectionTick } from "~/lib/native-extras";
 import { dictationEngine, LEVEL_MS } from "./engine";
 import { withDictation } from "./joined";
@@ -21,6 +21,8 @@ export const LEVEL_COUNT = 72;
  * transcription doesn't flash it.
  */
 const LEAST_SPINNER_MS = 350;
+/** The waveform has faded out this long after dictation ends. */
+const CLEAR_AFTER_MS = 300;
 /** Gives up waiting for the last words after this long. */
 const FINISH_TIMEOUT_MS = 8000;
 
@@ -52,6 +54,12 @@ export const dictating = {
   cancelled: makeMutable(false),
 };
 
+/** No level yet, for every bar. (A worklet isn't hoisted, so it's first.) */
+function silence() {
+  "worklet";
+  return Array.from({ length: LEVEL_COUNT }, () => 0);
+}
+
 /** The microphone's recent levels, 0 to 1, newest last. */
 export const levels = makeMutable(silence());
 /**
@@ -59,11 +67,6 @@ export const levels = makeMutable(silence());
  * as a level arrives, easing to 0 by the next, so it moves steadily left.
  */
 export const levelShift = makeMutable(0);
-
-function silence() {
-  "worklet";
-  return Array.from({ length: LEVEL_COUNT }, () => 0);
-}
 
 const PHASES = { finishing: 2, idle: 0, recording: 1 } as const;
 
@@ -118,6 +121,9 @@ function end(id: number, cancelled: boolean) {
   if (!isRunning(id)) return;
   running = undefined;
   set(IDLE, cancelled);
+  // Once the waveform has faded out, so the next starts from silence
+  // without redrawing every bar as it appears.
+  setTimeout(() => scheduleOnUI(clearLevels), CLEAR_AFTER_MS);
 }
 
 function explainDenied(denied: "microphone" | "speech" | undefined) {
@@ -170,11 +176,10 @@ export function startDictation(key: string) {
   if (engine === null || current().key === key) return;
   if (current().key !== null) {
     errorBuzz();
-    showToast("Already dictating in another conversation");
+    showToast("Already dictating elsewhere");
     return;
   }
   const id = nextId++;
-  scheduleOnUI(clearLevels);
   selectionTick();
   running = { engine, id, started: Promise.resolve(false) };
   set({ key, phase: "recording" });

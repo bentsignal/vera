@@ -5,6 +5,11 @@ import { router } from "expo-router";
 import type { Preferences } from "~/features/preferences/store";
 import { env } from "~/env";
 import { fakeDictation } from "~/features/dictation/engine";
+import {
+  cancelDictation,
+  finishDictation,
+  startDictation,
+} from "~/features/dictation/session";
 import { inboxQuery } from "~/features/messaging/inbox";
 import { cachedSelected } from "~/features/messaging/results";
 import { setPreference } from "~/features/preferences/store";
@@ -48,10 +53,17 @@ export function installDevAutomation() {
       /** The open conversation, to react and send without tapping. */
       conversation: devConversation,
       /**
-       * Dictation "hears" `text` rather than the microphone, for checking
-       * the composer without speaking; `fake(null)` goes back to it.
+       * Dictation "hears" `text` rather than the microphone (`fake`), for
+       * checking the composer without speaking; `fake(null)` goes back to
+       * it. The rest dictate into a draft (`<account>:<conversation ID>`)
+       * without tapping, for measuring frames.
        */
-      dictation: { fake: fakeDictation },
+      dictation: {
+        fake: fakeDictation,
+        start: startDictation,
+        finish: (key: string) => void finishDictation(key),
+        cancel: cancelDictation,
+      },
       /** The open conversation's list, to fling it at a constant speed. */
       list: devList,
       /** The JavaScript thread's stalls: `start()`, then `stop()`. */
