@@ -52,7 +52,14 @@ export function Avatar({
         style={{ experimental_backgroundImage: MONOGRAM_GRADIENT }}
       >
         {glyph === undefined ? (
-          <Text className={cn("font-semibold text-white", text)}>
+          // Across the circle, not sized to the letter: iOS measures a lone
+          // narrow letter ("I" in the header) a hair short and drops it.
+          <Text
+            className={cn(
+              "self-stretch text-center font-semibold text-white",
+              text,
+            )}
+          >
             {initials(name)}
           </Text>
         ) : (
