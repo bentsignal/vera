@@ -1,26 +1,30 @@
 import type { PdsRouterMutation } from "@decentralized-convex/server";
 
 import type { Doc } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
+import { replyThread } from "../assistant-threads";
 import { internal } from "./_generated/api";
 import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
-// ones in a direct conversation with an assistant.
+// ones in a direct conversation with an assistant. A reply kept in a
+// thread is answered in that thread, which keeps its own reply state
+// (assistant-threads.ts).
 
 /** How long a reply waits for more messages, so a burst gets one answer. */
 const REPLY_DELAY = 1500;
 
 /**
  * The router's `afterMutation` (pds.ts): when someone on this PDS sends a
- * direct message to an assistant, its reply runs after a short pause. A
- * newer message moves the reply later, so it answers them together.
+ * direct message to an assistant, its reply runs after a short pause, in
+ * the thread when the message was kept there. A newer message moves the
+ * reply later, so it answers them together.
  */
 export async function afterPdsMutation(
   ctx: MutationCtx,
-  { identity, operation, plugin }: PdsRouterMutation,
+  { identity, operation, plugin, value }: PdsRouterMutation,
 ) {
   if (plugin !== "messages" || identity === null) return;
   const type = field(operation, "type");
@@ -32,13 +36,21 @@ export async function afterPdsMutation(
     return;
   }
   if (type !== "send" || identity.accountId === undefined) return;
-  await startReply(ctx, conversationId, identity.accountId);
+  // The sent message, whose thread is its original's even when it was
+  // sent as a reply to a reply.
+  const threadId = field(value, "threadId");
+  const thread = replyThread({
+    threadId: typeof threadId === "string" ? threadId : undefined,
+    threadOnly: field(value, "threadOnly") === true,
+  });
+  await startReply(ctx, conversationId, thread ?? undefined, identity.accountId);
 }
 
 /** Schedules an assistant's reply to someone's direct message to it. */
 async function startReply(
   ctx: MutationCtx,
   conversationId: string,
+  threadId: string | undefined,
   author: string,
 ) {
   const members = conversationId.slice("direct:".length).split(":");
@@ -53,14 +65,29 @@ async function startReply(
     accountId: author,
     bot: bot.username,
     conversationId,
+    threadId,
     wakeAt: Date.now() + REPLY_DELAY,
   });
 }
 
+/** The reply state of a DM with an assistant, or with `threadId`, of that thread. */
+export function replyRow(
+  ctx: QueryCtx,
+  conversationId: string,
+  threadId: string | undefined,
+) {
+  return ctx.db
+    .query("botConversations")
+    .withIndex("by_conversation", (q) =>
+      q.eq("conversationId", conversationId).eq("threadId", threadId),
+    )
+    .unique();
+}
+
 /**
- * Has the assistant reply in a conversation at `wakeAt`, optionally with a
- * note from the team (agent.ts `teamNote`). A later call moves the reply
- * later.
+ * Has the assistant reply in a conversation (or with `threadId`, in that
+ * thread) at `wakeAt`, optionally with a note from the team (agent.ts
+ * `teamNote`). A later call moves the reply later.
  */
 export async function scheduleReply(
   ctx: MutationCtx,
@@ -69,22 +96,21 @@ export async function scheduleReply(
     bot,
     conversationId,
     note,
+    threadId,
     wakeAt,
   }: {
     accountId: string;
     bot: BotAccount["username"];
     conversationId: string;
     note?: string;
+    threadId?: string;
     wakeAt: number;
   },
 ) {
-  const existing = await ctx.db
-    .query("botConversations")
-    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
-    .unique();
+  const existing = await replyRow(ctx, conversationId, threadId);
   const update = {
     ...(note !== undefined && { note }),
-    runId: await scheduleRun(ctx, conversationId, wakeAt),
+    runId: await scheduleRun(ctx, { conversationId, threadId }, wakeAt),
     waitingSince: undefined,
     wakeAt,
   };
@@ -94,6 +120,7 @@ export async function scheduleReply(
       accountId,
       bot,
       conversationId,
+      ...(threadId !== undefined && { threadId }),
     });
   } else {
     await ctx.db.patch(existing._id, update);
@@ -106,11 +133,15 @@ export async function scheduleReply(
  */
 export function scheduleRun(
   ctx: MutationCtx,
-  conversationId: string,
+  {
+    conversationId,
+    threadId,
+  }: { conversationId: string; threadId: string | undefined },
   wakeAt: number,
 ) {
   return ctx.scheduler.runAt(wakeAt, internal.agent.run, {
     conversationId,
+    ...(threadId !== undefined && { threadId }),
     wakeAt,
   });
 }
@@ -151,7 +182,7 @@ export async function waitWhileTyping(
     return false;
   }
   const response = await queryAsBot(ctx, VERA, {
-    args: { conversationId: row.conversationId },
+    args: { conversationId: row.conversationId, threadId: row.threadId },
     type: "typing",
   });
   const typing =
@@ -160,7 +191,7 @@ export async function waitWhileTyping(
   if (!typing) return false;
   const wakeAt = now + TYPING_RECHECK;
   await ctx.db.patch(row._id, {
-    runId: await scheduleRun(ctx, row.conversationId, wakeAt),
+    runId: await scheduleRun(ctx, row, wakeAt),
     wakeAt,
     waitingSince: row.waitingSince ?? now,
   });

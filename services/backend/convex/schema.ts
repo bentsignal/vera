@@ -27,8 +27,9 @@ export const storedBotName = v.union(v.literal("support"), botName);
 
 export default defineSchema({
   /**
-   * One per person's DM with an assistant: when its next reply runs and
-   * whether one is running.
+   * One per person's DM with an assistant, and one per thread in it (each
+   * its own conversation, assistant-threads.ts): when its next reply runs
+   * and whether one is running.
    */
   botConversations: defineTable({
     accountId: v.string(),
@@ -49,6 +50,8 @@ export default defineSchema({
     rerun: v.optional(v.boolean()),
     /** The scheduled reply for `wakeAt`. */
     runId: v.optional(v.id("_scheduled_functions")),
+    /** The thread's original message, for a thread's row. */
+    threadId: v.optional(v.string()),
     /** The reply running since `runningSince`, to tell if it died (agent.ts `watch`). */
     running: v.optional(v.id("_scheduled_functions")),
     runningSince: v.optional(v.number()),
@@ -56,7 +59,7 @@ export default defineSchema({
     waitingSince: v.optional(v.number()),
     /** When the reply to the latest message runs; older wake-ups skip. */
     wakeAt: v.number(),
-  }).index("by_conversation", ["conversationId"]),
+  }).index("by_conversation", ["conversationId", "threadId"]),
   /** What an assistant remembers about one person, at their request. */
   botNotes: defineTable({
     accountId: v.string(),

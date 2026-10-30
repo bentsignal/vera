@@ -4,6 +4,7 @@ import { v } from "convex/values";
 
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import { components, internal } from "./_generated/api";
+import { threadMessages } from "../assistant-threads";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { createAuth } from "./auth";
 import { actorFromEmail, requireEnvironment } from "./lib";
@@ -89,19 +90,51 @@ export function queryAsBot(
   });
 }
 
-/** Sends `body` to a conversation the bot is in, as the bot. */
+/**
+ * Sends `body` to a conversation the bot is in, as the bot, or with
+ * `threadId`, to that thread, kept there.
+ */
 export async function sendAsBot(
   ctx: MutationCtx,
   bot: BotAccount,
   conversationId: string,
   body: string,
+  { threadId }: { threadId?: string } = {},
 ) {
   const messageId = crypto.randomUUID();
   await mutateAsBot(ctx, bot, {
-    args: { attachments: [], body, conversationId, messageId },
+    args: {
+      attachments: [],
+      body,
+      conversationId,
+      messageId,
+      ...(threadId !== undefined && { threadId, threadOnly: true }),
+    },
     type: "send",
   });
   return messageId;
+}
+
+/**
+ * Up to 50 of a thread's replies before `before` (or the latest), oldest
+ * first, after its original once they reach the start.
+ */
+export async function threadPageAsBot(
+  ctx: QueryCtx,
+  bot: AnyBotAccount,
+  conversationId: string,
+  threadId: string,
+  before?: number,
+) {
+  const response = await queryAsBot(ctx, bot, {
+    args: { before, conversationId, threadId },
+    type: "thread",
+  });
+  if (response.type !== "thread") throw new Error("Unexpected response");
+  return {
+    hasOlder: response.value.hasOlder,
+    messages: threadMessages(threadId, response.value),
+  };
 }
 
 /** Up to 50 messages before `before` (or the latest), oldest first. */
@@ -247,41 +280,67 @@ export async function welcomeEveryAccount(
   }
 }
 
-/** Sends a message as the bot (agent.ts's `send_message`, support updates). */
+/**
+ * Sends a message as the bot (agent.ts's `send_message`, support updates),
+ * or with `threadId`, to that thread.
+ */
 export const post = internalMutation({
-  args: { body: v.string(), bot: botName, conversationId: v.string() },
-  handler: (ctx, { body, bot, conversationId }) =>
-    sendAsBot(ctx, botAccount(bot), conversationId, body),
+  args: {
+    body: v.string(),
+    bot: botName,
+    conversationId: v.string(),
+    threadId: v.optional(v.string()),
+  },
+  handler: (ctx, { body, bot, conversationId, threadId }) =>
+    sendAsBot(ctx, botAccount(bot), conversationId, body, { threadId }),
 });
 
 export const setTyping = internalMutation({
-  args: { bot: botName, conversationId: v.string(), typing: v.boolean() },
-  handler: async (ctx, { bot, conversationId, typing }) => {
+  args: {
+    bot: botName,
+    conversationId: v.string(),
+    threadId: v.optional(v.string()),
+    typing: v.boolean(),
+  },
+  handler: async (ctx, { bot, conversationId, threadId, typing }) => {
     await mutateAsBot(ctx, botAccount(bot), {
-      args: { conversationId, typing },
+      args: { conversationId, threadId, typing },
       type: "setTyping",
     });
   },
 });
 
+/** Marks a conversation read, or with `threadId`, that thread. */
 export const markRead = internalMutation({
-  args: { bot: botName, conversationId: v.string() },
-  handler: async (ctx, { bot, conversationId }) => {
-    await mutateAsBot(ctx, botAccount(bot), {
-      args: { conversationId, readAt: Date.now() },
-      type: "markRead",
-    });
+  args: {
+    bot: botName,
+    conversationId: v.string(),
+    threadId: v.optional(v.string()),
+  },
+  handler: async (ctx, { bot, conversationId, threadId }) => {
+    const readAt = Date.now();
+    await mutateAsBot(
+      ctx,
+      botAccount(bot),
+      threadId === undefined
+        ? { args: { conversationId, readAt }, type: "markRead" }
+        : { args: { conversationId, readAt, threadId }, type: "markThreadRead" },
+    );
   },
 });
 
+/** A page of a conversation, or with `threadId`, of that thread. */
 export const page = internalQuery({
   args: {
     before: v.optional(v.number()),
     bot: botName,
     conversationId: v.string(),
+    threadId: v.optional(v.string()),
   },
-  handler: (ctx, { before, bot, conversationId }) =>
-    pageAsBot(ctx, botAccount(bot), conversationId, before),
+  handler: (ctx, { before, bot, conversationId, threadId }) =>
+    threadId === undefined
+      ? pageAsBot(ctx, botAccount(bot), conversationId, before)
+      : threadPageAsBot(ctx, botAccount(bot), conversationId, threadId, before),
 });
 
 export function field(value: unknown, name: string): unknown {

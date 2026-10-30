@@ -6,15 +6,16 @@ import type { Answered } from "./agentReply";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
 import { reply } from "./agentReply";
-import { scheduleRun, waitWhileTyping } from "./assistantHook";
+import { replyRow, scheduleRun, waitWhileTyping } from "./assistantHook";
 import { botAccount, sendAsBot } from "./bots";
 import { takeReply } from "./rateLimits";
 
 // The harness every assistant runs on. A direct message to one schedules
 // `run` (assistantHook.ts); it claims the conversation, replies
 // (agentReply.ts), and finishes, starting the next reply if messages came
-// in meanwhile. One reply runs per conversation at a time, and `watch`
-// checks on it in case its action dies without finishing.
+// in meanwhile. One reply runs per conversation at a time (each thread in
+// it is a conversation of its own, with `threadId`), and `watch` checks on
+// it in case its action dies without finishing.
 
 /**
  * A reply that has run this long is assumed to have died, when there's no
@@ -27,29 +28,38 @@ const WATCH_EVERY = 15_000;
 const FAILURE_NOTICE =
   "Sorry, something went wrong on my end. Try again in a moment.";
 
+const chat = {
+  conversationId: v.string(),
+  /** A thread in the conversation, which is answered as one of its own. */
+  threadId: v.optional(v.string()),
+};
+
 export const run = internalAction({
-  args: { conversationId: v.string(), wakeAt: v.number() },
-  handler: async (ctx, { conversationId, wakeAt }) => {
+  args: { ...chat, wakeAt: v.number() },
+  handler: async (ctx, { conversationId, threadId, wakeAt }) => {
     const claim = await ctx.runMutation(internal.agent.claim, {
       conversationId,
+      threadId,
       wakeAt,
     });
     if (claim === null) return;
     const bot = botAccount(claim.bot);
     let answered: Answered | undefined;
     try {
-      answered = await reply(ctx, bot, conversationId, claim);
+      answered = await reply(ctx, bot, { conversationId, threadId }, claim);
     } catch (error) {
       console.error(`${bot.username} failed to reply`, error);
       await ctx.runMutation(internal.bots.post, {
         body: FAILURE_NOTICE,
         bot: bot.username,
         conversationId,
+        threadId,
       });
     } finally {
       await ctx.runMutation(internal.agent.finish, {
         ...answered,
         conversationId,
+        threadId,
       });
     }
   },
@@ -61,9 +71,9 @@ export const run = internalAction({
  * is over the hourly limit (rateLimits.ts).
  */
 export const claim = internalMutation({
-  args: { conversationId: v.string(), wakeAt: v.number() },
-  handler: async (ctx, { conversationId, wakeAt }) => {
-    const row = await dueRow(ctx, conversationId, wakeAt);
+  args: { ...chat, wakeAt: v.number() },
+  handler: async (ctx, { conversationId, threadId, wakeAt }) => {
+    const row = await dueRow(ctx, conversationId, threadId, wakeAt);
     if (row === null) return null;
     const now = Date.now();
     // A reply that died is taken over: this one answers its messages too.
@@ -78,7 +88,9 @@ export const claim = internalMutation({
     });
     if (!limit.ok) {
       if (limit.notice !== null) {
-        await sendAsBot(ctx, botAccount(row.bot), conversationId, limit.notice);
+        await sendAsBot(ctx, botAccount(row.bot), conversationId, limit.notice, {
+          threadId,
+        });
       }
       return null;
     }
@@ -94,6 +106,7 @@ export const claim = internalMutation({
     await ctx.scheduler.runAfter(WATCH_EVERY, internal.agent.watch, {
       conversationId,
       runningSince: now,
+      threadId,
     });
     return {
       accountId: row.accountId,
@@ -109,12 +122,10 @@ export const claim = internalMutation({
 async function dueRow(
   ctx: MutationCtx,
   conversationId: string,
+  threadId: string | undefined,
   wakeAt: number,
 ) {
-  const row = await ctx.db
-    .query("botConversations")
-    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
-    .unique();
+  const row = await replyRow(ctx, conversationId, threadId);
   if (row?.wakeAt !== wakeAt) return null;
   // Vera Support's rows wait for the merge (mergeSupport.ts) to remove them.
   if (row.bot === "support") return null;
@@ -124,24 +135,23 @@ async function dueRow(
 /** Ends a reply, and starts the next if messages came in meanwhile. */
 export const finish = internalMutation({
   args: {
+    ...chat,
     answeredThrough: v.optional(v.number()),
-    conversationId: v.string(),
     historyFrom: v.optional(v.number()),
   },
-  handler: async (ctx, { answeredThrough, conversationId, historyFrom }) => {
-    const row = await ctx.db
-      .query("botConversations")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", conversationId),
-      )
-      .unique();
+  handler: async (
+    ctx,
+    { answeredThrough, conversationId, historyFrom, threadId },
+  ) => {
+    const row = await replyRow(ctx, conversationId, threadId);
     if (row === null) return;
     const answered = {
       answeredThrough: Math.max(row.answeredThrough ?? 0, answeredThrough ?? 0),
       ...(historyFrom !== undefined && { historyFrom }),
     };
-    // Vera remembers the whole conversation (memory.ts).
-    if (row.bot === "vera") {
+    // Vera remembers the whole conversation (memory.ts), apart from its
+    // threads, which it reads whole.
+    if (row.bot === "vera" && threadId === undefined) {
       await ctx.scheduler.runAfter(0, internal.memoryBuild.update, {
         bot: row.bot,
         conversationId,
@@ -159,20 +169,16 @@ export const finish = internalMutation({
  * nothing new, the person hears that something went wrong.
  */
 export const watch = internalMutation({
-  args: { conversationId: v.string(), runningSince: v.number() },
-  handler: async (ctx, { conversationId, runningSince }) => {
-    const row = await ctx.db
-      .query("botConversations")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", conversationId),
-      )
-      .unique();
+  args: { ...chat, runningSince: v.number() },
+  handler: async (ctx, { conversationId, runningSince, threadId }) => {
+    const row = await replyRow(ctx, conversationId, threadId);
     if (row?.runningSince !== runningSince) return;
     const state = await runState(ctx, row, Date.now());
     if (state === "running") {
       await ctx.scheduler.runAfter(WATCH_EVERY, internal.agent.watch, {
         conversationId,
         runningSince,
+        threadId,
       });
       return;
     }
@@ -180,7 +186,9 @@ export const watch = internalMutation({
     // Vera Support's rows wait for the merge (mergeSupport.ts); its account
     // can't write any more.
     if (row.rerun !== true && row.bot === "vera") {
-      await sendAsBot(ctx, botAccount(row.bot), conversationId, FAILURE_NOTICE);
+      await sendAsBot(ctx, botAccount(row.bot), conversationId, FAILURE_NOTICE, {
+        threadId,
+      });
     }
     await endRun(ctx, row, {});
   },
@@ -216,7 +224,7 @@ async function endRun(
   await ctx.db.patch(row._id, {
     ...ended,
     rerun: false,
-    runId: await scheduleRun(ctx, row.conversationId, wakeAt),
+    runId: await scheduleRun(ctx, row, wakeAt),
     wakeAt,
   });
 }
