@@ -16,6 +16,12 @@ import {
   MessageActionsProvider,
   useMessageActions,
 } from "~/features/conversation/message-actions";
+import {
+  lookThread,
+  ThreadLookRows,
+  withThreadLook,
+} from "~/features/conversation/thread-look-rows";
+import { useStickyOriginal } from "~/features/conversation/thread-look-sticky";
 import { useToday } from "~/lib/use-today";
 import { COMPOSER_GAP } from "./composer-binding";
 import { useDevNativeFling } from "./dev-native-fling";
@@ -106,6 +112,7 @@ function useRows({
   messages,
   notices,
   thread,
+  threadLook,
   typists,
   ...context
 }: Pick<
@@ -118,13 +125,15 @@ function useRows({
   | "self"
   | "showAuthors"
   | "thread"
+  | "threadLook"
   | "typists"
 >) {
   // Only messages that arrive while it's open animate in.
   const [openedAt] = useState(Date.now);
   // Re-labels the rows ("Today", "Yesterday · 9:14 PM") at midnight.
   const now = useToday();
-  const built = newestFirst(messages, context.layout, thread, notices);
+  const head = lookThread(thread, threadLook);
+  const built = newestFirst(messages, context.layout, head, notices);
   const byId = new Map<string, Message>();
   for (const row of built) {
     if (row.type === "message") byId.set(row.key, row.message);
@@ -139,7 +148,10 @@ function useRows({
       rowKinds: V1_ROW_KINDS,
     },
   });
-  return { messageOf: (rowId: string) => byId.get(rowId), rows };
+  return {
+    messageOf: (rowId: string) => byId.get(rowId),
+    rows: withThreadLook(rows, { now, thread, threadLook }),
+  };
 }
 
 function useLift(view: RefObject<MessageListViewMethods | null>) {
@@ -223,8 +235,10 @@ function NativeRows({
     messages: composer.messages,
   });
   const { lift, change: changeLift } = useLift(view);
+  const sticky = useStickyOriginal(shown, view, safeTop + topInset + 6);
 
   const onEvent = useListEvents({
+    onVisible: sticky.onVisible,
     menu: { layout, lift: changeLift, self },
     messageOf,
     // Frozen in the render the menu opens in, before it takes the keyboard.
@@ -262,8 +276,11 @@ function NativeRows({
           lift={lift}
           initialRowId={shown.anchorId}
           onEvent={onEvent}
-        />
+        >
+          <ThreadLookRows rows={rows} threadLook={shown.threadLook} />
+        </MessageListView>
       </View>
+      {sticky.bar}
       <Animated.View
         pointerEvents="none"
         className="bg-background absolute inset-0"

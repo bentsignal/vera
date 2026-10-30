@@ -6,6 +6,7 @@ import type {
   ToggleReaction,
   ViewReactions,
 } from "~/features/conversation/message-actions";
+import type { ThreadLook } from "~/features/conversation/thread-looks";
 import type {
   MemberNotice,
   Message,
@@ -28,6 +29,15 @@ export interface MessageListProps {
   notices?: readonly MemberNotice[];
   /** Set in a thread, whose original heads the list. */
   thread?: ThreadHead;
+  /** Development only: how a thread presents its original (thread-looks.ts). */
+  threadLook?: {
+    look: ThreadLook;
+    /** The conversation's name. */
+    title: string;
+    /** The original shows as sent a day earlier, to try a day change. */
+    yesterday: boolean;
+    onOpenConversation: () => void;
+  };
   self: string;
   layout: MessageLayout;
   profileOf: ProfileOf;

@@ -252,7 +252,10 @@ export function useListEvents({
   openMenu,
   menu,
   pages,
+  onVisible,
 }: {
+  /** The rows on screen changed (a thread look pins its original). */
+  onVisible?: (rowIds: readonly string[]) => void;
   /** The message a row shows, by the row's ID. */
   messageOf: (rowId: string) => Message | undefined;
   openThread: ((message: Message) => void) | undefined;
@@ -314,6 +317,7 @@ export function useListEvents({
       case "visible":
         // Read marks follow the newest message while it's open
         // (`useMarkRead`).
+        onVisible?.(event.rowIds);
         return;
       case "press":
       case "hold":

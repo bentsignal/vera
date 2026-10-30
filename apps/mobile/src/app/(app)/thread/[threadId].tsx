@@ -24,6 +24,7 @@ import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
 import { useDevConversation } from "~/features/dev/dev-conversation";
 import { useDevTools } from "~/features/dev/dev-tools";
+import { useThreadLookProps } from "~/features/dev/thread-look";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useMessages } from "~/features/messaging/messages";
@@ -205,6 +206,7 @@ function Thread({
   });
 
   const pending = useAccountPending(shown === null && !missing);
+  const look = useThreadLookProps(thread.replyCount, heading, toConversation);
 
   return (
     <View className="bg-background flex-1">
@@ -224,6 +226,7 @@ function Thread({
             key={thread.viewKey}
             anchorId={thread.anchor}
             thread={{ replyCount: thread.replyCount, root: shown.root }}
+            threadLook={look.threadLook}
             messages={replies}
             self={address}
             layout={shown.layout}
@@ -245,6 +248,7 @@ function Thread({
       </ConversationGestureArea>
       <ThreadHeader
         title={heading}
+        {...look.header}
         following={state.following}
         onOpenConversation={toConversation}
         onToggleFollowing={state.toggle}
