@@ -314,6 +314,19 @@ simulator: register the simulator's device token with Expo
 (`getExpoPushTokenAsync`, or `POST https://exp.host/--/api/v2/push/getExpoPushToken`
 with `development: true`) and send to that token through the Expo push API.
 
+## App Shortcuts
+
+"Open Chat" (`plugins/app-intents/VeraIntents.swift`, added to the app
+target by `plugins/with-app-intents.cjs`) opens a chat you pick with the
+keyboard up, ready to type or dictate with the keyboard's microphone. It
+shows in the Shortcuts app, Siri, Spotlight, and the Action button's
+Shortcut setting, along with an "Open <chat> in Vera" shortcut for each
+recent chat. The chats come from the Inbox: JavaScript lists its 100 most
+recent in `UserDefaults` (`src/features/shortcuts`, `modules/shortcuts`),
+where the intent's query reads them. Running it opens the app and leaves
+the chat there; JavaScript opens it and focuses the field once its
+messages show. App Intents need no entitlement or App ID capability.
+
 ## Layout
 
 - `src/app`: routes. `(auth)` holds welcome, create account, and sign in;

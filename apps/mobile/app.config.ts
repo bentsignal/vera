@@ -127,6 +127,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "./plugins/with-android-websocket-policy.cjs",
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
+    // App Shortcuts ("Open Chat"), in the app target.
+    "./plugins/with-app-intents.cjs",
     // React Native from source on iOS, for the repo's patch to it.
     "./plugins/with-react-native-from-source.cjs",
     ["./plugins/with-alternate-icons.cjs", { icons: ALTERNATE_ICONS }],
