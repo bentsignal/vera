@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@better-auth/expo": "~1.6.33",
+    "@bsky.app/expo-image-crop-tool": "^0.5.1",
     "@convex-dev/better-auth": "0.12.5",
     "@decentralized-convex/accounts": "workspace:0.1.0",
     "@decentralized-convex/address": "workspace:0.1.0",
@@ -103,6 +104,13 @@
       "exclude": [
         "typescript"
       ]
+    },
+    "autolinking": {
+      "android": {
+        "exclude": [
+          "@bsky.app/expo-image-crop-tool"
+        ]
+      }
     }
   },
   "prettier": "@acme/prettier-config"
