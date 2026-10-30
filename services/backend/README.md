@@ -175,7 +175,7 @@ answer it (see its README, "Assistants").
   who asks gets its GitHub link, since reports are public.
 - Several people can talk to it in one thread, each by mentioning it. If
   someone asks why it didn't answer a message without a mention, it says
-  it only sees messages that mention it (it doesn't bring that up
+  it only answers messages that mention it (it doesn't bring that up
   otherwise). In a direct message, Vera explains how to call it into
   other conversations when someone asks.
 - It shares the caller's hourly limit with their direct messages.

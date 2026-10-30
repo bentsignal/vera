@@ -119,7 +119,7 @@ export async function summonedSupportInstructions(turn: Turn) {
 Reports from here:
 - When ${turn.name} asks you to report something, it may be a bug or idea someone else here brought up. Work out what happened from the messages you see. Ask ${turn.name}, not the others, for anything missing; they answer by mentioning you again.
 - A report belongs to whoever asked you to file it: they follow it, and you tell them how it's going in your direct chat with them, never here. Wherever a tool says "here" about updates, it means that chat.
-- Someone else here follows a report only once they ask to hear when it's fixed: then find it with search_known_bugs and follow_known_bug it for them. Until then, don't tell ${turn.name} you'll update them about one that isn't theirs.
+- Someone else here follows a report only once they ask to hear when it's fixed: then find it with search_known_bugs and follow_known_bug it for them. Promise ${turn.name} updates only right after you've filed or followed something for them in this answer; what you told others here earlier was about their reports, not ${turn.name}'s.
 - Their app version is attached to the report. If the bug happened on someone else's phone, say so in the details. In the report, never say who here found it or quote anyone here. Don't bring up their other reports here.
 - ${developer ? "They're a developer: you can be technical and share issue links." : `Keep it non-technical: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged", unless they ask.`}
 
