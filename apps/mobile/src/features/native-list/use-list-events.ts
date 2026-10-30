@@ -20,7 +20,6 @@ import { impact } from "~/lib/native-extras";
 import { openLink } from "~/lib/open-link";
 import { heldPart, mediaOf } from "./held-part";
 import { isJumbo } from "./jumbo";
-import { listFocused, pressMedia } from "./media-open";
 import { reactionAction, reactionMenuPlace } from "./reaction-events";
 
 type PressEvent = Extract<ListEvent, { type: "press" }>;
@@ -171,20 +170,42 @@ function menuTarget(
   } satisfies MenuTarget;
 }
 
-/** Opens a message's photos and videos in the viewer, on `index`. */
-function useOpenMedia() {
-  const router = useRouter();
-  /** Media opened from here is on its way or showing (`pressMedia`). */
-  const opening = useRef(false);
+/**
+ * The list is covered: a screen opened from it (media, a thread, a
+ * profile) is on its way or showing, from the tap that opens it until the
+ * list's screen is back in focus. The new screen takes a moment to cover
+ * the list, longer while JavaScript is busy, and touches in that moment
+ * still reach it: a fast repeat on a photo would push a second viewer, and
+ * a hold would open the message menu over the viewer, stuck there once
+ * the viewer closes.
+ */
+function useCover() {
+  const covered = useRef(false);
   useFocusEffect(() => {
-    opening.current = listFocused();
+    covered.current = false;
+    return () => {
+      covered.current = true;
+    };
   });
+  return {
+    covered: () => covered.current,
+    /** A tap is opening another screen over the list. */
+    cover: () => {
+      covered.current = true;
+    },
+  };
+}
+
+/**
+ * Opens a message's photos and videos in the viewer, on `index`, covering
+ * the list (`cover`).
+ */
+function useOpenMedia(cover: () => void) {
+  const router = useRouter();
   return (message: Message, index: number) => {
     const item = mediaOf(message)[index];
     if (item === undefined || handledStuck(item.attachment)) return;
-    const press = pressMedia(opening.current);
-    opening.current = press.opening;
-    if (!press.opens) return;
+    cover();
     const { attachment } = item;
     // A video opens playing, in the video player, not on its poster in
     // the group.
@@ -270,15 +291,25 @@ export function useListEvents({
     onReady: () => void;
   };
 }) {
+  const { covered, cover } = useCover();
+  /** Opens another screen over the list, covering it (`useCover`). */
+  function covering<A extends unknown[]>(open: (...args: A) => void) {
+    return (...args: A) => {
+      cover();
+      open(...args);
+    };
+  }
   const actions = {
-    openMedia: useOpenMedia(),
-    openProfile: useOpenProfile(),
-    openThread,
+    openMedia: useOpenMedia(cover),
+    openProfile: covering(useOpenProfile()),
+    openThread: openThread && covering(openThread),
     toggleReaction,
     viewReactions,
   } satisfies PressActions;
 
   function onMessage(event: HoldEvent | PressEvent) {
+    // Nothing while a screen opened from the list covers it (`useCover`).
+    if (covered()) return;
     const message = messageOf(event.rowId);
     if (message === undefined) return;
     const reaction = reactionAction(event, menu.layout);
