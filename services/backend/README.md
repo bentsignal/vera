@@ -169,8 +169,15 @@ answer it (see its README, "Assistants").
 - It can search the web and take bug reports for the caller: searching
   GitHub, following a known issue, or filing one (the privacy notice
   first, as in a direct message, posted in the thread; they answer by
-  mentioning Vera again). The report is the caller's: updates on it go to
-  their direct message with Vera, never the group.
+  mentioning Vera again). A report belongs to whoever asked for it: updates on it
+  go to their direct message with Vera, never the group. Someone else in
+  the thread follows it too by asking to hear when it's fixed, and anyone
+  who asks gets its GitHub link, since reports are public.
+- Several people can talk to it in one thread, each by mentioning it. If
+  someone asks why it didn't answer a message without a mention, it says
+  it only sees messages that mention it (it doesn't bring that up
+  otherwise). In a direct message, Vera explains how to call it into
+  other conversations when someone asks.
 - It shares the caller's hourly limit with their direct messages.
 - Like direct messages, only people on this PDS can call it, and it sees
   only messages stored here.

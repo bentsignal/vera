@@ -49,7 +49,7 @@ export async function supportInstructions(turn: Turn) {
       : reports
           .map(
             (report) =>
-              `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}${reporter.developer === true ? `. ${linksOf(report)}` : ""}`,
+              `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}. ${linksOf(report)}`,
           )
           .join("\n");
   return `${reportRules("here")}
@@ -58,7 +58,7 @@ export async function supportInstructions(turn: Turn) {
 Talking about it:
 - Their developer status: ${developer}. If unknown, after you file their first report, ask once, casually, whether they're a developer, since you can share the technical details as the fix moves along; record the answer with set_developer.
 - If they're not a developer (or unknown), keep it non-technical: say "bug report" or "passed it to the team", never "issue", "GitHub", "ticket", "PR", or "merged".
-- If they are a developer, you can be technical and share the links listed with their reports below. Only those links: never make up a link, issue number, or ID.
+- If they are a developer, you can be technical and share the links listed with their reports below.
 - If they ask how to do something in the app and you're not sure, say so. Don't invent features.
 
 Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.
@@ -98,7 +98,9 @@ Filing:
 - Use file_bug_report once you have enough and nothing known matches. Write the title and details for a developer: specific, factual, concise. Write the summary for them: a short everyday phrase like "photos showing sideways in group chats".
 - Feature requests and ideas are welcome too; file them with kind "idea".
 - Everything you file is public, so use judgment: don't file jokes, tests, insults, or spam, and don't file what's already known. If they're clearly just messing around, don't file anything.
-- After filing, tell them in plain words that you passed it to the team and will message them ${updates} when it's fixed. Don't promise when.`;
+- After filing, tell them in plain words that you passed it to the team and will message them ${updates} when it's fixed. Don't promise when.
+
+Links: reports are public, so when anyone asks for the link to one, send it, developer or not. Your tools give each issue's link (search_known_bugs finds any report); never make up a link, issue number, or ID.`;
 }
 
 /**
@@ -116,9 +118,10 @@ export async function summonedSupportInstructions(turn: Turn) {
 
 Reports from here:
 - When ${turn.name} asks you to report something, it may be a bug or idea someone else here brought up. Work out what happened from the messages you see. Ask ${turn.name}, not the others, for anything missing; they answer by mentioning you again.
-- The report is ${turn.name}'s: they follow it, and you tell them how it's going in your direct chat with them, never here. Wherever a tool says "here" about updates, it means that chat.
+- A report belongs to whoever asked you to file it: they follow it, and you tell them how it's going in your direct chat with them, never here. Wherever a tool says "here" about updates, it means that chat.
+- Someone else here follows a report only once they ask to hear when it's fixed: then find it with search_known_bugs and follow_known_bug it for them. Until then, don't tell ${turn.name} you'll update them about one that isn't theirs.
 - Their app version is attached to the report. If the bug happened on someone else's phone, say so in the details. In the report, never say who here found it or quote anyone here. Don't bring up their other reports here.
-- ${developer ? "They're a developer: you can be technical and share an issue link a tool gives you." : `Keep it non-technical: say "bug report" or "passed it to the team", never "issue", "GitHub", "ticket", "PR", or "merged".`}
+- ${developer ? "They're a developer: you can be technical and share issue links." : `Keep it non-technical: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged", unless they ask.`}
 
 Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.`;
 }
@@ -251,10 +254,7 @@ async function fileBugReport(
   return {
     filed: true,
     reportId,
-    link:
-      reporter.developer !== true
-        ? "Not for this person (not a developer)."
-        : (created?.url ?? "None; it's kept privately."),
+    link: created?.url ?? "None; it's kept privately.",
   };
 }
 
@@ -332,7 +332,7 @@ async function addToBugReport(
   return "Added.";
 }
 
-/** A developer's links for a report, or that it has none. */
+/** A report's links, or that it has none. */
 function linksOf(report: PublicReport) {
   if (report.issueUrl === null) return "No public link (kept privately)";
   return report.pullRequestUrl === null
