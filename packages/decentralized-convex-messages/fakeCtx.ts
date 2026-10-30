@@ -11,6 +11,10 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_account_key: ["accountId", "key", "seenAt"],
     by_account_seen: ["accountId", "seenAt"],
   },
+  contacts: {
+    by_account_added: ["accountId", "addedAt"],
+    by_account_contact: ["accountId", "contactId"],
+  },
   conversationChanges: { by_conversation: ["conversationId"] },
   conversations: {
     by_conversation: ["conversationId"],
@@ -37,6 +41,7 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_thread_sent: ["threadId", "sentAt"],
   },
   notificationSettings: { by_account: ["accountId"] },
+  privacySettings: { by_account: ["accountId"] },
   reactions: {
     by_author_reacted: ["messageAuthorId", "reactedAt"],
     by_conversation_reacted: ["conversationId", "reactedAt"],

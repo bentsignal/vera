@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+import { messagesFrom } from "./contactShapes.ts";
 import {
   alertLevel,
   attachment,
@@ -275,6 +276,21 @@ export default defineSchema({
     threadReplies: v.optional(v.boolean()),
     // Pushes for messages that say the account's name: off until turned on.
     yourName: v.optional(v.boolean()),
+  }).index("by_account", ["accountId"]),
+  // People each account added, with its own name and photo for them.
+  contacts: defineTable({
+    accountId: v.string(),
+    addedAt: v.number(),
+    avatarUrl: v.optional(v.string()),
+    contactId: v.string(),
+    name: v.optional(v.string()),
+  })
+    .index("by_account_contact", ["accountId", "contactId"])
+    .index("by_account_added", ["accountId", "addedAt"]),
+  // Who can message each account; absent fields are `everyone`.
+  privacySettings: defineTable({
+    accountId: v.string(),
+    messagesFrom: v.optional(messagesFrom),
   }).index("by_account", ["accountId"]),
   pushTokens: defineTable({
     accountId: v.string(),

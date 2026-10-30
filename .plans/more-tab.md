@@ -27,6 +27,7 @@ aren't settings, such as contacts.
 - Routes: `/more`, `/more/settings`, `/more/notifications`,
   `/more/account`, `/more/about`.
 
-## Later
+## Contacts
 
-- Contacts, as its own row.
+Contacts is its own row, above Settings (see `contacts.md`), at
+`/more/contacts`.

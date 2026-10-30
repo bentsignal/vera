@@ -27,6 +27,12 @@ const JONAH = {
   displayName: "Jonah Weiss",
 };
 
+void test("a contact is suggested by your name for them or their own", () => {
+  const mom = { ...MAYA, displayName: "Mom", mentionName: "Maya Chen" };
+  assert.deepEqual(suggestions([mom, LEO], "mo"), [mom]);
+  assert.deepEqual(suggestions([mom, LEO], "chen"), [mom]);
+});
+
 void test("finds the name being typed after an @", () => {
   assert.deepEqual(mentionQuery("hi @ma", 6), { query: "ma", start: 3 });
   assert.deepEqual(mentionQuery("@", 1), { query: "", start: 0 });

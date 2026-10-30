@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { MessagePage } from "./paging.ts";
 import type { messagesProtocol } from "./protocol.ts";
 import { alertsFor } from "./alerts.ts";
+import { requireAcceptsMessages } from "./contacts.ts";
 import {
   fail,
   findAccess,
@@ -61,6 +62,8 @@ export async function openDirect(
   if (other === self) fail("INVALID_ADDRESS");
   const conversationId = directConversationId(self, other);
   if ((await getConversation(ctx, conversationId)) === null) {
+    // Only starting one asks: a conversation that exists stays open.
+    await requireAcceptsMessages(ctx, other, self);
     await ctx.db.insert("conversations", {
       conversationId,
       createdBy: self,
@@ -86,6 +89,7 @@ export async function createGroup(
   if (isRetriedCreate(existing, self, ({ kind }) => kind === "group")) {
     return { conversationId };
   }
+  for (const member of members) await requireAcceptsMessages(ctx, member, self);
   await ctx.db.insert("conversations", {
     conversationId,
     createdBy: self,
@@ -131,6 +135,7 @@ export async function addGroupMembers(
   if (existing.size + added.length > MAX_GROUP_MEMBERS) {
     fail("INVALID_GROUP_MEMBERS");
   }
+  for (const member of added) await requireAcceptsMessages(ctx, member, self);
   const { conversationId } = conversation;
   await insertMembers(ctx, conversationId, added);
   const at = Date.now();

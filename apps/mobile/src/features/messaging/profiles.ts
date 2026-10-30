@@ -1,9 +1,11 @@
+import type { Contact } from "@decentralized-convex/messages";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { domainOf } from "~/features/compose/people-match";
+import { useContactBook } from "~/features/contacts/contacts";
 import { useAccount, useAccounts } from "./account";
 import { pdsResult, pdsResultOr } from "./results";
 
@@ -12,44 +14,72 @@ export function usernameOf(address: string) {
 }
 
 /**
- * Each profile as screens show it, the same object while the profile is,
- * so rows that show it (every message in a conversation) don't redraw.
+ * Each profile as screens show it, the same object while the profile (and
+ * your contact for them) is, so rows that show it (every message in a
+ * conversation) don't redraw.
  */
-const shownProfiles = new WeakMap<object, ShownProfile>();
-const fallbacks = new Map<string, ShownProfile>();
+const shownProfiles = new WeakMap<object, WeakMap<object, ShownProfile>>();
+const fallbacks = new Map<string, WeakMap<object, ShownProfile>>();
+/** Stands for "not a contact" in the caches above. */
+const NOT_A_CONTACT = {};
 
 interface ShownProfile {
   readonly affiliated: boolean;
+  /** Your photo for them as a contact, or else theirs. */
   readonly avatarUrl: string | null;
+  /** Your name for them as a contact, or else theirs. */
   readonly displayName: string;
+  /** Whether they're one of your contacts. */
+  readonly isContact: boolean;
+  /** Their own photo, which yours for them replaces above. */
+  readonly ownAvatarUrl: string | null;
+  /** Their own name, which yours for them replaces above. */
+  readonly ownName: string;
+}
+
+interface Profile {
+  readonly affiliated?: boolean;
+  readonly avatarUrl?: string | null;
+  readonly displayName?: string;
+}
+
+/** The profile as shown with your contact for them (or without one). */
+function buildShown(
+  address: string,
+  profile: Profile | null | undefined,
+  contact: Contact | undefined,
+) {
+  const ownName = profile?.displayName ?? usernameOf(address);
+  const ownAvatarUrl = profile?.avatarUrl ?? null;
+  return {
+    affiliated: profile?.affiliated === true,
+    avatarUrl: contact?.avatarUrl ?? ownAvatarUrl,
+    displayName: contact?.name ?? ownName,
+    isContact: contact !== undefined,
+    ownAvatarUrl,
+    ownName,
+  } satisfies ShownProfile;
+}
+
+/** The cache of a profile's shown versions, by contact. */
+function shownCache(address: string, profile: Profile | null | undefined) {
+  const cache =
+    (profile == null ? fallbacks.get(address) : shownProfiles.get(profile)) ??
+    new WeakMap<object, ShownProfile>();
+  if (profile == null) fallbacks.set(address, cache);
+  else shownProfiles.set(profile, cache);
+  return cache;
 }
 
 function shownProfile(
   address: string,
-  profile:
-    | {
-        readonly affiliated?: boolean;
-        readonly avatarUrl?: string | null;
-        readonly displayName?: string;
-      }
-    | null
-    | undefined,
+  profile: Profile | null | undefined,
+  contact: Contact | undefined,
 ) {
-  if (profile == null) {
-    const fallback = fallbacks.get(address) ?? {
-      affiliated: false,
-      avatarUrl: null,
-      displayName: usernameOf(address),
-    };
-    fallbacks.set(address, fallback);
-    return fallback;
-  }
-  const shown = shownProfiles.get(profile) ?? {
-    affiliated: profile.affiliated === true,
-    avatarUrl: profile.avatarUrl ?? null,
-    displayName: profile.displayName ?? usernameOf(address),
-  };
-  shownProfiles.set(profile, shown);
+  const cache = shownCache(address, profile);
+  const key = contact ?? NOT_A_CONTACT;
+  const shown = cache.get(key) ?? buildShown(address, profile, contact);
+  cache.set(key, shown);
   return shown;
 }
 
@@ -75,6 +105,7 @@ function useProfileSession() {
  */
 export function useProfileState(addresses: readonly string[]) {
   const sessionFor = useProfileSession();
+  const contactOf = useContactBook();
   const unique = [...new Set(addresses)];
   // Shared structurally with the last result, so the same profiles give the
   // same object, and `profileOf` stays the same function: rows that take it
@@ -109,7 +140,8 @@ export function useProfileState(addresses: readonly string[]) {
     isLoading,
     /** Whether this address's profile (or its absence) is known. */
     isLoaded: (address: string) => found[address] !== undefined,
-    profileOf: (address: string) => shownProfile(address, found[address]),
+    profileOf: (address: string) =>
+      shownProfile(address, found[address], contactOf(address)),
   };
 }
 
@@ -125,11 +157,13 @@ export function useDisplayNames(addresses: readonly string[]) {
 }
 
 /**
- * One person's profile, falling back to the username and no photo.
- * `isLoading` holds until their PDS answers, so screens can fade it in.
+ * One person's profile, falling back to the username and no photo, with
+ * your contact name and photo for them in place of theirs. `isLoading`
+ * holds until their PDS answers, so screens can fade it in.
  */
 export function useProfile(address: string) {
   const session = useProfileSession()(address);
+  const contact = useContactBook()(address);
   const { data } = useQuery(
     pdsQuery({
       args: { accountId: address },
@@ -147,9 +181,7 @@ export function useProfile(address: string) {
     }),
   );
   return {
-    affiliated: data?.affiliated === true,
-    avatarUrl: data?.avatarUrl ?? null,
-    displayName: data?.displayName ?? usernameOf(address),
+    ...shownProfile(address, data, contact),
     isLoading: data === undefined,
   };
 }

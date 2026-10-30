@@ -8,6 +8,7 @@ import {
   internalQuery,
 } from "./_generated/server.js";
 import { badgeCount } from "./badges.ts";
+import { shownTo } from "./contacts.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
 import { listeners } from "./listeners.ts";
 import { noteWordsSaid, saysWord, wordCandidates } from "./mentions.ts";
@@ -36,8 +37,11 @@ export const targets = internalQuery({
     if (conversation === null) return null;
 
     const members = await memberAddresses(ctx, conversation);
+    const unnamedGroup =
+      conversation.kind === "group" && conversation.name === undefined;
     const recipients: (ReturnType<typeof recipientOf> & {
       reply: ReplyPush;
+      shown: Awaited<ReturnType<typeof shownTo>>;
     })[] = [];
     for (const { accountId, reply } of await listeners(
       ctx,
@@ -49,7 +53,15 @@ export const targets = internalQuery({
         .query("pushTokens")
         .withIndex("by_account", (index) => index.eq("accountId", accountId))
         .collect();
-      recipients.push(...rows.map((row) => ({ ...recipientOf(row), reply })));
+      if (rows.length === 0) continue;
+      // The recipient's own names and photos for their contacts.
+      const shown = await shownTo(ctx, accountId, [
+        message.authorId,
+        ...(unnamedGroup ? members : []),
+      ]);
+      recipients.push(
+        ...rows.map((row) => ({ ...recipientOf(row), reply, shown })),
+      );
     }
     return {
       body: previewText(message),
@@ -64,10 +76,7 @@ export const targets = internalQuery({
       messageId: message.messageId,
       // A group without a name is titled with the other members' names,
       // which differ for each recipient.
-      unnamedGroupMembers:
-        conversation.kind === "group" && conversation.name === undefined
-          ? members
-          : null,
+      unnamedGroupMembers: unnamedGroup ? members : null,
       kind: conversation.kind,
       senderId: message.authorId,
       senderName: message.authorName,
@@ -202,19 +211,29 @@ export const send = internalAction({
     ]);
     const senderName = sender?.displayName ?? target.senderName;
     const { conversationName: name } = target;
-    /** An unnamed group's title leaves out whoever it's for. */
-    function conversationNameFor(accountId: string) {
+    /**
+     * An unnamed group's title leaves out whoever it's for, and names
+     * their contacts as they do.
+     */
+    function conversationNameFor(
+      accountId: string,
+      shown: Record<string, { name?: string }>,
+    ) {
       const others = memberNames.filter(([member]) => member !== accountId);
       return others.length === 0
         ? name
-        : listNames(others.map(([, other]) => other));
+        : listNames(
+            others.map(([member, other]) => shown[member]?.name ?? other),
+          );
     }
 
     await deliver(
       ctx,
       recipients.map((recipient) => {
-        const { accountId, reply, token } = recipient;
-        const conversationName = conversationNameFor(accountId);
+        const { accountId, reply, shown, token } = recipient;
+        const conversationName = conversationNameFor(accountId, shown);
+        const asContact = shown[target.senderId];
+        const title = asContact?.name ?? senderName;
         // A reply kept in its thread opens the thread. Its `messageId` is
         // the original, where apps from before threads open the
         // conversation, since the reply isn't in it.
@@ -237,9 +256,9 @@ export const send = internalAction({
             conversationName,
             kind: target.kind,
             messageId: target.messageId,
-            senderAvatarUrl: sender?.avatarUrl ?? null,
+            senderAvatarUrl: asContact?.avatarUrl ?? sender?.avatarUrl ?? null,
             senderId: target.senderId,
-            senderName,
+            senderName: title,
             ...thread,
           },
           ...ANDROID_DELIVERY,
@@ -248,7 +267,7 @@ export const send = internalAction({
           sound: "default",
           ...(conversationName === null ? {} : { subtitle: conversationName }),
           threadId: target.conversationId,
-          title: senderName,
+          title,
           to: token,
         };
       }),

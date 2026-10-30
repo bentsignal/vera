@@ -21,7 +21,7 @@ export function validateMessage(
   if (!urls.every(isHttpsUrl)) fail("INVALID_ATTACHMENT");
 }
 
-function isHttpsUrl(value: string) {
+export function isHttpsUrl(value: string) {
   try {
     return new URL(value).protocol === "https:";
   } catch {
