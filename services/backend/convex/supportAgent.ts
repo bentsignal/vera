@@ -5,7 +5,7 @@ import type { Turn } from "./agentTools";
 import type { KnownBugCheck } from "./supportLookup";
 import type { Reporter } from "./supportReporters";
 import type { PublicReport } from "./supportReports";
-import { anonymize, issueFor } from "../bug-reports";
+import { anonymize, IDEA_LABEL, issueFor } from "../bug-reports";
 import { SUPPORT_COMMENT } from "../issue-closures";
 import { internal } from "./_generated/api";
 import { commentOnIssue, createIssue, githubConfig } from "./github";
@@ -250,7 +250,7 @@ async function openIssue(kind: "bug" | "idea", title: string, body: string) {
   try {
     return await createIssue(config, {
       body,
-      labels: [kind === "idea" ? "enhancement" : "bug", "user report"],
+      labels: [kind === "idea" ? IDEA_LABEL : "bug", "user report"],
       title,
     });
   } catch (error) {

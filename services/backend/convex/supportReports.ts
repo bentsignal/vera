@@ -153,6 +153,8 @@ const progressValidator = v.object({
   ),
   pullRequest: v.optional(v.object({ number: v.number(), url: v.string() })),
   release: v.optional(v.string()),
+  /** An idea for something new, not a bug (its issue's label). */
+  idea: v.optional(v.boolean()),
   stage: reportStage,
   stateReason: v.optional(v.union(v.null(), v.string())),
   /** Why the team closed it, in their words (supportClosures.ts). */
@@ -185,6 +187,7 @@ export const advance = internalMutation({
     if (progress.stage === "closed" && progress.closingComment !== undefined) {
       await explainClosure(ctx, updated, {
         comment: progress.closingComment,
+        idea: progress.idea === true,
         stateReason: progress.stateReason,
       });
     } else {
@@ -260,6 +263,7 @@ async function checkReport(
 ) {
   if (state.state === "CLOSED" && state.duplicateOf !== null) {
     await ctx.runMutation(internal.supportClosures.followOriginal, {
+      idea: state.idea,
       issueNumber: state.duplicateOf,
       issueUrl: `https://github.com/${config.owner}/${config.name}/issues/${String(state.duplicateOf)}`,
       reportId: report._id,
@@ -292,7 +296,7 @@ async function progressFrom(
   platform: Platform,
 ): Promise<Progress> {
   const found = progressOf(state);
-  const base = { ...found, stateReason: state.stateReason };
+  const base = { ...found, idea: state.idea, stateReason: state.stateReason };
   if (found.stage === "fixed" && found.fix !== undefined) {
     return {
       ...base,
@@ -302,7 +306,7 @@ async function progressFrom(
   if (found.stage === "closed" && state.closingComment !== null) {
     return { ...base, closingComment: state.closingComment };
   }
-  return found.stage === "live" ? { ...base, delivery: "unknown" } : base;
+  return base;
 }
 
 /**

@@ -17,6 +17,7 @@
     "./pds.ts",
     "./reply-outcome.ts",
     "./reply-outcome.test.ts",
+    "./report-messages.test.ts",
     "./send-limits.ts",
     "./send-limits.test.ts",
     "./upload-limits.ts",

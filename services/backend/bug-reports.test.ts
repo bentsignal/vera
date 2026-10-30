@@ -10,7 +10,6 @@ import {
   platformOf,
   progressOf,
   releaseNeeds,
-  updateMessage,
 } from "./bug-reports.ts";
 import {
   closingCommentOf,
@@ -64,6 +63,7 @@ const openIssue: IssueState = {
   closingComment: null,
   closingCommit: null,
   duplicateOf: null,
+  idea: false,
   pullRequests: [],
   state: "OPEN",
   stateReason: null,
@@ -102,7 +102,7 @@ void test("an issue's stage follows assignment, pull requests, and merges", () =
   );
 });
 
-void test("closed issues: not planned, by a commit, or just closed", () => {
+void test("closed issues: not planned, by a commit, or closed with no fix", () => {
   const closed = { ...openIssue, state: "CLOSED" as const };
   assert.equal(
     progressOf({ ...closed, stateReason: "NOT_PLANNED" }).stage,
@@ -119,9 +119,15 @@ void test("closed issues: not planned, by a commit, or just closed", () => {
       stage: "fixed",
     },
   );
+  // Closed as completed with nothing that fixed it is how the team says no
+  // as often as yes: never news that it's done.
+  assert.deepEqual(progressOf({ ...closed, stateReason: "COMPLETED" }), {
+    stage: "closed",
+  });
   assert.equal(
-    progressOf({ ...closed, stateReason: "COMPLETED" }).stage,
-    "live",
+    progressOf({ ...closed, closingCommit: "def", stateReason: "NOT_PLANNED" })
+      .stage,
+    "closed",
   );
 });
 
@@ -164,43 +170,6 @@ void test("only later stages are news, and skipped ones aren't sent", () => {
   assert.equal(isNewStage("reported", "live"), true);
   assert.equal(isNewStage("fixed", "inProgress"), false);
   assert.equal(isNewStage("live", "closed"), false);
-});
-
-void test("updates are plain for most people and add links for developers", () => {
-  const context = {
-    developer: false,
-    issueUrl: "https://github.com/o/r/issues/3",
-    pullRequest: pr,
-    summary: "photos showing sideways",
-  };
-  assert.equal(updateMessage("reported", context), null);
-  const plain = updateMessage("inProgress", context);
-  assert.equal(
-    plain,
-    "We're working on a fix for the bug you reported (photos showing sideways).",
-  );
-  assert.ok(!/github|issue|PR/i.test(plain));
-  assert.equal(
-    updateMessage("inProgress", { ...context, developer: true }),
-    `${plain}\nPR: ${pr.url}`,
-  );
-  assert.match(
-    updateMessage("live", { ...context, delivery: "update" }) ?? "",
-    /is live now\.$/,
-  );
-  assert.match(
-    updateMessage("live", { ...context, delivery: "build", platform: "ios" }) ??
-      "",
-    /Update it from TestFlight or the App Store/,
-  );
-  assert.match(
-    updateMessage("live", {
-      ...context,
-      delivery: "build",
-      platform: "android",
-    }) ?? "",
-    /Update it from Google Play/,
-  );
 });
 
 void test("a reporter's phone comes from the OS their app reports", () => {
