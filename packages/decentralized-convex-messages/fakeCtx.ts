@@ -33,11 +33,21 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_chat_sent: ["conversationId", "threadOnly", "sentAt"],
     by_conversation_sent: ["conversationId", "sentAt"],
     by_message: ["messageId"],
+    by_quote_author_conversation_sent: [
+      "quote.authorId",
+      "conversationId",
+      "sentAt",
+    ],
     by_quote_author_sent: ["quote.authorId", "sentAt"],
     by_thread_sent: ["threadId", "sentAt"],
   },
   notificationSettings: { by_account: ["accountId"] },
   reactions: {
+    by_author_conversation_reacted: [
+      "messageAuthorId",
+      "conversationId",
+      "reactedAt",
+    ],
     by_author_reacted: ["messageAuthorId", "reactedAt"],
     by_conversation_reacted: ["conversationId", "reactedAt"],
     by_message: ["messageId"],

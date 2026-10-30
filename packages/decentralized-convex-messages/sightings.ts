@@ -117,6 +117,8 @@ export async function markActivitySeen(
  * Reading a conversation sees its activity: its messages, mentions of the
  * caller, and replies to the caller through `readAt` (but not those kept
  * in threads), and every reaction so far to the caller's messages in it.
+ * Each is seen through its newest activity, so reading again with nothing
+ * new writes nothing (and so doesn't rerun the caller's activity).
  */
 export async function seeConversationActivity(
   ctx: MutationCtx,
@@ -130,26 +132,43 @@ export async function seeConversationActivity(
     now,
     through: readAt,
   });
+  await seeReactions(ctx, self, { conversationId, now });
+  await seeMentions(ctx, self, { conversationId, now, readAt });
+  await seeReplies(ctx, self, { conversationId, now, readAt });
+}
+
+/**
+ * Sees others' reactions so far to the caller's messages in a
+ * conversation, each message's through its newest.
+ */
+async function seeReactions(
+  ctx: MutationCtx,
+  self: string,
+  place: { conversationId: string; now: number },
+) {
+  const { conversationId, now } = place;
   const reactions = await ctx.db
     .query("reactions")
-    .withIndex("by_author_reacted", (index) =>
-      index.eq("messageAuthorId", self).gt("reactedAt", now - ACTIVITY_HORIZON),
+    .withIndex("by_author_conversation_reacted", (index) =>
+      index
+        .eq("messageAuthorId", self)
+        .eq("conversationId", conversationId)
+        .gt("reactedAt", now - ACTIVITY_HORIZON),
     )
+    .order("desc")
     .take(MAX_REACTIONS_SCANNED);
-  const messageIds = new Set(
-    reactions
-      .filter((row) => row.conversationId === conversationId)
-      .map(({ messageId }) => messageId),
-  );
-  for (const messageId of messageIds) {
+  const newest = new Map<string, number>();
+  for (const { accountId, messageId, reactedAt } of reactions) {
+    if (accountId === self || newest.has(messageId)) continue;
+    newest.set(messageId, reactedAt);
+  }
+  for (const [messageId, through] of newest) {
     await recordSighting(ctx, self, {
       key: reactionsKey(messageId),
       now,
-      through: now,
+      through,
     });
   }
-  await seeMentions(ctx, self, { conversationId, now, readAt });
-  await seeReplies(ctx, self, { conversationId, now, readAt });
 }
 
 /** Sees the replies to the caller sent in a conversation through `readAt`. */
@@ -161,17 +180,16 @@ async function seeReplies(
   const { conversationId, now, readAt } = place;
   const replies = await ctx.db
     .query("messages")
-    .withIndex("by_quote_author_sent", (index) =>
+    .withIndex("by_quote_author_conversation_sent", (index) =>
       index
         .eq("quote.authorId", self)
+        .eq("conversationId", conversationId)
         .gt("sentAt", now - ACTIVITY_HORIZON)
         .lte("sentAt", readAt),
     )
     .take(MAX_REPLIES_SCANNED);
   for (const reply of replies) {
-    if (reply.conversationId !== conversationId || reply.threadOnly === true) {
-      continue;
-    }
+    if (reply.threadOnly === true) continue;
     await recordSighting(ctx, self, {
       key: replyKey(reply.messageId),
       now,
