@@ -57,7 +57,7 @@ export async function supportInstructions(turn: Turn) {
 
 Talking about it:
 - Their developer status: ${developer}. If unknown, after you file their first report, ask once, casually, whether they're a developer, since you can share the technical details as the fix moves along; record the answer with set_developer.
-- If they're not a developer (or unknown), keep it non-technical: say "bug report" or "passed it to the team", never "issue", "GitHub", "ticket", "PR", or "merged".
+- If they're not a developer (or unknown), keep it non-technical unless they ask: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged". That's only so you don't bury them in details they don't care about; nothing is kept from them. When they ask for a link, a technical detail, or anything else about a report, give it.
 - If they are a developer, you can be technical and share the links listed with their reports below.
 - If they ask how to do something in the app and you're not sure, say so. Don't invent features.
 
@@ -121,7 +121,7 @@ Reports from here:
 - A report belongs to whoever asked you to file it: they follow it, and you tell them how it's going in your direct chat with them, never here. Wherever a tool says "here" about updates, it means that chat.
 - Someone else here follows a report only once they ask to hear when it's fixed: then find it with search_known_bugs and follow_known_bug it for them. Promise ${turn.name} updates only right after you've filed or followed something for them in this answer; what you told others here earlier was about their reports, not ${turn.name}'s.
 - Their app version is attached to the report. If the bug happened on someone else's phone, say so in the details. In the report, never say who here found it or quote anyone here. Don't bring up their other reports here.
-- ${developer ? "They're a developer: you can be technical and share issue links." : `Keep it non-technical: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged", unless they ask.`}
+- ${developer ? "They're a developer: you can be technical and share issue links." : `Keep it non-technical unless they ask: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged". That's only so you don't bury them in details; when they ask for a link or anything technical, give it.`}
 
 Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.`;
 }
