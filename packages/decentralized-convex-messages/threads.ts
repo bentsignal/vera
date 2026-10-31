@@ -131,7 +131,9 @@ export async function replyTo(
  * Counts a stored reply in its thread, and keeps its people up to date:
  * the original's author joins the thread (unless they turned it off
  * before anyone replied), the replier joins (or rejoins) it having read
- * it, and everyone in it sees it as their thread's newest reply.
+ * it, and everyone in it sees it as their thread's newest reply. An
+ * assistant's reply (assistants.ts) doesn't join it: it answers only when
+ * called again.
  */
 export async function addReply(
   ctx: MutationCtx,
@@ -139,6 +141,7 @@ export async function addReply(
     authorId: string;
     sentAt: number;
   },
+  { authorJoins = true }: { authorJoins?: boolean } = {},
 ) {
   const { authorId, conversationId, sentAt, threadId } = reply;
   const thread = await threadRow(ctx, threadId);
@@ -182,7 +185,7 @@ export async function addReply(
       threadId,
     });
   }
-  await join(authorId, sentAt);
+  if (authorJoins) await join(authorId, sentAt);
   // The original's author hasn't read the reply yet.
   await join(reply.rootAuthorId, reply.rootSentAt);
 }

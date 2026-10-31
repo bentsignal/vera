@@ -48,6 +48,11 @@ export interface RowContext {
   readonly layout: MessageLayout;
   /** Group chats, where incoming runs show their sender. */
   readonly showAuthors: boolean;
+  /**
+   * A direct message's two members. Anyone else there, such as Vera called
+   * in by an @mention, shows their name even without `showAuthors`.
+   */
+  readonly members?: readonly string[];
   readonly profileOf: ProfileOf;
   /** What the installed binary draws (see `nativeSupport`). */
   readonly support: Support;
@@ -187,7 +192,9 @@ function messageRow(
     layout,
     reactions,
     sentAt: message.sentAt.getTime(),
-    showAuthor: layout === "stacked" || (showAuthors && !isOwn),
+    showAuthor:
+      layout === "stacked" ||
+      (!isOwn && (showAuthors || isGuest(message.authorId, context))),
     startsGroup: row.startsGroup,
     status: message.status,
     // Stacked rows show it beside the name. Bubbles reveal it in a narrow
@@ -255,6 +262,11 @@ function nativeRow(built: BuiltRow, context: RowContext) {
   }
 }
 
+/** Whether someone isn't one of a direct message's members (`members`). */
+function isGuest(accountId: string, { members }: RowContext) {
+  return members !== undefined && !members.includes(accountId);
+}
+
 /** Who's typing, as the newest row; none when nobody is. */
 function typingRow(typists: readonly string[], context: RowContext) {
   if (typists.length === 0) return [];
@@ -271,7 +283,10 @@ function typingRow(typists: readonly string[], context: RowContext) {
       // Stacked rows always show the photos, one-on-one too, as the React
       // Native list's typing line does; bubbles only where messages show
       // who sent them, not one-on-one.
-      showFaces: context.layout === "stacked" || context.showAuthors,
+      showFaces:
+        context.layout === "stacked" ||
+        context.showAuthors ||
+        typists.some((address) => isGuest(address, context)),
     },
   ] satisfies Row[];
 }

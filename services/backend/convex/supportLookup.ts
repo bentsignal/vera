@@ -107,6 +107,7 @@ async function searchKnownBugs(check: KnownBugCheck, query: string) {
           issue: issue.number,
           title: issue.title,
           about: issue.about,
+          link: issue.url,
           status: await statusFor(config, releases, states.get(issue.number)),
           reported: issue.createdAt.slice(0, 10),
         })),
@@ -134,6 +135,7 @@ export async function filedSince(config: GitHubConfig, since: number) {
       createdAt: new Date(issue.createdAt).toISOString(),
       number: issue.number,
       title: issue.title,
+      url: issue.url,
     }));
 }
 

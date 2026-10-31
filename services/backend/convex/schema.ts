@@ -57,6 +57,19 @@ export default defineSchema({
     /** When the reply to the latest message runs; older wake-ups skip. */
     wakeAt: v.number(),
   }).index("by_conversation", ["conversationId"]),
+  /**
+   * Each message that called an assistant into a conversation by
+   * @mentioning it (summons.ts), so it's answered once.
+   */
+  botSummons: defineTable({
+    /** Who called it: the message's author. */
+    accountId: v.string(),
+    bot: botName,
+    conversationId: v.string(),
+    finishedAt: v.optional(v.number()),
+    messageId: v.string(),
+    startedAt: v.optional(v.number()),
+  }).index("by_message", ["messageId"]),
   /** What an assistant remembers about one person, at their request. */
   botNotes: defineTable({
     accountId: v.string(),

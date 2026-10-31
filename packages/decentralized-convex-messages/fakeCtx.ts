@@ -7,6 +7,7 @@ type Row = Record<string, unknown> & { _creationTime: number; _id: string };
 type Filter = (row: Row) => boolean;
 
 const INDEXES: Record<string, Record<string, string[]>> = {
+  assistants: { by_account: ["accountId"] },
   activitySightings: {
     by_account_key: ["accountId", "key", "seenAt"],
     by_account_seen: ["accountId", "seenAt"],

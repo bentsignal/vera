@@ -13,6 +13,7 @@ const ME = "me@vera.chat";
 const MAYA = "maya@vera.chat";
 const LEO = "leo@vera.chat";
 const STRANGER = "stranger@vera.chat";
+const VERA = "vera@vera.chat";
 const HOUR = 60 * 60 * 1000;
 const NOW = 30 * 24 * HOUR;
 
@@ -58,6 +59,7 @@ function chats() {
       ...members("group:b", [ME, MAYA, LEO]),
       ...members("direct:a", [ME, MAYA]),
     ],
+    assistants: [{ accountId: VERA }],
   });
 }
 
@@ -123,6 +125,27 @@ void test("direct messages have no mentions", async (t) => {
   );
   assert.equal(message.mentions, undefined);
   assert.equal(rows("mentions").length, 0);
+});
+
+void test("keeps mentions of assistants anywhere, members or not", async (t) => {
+  at(t, NOW);
+  const { ctx } = chats();
+  const inGroup = await sendAs(ctx, MAYA, "@Vera what's this?", [
+    { accountId: VERA, name: "Vera" },
+    { accountId: STRANGER, name: "Vera" },
+  ]);
+  assert.deepEqual(inGroup.mentions, [{ accountId: VERA, name: "Vera" }]);
+  const direct = await sendAs(
+    ctx,
+    MAYA,
+    "@Vera and @Me",
+    [
+      { accountId: VERA, name: "Vera" },
+      { accountId: ME, name: "Me" },
+    ],
+    "direct:a",
+  );
+  assert.deepEqual(direct.mentions, [{ accountId: VERA, name: "Vera" }]);
 });
 
 void test("a mention is its own activity item", async (t) => {
