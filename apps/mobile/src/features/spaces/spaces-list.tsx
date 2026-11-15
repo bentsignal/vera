@@ -4,7 +4,7 @@ import { ScreenList } from "~/components/screen-list";
 import { useVisibleAccounts } from "~/features/messaging/account";
 import { useSpaces } from "~/features/messaging/spaces";
 import { usePreference } from "~/features/preferences/store";
-import { useHomeOffline } from "~/features/saved/offline-pill";
+import { useHomePill } from "~/features/saved/offline-pill";
 import { sortSpaces } from "~/features/spaces/sort";
 import { SpaceRow } from "~/features/spaces/space-row";
 
@@ -29,10 +29,11 @@ export function SpacesList() {
   const { isLoading, spaces } = useSpaces();
   const sort = usePreference("spacesSort");
   const showAccount = useVisibleAccounts().length > 1;
-  const offline = useHomeOffline();
+  const pill = useHomePill();
   return (
     <ScreenList
-      offline={offline}
+      offline={pill.offline}
+      pill={pill.shown}
       ready={!isLoading}
       steady
       data={sortSpaces(spaces, sort)}
