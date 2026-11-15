@@ -3,7 +3,12 @@ import { accountsProtocol } from "@decentralized-convex/accounts";
 import { queryRequest } from "@decentralized-convex/plugin";
 
 import type { QueryCtx } from "./_generated/server.js";
-import type { Conversation, MemberEvent, Message } from "./protocol.ts";
+import type {
+  Contact,
+  Conversation,
+  MemberEvent,
+  Message,
+} from "./protocol.ts";
 import { MAX_REACTION_MESSAGES, messagesProtocol } from "./protocol.ts";
 import { threadRow } from "./threads.ts";
 
@@ -222,4 +227,9 @@ export function memberEventIncludes(
   events: readonly MemberEvent[],
 ): QueryRequest[] {
   return profiles(events.map(({ accountId }) => accountId));
+}
+
+/** The profiles of the people on a contacts list. */
+export function contactIncludes(contacts: readonly Contact[]) {
+  return profiles(contacts.map((contact) => contact.accountId));
 }

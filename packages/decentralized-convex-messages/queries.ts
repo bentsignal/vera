@@ -2,6 +2,7 @@ import { defineOperation } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
 
 import { activityItem } from "./activityShapes.ts";
+import { contactQueries } from "./contactShapes.ts";
 import {
   conversation,
   linkCard,
@@ -133,6 +134,7 @@ export const queries = {
     returns: v.array(threadSummary),
   }),
   ...threadListQueries,
+  ...contactQueries,
   /** Your place in a thread: its bell, and how far you've read. */
   threadState: defineOperation({
     args: v.object({ conversationId: v.string(), threadId: v.string() }),

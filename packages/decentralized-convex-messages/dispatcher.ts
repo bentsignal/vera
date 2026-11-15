@@ -7,10 +7,12 @@ import {
 import { mutation, query } from "./_generated/server.js";
 import * as activity from "./activity.ts";
 import * as alerts from "./alerts.ts";
+import * as contacts from "./contacts.ts";
 import * as conversations from "./conversations.ts";
 import * as editing from "./editing.ts";
 import * as inbox from "./inbox.ts";
 import {
+  contactIncludes,
   conversationIncludes,
   inboxIncludes,
   liveCursor,
@@ -94,6 +96,8 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
         },
         registerPushToken: (ctx, { args, identity }) =>
           push.registerPushToken(ctx, requireAccountId(identity), args),
+        removeContact: (ctx, { args, identity }) =>
+          contacts.removeContact(ctx, requireAccountId(identity), args),
         removeSpaceMember: (ctx, { args, identity }) =>
           spaces.removeSpaceMember(ctx, requireAccountId(identity), args),
         renameChannel: (ctx, { args, identity }) =>
@@ -110,6 +114,8 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           ),
         revokeSpaceInviteLink: (ctx, { args, identity }) =>
           invites.revokeSpaceInviteLink(ctx, requireAccountId(identity), args),
+        saveContact: (ctx, { args, identity }) =>
+          contacts.saveContact(ctx, requireAccountId(identity), args),
         send: (ctx, { args, identity }) => {
           const self = requireAccountId(identity);
           const authorName =
@@ -134,6 +140,8 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           typing.setTyping(ctx, requireAccountId(identity), args),
         setThreadFollowed: (ctx, { args, identity }) =>
           threads.setThreadFollowed(ctx, requireAccountId(identity), args),
+        setPrivacySettings: (ctx, { args, identity }) =>
+          contacts.setPrivacySettings(ctx, requireAccountId(identity), args),
         setPinned: (ctx, { args, identity }) =>
           inbox.setPinned(ctx, requireAccountId(identity), args),
         setShowInInbox: (ctx, { args, identity }) =>
@@ -144,6 +152,13 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
       queries: {
         activity: (ctx, { args, identity }) =>
           activity.activity(ctx, requireAccountId(identity), args),
+        contacts: async (ctx, { identity }) => {
+          const found = await contacts.contacts(
+            ctx,
+            requireAccountId(identity),
+          );
+          return queryResult(found, { include: contactIncludes(found) });
+        },
         conversation: async (ctx, { args, identity }) => {
           const self = requireAccountId(identity);
           const found = await conversations.conversation(ctx, self, args);
@@ -186,12 +201,24 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           );
           return queryResult(events, { include: memberEventIncludes(events) });
         },
+        messagePermission: async (ctx, { args, identity }) =>
+          // Their home PDS keeps their choice, so it answers too.
+          routedQueryResult(
+            await contacts.messagePermission(
+              ctx,
+              requireAccountId(identity),
+              args.accountId,
+            ),
+            [args.accountId.trim().toLowerCase()],
+          ),
         notificationSettings: (ctx, { identity }) =>
           settings.notificationSettings(ctx, requireAccountId(identity)),
         linkPreviews: (ctx, { args, identity }) => {
           requireAccountId(identity);
           return cachedCards(ctx, args.urls, Date.now());
         },
+        privacySettings: (ctx, { identity }) =>
+          contacts.privacySettings(ctx, requireAccountId(identity)),
         reactions: async (ctx, { args, identity }) => {
           const found = await reactions.reactions(
             ctx,

@@ -38,6 +38,18 @@ const TOOLBAR_SHEET =
       }
     : { presentation: "modal" as const };
 
+/** The photo and video viewer, over the conversation. */
+const MEDIA_VIEWER = {
+  // The screen fades itself in and animates its own closing (a photo
+  // carries on off the screen after a swipe), then closes at once; a
+  // closing animation here would fight the swipe.
+  animation: "none",
+  headerShown: false,
+  // Transparent so the conversation shows through as a photo is swiped
+  // away; the viewer draws its own black backdrop.
+  presentation: "transparentModal",
+} as const;
+
 /** Keeps one signed-in account's profile and notifications set up. */
 function AccountUpkeep() {
   useEnsureProfile();
@@ -112,19 +124,7 @@ function AppStack() {
       />
       <Stack.Screen name="dev-seed" options={{ headerShown: false }} />
       <Stack.Screen name="dev-native-list" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="media"
-        options={{
-          // The screen fades itself in and animates its own closing (a photo
-          // carries on off the screen after a swipe), then closes at once; a
-          // closing animation here would fight the swipe.
-          animation: "none",
-          headerShown: false,
-          // Transparent so the conversation shows through as a photo is
-          // swiped away; the viewer draws its own black backdrop.
-          presentation: "transparentModal",
-        }}
-      />
+      <Stack.Screen name="media" options={MEDIA_VIEWER} />
       <Stack.Screen
         name="new-message"
         // Its own stack: Group continues to a name step.
@@ -144,6 +144,15 @@ function AppStack() {
       <Stack.Screen
         name="new-channel"
         options={{ ...TOOLBAR_SHEET, title: "New Channel" }}
+      />
+      <Stack.Screen
+        name="add-contact"
+        options={{ ...TOOLBAR_SHEET, title: "Add Contact" }}
+        listeners={dismissKeyboardOnSheetSwipe}
+      />
+      <Stack.Screen
+        name="edit-contact"
+        options={{ ...formScreen, title: "Edit Contact" }}
       />
       <Stack.Screen
         name="add-people"

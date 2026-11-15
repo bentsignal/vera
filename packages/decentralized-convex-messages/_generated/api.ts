@@ -17,6 +17,8 @@ import type * as alerts from "../alerts.js";
 import type * as badges from "../badges.js";
 import type * as changes from "../changes.js";
 import type * as chatMessages from "../chatMessages.js";
+import type * as contactShapes from "../contactShapes.js";
+import type * as contacts from "../contacts.js";
 import type * as conversations from "../conversations.js";
 import type * as delivery from "../delivery.js";
 import type * as dispatcher from "../dispatcher.js";
@@ -75,6 +77,8 @@ const fullApi: ApiFromModules<{
   badges: typeof badges;
   changes: typeof changes;
   chatMessages: typeof chatMessages;
+  contactShapes: typeof contactShapes;
+  contacts: typeof contacts;
   conversations: typeof conversations;
   delivery: typeof delivery;
   dispatcher: typeof dispatcher;

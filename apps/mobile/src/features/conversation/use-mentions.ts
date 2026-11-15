@@ -87,7 +87,7 @@ export function useMentions(
     /** The text with `person` in place of the `@name` being typed. */
     pick: (person: MentionCandidate) => {
       if (query === null) return null;
-      const name = person.displayName.trim();
+      const name = (person.mentionName ?? person.displayName).trim();
       const inserted = insertMention(draft, query.start, selection.start, name);
       setMentions([...mentions, { accountId: person.accountId, name }]);
       place(inserted.cursor);

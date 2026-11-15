@@ -4,6 +4,7 @@ import type { QueryCtx } from "./_generated/server.js";
 import { internal } from "./_generated/api.js";
 import { internalAction, internalQuery } from "./_generated/server.js";
 import { alertsOf } from "./alerts.ts";
+import { shownTo } from "./contacts.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
 import { getConversation } from "./model.ts";
 import {
@@ -66,9 +67,26 @@ export const reactionTargets = internalQuery({
       // A reaction to a reply kept in its thread opens the thread.
       threadId: message.threadOnly === true ? (message.threadId ?? null) : null,
       recipients: tokens.map(recipientOf),
+      // The author's own name and photo for the reactor, if they gave one.
+      reactorAsContact: (await shownTo(ctx, author, [reactorId]))[reactorId],
     };
   },
 });
+
+/**
+ * The reactor as the author sees them: by the name and photo the author
+ * gave them as a contact, or else their own.
+ */
+function reactorShown(
+  asContact: { avatarUrl?: string; name?: string } | undefined,
+  profile: { avatarUrl: string | null; displayName: string } | null,
+  storedName: string,
+) {
+  return {
+    senderAvatarUrl: asContact?.avatarUrl ?? profile?.avatarUrl ?? null,
+    senderName: asContact?.name ?? profile?.displayName ?? storedName,
+  };
+}
 
 /**
  * Tells a message's author someone reacted to it: the reactor as the
@@ -95,7 +113,11 @@ export const sendReaction = internalAction({
       accountProfile(reactorId),
       badgeCounts(ctx, target.recipients),
     ]);
-    const senderName = reactor?.displayName ?? reactorName;
+    const { senderAvatarUrl, senderName } = reactorShown(
+      target.reactorAsContact,
+      reactor,
+      reactorName,
+    );
     const { conversationName } = target;
     await deliver(
       ctx,
@@ -112,7 +134,7 @@ export const sendReaction = internalAction({
           emoji,
           kind: "reaction",
           messageId,
-          senderAvatarUrl: reactor?.avatarUrl ?? null,
+          senderAvatarUrl,
           senderId: reactorId,
           senderName,
           ...(target.threadId === null ? {} : { threadId: target.threadId }),

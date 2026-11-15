@@ -6,6 +6,7 @@ import {
 import { v } from "convex/values";
 
 import { activitySighting } from "./activityShapes.ts";
+import { contactMutations } from "./contactShapes.ts";
 import { decentralizedConvexPackage } from "./metadata.ts";
 import { queries } from "./queries.ts";
 import {
@@ -19,6 +20,7 @@ import {
 } from "./shapes.ts";
 
 export * from "./activityShapes.ts";
+export * from "./contactShapes.ts";
 export * from "./shapes.ts";
 
 export const messagesProtocol = definePluginProtocol({
@@ -330,6 +332,7 @@ export const messagesProtocol = definePluginProtocol({
       args: v.object({ token: v.string() }),
       returns: v.null(),
     }),
+    ...contactMutations,
   },
   queries,
   requires: { accounts: DECENTRALIZED_CONVEX_VERSION },

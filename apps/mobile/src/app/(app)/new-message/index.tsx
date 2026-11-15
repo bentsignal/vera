@@ -120,6 +120,7 @@ function NewMessage({
           <PeoplePicker
             search={search}
             selected={isGroup ? members : undefined}
+            pickedFor={isGroup ? "groups" : "direct"}
             onPress={(address) =>
               isGroup ? toggle(address) : void message(address)
             }

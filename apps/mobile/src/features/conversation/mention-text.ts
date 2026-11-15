@@ -8,7 +8,13 @@ import type { Mention } from "@decentralized-convex/messages";
 export interface MentionCandidate {
   readonly accountId: string;
   readonly avatarUrl: string | null;
+  /** The name shown, which may be yours for them as a contact. */
   readonly displayName: string;
+  /**
+   * The name written after the `@`: their own, since everyone reads it.
+   * Defaults to `displayName`.
+   */
+  readonly mentionName?: string;
 }
 
 /** A stretch of text: `[start, end)`. */
@@ -61,11 +67,16 @@ export function isPicked(query: string, mentions: readonly Mention[]) {
 function matches(candidate: MentionCandidate, query: string) {
   const needle = query.trim().toLowerCase();
   if (needle === "") return true;
-  const name = candidate.displayName.toLowerCase();
+  const names = new Set([
+    candidate.displayName.toLowerCase(),
+    (candidate.mentionName ?? candidate.displayName).toLowerCase(),
+  ]);
   return (
-    name.startsWith(needle) ||
-    name.split(/\s+/).some((word) => word.startsWith(needle)) ||
-    usernameOf(candidate.accountId).toLowerCase().startsWith(needle)
+    [...names].some(
+      (name) =>
+        name.startsWith(needle) ||
+        name.split(/\s+/).some((word) => word.startsWith(needle)),
+    ) || usernameOf(candidate.accountId).toLowerCase().startsWith(needle)
   );
 }
 

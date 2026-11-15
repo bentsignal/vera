@@ -14,12 +14,15 @@ import { AffiliatedBadge } from "./affiliated-badge";
  */
 export function ProfileCard({
   name,
+  aka,
   subtitle,
   avatarUrl = null,
   glyph,
   onPressAffiliated,
 }: {
   name: string;
+  /** Their own name, under one you gave them. */
+  aka?: string;
   subtitle: string;
   avatarUrl?: string | null;
   glyph?: AvatarGlyph;
@@ -52,6 +55,14 @@ export function ProfileCard({
             </RNHostView>
           )}
         </Row>
+        {aka !== undefined && (
+          <Text
+            numberOfLines={1}
+            textStyle={{ fontSize: 17, fontWeight: "500", textAlign: "center" }}
+          >
+            {aka}
+          </Text>
+        )}
         <Text
           numberOfLines={1}
           textStyle={{ ...secondaryTextStyle, textAlign: "center" }}

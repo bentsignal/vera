@@ -25,7 +25,7 @@ type Store = PdsOptimisticLocalStore;
  */
 const startedAt = new WeakMap<object, number>();
 
-function startTime(args: object) {
+export function startTime(args: object) {
   const known = startedAt.get(args);
   if (known !== undefined) return known;
   const now = Date.now();

@@ -121,6 +121,24 @@ text. Replies stored on other PDSs keep their quote until federation
 carries changes there. Inbox previews, unread counts, and activity skip
 deleted placeholders.
 
+Contacts: `messages.saveContact` adds someone to the caller's contacts
+or changes one, with the caller's own `name` and `avatarUrl` for them
+(null goes back to theirs); `messages.removeContact` removes one, and
+`messages.contacts` lists them, newest first. Adding someone doesn't tell
+them. Pushes title a sender by the name and photo their recipient gave
+them. `messages.setPrivacySettings` chooses who can message the caller
+(`messagesFrom`): `everyone` (the default), `contacts` (people they
+added), or `mutual` (people they added who added them back). It decides
+who can start a direct conversation with them and who can add them to a
+group: `openDirect` (only when it would create the conversation),
+`createGroup`, and `addGroupMembers` fail with `NOT_ACCEPTING_MESSAGES`.
+A conversation that already exists stays open, so someone who messages a
+non-contact first gets their reply. `messages.messagePermission` tells an
+app ahead of time whether the caller can do either (`direct`, `groups`);
+it's routed to the person's home PDS, and any PDS saying no wins. With
+one server the creating PDS sees both accounts' contacts; see
+[`.plans/contacts.md`](../../.plans/contacts.md) for other servers.
+
 Reactions follow the same author-home rule as messages: `messages.react`
 stores your reaction on your home PDS, and `messages.reactions` (given the
 message IDs on screen) gathers reactions from every member's PDS.

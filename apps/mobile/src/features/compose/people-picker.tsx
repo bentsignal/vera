@@ -1,11 +1,12 @@
 import type { TextInputRef } from "@expo/ui";
 import { useRef } from "react";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import { FieldGroup, ListItem, Text } from "@expo/ui";
 
 import type { PeopleSearch } from "./use-people-search";
 import { Avatar } from "~/components/avatar";
 import { TextInput } from "~/components/text-input";
+import { useMessagePermissions } from "~/features/contacts/contacts";
 import { secondaryTextStyle } from "~/lib/colors";
 import { nestedListItemColors } from "~/lib/ui-modifiers";
 import { CheckMark } from "./check-mark";
@@ -21,33 +22,55 @@ import { PeopleSections } from "./people-sections";
  */
 const KEEP_SECTIONS = Platform.OS === "android";
 
+/** What the people listed are picked for, which they may not accept. */
+export type PickedFor = "direct" | "groups";
+
+const NOT_ACCEPTING = "Only takes messages from contacts";
+
 function PersonRow({
   address,
   search,
   checked,
+  unavailable = false,
   onPress,
 }: {
   address: string;
   search: PeopleSearch;
   /** Shows a check mark; leave undefined for a plain tappable row. */
   checked?: boolean;
+  /** They don't take messages from you, so picking them only says so. */
+  unavailable?: boolean;
   onPress: (address: string) => void;
 }) {
   const { avatarUrl, displayName } = search.profileOf(address);
+  function press() {
+    if (!unavailable) {
+      onPress(address);
+      return;
+    }
+    Alert.alert(
+      `Can't Message ${displayName}`,
+      `${displayName} only takes messages from their contacts.`,
+    );
+  }
   return (
     <ListItem
       colors={nestedListItemColors}
       leading={<Avatar name={displayName} size="sm" uri={avatarUrl} />}
-      supportingText={<Text textStyle={secondaryTextStyle}>{address}</Text>}
+      supportingText={
+        <Text textStyle={secondaryTextStyle}>
+          {unavailable ? NOT_ACCEPTING : address}
+        </Text>
+      }
       trailing={
         // Compose reads a row's trailing slot only when the row mounts.
         // Android keeps an empty one on rows without a mark, so switching to
         // picking shows the marks without remounting every row.
         checked === undefined && Platform.OS !== "android" ? undefined : (
-          <CheckMark checked={checked} onChange={() => onPress(address)} />
+          <CheckMark checked={checked} onChange={press} />
         )
       }
-      onPress={() => onPress(address)}
+      onPress={press}
     >
       {displayName}
     </ListItem>
@@ -84,12 +107,14 @@ function ResultsSection({
   results,
   search,
   checked,
+  unavailable,
   onPress,
 }: {
   results: readonly string[];
   search: PeopleSearch;
   /** Whether a row shows checked; undefined for plain tappable rows. */
   checked?: (address: string) => boolean;
+  unavailable: (address: string) => boolean;
   onPress: (address: string) => void;
 }) {
   if (!KEEP_SECTIONS && results.length === 0 && !search.noResults) return null;
@@ -108,12 +133,31 @@ function ResultsSection({
             address={address}
             search={search}
             checked={checked?.(address)}
+            unavailable={unavailable(address)}
             onPress={onPress}
           />
         ))
       )}
     </FieldGroup.Section>
   );
+}
+
+/**
+ * Whether each person listed doesn't take messages from you for what
+ * they're picked for. People already picked stay pickable, to uncheck.
+ */
+function useUnavailable(
+  pickedFor: PickedFor | undefined,
+  listed: readonly string[],
+  picked: ReadonlySet<string>,
+) {
+  const permissionOf = useMessagePermissions(
+    pickedFor === undefined ? [] : listed,
+  );
+  return (address: string) =>
+    pickedFor !== undefined &&
+    !picked.has(address) &&
+    !permissionOf(address)[pickedFor];
 }
 
 /**
@@ -132,12 +176,18 @@ export function PeoplePicker({
   search,
   selected,
   footer,
+  pickedFor,
   onPress,
 }: {
   search: PeopleSearch;
   selected?: readonly string[];
   /** A note under the search field. */
   footer?: string;
+  /**
+   * What people are picked for: those who don't take messages from you
+   * there show it, and picking them says so. Undefined for anything else.
+   */
+  pickedFor?: PickedFor;
   onPress: (address: string) => void;
 }) {
   const field = useRef<TextInputRef>(null);
@@ -149,6 +199,7 @@ export function PeoplePicker({
     ...(search.newAddress === null ? [] : [search.newAddress]),
     ...search.people,
   ];
+  const unavailable = useUnavailable(pickedFor, results, picked);
 
   function pick(address: string) {
     const adding = picking && !picked.has(address);
@@ -192,6 +243,7 @@ export function PeoplePicker({
           results={results}
           search={search}
           checked={picking ? (address) => picked.has(address) : undefined}
+          unavailable={unavailable}
           onPress={pick}
         />
       </PeopleSections>

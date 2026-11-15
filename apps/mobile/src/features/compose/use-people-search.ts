@@ -1,6 +1,7 @@
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
+import { useContacts } from "~/features/contacts/contacts";
 import { useAccount } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/inbox";
 import { useProfiles } from "~/features/messaging/profiles";
@@ -75,13 +76,15 @@ export function usePeopleSearch({
 } = {}) {
   const { address: self } = useAccount();
   const { conversations } = useInbox({ account: self });
+  const contacts = useContacts();
   const text = useSearchText();
   const excluded = new Set(exclude);
   const picked = new Set(selected);
   const known = new Set(
-    (conversations ?? [])
-      .flatMap((item) => item.memberIds)
-      .filter((address) => address !== self && !excluded.has(address)),
+    [
+      ...(conversations ?? []).flatMap((item) => item.memberIds),
+      ...(contacts ?? []).map((contact) => contact.accountId),
+    ].filter((address) => address !== self && !excluded.has(address)),
   );
   // Picked people can come from a lookup rather than a conversation; a
   // search finds them too.
@@ -98,7 +101,13 @@ export function usePeopleSearch({
   // so a search's rows change once, when its lookup settles.
   const { people, noResults, searching } = searchPeople({
     candidates: [...candidates],
-    displayNameOf: (address) => profileOf(address).displayName,
+    // A contact is found by your name for them or their own.
+    displayNameOf: (address) => {
+      const { displayName, ownName } = profileOf(address);
+      return displayName === ownName
+        ? displayName
+        : `${displayName}\n${ownName}`;
+    },
     found: newAddress,
     known: [...known],
     picked,

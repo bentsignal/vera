@@ -128,6 +128,7 @@ function AddToGroup({ conversationId }: { conversationId: string }) {
             search={search}
             selected={members}
             footer="They'll see the group's earlier messages too."
+            pickedFor="groups"
             onPress={toggle}
           />
         </FieldList>
