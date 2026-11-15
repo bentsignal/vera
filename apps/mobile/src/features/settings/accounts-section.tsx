@@ -14,7 +14,7 @@ import {
 } from "~/features/messaging/account";
 import { useMyProfile } from "~/features/messaging/directory";
 import { useSession } from "~/features/session/session-provider";
-import { secondaryTextStyle } from "~/lib/colors";
+import { nativeColors, secondaryTextStyle } from "~/lib/colors";
 import { removeUnreachableAccount } from "./sign-out";
 
 function AccountRow() {
@@ -49,16 +49,26 @@ function AccountRow() {
 }
 
 /**
- * An account whose home server can't be found. It's left out of the app
- * until the server is back; tapping it tries again or removes it.
+ * An account whose home server can't be found, in red with a warning sign
+ * so it stands out from the ones that work. It's left out of the app until
+ * the server is back; tapping it tries again or removes it.
  */
 function UnreachableAccountRow({ account }: { account: StoredAccount }) {
   const { retryUnreachable } = useSession();
   return (
     <ListItem
       leading={<Avatar name={account.address} size="md" uri={null} />}
+      trailing={
+        <SymbolIcon
+          name={{ android: "error", ios: "exclamationmark.circle.fill" }}
+          size={20}
+          tintColorClassName="accent-destructive"
+        />
+      }
       supportingText={
-        <Text textStyle={secondaryTextStyle}>
+        <Text
+          textStyle={{ ...secondaryTextStyle, color: nativeColors.destructive }}
+        >
           {`Can't reach ${account.domain}`}
         </Text>
       }
@@ -79,7 +89,7 @@ function UnreachableAccountRow({ account }: { account: StoredAccount }) {
       }
     >
       <Text textStyle={{ fontSize: 17, fontWeight: "600" }}>
-        {account.address}
+        {account.address.slice(0, account.address.lastIndexOf("@"))}
       </Text>
     </ListItem>
   );
