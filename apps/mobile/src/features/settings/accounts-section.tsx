@@ -1,4 +1,4 @@
-import { Alert } from "react-native";
+import { ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { FieldGroup, Text } from "@expo/ui";
 
@@ -51,19 +51,24 @@ function AccountRow() {
 /**
  * An account whose home server can't be found, in red with a warning sign
  * so it stands out from the ones that work. It's left out of the app until
- * the server is back; tapping it tries again or removes it.
+ * the server is back; tapping it tries again (a spinner while it looks) or
+ * removes it.
  */
 function UnreachableAccountRow({ account }: { account: StoredAccount }) {
-  const { retryUnreachable } = useSession();
+  const { retrying, retryUnreachable } = useSession();
   return (
     <ListItem
       leading={<Avatar name={account.address} size="md" uri={null} />}
       trailing={
-        <SymbolIcon
-          name={{ android: "error", ios: "exclamationmark.circle.fill" }}
-          size={20}
-          tintColorClassName="accent-destructive"
-        />
+        retrying ? (
+          <ActivityIndicator />
+        ) : (
+          <SymbolIcon
+            name={{ android: "error", ios: "exclamationmark.circle.fill" }}
+            size={20}
+            tintColorClassName="accent-destructive"
+          />
+        )
       }
       supportingText={
         <Text

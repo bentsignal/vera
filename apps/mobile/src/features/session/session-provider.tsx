@@ -1,7 +1,7 @@
 import type { DiscoveredPds } from "@decentralized-convex/client";
 import type { ReactNode } from "react";
-import { createContext, use, useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { createContext, use, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useQueries } from "@tanstack/react-query";
 
 import type { AccountSession } from "./account-session";
@@ -15,7 +15,7 @@ import {
   verifyAccountSession,
 } from "./account-session";
 import { useStoredAccounts } from "./account-store";
-import { discoverHome, savedHome } from "./home";
+import { discoverHome, isHomeGone, savedHome, wasHomeGone } from "./home";
 
 interface Session {
   /** Every signed-in account, in the order they were added. */
@@ -32,6 +32,8 @@ interface Session {
   readonly unreachable: readonly StoredAccount[];
   /** Looks for the unreachable accounts' home PDSes again. */
   readonly retryUnreachable: () => void;
+  /** Whether `retryUnreachable` is looking. */
+  readonly retrying: boolean;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -77,7 +79,13 @@ export function SessionProvider({
       // the server is back.
       refetchInterval: (query: { state: { status: string } }) =>
         query.state.status === "error" ? 60_000 : false,
-      retry: 3,
+      // A domain with no home PDS is an answer, so it's asked once more,
+      // quickly, in case of a DNS blip: its accounts show what's saved
+      // until it fails. Anything else gets three tries, backing off.
+      retry: (count: number, error: Error) =>
+        count < (isHomeGone(error) ? 1 : 3),
+      retryDelay: (count: number, error: Error) =>
+        isHomeGone(error) ? 500 : Math.min(1000 * 2 ** count, 30_000),
       select: (discovered: DiscoveredPds) => discovered,
       staleTime: (query: { state: { dataUpdatedAt: number } }) =>
         query.state.dataUpdatedAt === 0 ? 0 : Infinity,
@@ -94,10 +102,10 @@ export function SessionProvider({
     failed.has(account.domain),
   );
   for (const account of unreachable) suspendAccountSession(account);
+  const [retrying, setRetrying] = useState(false);
   function retry() {
-    for (const query of homes) {
-      if (query.isError) void query.refetch();
-    }
+    setRetrying(true);
+    void lookAgain(homes).finally(() => setRetrying(false));
   }
   // Without this build's home there's nowhere to sign in, and with every
   // account unreachable the app would look signed out, so both take the
@@ -107,9 +115,23 @@ export function SessionProvider({
     failed.has(env.veraDomain) ||
     (unreachable.length > 0 && unreachable.length === stored.accounts.length)
   ) {
-    return <Unreachable accounts={online ? unreachable : []} onRetry={retry} />;
+    return (
+      <Unreachable
+        accounts={online ? unreachable : []}
+        retrying={retrying}
+        onRetry={retry}
+      />
+    );
   }
-  if (home === undefined || homes.some((query) => query.isPending)) {
+  // A domain that was gone last time doesn't hold up the app: its
+  // accounts sit out until its lookup finds it.
+  if (
+    home === undefined ||
+    homes.some(
+      (query, index) =>
+        query.isPending && !wasHomeGone(domains[index] ?? env.veraDomain),
+    )
+  ) {
     return fallback;
   }
   const accounts = stored.accounts.flatMap((account) => {
@@ -126,7 +148,14 @@ export function SessionProvider({
     : stored.filter;
   return (
     <SessionContext
-      value={{ accounts, filter, home, retryUnreachable: retry, unreachable }}
+      value={{
+        accounts,
+        filter,
+        home,
+        retrying,
+        retryUnreachable: retry,
+        unreachable,
+      }}
     >
       <HideSplash />
       <VerifySessions accounts={accounts} />
@@ -138,17 +167,32 @@ export function SessionProvider({
 interface HomeLookup {
   readonly data: DiscoveredPds | undefined;
   readonly dataUpdatedAt: number;
+  readonly error: Error | null;
   readonly isError: boolean;
   readonly isSuccess: boolean;
+  readonly refetch: () => Promise<unknown>;
+}
+
+/** How long Try Again looks, at least, so it shows that it tried. */
+const RETRY_MIN_MS = 1000;
+
+/** Looks up every home whose lookup failed again. */
+function lookAgain(homes: readonly HomeLookup[]) {
+  return Promise.all([
+    ...homes.flatMap((query) => (query.isError ? [query.refetch()] : [])),
+    new Promise((resolve) => setTimeout(resolve, RETRY_MIN_MS)),
+  ]);
 }
 
 /**
  * The domains whose home PDS lookup failed, and whether the network is up:
  * this build's home answered its lookup just now. A failed lookup counts
- * when there's no saved home to fall back on, or when the network is up:
- * then the domain's server is gone or down, and its saved home would only
- * keep reconnecting to a server that isn't there. Offline, every lookup
- * fails, and the saved homes show what's saved.
+ * when there's no saved home to fall back on, when it found the domain has
+ * no home PDS, or when the network is up: then the domain's server is gone
+ * or down, and its saved home would only keep reconnecting to a server
+ * that isn't there. Offline, every lookup fails, and the saved homes show
+ * what's saved. A domain whose home was gone last time counts until its
+ * lookup finds one.
  */
 function failedLookups(
   domains: readonly string[],
@@ -162,10 +206,13 @@ function failedLookups(
   const failed = new Set(
     domains.filter((_, index) => {
       const lookup = homes[index];
+      if (lookup === undefined) return false;
+      if (lookup.data === undefined && wasHomeGone(domains[index] ?? "")) {
+        return true;
+      }
       return (
-        lookup !== undefined &&
         lookup.isError &&
-        (lookup.data === undefined || online)
+        (lookup.data === undefined || online || isHomeGone(lookup.error))
       );
     }),
   );
@@ -205,9 +252,11 @@ function HideSplash() {
  */
 function Unreachable({
   accounts,
+  retrying,
   onRetry,
 }: {
   accounts: readonly StoredAccount[];
+  retrying: boolean;
   onRetry: () => void;
 }) {
   const domains = [...new Set(accounts.map((account) => account.domain))];
@@ -224,9 +273,13 @@ function Unreachable({
           ? "Check your connection and try again."
           : accounts.map((account) => account.address).join("\n")}
       </Text>
-      <Pressable accessibilityRole="button" onPress={onRetry}>
-        <Text className="text-body text-accent font-semibold">Try Again</Text>
-      </Pressable>
+      {retrying ? (
+        <ActivityIndicator className="h-6" />
+      ) : (
+        <Pressable accessibilityRole="button" onPress={onRetry}>
+          <Text className="text-body text-accent font-semibold">Try Again</Text>
+        </Pressable>
+      )}
       {accounts.length > 0 && (
         <Pressable
           accessibilityRole="button"
