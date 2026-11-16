@@ -1,0 +1,33 @@
+diff --git a/ios/Cropper.swift b/ios/Cropper.swift
+index e78db08c0ed9035fe61d47b12a392ff9f9f17801..7ffad832499748e227ca9cbae9516616ef091684 100644
+--- a/ios/Cropper.swift
++++ b/ios/Cropper.swift
+@@ -167,7 +167,27 @@ class Cropper: NSObject, CropViewControllerDelegate {
+     }
+ 
+     DispatchQueue.main.async {
+-      rootVc.topmostViewController().present(cropVc, animated: true)
++      self.present(cropVc, from: rootVc, attempts: 40)
++    }
++  }
++
++  // Presents once nothing is being dismissed. expo-image-picker hands back
++  // the photo while its picker is still animating away, and UIKit drops a
++  // presentation made during that, which left the promise waiting forever.
++  private func present(_ cropVc: UIViewController, from rootVc: UIViewController, attempts: Int) {
++    let top = rootVc.topmostViewController()
++    guard attempts > 0, let dismissing = top.presentedViewController, dismissing.isBeingDismissed else {
++      top.present(cropVc, animated: true)
++      return
++    }
++    if let coordinator = dismissing.transitionCoordinator {
++      coordinator.animate(alongsideTransition: nil) { _ in
++        self.present(cropVc, from: rootVc, attempts: attempts - 1)
++      }
++    } else {
++      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
++        self.present(cropVc, from: rootVc, attempts: attempts - 1)
++      }
+     }
+   }
+ 
