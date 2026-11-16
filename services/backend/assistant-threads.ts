@@ -17,6 +17,7 @@ export function replyThread({ threadId, threadOnly }: Sent) {
 }
 
 interface ThreadMessage {
+  readonly messageId: string;
   readonly quote?: { readonly messageId?: string };
 }
 
@@ -37,11 +38,10 @@ export function threadMessages<Message extends ThreadMessage>(
     readonly messages: readonly Message[];
     readonly root: Message | null;
   },
-): Message[] {
+): (Omit<Message, "quote"> & Pick<Partial<Message>, "quote">)[] {
   const replies = messages.map((message) => {
-    if (message.quote?.messageId !== threadId) return message;
-    const { quote: _, ...rest } = message;
-    return rest as Message;
+    const { quote, ...rest } = message;
+    return quote?.messageId === threadId ? rest : message;
   });
   return hasOlder || root === null ? replies : [root, ...replies];
 }

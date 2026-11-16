@@ -88,9 +88,15 @@ export const claim = internalMutation({
     });
     if (!limit.ok) {
       if (limit.notice !== null) {
-        await sendAsBot(ctx, botAccount(row.bot), conversationId, limit.notice, {
-          threadId,
-        });
+        await sendAsBot(
+          ctx,
+          botAccount(row.bot),
+          conversationId,
+          limit.notice,
+          {
+            threadId,
+          },
+        );
       }
       return null;
     }
@@ -186,9 +192,15 @@ export const watch = internalMutation({
     // Vera Support's rows wait for the merge (mergeSupport.ts); its account
     // can't write any more.
     if (row.rerun !== true && row.bot === "vera") {
-      await sendAsBot(ctx, botAccount(row.bot), conversationId, FAILURE_NOTICE, {
-        threadId,
-      });
+      await sendAsBot(
+        ctx,
+        botAccount(row.bot),
+        conversationId,
+        FAILURE_NOTICE,
+        {
+          threadId,
+        },
+      );
     }
     await endRun(ctx, row, {});
   },

@@ -17,8 +17,8 @@ void test("a reply sent from the conversation is answered there", () => {
 });
 
 void test("a thread starts with its original", () => {
-  const root = { body: "original" };
-  const reply = { body: "reply" };
+  const root = { messageId: "root" };
+  const reply = { messageId: "reply" };
   assert.deepEqual(
     threadMessages("root", { hasOlder: false, messages: [reply], root }),
     [root, reply],
@@ -26,19 +26,19 @@ void test("a thread starts with its original", () => {
 });
 
 void test("a page with older replies before it has no original", () => {
-  const reply = { body: "reply" };
+  const reply = { messageId: "reply" };
   assert.deepEqual(
     threadMessages("root", {
       hasOlder: true,
       messages: [reply],
-      root: { body: "original" },
+      root: { messageId: "root" },
     }),
     [reply],
   );
 });
 
 void test("a thread whose original isn't here is just its replies", () => {
-  const reply = { body: "reply" };
+  const reply = { messageId: "reply" };
   assert.deepEqual(
     threadMessages("root", { hasOlder: false, messages: [reply], root: null }),
     [reply],
@@ -47,11 +47,11 @@ void test("a thread whose original isn't here is just its replies", () => {
 
 void test("replies quote only what isn't the original", () => {
   const replies = [
-    { body: "first", quote: { messageId: "root" } },
-    { body: "second", quote: { messageId: "first-reply" } },
+    { messageId: "first", quote: { messageId: "root" } },
+    { messageId: "second", quote: { messageId: "first" } },
   ];
   assert.deepEqual(
     threadMessages("root", { hasOlder: true, messages: replies, root: null }),
-    [{ body: "first" }, replies[1]],
+    [{ messageId: "first" }, replies[1]],
   );
 });

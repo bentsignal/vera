@@ -3,8 +3,8 @@ import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { v } from "convex/values";
 
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
-import { components, internal } from "./_generated/api";
 import { threadMessages } from "../assistant-threads";
+import { components, internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { createAuth } from "./auth";
 import { actorFromEmail, requireEnvironment } from "./lib";
@@ -331,7 +331,10 @@ export const markRead = internalMutation({
       botAccount(bot),
       threadId === undefined
         ? { args: { conversationId, readAt }, type: "markRead" }
-        : { args: { conversationId, readAt, threadId }, type: "markThreadRead" },
+        : {
+            args: { conversationId, readAt, threadId },
+            type: "markThreadRead",
+          },
     );
   },
 });

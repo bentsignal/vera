@@ -4,7 +4,7 @@ import { isStepCount } from "ai";
 
 import type { ActionCtx } from "./_generated/server";
 import type { Prompt } from "./agentReply";
-import type { Turn } from "./agentTools";
+import type { Chat, Turn } from "./agentTools";
 import { modelOrder } from "../assistant-models";
 import {
   teamNote,
@@ -69,7 +69,7 @@ export async function replyRequest(
     providerOptions: {
       convexGateway: {
         ...REASONING,
-        session_id: await cacheSession(turn.conversationId),
+        session_id: await cacheSession(turn),
       },
     },
     stopWhen: [isStepCount(MAX_STEPS), saidItsPiece],
@@ -109,8 +109,10 @@ function saidItsPiece({ steps }: { steps: StepResult<ToolSet>[] }) {
  * the first follow-up missed without it). A hash, since the ID holds their
  * address.
  */
-function cacheSession(conversationId: string) {
-  return sha256(conversationId);
+function cacheSession({ conversationId, threadId }: Chat) {
+  return sha256(
+    threadId === undefined ? conversationId : `${conversationId}/${threadId}`,
+  );
 }
 
 /**

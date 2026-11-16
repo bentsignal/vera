@@ -2,6 +2,7 @@ import type { PdsRouterMutation } from "@decentralized-convex/server";
 
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Chat } from "./agentTools";
 import type { BotAccount } from "./bots";
 import { replyThread } from "../assistant-threads";
 import { internal } from "./_generated/api";
@@ -46,14 +47,20 @@ export async function afterPdsMutation(
     return;
   }
   if (type !== "send" || identity.accountId === undefined) return;
-  // The sent message, whose thread is its original's even when it was
-  // sent as a reply to a reply.
-  const threadId = field(value, "threadId");
+  await startReply(ctx, conversationId, sentThread(value), identity.accountId);
+}
+
+/**
+ * The thread a sent message is answered in, when it was kept in one
+ * (assistant-threads.ts): its original's, even for a reply to a reply.
+ */
+function sentThread(sent: unknown) {
+  const threadId = field(sent, "threadId");
   const thread = replyThread({
     threadId: typeof threadId === "string" ? threadId : undefined,
-    threadOnly: field(value, "threadOnly") === true,
+    threadOnly: field(sent, "threadOnly") === true,
   });
-  await startReply(ctx, conversationId, thread ?? undefined, identity.accountId);
+  return thread ?? undefined;
 }
 
 /** A direct conversation's two members, or none for any other kind. */
@@ -198,10 +205,7 @@ export async function scheduleReply(
  */
 export function scheduleRun(
   ctx: MutationCtx,
-  {
-    conversationId,
-    threadId,
-  }: { conversationId: string; threadId: string | undefined },
+  { conversationId, threadId }: Chat,
   wakeAt: number,
 ) {
   return ctx.scheduler.runAt(wakeAt, internal.agent.run, {
