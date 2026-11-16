@@ -1,17 +1,8 @@
 diff --git a/ios/Cropper.swift b/ios/Cropper.swift
-index e78db08c0ed9035fe61d47b12a392ff9f9f17801..16b48e61b1ddfd0f5b114600444fba4d37de9ac1 100644
+index e78db08c0ed9035fe61d47b12a392ff9f9f17801..3a5d49a4f09e102535940b842ce8bcdbbaf8d16c 100644
 --- a/ios/Cropper.swift
 +++ b/ios/Cropper.swift
-@@ -100,11 +100,18 @@ class Cropper: NSObject, CropViewControllerDelegate {
-       viewConfig.cropShapeType = .circle(maskOnly: true)
-     }
- 
-+    // Plain black around the crop, like the Photos app, instead of the
-+    // default dark blur, which reads as gray.
-+    viewConfig.cropMaskVisualEffectType = .custom(color: UIColor.black.withAlphaComponent(0.6))
-+
-     config.cropViewConfig = viewConfig
- 
+@@ -105,6 +105,9 @@ class Cropper: NSObject, CropViewControllerDelegate {
      let cropVc = Mantis.cropViewController(image: image, config: config)
      cropVc.delegate = self
      cropVc.modalPresentationStyle = .fullScreen
@@ -21,7 +12,7 @@ index e78db08c0ed9035fe61d47b12a392ff9f9f17801..16b48e61b1ddfd0f5b114600444fba4d
      self.cropVc = cropVc
    }
  
-@@ -112,42 +119,34 @@ class Cropper: NSObject, CropViewControllerDelegate {
+@@ -112,42 +115,34 @@ class Cropper: NSObject, CropViewControllerDelegate {
      _ cropViewController: Mantis.CropViewController, cropped: UIImage,
      transformation: Mantis.Transformation, cropInfo: Mantis.CropInfo
    ) {
@@ -91,7 +82,7 @@ index e78db08c0ed9035fe61d47b12a392ff9f9f17801..16b48e61b1ddfd0f5b114600444fba4d
    }
  
    public func cropViewControllerDidCancel(
-@@ -167,7 +166,27 @@ class Cropper: NSObject, CropViewControllerDelegate {
+@@ -167,8 +162,52 @@ class Cropper: NSObject, CropViewControllerDelegate {
      }
  
      DispatchQueue.main.async {
@@ -106,6 +97,7 @@ index e78db08c0ed9035fe61d47b12a392ff9f9f17801..16b48e61b1ddfd0f5b114600444fba4d
 +  private func present(_ cropVc: UIViewController, from rootVc: UIViewController, attempts: Int) {
 +    let top = rootVc.topmostViewController()
 +    guard attempts > 0, let dismissing = top.presentedViewController, dismissing.isBeingDismissed else {
++      Self.darkenMask(of: cropVc, in: top.view.window?.bounds ?? UIScreen.main.bounds)
 +      top.present(cropVc, animated: true)
 +      return
 +    }
@@ -117,6 +109,30 @@ index e78db08c0ed9035fe61d47b12a392ff9f9f17801..16b48e61b1ddfd0f5b114600444fba4d
 +      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
 +        self.present(cropVc, from: rootVc, attempts: attempts - 1)
 +      }
++    }
++  }
++
++  // Mantis's dark blur around the crop reads as gray over a photo, and its
++  // plain-color masks don't line up with the crop circle. So the blur
++  // stays and gets a black layer inside it, which the blur's mask clips.
++  // The mask views exist after the first layout, so it's laid out here,
++  // before it's presented.
++  private static func darkenMask(of cropVc: UIViewController, in bounds: CGRect) {
++    cropVc.loadViewIfNeeded()
++    cropVc.view.frame = bounds
++    cropVc.view.layoutIfNeeded()
++    func visit(_ view: UIView) {
++      if let effectView = view as? UIVisualEffectView,
++        String(describing: type(of: effectView)) == "CropMaskVisualEffectView" {
++        let tint = UIView(frame: effectView.contentView.bounds)
++        tint.autoresizingMask = [.flexibleWidth, .flexibleHeight]
++        tint.backgroundColor = UIColor.black.withAlphaComponent(0.55)
++        tint.isUserInteractionEnabled = false
++        effectView.contentView.addSubview(tint)
++      }
++      view.subviews.forEach(visit)
      }
++    visit(cropVc.view)
    }
  
+   private func getRootViewController() -> UIViewController? {
