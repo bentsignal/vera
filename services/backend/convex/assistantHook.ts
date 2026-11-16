@@ -91,9 +91,8 @@ async function summonMentioned(
     return;
   }
   if (typeof threadId === "string") {
-    await mentionedInThread(ctx, {
+    await mentionedInThread(ctx, bot, {
       accountId: author,
-      bot,
       conversationId,
       messageId,
       threadId,
