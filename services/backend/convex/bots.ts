@@ -134,7 +134,10 @@ export async function ensureBotAccount(ctx: ActionCtx, bot: BotAccount) {
   return address;
 }
 
-/** Gives a bot its name and verified check, once. */
+/**
+ * Gives a bot its name and verified check, once, and makes it an assistant
+ * people can @mention anywhere (summons.ts).
+ */
 export const ensureProfile = internalMutation({
   args: { bot: botName },
   handler: async (ctx, args) => {
@@ -161,6 +164,10 @@ export const ensureProfile = internalMutation({
     await ctx.runMutation(components.accounts.affiliations.setAffiliated, {
       accountId,
       affiliated: true,
+    });
+    await ctx.runMutation(components.messages.assistants.setAssistant, {
+      accountId,
+      assistant: true,
     });
   },
 });

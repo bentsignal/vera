@@ -30,6 +30,7 @@ import { useMarkRead, useMessages } from "~/features/messaging/messages";
 import { useStayLive } from "~/features/messaging/stay-live";
 import { useTypingReporter, useTypists } from "~/features/messaging/typing";
 import { ConversationGestureArea } from "~/features/native-list/conversation-gesture-area";
+import { authorsShownIn } from "~/features/native-list/list-props";
 import { NativeMessageList } from "~/features/native-list/native-message-list";
 import { useActiveConversation } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
@@ -240,7 +241,7 @@ function Conversation({
             self={address}
             layout={layout}
             profileOf={profileOf}
-            showAuthors={conversation?.kind !== "direct"}
+            {...authorsShownIn(conversation)}
             anchorId={messages.anchor}
             hasNewer={messages.hasNewer}
             onLoadOlder={messages.loadOlder}

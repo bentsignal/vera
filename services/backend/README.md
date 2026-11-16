@@ -140,6 +140,62 @@ the input came from the prompt cache (`cacheHitRate`), and how often a
 reply's instructions or tools changed since the one before it in its
 conversation (`cachedPartChangeRate`; see "Keeping replies cheap" below).
 
+### Calling Vera into other conversations
+
+Anyone can @mention Vera in a group, a channel, or a direct message with
+someone else (the app's mention picker lists it everywhere), and Vera
+answers that message in a thread on it (`convex/summons.ts`,
+`summonReply.ts`, `summonPrompt.ts`). It never answers in the chat
+itself. It isn't a member: the messages plugin's assistant functions let
+it read what the caller can see before their message and answer it (see
+its README, "Assistants").
+
+- **Vera follows any thread it's mentioned in**, one that starts with a
+  mention and one where someone mentions it in a reply. Every reply there
+  reaches it from then on, mentioned or not (`convex/summonThreads.ts`). A reply waits
+  2.5 seconds for more, and while anyone's typing in the thread (up to 30
+  seconds), so a quick back-and-forth gets one look once it pauses. Then
+  a gate (`thread-gate.ts`) asks Jev, a cheap decision model on the AI
+  Gateway, which new reply, if any, is meant for Vera: a question to it
+  or a follow-up to its answer, not people talking to each other, and
+  only clearly so when they're going back and forth quickly. Only that
+  one is answered, by the main model, which may still stay quiet. Nothing
+  shows Vera typing until the gate says yes. A decision costs about
+  $0.00003 and takes about 150 ms; `botThreads` counts each thread's.
+- **In the chat itself, only a mention reaches it.** Each message is answered once (`botSummons`), even if the app
+  retries the send.
+- It reads the 30 messages before theirs, from the thread they wrote in or
+  from the conversation (with the original their reply quotes), with each
+  message's author named, and can read further back.
+- Everyone there reads the answer, so it knows nothing private about
+  anyone: no notes, no memory of anyone's chats with Vera, no list of
+  anyone's bug reports, and no tools to save or look any of it up. Those
+  live only in each person's direct message with Vera. Asked about
+  someone's memories, it says it can't share that there.
+- It answers only the person whose message it's answering. Other
+  people's messages are context, not requests, and every tool acts for
+  that person alone and takes no account or conversation, so no one can
+  point it at someone else's data.
+- It can search the web and take bug reports: searching GitHub, following
+  a known issue, or filing one (the privacy notice first, as in a direct
+  message, posted in the thread). A report belongs to whoever asked for
+  it: updates on it go to their direct message with Vera, never the
+  group. Someone else in the thread follows it too by asking to hear when
+  it's fixed, and anyone who asks gets its GitHub link, since reports are
+  public.
+- Asked why it didn't answer something, it says how people reach it (it
+  doesn't bring that up otherwise). In a direct message, Vera explains
+  how to call it into other conversations when someone asks.
+- Each answer counts toward the person's hourly limit, shared with their
+  direct messages; the gate's looks don't.
+- Like direct messages, only people on this PDS can call it, and it sees
+  only messages stored here.
+
+In a direct message's bubbles, the app names no one, since it's just the
+two of you. Once Vera has written or is typing there (in a thread), every
+sender is named, as in a group, so its messages and the other person's
+can't be confused (`map-rows.ts`).
+
 When an issue is closed without a fix, Vera follows the original issue
 if it was marked as a duplicate. If the team left a comment when closing
 it, Vera's model explains that comment to the reporter in plain words

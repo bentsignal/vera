@@ -49,9 +49,31 @@ export async function supportInstructions(turn: Turn) {
       : reports
           .map(
             (report) =>
-              `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}${reporter.developer === true ? `. ${linksOf(report)}` : ""}`,
+              `- [${report.id}] ${report.summary}: ${STAGE_WORDS[report.stage]}. ${linksOf(report)}`,
           )
           .join("\n");
+  return `${reportRules("here")}
+- More details about something already filed go to add_to_bug_report, not a new report.
+
+Talking about it:
+- Their developer status: ${developer}. If unknown, after you file their first report, ask once, casually, whether they're a developer, since you can share the technical details as the fix moves along; record the answer with set_developer.
+- If they're not a developer (or unknown), keep it non-technical unless they ask: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged". That's only so you don't bury them in details they don't care about; nothing is kept from them. When they ask for a link, a technical detail, or anything else about a report, give it.
+- If they are a developer, you can be technical and share the links listed with their reports below.
+- If they ask how to do something in the app and you're not sure, say so. Don't invent features.
+
+Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.
+
+Their app: ${app}
+
+Their reports (newest first):
+${reportList}`;
+}
+
+/**
+ * How Vera takes a report, anywhere: `updates` says where it tells them
+ * how it's going ("here" in their direct message with it).
+ */
+function reportRules(updates: string) {
   return `Bugs and ideas: when something in the Vera app isn't working for them, or they have an idea for it, understand the problem well enough for the team to fix it, file it, and keep them in the loop. Be kind about it; something broken is frustrating.
 
 Getting a good report:
@@ -67,7 +89,7 @@ Privacy, before anything is filed:
 
 Checking what the team already knows:
 - Once you understand the problem, search_known_bugs first, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Search again in the reply you file in. It searches the team's issues on GitHub by your keywords and lists everything filed in the last day. Compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "messages out of order when opening a chat" and "an older message shows at the bottom"). Keywords match words, so if nothing matches, try another set or two before deciding it's new.
-- A known bug that matches, open or fixed but not out yet: follow_known_bug instead of filing a new one, adding anything new they told you. Then tell them someone already reported it, where it stands, and that you'll message them here when it's fixed.
+- A known bug that matches, open or fixed but not out yet: follow_known_bug instead of filing a new one, adding anything new they told you. Then tell them someone already reported it, where it stands, and that you'll message them ${updates} when it's fixed.
 - A fix that's already out: tell them, and how to get it (close and reopen the app, or update it). A fix merged but not released yet: tell them it's coming in an upcoming update, and follow its issue if it has one.
 - Judge by what the bug or fix actually says, and by dates: a fix from before they reported it didn't fix their problem.
 - Only when nothing matches, file it.
@@ -76,21 +98,52 @@ Filing:
 - Use file_bug_report once you have enough and nothing known matches. Write the title and details for a developer: specific, factual, concise. Write the summary for them: a short everyday phrase like "photos showing sideways in group chats".
 - Feature requests and ideas are welcome too; file them with kind "idea".
 - Everything you file is public, so use judgment: don't file jokes, tests, insults, or spam, and don't file what's already known. If they're clearly just messing around, don't file anything.
-- After filing, tell them in plain words that you passed it to the team and will message them here when it's fixed. Don't promise when.
-- More details about something already filed go to add_to_bug_report, not a new report.
+- After filing, tell them in plain words that you passed it to the team and will message them ${updates} when it's fixed. Don't promise when.
 
-Talking about it:
-- Their developer status: ${developer}. If unknown, after you file their first report, ask once, casually, whether they're a developer, since you can share the technical details as the fix moves along; record the answer with set_developer.
-- If they're not a developer (or unknown), keep it non-technical: say "bug report" or "passed it to the team", never "issue", "GitHub", "ticket", "PR", or "merged".
-- If they are a developer, you can be technical and share the links listed with their reports below. Only those links: never make up a link, issue number, or ID.
-- If they ask how to do something in the app and you're not sure, say so. Don't invent features.
+Links: reports are public, so when anyone asks for the link to one, send it, developer or not. Your tools give each issue's link (search_known_bugs finds any report); never make up a link, issue number, or ID.`;
+}
 
-Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.
+/**
+ * Bug reports when someone calls Vera into another conversation
+ * (summonPrompt.ts): for them alone, with nothing about their other
+ * reports, and updates in their direct message with Vera.
+ */
+export async function summonedSupportInstructions(turn: Turn) {
+  const reporter: Reporter = await turn.ctx.runQuery(
+    internal.supportReporters.reporter,
+    { accountId: turn.accountId },
+  );
+  const developer = reporter.developer === true;
+  return `${reportRules("in your direct chat with them (never here)")}
 
-Their app: ${app}
+Reports from here:
+- When ${turn.name} asks you to report something, it may be a bug or idea someone else here brought up. Work out what happened from the messages you see. Ask ${turn.name}, not the others, for anything missing; they answer by mentioning you again.
+- A report belongs to whoever asked you to file it: they follow it, and you tell them how it's going in your direct chat with them, never here. Wherever a tool says "here" about updates, it means that chat.
+- Someone else here follows a report only once they ask to hear when it's fixed: then find it with search_known_bugs and follow_known_bug it for them. Promise ${turn.name} updates only right after you've filed or followed something for them in this answer; what you told others here earlier was about their reports, not ${turn.name}'s.
+- Their app version is attached to the report. If the bug happened on someone else's phone, say so in the details. In the report, never say who here found it or quote anyone here. Don't bring up their other reports here.
+- ${developer ? "They're a developer: you can be technical and share issue links." : `Keep it non-technical unless they ask: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged". That's only so you don't bury them in details; when they ask for a link or anything technical, give it.`}
 
-Their reports (newest first):
-${reportList}`;
+Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.`;
+}
+
+/**
+ * The report tools that act for the caller alone when Vera is called into
+ * another conversation: no adding to their earlier reports, which it
+ * can't list there.
+ */
+export function summonedSupportTools(turn: Turn) {
+  const {
+    file_bug_report,
+    follow_known_bug,
+    search_known_bugs,
+    share_privacy_notice,
+  } = supportTools(turn);
+  return {
+    file_bug_report,
+    follow_known_bug,
+    search_known_bugs,
+    share_privacy_notice,
+  };
 }
 
 /** Filing and following bug reports. */
@@ -196,15 +249,12 @@ async function fileBugReport(
   const reportId = await turn.ctx.runMutation(internal.supportReports.insert, {
     ...filed,
     accountId: turn.accountId,
-    conversationId: turn.conversationId,
+    conversationId: turn.updatesIn,
   });
   return {
     filed: true,
     reportId,
-    link:
-      reporter.developer !== true
-        ? "Not for this person (not a developer)."
-        : (created?.url ?? "None; it's kept privately."),
+    link: created?.url ?? "None; it's kept privately.",
   };
 }
 
@@ -282,7 +332,7 @@ async function addToBugReport(
   return "Added.";
 }
 
-/** A developer's links for a report, or that it has none. */
+/** A report's links, or that it has none. */
 function linksOf(report: PublicReport) {
   if (report.issueUrl === null) return "No public link (kept privately)";
   return report.pullRequestUrl === null
