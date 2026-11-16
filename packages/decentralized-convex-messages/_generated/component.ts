@@ -35,7 +35,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           conversationId: string;
           inReplyTo: string;
           messageId: string;
-          place: "thread" | "reply" | "conversation";
         },
         any,
         Name
@@ -55,7 +54,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           callerId: string;
           conversationId: string;
           inReplyTo: string;
-          place: "thread" | "reply" | "conversation";
           typing: boolean;
         },
         null,
@@ -72,6 +70,18 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           messageId: string;
         },
         any,
+        Name
+      >;
+      threadTyping: FunctionReference<
+        "query",
+        "internal",
+        {
+          assistantId: string;
+          callerId: string;
+          conversationId: string;
+          messageId: string;
+        },
+        Array<string>,
         Name
       >;
     };

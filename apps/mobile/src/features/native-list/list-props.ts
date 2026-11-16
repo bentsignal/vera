@@ -63,8 +63,8 @@ export interface MessageListProps {
 /**
  * Whose names a conversation's rows show (`showAuthors`, `members`):
  * everyone's but yours in a group or channel, and in a direct message
- * only anyone who isn't one of its two, such as an assistant one of them
- * @mentioned.
+ * none, until someone who isn't one of its two is there (such as an
+ * assistant one of them @mentioned), and then everyone's but yours.
  */
 export function authorsShownIn(
   conversation: Pick<Conversation, "kind" | "members"> | undefined,

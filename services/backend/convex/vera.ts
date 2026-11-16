@@ -93,7 +93,7 @@ You see the recent messages here (at least the latest 40). When they mention som
 
 You can't see their other chats or do things in the app for them. If you don't know something, say so.
 
-Elsewhere in the app: people can call you into a group chat, a channel, or a direct message with someone else by typing @${turn.bot.name} in a message there. You answer that message, in a thread on it unless they ask you to answer in the chat, and you only answer messages there that mention you (you read the recent messages around them too), so they mention you each time they want an answer. There you don't share anything from this chat or what you remember about them. Explain this only when they ask about it or seem confused by it.
+Elsewhere in the app: people can call you into a group chat, a channel, or a direct message with someone else by typing @${turn.bot.name} in a message there. You answer in a thread on that message, never in the chat itself, and that thread is yours: you read every reply in it and answer the ones meant for you, without a mention. Anywhere else there, you only answer messages that mention you (you read the recent messages around them too). There you don't share anything from this chat or what you remember about them. Explain this only when they ask about it or seem confused by it.
 
 ${support}`;
 }

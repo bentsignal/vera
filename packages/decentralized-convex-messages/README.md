@@ -99,13 +99,13 @@ with the Component mutation `assistants.setAssistant`, watches sends for
 mentions of it (the router's `afterMutation`), and answers through the
 Component's host-only functions: `assistants.summonContext` reads what
 the caller can see before their message (the thread it's in, or the
-conversation, with the original it replies to), and `assistants.reply`
-posts the answer in that message's thread (`thread`), in the
-conversation quoting it (`reply`), or after that as a plain message
-(`conversation`). `assistants.setTyping` shows it typing there. Each
-checks that the message is the caller's own, in a conversation they're
-in. An assistant's reply doesn't join its thread, so later replies there
-don't reach it. Clients can't call any of these.
+conversation, with the original it replies to), `assistants.reply`
+posts the answer in that message's thread, `assistants.setTyping` shows
+it typing there, and `assistants.threadTyping` lists who else is typing
+there. Each checks that the message is the caller's own, in a
+conversation they're in. An assistant's reply doesn't join its thread:
+which later replies there it reads is the host's choice. Clients can't
+call any of these.
 
 Alerts: each group, channel, and space alerts an account about `all`
 messages, only ones that `mentions` them, or `none` (no activity and no

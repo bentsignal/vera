@@ -27,6 +27,7 @@ import { linkCardsOf, visibleBody } from "../conversation/message-text.ts";
 import { quoteText } from "../conversation/reply-parts.ts";
 import { attachmentPart } from "../messaging/reaction-part.ts";
 import { typingLabel } from "../messaging/typing-state.ts";
+import { withGuests } from "./guests.ts";
 import {
   blocksOf,
   DELETED_TEXT,
@@ -49,8 +50,8 @@ export interface RowContext {
   /** Group chats, where incoming runs show their sender. */
   readonly showAuthors: boolean;
   /**
-   * A direct message's two members. Anyone else there, such as Vera called
-   * in by an @mention, shows their name even without `showAuthors`.
+   * A direct message's two members. Once anyone else is there, such as
+   * Vera called in by an @mention, every sender shows, as in a group.
    */
   readonly members?: readonly string[];
   readonly profileOf: ProfileOf;
@@ -192,9 +193,7 @@ function messageRow(
     layout,
     reactions,
     sentAt: message.sentAt.getTime(),
-    showAuthor:
-      layout === "stacked" ||
-      (!isOwn && (showAuthors || isGuest(message.authorId, context))),
+    showAuthor: layout === "stacked" || (!isOwn && showAuthors),
     startsGroup: row.startsGroup,
     status: message.status,
     // Stacked rows show it beside the name. Bubbles reveal it in a narrow
@@ -262,11 +261,6 @@ function nativeRow(built: BuiltRow, context: RowContext) {
   }
 }
 
-/** Whether someone isn't one of a direct message's members (`members`). */
-function isGuest(accountId: string, { members }: RowContext) {
-  return members !== undefined && !members.includes(accountId);
-}
-
 /** Who's typing, as the newest row; none when nobody is. */
 function typingRow(typists: readonly string[], context: RowContext) {
   if (typists.length === 0) return [];
@@ -283,10 +277,7 @@ function typingRow(typists: readonly string[], context: RowContext) {
       // Stacked rows always show the photos, one-on-one too, as the React
       // Native list's typing line does; bubbles only where messages show
       // who sent them, not one-on-one.
-      showFaces:
-        context.layout === "stacked" ||
-        context.showAuthors ||
-        typists.some((address) => isGuest(address, context)),
+      showFaces: context.layout === "stacked" || context.showAuthors,
     },
   ] satisfies Row[];
 }
@@ -357,8 +348,9 @@ export function nativeRows(
   typists: readonly string[],
   context: RowContext,
 ) {
+  const shown = withGuests(rows, typists, context);
   return [
-    ...typingRow(typists, context),
-    ...rows.map((row) => nativeRow(row, context)),
-  ].map((row) => supported(row, context.support));
+    ...typingRow(typists, shown),
+    ...rows.map((row) => nativeRow(row, shown)),
+  ].map((row) => supported(row, shown.support));
 }

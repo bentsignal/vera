@@ -13,10 +13,27 @@ import {
 
 // Someone in a direct message who isn't one of its two members: Vera,
 // when either of them @mentions it (services/backend/convex/summons.ts).
+// From then on it reads like a group, so every sender is named.
 
 const direct = { kind: "direct" as const, members: [ME, MAYA] };
 
-void test("direct chats name anyone who isn't in them, like Vera", () => {
+void test("direct chats name no one while it's just the two of them", () => {
+  const rows = messageRows(
+    rowsOf(
+      [message("a", 0), message("b", 10, { authorId: ME })],
+      authorsShownIn(direct),
+    ),
+  );
+  assert.deepEqual(
+    rows.map((row) => [row.id, row.showAuthor]),
+    [
+      ["b", false],
+      ["a", false],
+    ],
+  );
+});
+
+void test("once someone else is there, like Vera, direct chats name everyone", () => {
   const rows = messageRows(
     rowsOf(
       [
@@ -32,14 +49,17 @@ void test("direct chats name anyone who isn't in them, like Vera", () => {
     [
       ["c", false],
       ["b", true],
-      ["a", false],
+      ["a", true],
     ],
   );
 });
 
-void test("Vera typing in a direct chat shows its face", () => {
-  const [typing] = rowsOf([message("a", 0)], authorsShownIn(direct), [LEO]);
+void test("Vera typing in a direct chat names everyone", () => {
+  const [typing, row] = rowsOf([message("a", 0)], authorsShownIn(direct), [
+    LEO,
+  ]);
   assert.equal(typing?.kind === "typing" && typing.showFaces, true);
+  assert.equal(row?.kind === "message" && row.showAuthor, true);
 });
 
 void test("groups and channels name everyone but you", () => {

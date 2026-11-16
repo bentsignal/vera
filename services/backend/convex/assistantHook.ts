@@ -6,11 +6,13 @@ import type { BotAccount } from "./bots";
 import { internal } from "./_generated/api";
 import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
 import { mentionsAssistant, startSummon } from "./summons";
+import { heardInThread, mentionedInThread } from "./summonThreads";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
-// ones in a direct conversation with an assistant, and to messages
-// anywhere else that @mention one (summons.ts).
+// ones in a direct conversation with an assistant, to messages anywhere
+// else that @mention one (summons.ts), and to replies in its threads
+// (summonThreads.ts).
 
 /** How long a reply waits for more messages, so a burst gets one answer. */
 const REPLY_DELAY = 1500;
@@ -57,7 +59,11 @@ function withAssistant(conversationId: string) {
   return ASSISTANTS.some((bot) => members.includes(botAddress(bot)));
 }
 
-/** Answers a message that mentions an assistant (summons.ts). */
+/**
+ * Answers a message that mentions an assistant (summons.ts). A reply in a
+ * thread that mentions none goes to the thread's gate, in case the thread
+ * is an assistant's (summonThreads.ts).
+ */
 async function summonMentioned(
   ctx: MutationCtx,
   author: string | undefined,
@@ -68,10 +74,22 @@ async function summonMentioned(
   const messageId = field(args, "messageId");
   if (author === undefined) return;
   if (typeof body !== "string" || typeof messageId !== "string") return;
+  const threadId = field(args, "threadId");
   const bot = ASSISTANTS.find((candidate) =>
     mentionsAssistant(candidate, body, field(args, "mentions")),
   );
-  if (bot === undefined) return;
+  if (bot === undefined) {
+    if (typeof threadId === "string") {
+      await heardInThread(ctx, {
+        accountId: author,
+        conversationId,
+        messageId,
+        threadId,
+      });
+    }
+    return;
+  }
+  if (typeof threadId === "string") await mentionedInThread(ctx, threadId);
   await startSummon(ctx, { accountId: author, bot, conversationId, messageId });
 }
 

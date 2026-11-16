@@ -2,7 +2,6 @@ import type { Message } from "@decentralized-convex/messages";
 
 import type { ActionCtx } from "./_generated/server";
 import type { Turn } from "./agentTools";
-import type { SummonPlace } from "./summonPrompt";
 import type { Summon, SummonContextValue } from "./summons";
 import type { Tally } from "./usage";
 import { internal } from "./_generated/api";
@@ -14,11 +13,11 @@ import { summonedPrompt } from "./summonPrompt";
 import { summonArgs } from "./summons";
 import { usageOf } from "./usage";
 
-// One answer to a message that called Vera into a conversation
-// (summons.ts `run`): it reads what the caller can see there, hands it to
-// the model with summonPrompt.ts's instructions and tools, and posts what
-// the model sends, in a thread on their message unless they asked for the
-// chat.
+// One answer to a message that called Vera into a conversation, or to a
+// reply in its thread meant for it (summons.ts `run`): it reads what the
+// caller can see there, hands it to the model with summonPrompt.ts's
+// instructions and tools, and posts what the model sends, in the thread
+// on their message.
 
 /** The fewest recent messages it reads from the conversation, or a thread. */
 const CONTEXT = 30;
@@ -56,14 +55,14 @@ export async function answer(
   );
   const { history, oldestSentAt } = shownHistory(found);
   const self = botAddress(summon.bot);
-  // Where it answers: a thread unless the model chooses the chat, which
-  // it may only when they asked (summonPrompt.ts).
-  let where: SummonPlace = "thread";
-  let typingIn: SummonPlace = "thread";
+  const threadId = found.message.threadId;
+  // A mention outside a thread starts one, which is its own.
+  const ownThread =
+    threadId === undefined ||
+    (await ctx.runQuery(internal.summonThreads.isOwnThread, { threadId }));
   const typing = typingWith((on) =>
     ctx.runMutation(internal.summons.setTyping, {
       ...summonArgs(summon),
-      place: typingIn,
       typing: on,
     }),
   );
@@ -72,8 +71,6 @@ export async function answer(
       await ctx.runMutation(internal.summons.post, {
         ...summonArgs(summon),
         body,
-        first: posted.count === 0,
-        place: where,
       });
       posted.count += 1;
     });
@@ -106,12 +103,8 @@ export async function answer(
     };
     const prompt = await summonedPrompt(turn, {
       context: found,
-      // Placed once, with the first message, so an answer isn't split.
-      place: (chosen) => {
-        if (posted.count === 0) where = chosen;
-        typingIn = where;
-        return where;
-      },
+      heard: summon.heard,
+      ownThread,
       readEarlier: (before) =>
         ctx.runQuery(internal.summons.context, {
           ...summonArgs(summon),

@@ -1,13 +1,13 @@
-import type { Infer } from "convex/values";
 import { v } from "convex/values";
 
 import type { QueryCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
 import { fail, isAssistant, requireAccess, toMessage } from "./model.ts";
 import { olderThan } from "./paging.ts";
+import { TYPING_TIMEOUT } from "./protocol.ts";
 import { alreadySent, storeMessage } from "./sending.ts";
 import { messageById, replyTo } from "./threads.ts";
-import { writeTyping } from "./typing.ts";
+import { MAX_TYPISTS, writeTyping } from "./typing.ts";
 import { validateMessage } from "./validation.ts";
 
 // Assistants: accounts the host answers people with (such as Vera's),
@@ -16,21 +16,10 @@ import { validateMessage } from "./validation.ts";
 // (`setAssistant`) and does the rest through these functions, which only
 // the host can call (Component functions are never reachable by clients):
 // reading what the caller can see around the message that called it
-// (`summonContext`), and answering that message (`reply`, `setTyping`).
-// Nothing here reads anywhere the caller can't, or writes anywhere but
-// in answer to the caller's own message.
-
-/** Where an assistant's reply goes, relative to the message that called it. */
-export const replyPlace = v.union(
-  // In the thread of the message that called it, kept there.
-  v.literal("thread"),
-  // In the conversation, quoting it (and joining its thread).
-  v.literal("reply"),
-  // In the conversation, as a plain message after such a reply.
-  v.literal("conversation"),
-);
-
-export type ReplyPlace = Infer<typeof replyPlace>;
+// (`summonContext`), who's typing in its thread (`threadTyping`), and
+// answering that message in its thread (`reply`, `setTyping`). Nothing
+// here reads anywhere the caller can't, or writes anywhere but in answer
+// to the caller's own message.
 
 /** Makes an account an assistant, or stops it being one. */
 export const setAssistant = mutation({
@@ -130,9 +119,9 @@ export const summonContext = query({
 });
 
 /**
- * Sends an assistant's answer to the caller's message `inReplyTo`, where
- * `place` says. The host checks the caller asked; this checks the
- * message is theirs and in the conversation.
+ * Sends an assistant's answer to the caller's message `inReplyTo`, in its
+ * thread. The host checks the caller asked; this checks the message is
+ * theirs and in the conversation.
  */
 export const reply = mutation({
   args: {
@@ -143,7 +132,6 @@ export const reply = mutation({
     conversationId: v.string(),
     inReplyTo: v.string(),
     messageId: v.string(),
-    place: replyPlace,
   },
   handler: async (ctx, args) => {
     const { assistantId, conversationId } = args;
@@ -152,15 +140,7 @@ export const reply = mutation({
     validateMessage(body, []);
     const retried = await alreadySent(ctx, assistantId, args.messageId);
     if (retried !== null) return retried;
-    const reply =
-      args.place === "conversation"
-        ? undefined
-        : await replyTo(
-            ctx,
-            conversationId,
-            args.inReplyTo,
-            args.place === "thread",
-          );
+    const reply = await replyTo(ctx, conversationId, args.inReplyTo, true);
     return storeMessage(
       ctx,
       {
@@ -178,14 +158,13 @@ export const reply = mutation({
   },
 });
 
-/** Shows an assistant typing its answer to `inReplyTo` where it'll go, or stops. */
+/** Shows an assistant typing its answer to `inReplyTo` in its thread, or stops. */
 export const setTyping = mutation({
   args: {
     assistantId: v.string(),
     callerId: v.string(),
     conversationId: v.string(),
     inReplyTo: v.string(),
-    place: replyPlace,
     typing: v.boolean(),
   },
   returns: v.null(),
@@ -197,11 +176,41 @@ export const setTyping = mutation({
     return writeTyping(ctx, args.assistantId, {
       conversationId: args.conversationId,
       // A thread is named by its original (threads are flat).
-      threadId:
-        args.place === "thread"
-          ? (message.threadId ?? message.messageId)
-          : undefined,
+      threadId: message.threadId ?? message.messageId,
       typing: args.typing,
     });
+  },
+});
+
+/**
+ * Who's typing in the thread of the caller's message `messageId` on this
+ * PDS, besides the assistant, so it can wait for them to finish.
+ */
+export const threadTyping = query({
+  args: {
+    assistantId: v.string(),
+    callerId: v.string(),
+    conversationId: v.string(),
+    messageId: v.string(),
+  },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) => {
+    const { message } = await summoningMessage(ctx, args);
+    const threadId = message.threadId ?? message.messageId;
+    const now = Date.now();
+    const rows = await ctx.db
+      .query("typing")
+      .withIndex("by_conversation", (q) =>
+        q
+          .eq("conversationId", args.conversationId)
+          .gt("typedAt", now - TYPING_TIMEOUT),
+      )
+      .take(MAX_TYPISTS);
+    return rows
+      .filter(
+        (row) =>
+          row.threadId === threadId && row.accountId !== args.assistantId,
+      )
+      .map((row) => row.accountId);
   },
 });

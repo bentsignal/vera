@@ -3,7 +3,6 @@ import { v } from "convex/values";
 
 import type { MutationCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
-import type { SummonPlace } from "./summonPrompt";
 import { mentionsAssistant as mentionsWritten } from "../assistant-mentions";
 import { components, internal } from "./_generated/api";
 import {
@@ -18,11 +17,12 @@ import { answer } from "./summonReply";
 
 // Calling Vera into any other conversation: a message that @mentions it,
 // in a group, a channel, or a direct message with someone else, gets one
-// answer, in a thread on that message unless it asks for one in the chat.
-// Nothing else there reaches Vera, not even replies in that thread, until
-// someone mentions it again. It isn't a member: the messages plugin lets
-// the host read what the caller can see around their message and answer
-// it (`assistants` in @decentralized-convex/messages).
+// answer, in a thread on that message. That thread is then Vera's: it
+// reads every reply there and answers the ones meant for it
+// (summonThreads.ts). Elsewhere, only a mention reaches it. It isn't a
+// member: the messages plugin lets the host read what the caller can see
+// around their message and answer it (`assistants` in
+// @decentralized-convex/messages).
 //
 // Everyone there reads the answer, so it knows nothing private about
 // anyone: no notes, no memory of anyone's chats with Vera, no one's bug
@@ -47,8 +47,10 @@ export function mentionsAssistant(
 
 /**
  * The router's `afterMutation` (assistantHook.ts) saw a message that
- * mentions an assistant outside its own direct messages: it's answered
- * once, right away. A send retried with the same ID isn't answered again.
+ * mentions an assistant outside its own direct messages, or the gate
+ * judged a reply in its thread was for it (`heard`, summonThreads.ts):
+ * it's answered once, right away. A send retried with the same ID isn't
+ * answered again.
  */
 export async function startSummon(
   ctx: MutationCtx,
@@ -56,11 +58,13 @@ export async function startSummon(
     accountId,
     bot,
     conversationId,
+    heard,
     messageId,
   }: {
     accountId: string;
     bot: BotAccount;
     conversationId: string;
+    heard?: true;
     messageId: string;
   },
 ) {
@@ -80,6 +84,7 @@ export async function startSummon(
     accountId,
     bot: bot.username,
     conversationId,
+    heard,
     messageId,
   });
   await ctx.scheduler.runAfter(0, internal.summons.run, { messageId });
@@ -103,7 +108,6 @@ export const run = internalAction({
           .runMutation(internal.summons.post, {
             ...summonArgs(summon),
             body: FAILURE_NOTICE,
-            place: "thread",
           })
           .catch((cause: unknown) => {
             // Their message is gone, say.
@@ -136,11 +140,7 @@ export const claim = internalMutation({
     });
     if (!limit.ok) {
       if (limit.notice !== null) {
-        await replyAs(ctx, {
-          ...row,
-          body: limit.notice,
-          place: "thread",
-        });
+        await replyAs(ctx, { ...row, body: limit.notice });
       }
       return null;
     }
@@ -148,6 +148,7 @@ export const claim = internalMutation({
       accountId: row.accountId,
       bot: row.bot,
       conversationId: row.conversationId,
+      heard: row.heard === true,
     };
   },
 });
@@ -168,6 +169,8 @@ export interface Summon {
   readonly accountId: string;
   readonly bot: BotAccount;
   readonly conversationId: string;
+  /** A reply in its thread without a mention (summonThreads.ts). */
+  readonly heard: boolean;
   /** Their message that called it. */
   readonly messageId: string;
 }
@@ -188,12 +191,7 @@ const summonFields = {
   messageId: v.string(),
 };
 
-const place = v.union(v.literal("thread"), v.literal("inline"));
-
-/**
- * Posts the assistant's answer to the caller's message: in its thread, or
- * in the conversation, quoting it the first time (`inline`, `first`).
- */
+/** Posts the assistant's answer to the caller's message, in its thread. */
 function replyAs(
   ctx: MutationCtx,
   {
@@ -201,17 +199,13 @@ function replyAs(
     body,
     bot,
     conversationId,
-    first = true,
     messageId,
-    place,
   }: {
     accountId: string;
     body: string;
     bot: BotAccount["username"];
     conversationId: string;
-    first?: boolean;
     messageId: string;
-    place: SummonPlace;
   },
 ) {
   const account = botAccount(bot);
@@ -223,17 +217,11 @@ function replyAs(
     conversationId,
     inReplyTo: messageId,
     messageId: crypto.randomUUID(),
-    place: place === "thread" ? "thread" : first ? "reply" : "conversation",
   });
 }
 
 export const post = internalMutation({
-  args: {
-    ...summonFields,
-    body: v.string(),
-    first: v.optional(v.boolean()),
-    place,
-  },
+  args: { ...summonFields, body: v.string() },
   handler: async (ctx, args) => {
     await replyAs(ctx, args);
     return null;
@@ -241,15 +229,14 @@ export const post = internalMutation({
 });
 
 export const setTyping = internalMutation({
-  args: { ...summonFields, place, typing: v.boolean() },
-  handler: (ctx, { accountId, bot, conversationId, messageId, ...args }) =>
+  args: { ...summonFields, typing: v.boolean() },
+  handler: (ctx, { accountId, bot, conversationId, messageId, typing }) =>
     ctx.runMutation(components.messages.assistants.setTyping, {
       assistantId: botAddress(botAccount(bot)),
       callerId: accountId,
       conversationId,
       inReplyTo: messageId,
-      place: args.place === "thread" ? "thread" : "reply",
-      typing: args.typing,
+      typing,
     }),
 });
 

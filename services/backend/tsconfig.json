@@ -21,6 +21,8 @@
     "./reply-outcome.test.ts",
     "./send-limits.ts",
     "./send-limits.test.ts",
+    "./thread-gate.ts",
+    "./thread-gate.test.ts",
     "./upload-limits.ts",
     "./upload-limits.test.ts",
     "./convex/**/*"
