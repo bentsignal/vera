@@ -15,6 +15,7 @@ import {
   CONVERSATION_HEADER_HEIGHT,
   ConversationHeader,
 } from "~/features/conversation/conversation-header";
+import { draftKey } from "~/features/conversation/drafts";
 import { FloatingComposer } from "~/features/conversation/floating-composer";
 import { mentionableIn } from "~/features/conversation/mentionable";
 import { usePacedMessages } from "~/features/conversation/paced-messages";
@@ -34,6 +35,7 @@ import { useActiveConversation } from "~/features/notifications/push";
 import { useMessageLayout } from "~/features/preferences/store";
 import { useAccountPending } from "~/features/saved/offline-pill";
 import { useSavedConversation } from "~/features/saved/show-saved";
+import { useShortcutFocus } from "~/features/shortcuts/shortcuts";
 
 /**
  * What the header shows: the title, photo, and badge arrive together, so
@@ -138,16 +140,25 @@ function useComposing(
 }
 
 /**
- * What shows while the conversation opens (`usePending`), and what's saved
- * of it if it's slow to (`useSavedConversation`).
+ * What shows while the conversation opens (`usePending`), what's saved of
+ * it if it's slow to (`useSavedConversation`), and the keyboard, once it
+ * has, when a shortcut opened it (`useShortcutFocus`).
  */
 function useOpening(
   conversationId: string,
   messages: ReturnType<typeof useMessages>,
   shown: boolean,
+  composer: RefObject<ComposerHandle | null>,
 ) {
+  const { address } = useAccount();
   useSavedConversation(conversationId, messages, !shown);
-  return useAccountPending(!shown);
+  const pending = useAccountPending(!shown);
+  useShortcutFocus(
+    draftKey(address, conversationId),
+    composer,
+    shown && pending === "ready",
+  );
+  return pending;
 }
 
 /** Enqueue locally, then perform the conversation's existing send actions. */
@@ -205,7 +216,7 @@ function Conversation({
   const shown =
     listReady([messages, notices, typing], layout, profilesLoaded) &&
     composerHeight.laidOut !== undefined;
-  const pending = useOpening(conversationId, messages, shown);
+  const pending = useOpening(conversationId, messages, shown, composer);
   const submit = useConversationSubmission(messages, replies, list, afterSend);
   if (!isLoading && conversation === undefined) {
     return (

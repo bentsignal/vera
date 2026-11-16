@@ -25,6 +25,12 @@ const config = {
       filePath: "plugins/notification-service",
       reasons: ["notificationServiceExtension"],
     },
+    // The App Shortcuts' Swift, copied into the app target the same way.
+    {
+      type: "dir",
+      filePath: "plugins/app-intents",
+      reasons: ["appIntents"],
+    },
     // pnpm's patches to dependencies are in the repo's root, not this
     // project's `patches`, which is all the default sources read. A patch
     // to native code (react-native's, for dictation) needs a new build.
