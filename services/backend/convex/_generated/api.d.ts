@@ -61,7 +61,6 @@ import type * as supportReporters from "../supportReporters.js";
 import type * as supportReports from "../supportReports.js";
 import type * as supportRules from "../supportRules.js";
 import type * as timeZones from "../timeZones.js";
-import type * as tmpThreadTest from "../tmpThreadTest.js";
 import type * as usage from "../usage.js";
 import type * as vera from "../vera.js";
 import type * as veraInbox from "../veraInbox.js";
@@ -127,7 +126,6 @@ declare const fullApi: ApiFromModules<{
   supportReports: typeof supportReports;
   supportRules: typeof supportRules;
   timeZones: typeof timeZones;
-  tmpThreadTest: typeof tmpThreadTest;
   usage: typeof usage;
   vera: typeof vera;
   veraInbox: typeof veraInbox;
