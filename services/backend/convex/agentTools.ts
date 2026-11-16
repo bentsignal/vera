@@ -16,10 +16,18 @@ import { localTime } from "./timeZones";
 /** The most messages one reply sends. */
 export const MAX_MESSAGES_PER_TURN = 3;
 
-export interface Turn {
+/**
+ * Where a reply goes: a conversation, or with `threadId`, a thread in it,
+ * which is a conversation of its own (assistant-threads.ts).
+ */
+export interface Chat {
+  readonly conversationId: string;
+  readonly threadId?: string;
+}
+
+export interface Turn extends Chat {
   readonly accountId: string;
   readonly bot: BotAccount;
-  readonly conversationId: string;
   readonly ctx: ActionCtx;
   /** What the team asked this reply to cover, if anything (agent.ts `teamNote`). */
   readonly note: string | null;
@@ -69,7 +77,11 @@ export function currentTools(tools: ToolSet) {
 
 /** The rules every assistant follows, before its own instructions. */
 export function sharedInstructions(turn: Turn) {
-  return `You are ${turn.bot.name} (${botAddress(turn.bot)}), an official account in Vera, a messaging app. You're in a direct message with ${turn.name}. You can only see and write in this one conversation.
+  const where =
+    turn.threadId === undefined
+      ? `You're in a direct message with ${turn.name}. You can only see and write in this one conversation.`
+      : `You're in a thread in your direct message with ${turn.name}: a side conversation of its own, on the message it starts from. You can only see and write in this thread. Your main chat with them and their other threads are separate conversations you can't see here; search_memory searches the main chat, if they bring something up from there.`;
+  return `You are ${turn.bot.name} (${botAddress(turn.bot)}), an official account in Vera, a messaging app. ${where}
 
 ${writingRules({ quiet: true })}`;
 }
@@ -136,7 +148,7 @@ export function conversationTools(turn: Turn) {
     }),
     read_earlier_messages: tool({
       description:
-        "Read older messages in this conversation than the ones you can see, 50 at a time.",
+        "Read older messages in this conversation (or thread) than the ones you can see, 50 at a time.",
       inputSchema: z.object({
         before: z
           .number()
@@ -152,6 +164,7 @@ export function conversationTools(turn: Turn) {
           before: cursor,
           bot: turn.bot.username,
           conversationId: turn.conversationId,
+          threadId: turn.threadId,
         });
         const self = botAddress(turn.bot);
         const messages = page.messages.filter(
@@ -178,16 +191,17 @@ export function conversationTools(turn: Turn) {
 /** How often typing is refreshed (the app drops it after 6 seconds). */
 const TYPING_REFRESH = 4000;
 
-/** Shows the assistant typing while it works. */
+/** Shows the assistant typing in a conversation or thread while it works. */
 export function keepTyping(
   ctx: ActionCtx,
   bot: BotAccount,
-  conversationId: string,
+  { conversationId, threadId }: Chat,
 ) {
   return typingWith((typing) =>
     ctx.runMutation(internal.bots.setTyping, {
       bot: bot.username,
       conversationId,
+      threadId,
       typing,
     }),
   );
@@ -246,7 +260,7 @@ export function typingWith(setTyping: (typing: boolean) => Promise<unknown>) {
 export function messageSender(
   ctx: ActionCtx,
   bot: BotAccount,
-  conversationId: string,
+  { conversationId, threadId }: Chat,
   typing: ReturnType<typeof keepTyping>,
 ) {
   return pacedSender(typing, (body) =>
@@ -254,6 +268,7 @@ export function messageSender(
       body,
       bot: bot.username,
       conversationId,
+      threadId,
     }),
   );
 }
