@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 import type { Prompt } from "./agentReply";
 import type { Turn } from "./agentTools";
 import type { SummonContextValue } from "./summons";
-import { MAX_MESSAGES_PER_TURN, writingRules } from "./agentTools";
+import { replyTool, writingRules } from "./agentTools";
 import { botAddress } from "./bots";
 import {
   summonedSupportInstructions,
@@ -90,17 +90,7 @@ ${await summonedSupportInstructions(turn)}`,
 function tools(turn: Turn, setup: SummonSetup) {
   const { web_search } = webTools(turn);
   return {
-    send_message: tool({
-      description: `Send one message to ${turn.name}, as plain text, in the thread. Call it several times to send several short messages.`,
-      inputSchema: z.object({
-        text: z.string().describe("The message, plain text, no markdown."),
-      }),
-      execute: async ({ text }) => {
-        if (turn.written() >= MAX_MESSAGES_PER_TURN) return "Not sent.";
-        await turn.send(text);
-        return "Sent.";
-      },
-    }),
+    reply: replyTool(turn, `${turn.name}, in the thread`),
     ...(setup.heard && {
       stay_quiet: tool({
         description:

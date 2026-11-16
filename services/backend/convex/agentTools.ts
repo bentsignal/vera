@@ -16,6 +16,13 @@ import { localTime } from "./timeZones";
 /** The most messages one reply sends. */
 export const MAX_MESSAGES_PER_TURN = 3;
 
+/**
+ * The longest message the model may send: a few sentences, like a text.
+ * Asked for a long guide, Kimi otherwise wrote 2,000 to 4,000 characters
+ * (2026-11-16); a longer one fails the tool call and it tries again.
+ */
+export const MAX_MESSAGE_LENGTH = 600;
+
 export interface Turn {
   readonly accountId: string;
   readonly bot: BotAccount;
@@ -56,6 +63,81 @@ export interface Turn {
   readonly written: () => number;
   /** Counts a paid lookup for the reply's usage record (usage.ts). */
   readonly counted: (what: "memory" | "search") => void;
+  /** Stops the reply when the person writes again first (`interruption`). */
+  readonly interruption: Interruption;
+}
+
+/** Why a reply stopped: the person wrote again before it sent anything. */
+export class Interrupted extends Error {
+  constructor() {
+    super("They wrote again before the reply was sent");
+    this.name = "Interrupted";
+  }
+}
+
+export type Interruption = ReturnType<typeof interruption>;
+
+/**
+ * A reply's way to stop when the person writes again before it has sent
+ * anything, so the next reply answers everything together instead of two
+ * replies answering half each. `check` says whether they have; `stop`
+ * aborts the reply's model calls (agentRequest.ts passes `signal`).
+ */
+export function interruption(check: () => Promise<boolean>) {
+  const controller = new AbortController();
+  return {
+    check,
+    signal: controller.signal,
+    stop: () => controller.abort(new Interrupted()),
+  };
+}
+
+/** For replies nothing interrupts (a summons answers one message). */
+export function uninterrupted() {
+  return interruption(() => Promise.resolve(false));
+}
+
+/**
+ * The tool every assistant speaks through: all of a reply's messages in one
+ * call. Models that also write text outside a tool sometimes treat that
+ * text as said and send only what follows it; with one call holding the
+ * whole reply, there's no "rest of it" to send (2026-11-16 comparison).
+ */
+export function replyTool(turn: Turn, to: string) {
+  return tool({
+    description: `Send your reply to ${to}: one to ${MAX_MESSAGES_PER_TURN} short messages, in order, as plain text. Call it once, with every message in it.`,
+    inputSchema: z.object({
+      messages: z
+        .array(
+          z
+            .string()
+            .max(MAX_MESSAGE_LENGTH)
+            .describe(
+              `One message: plain text, no markdown, a few sentences at most (${MAX_MESSAGE_LENGTH} characters).`,
+            ),
+        )
+        .min(1)
+        .max(MAX_MESSAGES_PER_TURN),
+    }),
+    execute: async ({ messages }) => {
+      if (turn.written() >= MAX_MESSAGES_PER_TURN) return "Not sent.";
+      // Tools can't throw out of a reply (the AI SDK hands the error to
+      // the model), so this aborts it instead.
+      if (turn.sent() === 0 && (await turn.interruption.check())) {
+        turn.interruption.stop();
+        return "Not sent.";
+      }
+      for (const text of messages.slice(
+        0,
+        MAX_MESSAGES_PER_TURN - turn.written(),
+      )) {
+        await turn.send(text);
+      }
+      // Nothing else: models read instructions in a tool result as someone
+      // trying to steer them, and answer them to the person.
+      return "Sent.";
+    },
+  });
 }
 
 /**
@@ -81,7 +163,7 @@ ${writingRules({ quiet: true })}`;
  */
 export function writingRules({ quiet }: { quiet: boolean }) {
   return `How you write:
-- People see only what you send with the send_message tool. Anything else you write is discarded.
+- People see only what you send with the reply tool: call it once, with all your messages. Anything else you write is discarded.
 - Write like a person texting: plain text only. No markdown, headings, bold, bullet symbols, numbered lists, tables, or code fences. Links are fine written out as plain URLs.
 - Text like a person would: usually one short message, two when it really helps (a quick answer, then one detail). A sentence or two each, no paragraphs. If there's more to say, give the gist and let them ask.
 - Don't repeat yourself, and don't end with offers like "let me know if you need anything else".${
@@ -112,22 +194,7 @@ export function currentTime(turn: Turn) {
 /** Reading and writing this conversation, which every assistant has. */
 export function conversationTools(turn: Turn) {
   return {
-    send_message: tool({
-      description:
-        "Send one message to the person, as plain text. Call it several times to send several short messages.",
-      inputSchema: z.object({
-        text: z.string().describe("The message, plain text, no markdown."),
-      }),
-      execute: async ({ text }) => {
-        if (turn.written() >= MAX_MESSAGES_PER_TURN) {
-          return "Not sent.";
-        }
-        await turn.send(text);
-        // Nothing else: Grok reads instructions in a tool result as someone
-        // trying to steer it, and answers them to the person.
-        return "Sent.";
-      },
-    }),
+    reply: replyTool(turn, "the person"),
     stay_quiet: tool({
       description:
         "Send nothing this time, when the conversation seems to have ended or they clearly have more to say. Never when they're asking for something or expecting an answer.",

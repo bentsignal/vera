@@ -9,7 +9,12 @@ import { internal } from "./_generated/api";
 import { toAnswer } from "./agentHistory";
 import { generateReply } from "./agentModels";
 import { cachedPartHash, replyRequest } from "./agentRequest";
-import { keepTyping, messageSender } from "./agentTools";
+import {
+  Interrupted,
+  interruption,
+  keepTyping,
+  messageSender,
+} from "./agentTools";
 import { botAddress } from "./bots";
 import { recallOlder } from "./memory";
 import { usageOf } from "./usage";
@@ -17,8 +22,7 @@ import { veraAssistant } from "./vera";
 
 // One reply of an assistant's (agent.ts `run`): it reads the conversation,
 // hands it to the model with the assistant's instructions and tools
-// (`Prompt`, agentRequest.ts), and the model answers by calling
-// `send_message`.
+// (`Prompt`, agentRequest.ts), and the model answers by calling `reply`.
 
 export interface Assistant {
   /** Sets up one reply: what the model is told, and its tools. */
@@ -91,6 +95,26 @@ async function recentMessages(
     messages = [...page.messages, ...messages];
   }
   return { hasOlder: page.hasOlder, messages };
+}
+
+/** Whether the person wrote in the conversation after `since`. */
+async function wroteAgain(
+  ctx: ActionCtx,
+  bot: BotAccount,
+  conversationId: string,
+  since: number,
+) {
+  const self = botAddress(bot);
+  const page = await ctx.runQuery(internal.bots.page, {
+    bot: bot.username,
+    conversationId,
+  });
+  return page.messages.some(
+    (message) =>
+      message.authorId !== self &&
+      message.deletedAt === undefined &&
+      message.sentAt > since,
+  );
 }
 
 /** What `claim` hands a reply (agent.ts). */
@@ -175,6 +199,9 @@ export async function reply(
       bot,
       conversationId,
       ctx,
+      interruption: interruption(() =>
+        wroteAgain(ctx, bot, conversationId, answering.newest.sentAt),
+      ),
       note: claimed.note,
       lastHeardAt: answering.newest.sentAt,
       name: answering.newest.authorName,
@@ -198,7 +225,16 @@ export async function reply(
       answering.history,
       prompt,
     );
-    const results = await generateReply(options, models, sender, bot);
+    let results;
+    try {
+      results = await generateReply(options, models, sender, bot);
+    } catch (error) {
+      if (!(error instanceof Interrupted)) throw error;
+      // Their newer message's reply answers this one too: it hasn't been
+      // answered, so the next reply sees it as new (agent.ts `finish`).
+      console.log(`${bot.username}'s reply in ${conversationId} gave way`);
+      return;
+    }
     await ctx.runMutation(internal.usage.record, {
       ...usageOf(results, tally),
       accountId: claimed.accountId,

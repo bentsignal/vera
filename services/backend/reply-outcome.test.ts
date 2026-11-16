@@ -8,7 +8,7 @@ function step(...tools: string[]) {
 }
 
 void test("a reply that sent something answered", () => {
-  assert.equal(replyOutcome([step("send_message")], 1), "answered");
+  assert.equal(replyOutcome([step("reply")], 1), "answered");
   // The bug-report privacy notice alone is a message too.
   assert.equal(replyOutcome([step("share_privacy_notice")], 1), "answered");
 });
@@ -22,7 +22,7 @@ void test("a reply that called stay_quiet chose silence", () => {
 });
 
 void test("plain text, or tools that never reached them, is an error", () => {
-  // Grok writing "stay_quiet" as text instead of calling it.
+  // A model writing "stay_quiet" as text instead of calling it.
   assert.equal(replyOutcome([step()], 0), "noToolCall");
   // A search, then an answer written as text.
   assert.equal(replyOutcome([step("web_search"), step()], 0), "noToolCall");

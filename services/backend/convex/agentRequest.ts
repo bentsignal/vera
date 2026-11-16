@@ -2,10 +2,11 @@ import type { Message } from "@decentralized-convex/messages";
 import type { ModelMessage, StepResult, ToolSet } from "ai";
 import { isStepCount } from "ai";
 
+import type { AssistantModel } from "../assistant-models";
 import type { ActionCtx } from "./_generated/server";
 import type { Prompt } from "./agentReply";
 import type { Turn } from "./agentTools";
-import { modelOrder } from "../assistant-models";
+import { configuredModels, modelOrder } from "../assistant-models";
 import {
   teamNote,
   toModelMessages,
@@ -14,6 +15,7 @@ import {
 } from "./agentHistory";
 import { currentTime, currentTools } from "./agentTools";
 import { imageUrls } from "./assistantImages";
+import { optionalEnvironment } from "./lib";
 
 // The request for a reply (agent.ts): the assistant's `Prompt` and the
 // conversation, laid out for the provider's prompt cache, for each model
@@ -38,7 +40,14 @@ export async function replyRequest(
   turn: Turn,
   history: readonly Message[],
   { instructions, latest, tools }: Prompt,
-  { speakers = false }: { speakers?: boolean } = {},
+  {
+    candidates = configuredModels(optionalEnvironment("ASSISTANT_MODELS")),
+    speakers = false,
+  }: {
+    /** The models that may answer, in order (assistant-models.ts). */
+    candidates?: readonly AssistantModel[];
+    speakers?: boolean;
+  } = {},
 ) {
   const closing: ModelMessage[] = [
     ...(latest === undefined
@@ -54,16 +63,20 @@ export async function replyRequest(
   ];
   const self = turn.self;
   const shown = await imageUrls(ctx, visibleImages(history, self));
-  const models = modelOrder(visibleImageTypes(history, self, shown)).map(
-    (model) => ({
-      messages: [
-        ...toModelMessages(history, self, model, shown, { speakers }),
-        ...closing,
-      ],
-      model,
-    }),
-  );
+  const models = modelOrder(
+    visibleImageTypes(history, self, shown),
+    candidates,
+  ).map((model) => ({
+    messages: [
+      ...toModelMessages(history, self, model, shown, { speakers }),
+      ...closing,
+    ],
+    model,
+  }));
   const options = {
+    // Stops the reply when the person writes again before it has sent
+    // anything (agentTools.ts `interruption`).
+    abortSignal: turn.interruption.signal,
     allowSystemInMessages: true,
     instructions,
     providerOptions: {
@@ -72,9 +85,17 @@ export async function replyRequest(
         session_id: await cacheSession(turn.conversationId),
       },
     },
+    // Before each step after the first (a search, say), a reply that
+    // hasn't sent anything checks whether they wrote again meanwhile.
+    prepareStep: async ({ stepNumber }: { stepNumber: number }) => {
+      if (stepNumber > 0 && turn.sent() === 0) {
+        if (await turn.interruption.check()) turn.interruption.stop();
+      }
+      return undefined;
+    },
     stopWhen: [isStepCount(MAX_STEPS), saidItsPiece],
-    // Every step calls a tool: it speaks only through send_message (or
-    // stays quiet), and models otherwise often answer in plain text.
+    // Every step calls a tool: it speaks only through reply (or stays
+    // quiet), and models otherwise often answer in plain text.
     toolChoice: "required" as const,
     timeout: { stepMs: STEP_TIMEOUT },
     toolCallConcurrency: 1,
@@ -84,21 +105,17 @@ export async function replyRequest(
 }
 
 /**
- * Ends the reply after a step that only sent messages (or shared support's
- * privacy notice): the model has said its piece and waits for them. It goes
- * on only after other tools, such as a search, whose results it needs.
- * Without this, models keep talking after their answer, even to themselves.
+ * Ends the reply after a step that answered (`reply`), stayed quiet, or
+ * shared support's privacy notice: the model has said its piece and waits
+ * for them. It goes on only after other tools, such as a search, whose
+ * results it needs, and after a call that failed (a message over
+ * `MAX_MESSAGE_LENGTH`), so it can try again. Without this, models keep
+ * talking after their answer, even to themselves.
  */
 function saidItsPiece({ steps }: { steps: StepResult<ToolSet>[] }) {
-  const calls = steps.at(-1)?.toolCalls ?? [];
-  return (
-    calls.some(
-      (call) =>
-        call.toolName === "share_privacy_notice" ||
-        call.toolName === "stay_quiet",
-    ) ||
-    (calls.length > 0 &&
-      calls.every((call) => call.toolName === "send_message"))
+  const results = steps.at(-1)?.toolResults ?? [];
+  return results.some((result) =>
+    ["reply", "share_privacy_notice", "stay_quiet"].includes(result.toolName),
   );
 }
 

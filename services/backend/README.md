@@ -220,29 +220,50 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   (`agent:watch` asks the scheduler about its job): the next message's
   reply takes over, or with nothing new the person hears that something
   went wrong. Before, the conversation stayed locked for 10 minutes.
-  The model answers only through `send_message`, which can write to that
-  one conversation and nowhere else; no tool takes an account or
-  conversation, so nothing can reach another person's messages. Text it
-  writes outside a tool is never sent: a reply that ends with neither a
-  message nor `stay_quiet` is an error, and the model gets one more try,
-  told why (`reply-outcome.ts`). At most 3 messages per reply, not
-  counting canned ones like the bug-report privacy notice. Messages that
-  arrive during a reply get the next one.
+  The model answers only through `reply`, one call with all of the
+  reply's messages, which can write to that one conversation and nowhere
+  else; no tool takes an account or conversation, so nothing can reach
+  another person's messages. Text it writes outside a tool is never sent:
+  a reply that ends with neither a message nor `stay_quiet` is an error,
+  and the model gets one more try, told why (`reply-outcome.ts`). At most
+  3 messages per reply, each at most 600 characters (a longer one fails
+  the call and the model tries again), not counting canned ones like the
+  bug-report privacy notice. One call for the whole reply is what stopped
+  replies from losing their first message: with a tool call per message,
+  models wrote the first as text outside a tool, took it as said, and
+  sent only the rest (Grok 4.7 did in about 1 reply in 20, 2026-11-16).
+- A person who writes again before the reply has sent anything
+  interrupts it: before each model step after the first and before
+  sending, the reply checks for a newer message from them, and if there
+  is one it stops (`agentTools.ts` `interruption`), unanswered, so the
+  next reply answers everything together instead of two replies
+  answering half each. Once it has started sending it finishes, and
+  messages that arrive meanwhile get the next reply.
 - Models run through the Convex AI Gateway (`@convex-dev/ai-sdk-provider`
   and the AI SDK), billed on the Convex bill, with zero-data-retention
-  routing (`assistant-models.ts`). Grok 4.7 answers, and Gemini 4 Argon
-  takes over when it fails: each model gets two tries, or one when the
-  error says retrying won't help (a rejected request), before the next.
+  routing (`assistant-models.ts`). Kimi K3.1 Pro answers, and Claude
+  Haiku 5.5 takes over when it fails: each model gets two tries, or one
+  when the error says retrying won't help (a rejected request), before
+  the next. They were picked from 7 models compared on real
+  conversations: neither lost a message, both use tools reliably, and
+  Kimi writes closest to Grok's plain, short answers; Haiku is the
+  fastest and cheapest. `ASSISTANT_MODELS` (gateway model IDs,
+  comma-separated, in order) overrides them on a deployment, such as
+  `anthropic/claude-haiku-5.5` alone on a test backend. Gemini models
+  are out: their tool calls were unreliable. Claude Sonnet can't run
+  here: its zero-retention endpoint requires reasoning, which Anthropic
+  doesn't allow with a required tool call.
   The model sees the newest few images in the conversation, in the formats
   it reads. The gateway fetches each by its URL; nothing is sent inside
   the request, which ran replies out of Convex's 64 MB (a 2.4 MB iPhone
   photo did, 2026-10-26). HEIC photos (how iPhones save them) are
   converted once to a JPEG of at most 1568 pixels a side, in a Node
   action (`assistantImagesNode.ts`, about a second), kept in Convex file
-  storage, and reused (`assistant-images.ts`). Grok can't read GIF, so
-  Gemini answers first while one is among them; a format neither reads
-  shows as a note. One image a model can't read fails the whole request,
-  which is what took both assistants down on 2026-10-23.
+  storage, and reused (`assistant-images.ts`). Both models read JPEG,
+  PNG, WebP, and GIF; a model that can't read one of the images shown
+  goes after one that can, and a format none reads shows as a note. One
+  image a model can't read fails the whole request, which is what took
+  both assistants down on 2026-10-23.
 - The app sends the device's time zone after a message to Vera
   (`timeZones:report`), so it knows the person's date and time.
 - Each person gets at most 300 replies an hour from Vera, on a rolling
@@ -267,8 +288,8 @@ dev and production deployments without any key.
 
 Every model call sends the whole prompt again: tools, instructions, and
 the conversation. The provider's prompt cache bills what it has seen
-before at a quarter of the price (Grok 4.7: $0.50 per million input tokens
-against $2), but only while the prompt stays the same at the start and
+before for much less (a quarter of the price on Grok 4.7, which Vera
+used before), but only while the prompt stays the same at the start and
 the conversation only grows at the end. Measured through the gateway
 (2026-10-26): appending messages reused everything before them; changing
 the end of the instructions reused what came before the change; changing
