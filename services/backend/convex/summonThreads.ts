@@ -8,18 +8,14 @@ import type { BotAccount } from "./bots";
 import type { SummonContextValue } from "./summons";
 import { GATE_MODEL, gateChoice, gateRequest } from "../thread-gate";
 import { components, internal } from "./_generated/api";
-import {
-  internalAction,
-  internalMutation,
-  internalQuery,
-} from "./_generated/server";
+import { internalAction, internalMutation } from "./_generated/server";
 import { botAccount, botAddress, isBotAddress } from "./bots";
 import { requireEnvironment } from "./lib";
 import { mentionsAssistant, startSummon } from "./summons";
 
-// An assistant's own thread: the thread on a message that called it by
-// @mentioning it (summons.ts). Every reply there reaches it, not only
-// mentions. A reply waits a moment for more, and while anyone's typing
+// The threads an assistant follows: one that starts with a message that
+// @mentions it, and one where someone mentions it in a reply (summons.ts).
+// Every reply there reaches it from then on, not only mentions. A reply waits a moment for more, and while anyone's typing
 // there, so a quick back-and-forth gets one look once it pauses. Then the
 // gate (thread-gate.ts), a cheap decision model, reads the thread and
 // picks the new reply meant for the assistant, if any. Only that one is
@@ -66,16 +62,17 @@ function threadRow(ctx: QueryCtx, threadId: string) {
     .unique();
 }
 
-/** Whether a thread is an assistant's: its original mentioned one. */
-export const isOwnThread = internalQuery({
-  args: { threadId: v.string() },
-  handler: async (ctx, { threadId }) =>
-    (await summonOf(ctx, threadId)) !== null,
-});
+/** The assistant following a thread, if one is. */
+async function followerOf(ctx: QueryCtx, threadId: string) {
+  const row = await threadRow(ctx, threadId);
+  if (row !== null) return row.bot;
+  // Its original mentioned one, and no reply has been read yet.
+  return (await summonOf(ctx, threadId))?.bot ?? null;
+}
 
 /**
  * A reply in a thread that didn't mention an assistant (assistantHook.ts):
- * in an assistant's thread, the gate reads it after a pause.
+ * in a thread one follows, the gate reads it after a pause.
  */
 export async function heardInThread(
   ctx: MutationCtx,
@@ -92,15 +89,15 @@ export async function heardInThread(
   },
 ) {
   if (isBotAddress(accountId)) return;
-  const original = await summonOf(ctx, threadId);
-  if (original === null) return;
+  const bot = await followerOf(ctx, threadId);
+  if (bot === null) return;
   const wakeAt = Date.now() + LISTEN_DELAY;
   const update = { accountId, messageId, waitingSince: undefined, wakeAt };
   const existing = await threadRow(ctx, threadId);
   if (existing === null) {
     await ctx.db.insert("botThreads", {
       ...update,
-      bot: original.bot,
+      bot,
       conversationId,
       gateChecks: 0,
       gateCost: 0,
@@ -116,13 +113,45 @@ export async function heardInThread(
 }
 
 /**
- * A mention in a thread is answered as one (summons.ts), reading the
- * replies before it, so a look waiting for those doesn't run.
+ * A mention in a thread: the assistant follows the thread from then on.
+ * The mention is answered as one (summons.ts), reading the replies before
+ * it, so a look waiting for those doesn't run.
  */
-export async function mentionedInThread(ctx: MutationCtx, threadId: string) {
+export async function mentionedInThread(
+  ctx: MutationCtx,
+  {
+    accountId,
+    bot,
+    conversationId,
+    messageId,
+    threadId,
+  }: {
+    accountId: string;
+    bot: BotAccount;
+    conversationId: string;
+    messageId: string;
+    threadId: string;
+  },
+) {
+  if (isBotAddress(accountId)) return;
+  const update = {
+    accountId,
+    messageId,
+    waitingSince: undefined,
+    wakeAt: undefined,
+  };
   const row = await threadRow(ctx, threadId);
-  if (row?.wakeAt !== undefined) {
-    await ctx.db.patch(row._id, { waitingSince: undefined, wakeAt: undefined });
+  if (row === null) {
+    await ctx.db.insert("botThreads", {
+      ...update,
+      bot: bot.username,
+      conversationId,
+      gateChecks: 0,
+      gateCost: 0,
+      threadId,
+    });
+  } else {
+    await ctx.db.patch(row._id, update);
   }
 }
 

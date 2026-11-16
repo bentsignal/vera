@@ -74,8 +74,8 @@ export default defineSchema({
     startedAt: v.optional(v.number()),
   }).index("by_message", ["messageId"]),
   /**
-   * An assistant's thread (summonThreads.ts) while replies there wait to
-   * be read: the newest one, and how far the gate has read.
+   * A thread an assistant follows (summonThreads.ts): it was mentioned
+   * there. The newest reply, and how far the gate has read.
    */
   botThreads: defineTable({
     /** Who wrote the newest reply, whose view of the thread it reads. */
@@ -89,7 +89,7 @@ export default defineSchema({
     gateCost: v.number(),
     /** The newest reply. */
     messageId: v.string(),
-    /** The thread's original, which mentioned the assistant. */
+    /** The thread's original. */
     threadId: v.string(),
     /** Since when the read waits for someone typing there. */
     waitingSince: v.optional(v.number()),

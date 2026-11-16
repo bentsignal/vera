@@ -55,11 +55,6 @@ export async function answer(
   );
   const { history, oldestSentAt } = shownHistory(found);
   const self = botAddress(summon.bot);
-  const threadId = found.message.threadId;
-  // A mention outside a thread starts one, which is its own.
-  const ownThread =
-    threadId === undefined ||
-    (await ctx.runQuery(internal.summonThreads.isOwnThread, { threadId }));
   const typing = typingWith((on) =>
     ctx.runMutation(internal.summons.setTyping, {
       ...summonArgs(summon),
@@ -104,7 +99,6 @@ export async function answer(
     const prompt = await summonedPrompt(turn, {
       context: found,
       heard: summon.heard,
-      ownThread,
       readEarlier: (before) =>
         ctx.runQuery(internal.summons.context, {
           ...summonArgs(summon),

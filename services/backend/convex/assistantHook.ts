@@ -60,9 +60,10 @@ function withAssistant(conversationId: string) {
 }
 
 /**
- * Answers a message that mentions an assistant (summons.ts). A reply in a
- * thread that mentions none goes to the thread's gate, in case the thread
- * is an assistant's (summonThreads.ts).
+ * Answers a message that mentions an assistant (summons.ts); in a thread,
+ * the assistant follows it from then on. A reply in a thread that mentions
+ * none goes to the thread's gate, in case an assistant follows the thread
+ * (summonThreads.ts).
  */
 async function summonMentioned(
   ctx: MutationCtx,
@@ -89,7 +90,15 @@ async function summonMentioned(
     }
     return;
   }
-  if (typeof threadId === "string") await mentionedInThread(ctx, threadId);
+  if (typeof threadId === "string") {
+    await mentionedInThread(ctx, {
+      accountId: author,
+      bot,
+      conversationId,
+      messageId,
+      threadId,
+    });
+  }
   await startSummon(ctx, { accountId: author, bot, conversationId, messageId });
 }
 

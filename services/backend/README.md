@@ -150,8 +150,9 @@ itself. It isn't a member: the messages plugin's assistant functions let
 it read what the caller can see before their message and answer it (see
 its README, "Assistants").
 
-- **A thread that starts with a mention is Vera's.** Every reply there
-  reaches it, mentioned or not (`convex/summonThreads.ts`). A reply waits
+- **Vera follows any thread it's mentioned in**, one that starts with a
+  mention and one where someone mentions it in a reply. Every reply there
+  reaches it from then on, mentioned or not (`convex/summonThreads.ts`). A reply waits
   2.5 seconds for more, and while anyone's typing in the thread (up to 30
   seconds), so a quick back-and-forth gets one look once it pauses. Then
   a gate (`thread-gate.ts`) asks Jev, a cheap decision model on the AI
@@ -161,9 +162,7 @@ its README, "Assistants").
   one is answered, by the main model, which may still stay quiet. Nothing
   shows Vera typing until the gate says yes. A decision costs about
   $0.00003 and takes about 150 ms; `botThreads` counts each thread's.
-- **Anywhere else, only a mention reaches it**, a mention in someone
-  else's thread included: Vera answers that one and goes back to staying
-  out of it. Each message is answered once (`botSummons`), even if the app
+- **In the chat itself, only a mention reaches it.** Each message is answered once (`botSummons`), even if the app
   retries the send.
 - It reads the 30 messages before theirs, from the thread they wrote in or
   from the conversation (with the original their reply quotes), with each
