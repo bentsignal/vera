@@ -52,7 +52,7 @@ export async function followKnownBug(turn: Turn, input: FollowInput) {
   // they told support does.
   const stage = await followIssue(turn.ctx, config, followed.state, {
     accountId: turn.accountId,
-    conversationId: turn.conversationId,
+    conversationId: turn.updatesIn,
     issueNumber: followed.issueNumber,
     summary: input.summary,
   });

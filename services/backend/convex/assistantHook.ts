@@ -6,12 +6,15 @@ import type { BotAccount } from "./bots";
 import { replyThread } from "../assistant-threads";
 import { internal } from "./_generated/api";
 import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
+import { mentionsAssistant, startSummon } from "./summons";
+import { heardInThread, mentionedInThread } from "./summonThreads";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
-// ones in a direct conversation with an assistant. A reply kept in a
-// thread is answered in that thread, which keeps its own reply state
-// (assistant-threads.ts).
+// ones in a direct conversation with an assistant (a reply kept in a
+// thread there is answered in that thread, which keeps its own reply
+// state, assistant-threads.ts), to messages anywhere else that @mention
+// one (summons.ts), and to replies in its threads (summonThreads.ts).
 
 /** How long a reply waits for more messages, so a burst gets one answer. */
 const REPLY_DELAY = 1500;
@@ -20,7 +23,8 @@ const REPLY_DELAY = 1500;
  * The router's `afterMutation` (pds.ts): when someone on this PDS sends a
  * direct message to an assistant, its reply runs after a short pause, in
  * the thread when the message was kept there. A newer message moves the
- * reply later, so it answers them together.
+ * reply later, so it answers them together. A message anywhere else that
+ * mentions one gets its answer (summons.ts).
  */
 export async function afterPdsMutation(
   ctx: MutationCtx,
@@ -28,9 +32,15 @@ export async function afterPdsMutation(
 ) {
   if (plugin !== "messages" || identity === null) return;
   const type = field(operation, "type");
-  const conversationId = field(field(operation, "args"), "conversationId");
+  const args = field(operation, "args");
+  const conversationId = field(args, "conversationId");
   if (typeof conversationId !== "string") return;
-  if (!conversationId.startsWith("direct:")) return;
+  if (!withAssistant(conversationId)) {
+    if (type === "send") {
+      await summonMentioned(ctx, identity.accountId, conversationId, args);
+    }
+    return;
+  }
   if (type === "editMessage" || type === "deleteMessage") {
     await forgetChangedMessage(ctx, conversationId, operation);
     return;
@@ -46,6 +56,61 @@ export async function afterPdsMutation(
   await startReply(ctx, conversationId, thread ?? undefined, identity.accountId);
 }
 
+/** A direct conversation's two members, or none for any other kind. */
+function directMembers(conversationId: string) {
+  return conversationId.startsWith("direct:")
+    ? conversationId.slice("direct:".length).split(":")
+    : [];
+}
+
+/** Whether it's someone's direct conversation with an assistant. */
+function withAssistant(conversationId: string) {
+  const members = directMembers(conversationId);
+  return ASSISTANTS.some((bot) => members.includes(botAddress(bot)));
+}
+
+/**
+ * Answers a message that mentions an assistant (summons.ts); in a thread,
+ * the assistant follows it from then on. A reply in a thread that mentions
+ * none goes to the thread's gate, in case an assistant follows the thread
+ * (summonThreads.ts).
+ */
+async function summonMentioned(
+  ctx: MutationCtx,
+  author: string | undefined,
+  conversationId: string,
+  args: unknown,
+) {
+  const body = field(args, "body");
+  const messageId = field(args, "messageId");
+  if (author === undefined) return;
+  if (typeof body !== "string" || typeof messageId !== "string") return;
+  const threadId = field(args, "threadId");
+  const bot = ASSISTANTS.find((candidate) =>
+    mentionsAssistant(candidate, body, field(args, "mentions")),
+  );
+  if (bot === undefined) {
+    if (typeof threadId === "string") {
+      await heardInThread(ctx, {
+        accountId: author,
+        conversationId,
+        messageId,
+        threadId,
+      });
+    }
+    return;
+  }
+  if (typeof threadId === "string") {
+    await mentionedInThread(ctx, bot, {
+      accountId: author,
+      conversationId,
+      messageId,
+      threadId,
+    });
+  }
+  await startSummon(ctx, { accountId: author, bot, conversationId, messageId });
+}
+
 /** Schedules an assistant's reply to someone's direct message to it. */
 async function startReply(
   ctx: MutationCtx,
@@ -53,7 +118,7 @@ async function startReply(
   threadId: string | undefined,
   author: string,
 ) {
-  const members = conversationId.slice("direct:".length).split(":");
+  const members = directMembers(conversationId);
   if (!members.includes(author)) return;
   const bot = ASSISTANTS.find(
     (candidate) =>

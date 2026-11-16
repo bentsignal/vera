@@ -60,6 +60,45 @@ export default defineSchema({
     /** When the reply to the latest message runs; older wake-ups skip. */
     wakeAt: v.number(),
   }).index("by_conversation", ["conversationId", "threadId"]),
+  /**
+   * Each message that called an assistant into a conversation by
+   * @mentioning it (summons.ts), so it's answered once, and each reply in
+   * its thread it answered without one (`heard`, summonThreads.ts). A
+   * thread whose original is here is the assistant's.
+   */
+  botSummons: defineTable({
+    /** Who called it: the message's author. */
+    accountId: v.string(),
+    bot: botName,
+    conversationId: v.string(),
+    finishedAt: v.optional(v.number()),
+    heard: v.optional(v.boolean()),
+    messageId: v.string(),
+    startedAt: v.optional(v.number()),
+  }).index("by_message", ["messageId"]),
+  /**
+   * A thread an assistant follows (summonThreads.ts): it was mentioned
+   * there. The newest reply, and how far the gate has read.
+   */
+  botThreads: defineTable({
+    /** Who wrote the newest reply, whose view of the thread it reads. */
+    accountId: v.string(),
+    bot: botName,
+    /** The newest reply the gate already judged, by when it was sent. */
+    checkedThrough: v.optional(v.number()),
+    conversationId: v.string(),
+    /** Gate decisions here, and what they cost in dollars. */
+    gateChecks: v.number(),
+    gateCost: v.number(),
+    /** The newest reply. */
+    messageId: v.string(),
+    /** The thread's original. */
+    threadId: v.string(),
+    /** Since when the read waits for someone typing there. */
+    waitingSince: v.optional(v.number()),
+    /** When the read runs; older wake-ups skip. None while none waits. */
+    wakeAt: v.optional(v.number()),
+  }).index("by_thread", ["threadId"]),
   /** What an assistant remembers about one person, at their request. */
   botNotes: defineTable({
     accountId: v.string(),

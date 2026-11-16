@@ -24,6 +24,18 @@ export interface DiscoveredPds {
   manifestUrl: string;
 }
 
+/**
+ * The domain has no PDS: its `_pds` record or domain doesn't exist, or its
+ * manifest is gone (404 or 410). An answer, not a failure to get one, so
+ * trying again right away won't find one either.
+ */
+export class PdsNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PdsNotFoundError";
+  }
+}
+
 export interface DiscoverPdsOptions {
   fetch?: typeof fetch;
   resolveTxt?: (name: string) => Promise<readonly string[]>;
@@ -43,7 +55,10 @@ export async function discoverPds(
     headers: { accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(`PDS manifest request failed (${response.status})`);
+    const message = `PDS manifest request failed (${response.status})`;
+    throw response.status === 404 || response.status === 410
+      ? new PdsNotFoundError(message)
+      : new Error(message);
   }
   const manifest = parsePdsManifest(await response.json());
   if (manifest.accountDomain !== domain) {
@@ -105,7 +120,7 @@ function selectManifestUrl(records: readonly string[]) {
     .map(parsePdsTxtRecord)
     .filter((url): url is string => url !== null);
   if (matches.length === 0) {
-    throw new Error(
+    throw new PdsNotFoundError(
       `No ${PDS_DISCOVERY_RECORD_FORMAT} record found at the _pds DNS name`,
     );
   }
@@ -128,6 +143,10 @@ async function resolveTxtWithDoh(name: string, fetcher: typeof fetch) {
     throw new Error(`DNS lookup failed (${response.status})`);
   }
   const payload: unknown = await response.json();
+  // NXDOMAIN: the name doesn't exist.
+  if (isRecord(payload) && payload.Status === 3) {
+    throw new PdsNotFoundError("The PDS DNS record does not exist");
+  }
   if (!isRecord(payload) || payload.Status !== 0) {
     throw new Error("The PDS DNS record could not be resolved");
   }

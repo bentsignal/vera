@@ -186,6 +186,7 @@ export async function reply(
         tally,
       }),
       self,
+      updatesIn: conversationId,
       timeZone: await ctx.runQuery(internal.timeZones.of, {
         accountId: claimed.accountId,
       }),
