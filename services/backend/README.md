@@ -94,7 +94,8 @@ answered, `file_bug_report` is offered, and it files an anonymized GitHub
 issue labeled "user report" with the app version and device the app
 reported. A reply that says a report went to the team when it filed and
 followed nothing is sent back to be rewritten once (Haiku and Kimi both
-claimed to have filed reports they hadn't). Screenshots never
+claimed to have filed reports they hadn't; so is one promising word on a
+fix to someone who follows no report). Screenshots never
 go in an issue: Vera describes what they show in words, without personal
 details. A cron (`crons.ts`, every 10 minutes) follows each issue and tells
 the reporter, in plain words, when it's picked up (assigned), being worked
@@ -249,18 +250,19 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   messages that arrive meanwhile get the next reply.
 - Models run through the Convex AI Gateway (`@convex-dev/ai-sdk-provider`
   and the AI SDK), billed on the Convex bill, with zero-data-retention
-  routing (`assistant-models.ts`). Claude Haiku 5.5 answers, and Kimi
-  K3.1 Pro takes over when it fails: each model gets two tries, or one
-  when the error says retrying won't help (a rejected request), before
-  the next. They were picked from 7 models compared on real
-  conversations: neither lost a message and both use tools reliably;
-  Haiku is the fastest and cheapest (about 2 to 4 seconds and a fifth of
-  a cent a reply), and Kimi writes closest to Grok's plain, short
-  answers. `ASSISTANT_MODELS` (gateway model IDs, comma-separated, in
-  order) overrides them on a deployment. Gemini models
-  are out: their tool calls were unreliable. Claude Sonnet can't run
-  here: its zero-retention endpoint requires reasoning, which Anthropic
-  doesn't allow with a required tool call.
+  routing (`assistant-models.ts`). Gemini 4 Hydrogen answers, and GPT-6.2
+  Sol, from another provider, takes over when it fails: each model gets
+  two tries, or one when the error says retrying won't help (a rejected
+  request), before the next. They were picked from 12 models replayed
+  through the real reply code on chats and bug reports (2026-11-17):
+  both answer in about 5 to 7 seconds from the person's message, never
+  lost a reply, and never claimed to have filed or followed a report they
+  hadn't. Claude Haiku 5.5 was as fast but did (4 in 30 bug reports), and
+  Hydrogen writes the shortest, most natural replies. `ASSISTANT_MODELS`
+  (gateway model IDs, comma-separated, in order) overrides them on a
+  deployment. Claude Sonnet and Opus 5.5 can't run here: they refuse a
+  required tool call, with or without zero retention. Qwen4 Max has no
+  zero-retention endpoint.
   The model sees the newest few images in the conversation, in the formats
   it reads. The gateway fetches each by its URL; nothing is sent inside
   the request, which ran replies out of Convex's 64 MB (a 2.4 MB iPhone

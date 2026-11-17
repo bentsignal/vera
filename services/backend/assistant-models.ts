@@ -1,11 +1,15 @@
 // The models assistant replies run on (convex/agent.ts), through the Convex
-// AI Gateway (billed on the Convex bill). Claude Haiku answers first; Kimi
-// takes over when Haiku fails. Chosen from a comparison on real
-// conversations (2026-11-16): neither dropped a message in 280 replies,
-// where Grok 4.7 lost one in about 20, and Haiku answered in about half
-// Kimi's time for a fifth of the cost; Shawn preferred it on his phone
-// (2026-11-17). A deployment can set `ASSISTANT_MODELS` (gateway model
-// IDs, comma-separated, in order) to try others.
+// AI Gateway (billed on the Convex bill). Gemini 4 Hydrogen answers first;
+// GPT-6.2 Sol, from another provider, takes over when it fails. Chosen
+// from 12 models compared on real conversations and bug reports
+// (2026-11-17, 60 replays each): Haiku 5.5 was as fast but drafted false
+// "I passed it to the team" claims (4 in 30 bug reports, all caught by
+// reply-claims.ts) where these drafted none; Hydrogen's replies were the
+// shortest and most natural, and Shawn preferred it on his phone. Sonnet
+// and Opus 5.5 refuse the required tool call; Muse Ember, the fastest,
+// wrote carelessly about serious topics. A deployment can set
+// `ASSISTANT_MODELS` (gateway model IDs, comma-separated, in order) to try
+// others.
 
 export interface AssistantModel {
   readonly id: string;
@@ -16,19 +20,19 @@ export interface AssistantModel {
 /** What every current model reads; HEIC reaches them as JPEG (assistant-images.ts). */
 const IMAGES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-export const KIMI: AssistantModel = {
-  id: "moonshotai/kimi-k3.1-pro",
+export const HYDROGEN: AssistantModel = {
+  id: "google/gemini-4-hydrogen",
   images: IMAGES,
 };
 
-export const HAIKU: AssistantModel = {
-  id: "anthropic/claude-haiku-5.5",
+export const SOL: AssistantModel = {
+  id: "openai/gpt-6.2-sol",
   images: IMAGES,
 };
 
-const KNOWN = [HAIKU, KIMI];
+const KNOWN = [HYDROGEN, SOL];
 
-/** The models in order: `ASSISTANT_MODELS`'s, if set, or Haiku then Kimi. */
+/** The models in order: `ASSISTANT_MODELS`'s, if set, or Hydrogen then Sol. */
 export function configuredModels(setting: string | null | undefined) {
   const ids = (setting ?? "")
     .split(",")
