@@ -6,6 +6,7 @@ import type {
   PdsConnection,
   PdsRequestResult,
 } from "./pds.ts";
+import type { ResolvedRoute } from "./routes.ts";
 import type {
   FederatedQuerySnapshot,
   FederationSourceSnapshot,
@@ -15,6 +16,7 @@ import type {
 import { PdsInitialResponseTimeoutError } from "./errors.ts";
 import { includedOnHome } from "./included.ts";
 import { PdsClient } from "./pds.ts";
+import { resolvedTargets, unresolvedSources } from "./routes.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
 import { groupFederationTargets } from "./targets.ts";
 
@@ -62,7 +64,7 @@ export class RoutedPdsQueryObserver<
     revealPartialResultsAfter: number;
     resolveRoutes: (
       routes: readonly string[],
-    ) => Promise<readonly FederationTarget[]>;
+    ) => Promise<readonly ResolvedRoute[]>;
   }) {
     this.#getConnection = options.getConnection;
     this.#home = groupFederationTargets([options.home])[0] ?? {
@@ -141,16 +143,23 @@ export class RoutedPdsQueryObserver<
 
     const targets = groupFederationTargets([
       { id: this.#home.ids[0] ?? this.#home.url, url: this.#home.url },
-      ...resolved,
+      ...resolvedTargets(resolved),
     ]);
-    const removed = this.#removeStaleTargets(targets);
+    // A route whose PDS can't be found counts as failed rather than holding
+    // up the result, so a server that's gone doesn't stop the others.
+    const unresolved = unresolvedSources(resolved);
+    const removed = this.#removeStaleTargets([
+      ...targets,
+      ...unresolved.map(({ target }) => target),
+    ]);
     const first = !this.#routesResolved;
     this.#routesResolved = true;
     const added = this.#addTargets(targets);
+    const failed = this.#failTargets(unresolved);
     // Every update from home brings its routes; only a change to them
     // changes what this shows. Publishing again otherwise would show the
     // same result twice for every update.
-    if (first || removed || added) this.#publish();
+    if (first || removed || added || failed) this.#publish();
   }
 
   /** Stops asking PDSes no longer routed to; whether there were any. */
@@ -176,7 +185,7 @@ export class RoutedPdsQueryObserver<
   ) {
     const added = targets.filter(
       (target) =>
-        target.url !== this.#home.url && !this.#sources.has(target.url),
+        target.url !== this.#home.url && !this.#unsubscribes.has(target.url),
     );
     for (const target of added) {
       this.#sources.set(target.url, { status: "pending", target });
@@ -197,6 +206,22 @@ export class RoutedPdsQueryObserver<
       );
     }
     return added.length > 0;
+  }
+
+  /** Records routes with no PDS to ask; whether any are new. */
+  #failTargets(
+    unresolved: readonly FederationSourceSnapshot<PdsRequestResult<Request>>[],
+  ) {
+    const failed = unresolved.filter(
+      ({ target }) => this.#sources.get(target.url)?.status !== "error",
+    );
+    for (const source of failed) {
+      this.#unsubscribes.get(source.target.url)?.();
+      this.#unsubscribes.delete(source.target.url);
+      this.#clearInitialResponseTimer(source.target.url);
+      this.#sources.set(source.target.url, source);
+    }
+    return failed.length > 0;
   }
 
   #update(

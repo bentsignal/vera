@@ -537,7 +537,12 @@ final class MessageListView: ExpoView, UICollectionViewDataSource, UICollectionV
   }
 
   private var currentKeyboardHeight: CGFloat {
-    var raw = followsKeyboard ? max(0, bounds.height - keyboardTracker.frame.minY) : 0
+    // Until Auto Layout places the tracker its frame is zero, which reads
+    // as a keyboard over the whole list. Rows placed then would sit above
+    // it, and fall by its height when it "closed" (a notification's
+    // message ended up below the screen).
+    let trackerPlaced = keyboardTracker.frame.height > 0
+    var raw = followsKeyboard && trackerPlaced ? max(0, bounds.height - keyboardTracker.frame.minY) : 0
     if raw <= safeAreaInsets.bottom + 0.5 { raw = 0 }
     return max(0, raw - (keyboardOverlap ?? safeAreaInsets.bottom))
   }

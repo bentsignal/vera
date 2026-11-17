@@ -182,6 +182,33 @@ export function liveSession(address: string) {
   return [...sessions.values()].find((session) => session.address === address);
 }
 
+/**
+ * Stops the live session of an account whose home PDS can't be found, so
+ * it doesn't keep reconnecting to a server that's gone. The account stays
+ * signed in on this device, with what's saved, for when its server is back.
+ */
+export function suspendAccountSession(stored: StoredAccount) {
+  const existing = sessions.get(stored.storagePrefix);
+  if (existing === undefined) return;
+  sessions.delete(stored.storagePrefix);
+  existing.end();
+  existing.pds.disconnect(queryClient);
+  void existing.transport.close();
+}
+
+/**
+ * Forgets an account whose home PDS can't be found: its session can't be
+ * ended there, so this drops it from this device only, with its cached
+ * data.
+ */
+export function forgetUnreachableAccount(stored: StoredAccount) {
+  suspendAccountSession(stored);
+  removeStoredAccount(stored.address);
+  forgetHomeToken(stored.storagePrefix);
+  forgetSaved(stored.storagePrefix);
+  queryClient.removeQueries({ queryKey: pdsSessionQueryKey(stored.address) });
+}
+
 /** Forgets an account on this device and drops its cached data. */
 export function closeAccountSession(session: AccountSession) {
   removeStoredAccount(session.address);

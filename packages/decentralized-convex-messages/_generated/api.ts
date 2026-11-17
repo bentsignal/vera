@@ -14,6 +14,7 @@ import type * as activityShapes from "../activityShapes.js";
 import type * as agents from "../agents.js";
 import type * as alertChoice from "../alertChoice.js";
 import type * as alerts from "../alerts.js";
+import type * as assistants from "../assistants.js";
 import type * as badges from "../badges.js";
 import type * as changes from "../changes.js";
 import type * as chatMessages from "../chatMessages.js";
@@ -74,6 +75,7 @@ const fullApi: ApiFromModules<{
   agents: typeof agents;
   alertChoice: typeof alertChoice;
   alerts: typeof alerts;
+  assistants: typeof assistants;
   badges: typeof badges;
   changes: typeof changes;
   chatMessages: typeof chatMessages;

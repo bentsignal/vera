@@ -12,6 +12,7 @@ import { pds } from "@vera/backend/pds";
 
 import type { ReactionSummary } from "./reactions";
 import type { Message, MessageAttachment } from "~/features/conversation/types";
+import { assistantsOf } from "~/features/assistants/assistants";
 import { useAccount } from "./account";
 import { directConversation } from "./direct";
 import * as optimistic from "./optimistic";
@@ -147,7 +148,12 @@ export function useConversation(
   );
   const known = data === undefined ? directConversation(conversationId) : data;
   const members = known?.members ?? [];
-  const { isLoaded, profileOf } = useProfileState([...members, ...shown]);
+  // Assistants too, for @mentions (mentionable.ts).
+  const { isLoaded, profileOf } = useProfileState([
+    ...members,
+    ...shown,
+    ...assistantsOf(address),
+  ]);
   function displayName(account: string) {
     return profileOf(account).displayName;
   }
