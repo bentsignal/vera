@@ -38,13 +38,28 @@ enum Images {
     let shown = "\(blur)|\(url.absoluteString)"
     if view.layer.value(forKey: shownKey) as? String == shown, view.image != nil { return }
     view.layer.setValue(shown, forKey: shownKey)
-    view.sd_imageTransition = .fade(duration: 0.18)
-    view.sd_setImage(with: url, placeholderImage: placeholder, options: options, context: context(size, blur: blur), progress: nil) { [weak view] image, error, _, _ in
-      // Failed: the placeholder stays, and setting it again tries again.
-      // (A load replaced by another is cancelled, and that one's showing.)
-      guard image == nil, (error as NSError?)?.code != SDWebImageError.cancelled.rawValue,
-            let view, view.layer.value(forKey: shownKey) as? String == shown else { return }
-      view.layer.setValue(nil, forKey: shownKey)
+    // The image is set here, not by SDWebImage, because a load it has already
+    // finished can still reach the view after the view has moved on: a
+    // recycled cell would then end up with the last row's photo (another
+    // person's face), and the check above would keep it there. Only the
+    // image the view still wants gets through.
+    view.sd_setImage(with: url, placeholderImage: placeholder, options: options.union(.avoidAutoSetImage), context: context(size, blur: blur), progress: nil) { [weak view] image, error, cacheType, _ in
+      guard let view, view.layer.value(forKey: shownKey) as? String == shown else { return }
+      guard let image else {
+        // Failed: the placeholder stays, and setting it again tries again.
+        // (A load replaced by another is cancelled, and that one's showing.)
+        if (error as NSError?)?.code != SDWebImageError.cancelled.rawValue {
+          view.layer.setValue(nil, forKey: shownKey)
+        }
+        return
+      }
+      if cacheType == .memory {
+        view.image = image
+      } else {
+        UIView.transition(with: view, duration: 0.18, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+          view.image = image
+        }
+      }
     }
   }
 

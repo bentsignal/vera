@@ -1,5 +1,5 @@
-// Native runtimes (an app binary's fingerprint, see docs/releasing.md →
-// Binaries, channels, and runtimes) too old to keep: the backend serves
+// Native runtimes (an app binary's runtime version, see docs/releasing.md →
+// Runtime versions) too old to keep: the backend serves
 // them as a live query (`release.outdatedRuntimes`), and a production app
 // whose own runtime is listed covers the screen with "Update Vera" and one
 // button to TestFlight or Play (apps/mobile/src/features/updates). A

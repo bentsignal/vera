@@ -27,6 +27,7 @@ import { linkCardsOf, visibleBody } from "../conversation/message-text.ts";
 import { quoteText } from "../conversation/reply-parts.ts";
 import { attachmentPart } from "../messaging/reaction-part.ts";
 import { typingLabel } from "../messaging/typing-state.ts";
+import { withGuests } from "./guests.ts";
 import {
   blocksOf,
   DELETED_TEXT,
@@ -48,6 +49,11 @@ export interface RowContext {
   readonly layout: MessageLayout;
   /** Group chats, where incoming runs show their sender. */
   readonly showAuthors: boolean;
+  /**
+   * A direct message's two members. Once anyone else is there, such as
+   * Vera called in by an @mention, every sender shows, as in a group.
+   */
+  readonly members?: readonly string[];
   readonly profileOf: ProfileOf;
   /** What the installed binary draws (see `nativeSupport`). */
   readonly support: Support;
@@ -187,7 +193,7 @@ function messageRow(
     layout,
     reactions,
     sentAt: message.sentAt.getTime(),
-    showAuthor: layout === "stacked" || (showAuthors && !isOwn),
+    showAuthor: layout === "stacked" || (!isOwn && showAuthors),
     startsGroup: row.startsGroup,
     status: message.status,
     // Stacked rows show it beside the name. Bubbles reveal it in a narrow
@@ -342,8 +348,9 @@ export function nativeRows(
   typists: readonly string[],
   context: RowContext,
 ) {
+  const shown = withGuests(rows, typists, context);
   return [
-    ...typingRow(typists, context),
-    ...rows.map((row) => nativeRow(row, context)),
-  ].map((row) => supported(row, context.support));
+    ...typingRow(typists, shown),
+    ...rows.map((row) => nativeRow(row, shown)),
+  ].map((row) => supported(row, shown.support));
 }

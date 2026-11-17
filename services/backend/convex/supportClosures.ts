@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import type { BotAccount } from "./bots";
 import { internalMutation } from "./_generated/server";
 import { scheduleReply } from "./assistantHook";
 import { sendAsBot, VERA } from "./bots";
@@ -13,7 +14,10 @@ import { sendAsBot, VERA } from "./bots";
 //   instead, from where it is now.
 // - Closed with a comment from the team: Vera's model explains it in plain
 //   words, and follows another issue if the comment points to one.
-// - Otherwise, the fixed message in bug-reports.ts.
+// - Otherwise, the closed message in bug-reports.ts.
+//
+// Closed as completed counts here too when no fix closed it: that's also
+// how the team turns down an idea, so Vera never calls it done.
 
 /**
  * Moves a report onto the issue it duplicates, and tells the reporter.
@@ -21,11 +25,12 @@ import { sendAsBot, VERA } from "./bots";
  */
 export const followOriginal = internalMutation({
   args: {
+    idea: v.optional(v.boolean()),
     issueNumber: v.number(),
     issueUrl: v.string(),
     reportId: v.id("bugReports"),
   },
-  handler: async (ctx, { issueNumber, issueUrl, reportId }) => {
+  handler: async (ctx, { idea, issueNumber, issueUrl, reportId }) => {
     const report = await ctx.db.get(reportId);
     if (report === null) return;
     const theirs = await ctx.db
@@ -54,14 +59,14 @@ export const followOriginal = internalMutation({
       tracking: true,
     });
     const developer = await isDeveloper(ctx, report.accountId);
-    await sendAsBot(
+    await sendWithAside(
       ctx,
       VERA,
       report.conversationId,
-      [
-        `Update on the bug you reported (${report.summary}): it turned out to be the same as another report the team is tracking, so I'll follow that one for you and let you know when it's fixed.`,
-        ...(developer ? [issueUrl] : []),
-      ].join("\n"),
+      idea === true
+        ? `Update on the idea you suggested (${report.summary}): it turned out to be the same as another idea the team has, so I'll follow that one for you and let you know when it's done.`
+        : `Update on the bug you reported (${report.summary}): it turned out to be the same as another report the team is tracking, so I'll follow that one for you and let you know when it's fixed.`,
+      developer ? issueUrl : null,
     );
   },
 });
@@ -70,23 +75,30 @@ export const followOriginal = internalMutation({
 export async function explainClosure(
   ctx: MutationCtx,
   report: Doc<"bugReports">,
-  { comment, stateReason }: { comment: string; stateReason?: string | null },
+  {
+    comment,
+    idea,
+    stateReason,
+  }: { comment: string; idea: boolean; stateReason?: string | null },
 ) {
+  const kind = idea ? "idea" : "bug report";
   const how =
     stateReason === "DUPLICATE"
       ? "as the same as another report"
-      : "without a change (the team isn't planning to change it for now)";
+      : stateReason === "NOT_PLANNED"
+        ? "without a change (the team isn't planning to change it for now)"
+        : `as completed, but no change to Vera came with it: unless the comment says otherwise, the team decided against it`;
   await scheduleReply(ctx, {
     accountId: report.accountId,
     bot: VERA.username,
     conversationId: report.conversationId,
-    note: `Their report "${report.summary}" (issue #${String(report.issueNumber)}) was just closed ${how}. The team's closing comment:
+    note: `Their ${kind} "${report.summary}" (issue #${String(report.issueNumber)}) was just closed ${how}. The team's closing comment:
 
 """
 ${comment}
 """
 
-Tell them what happened and why, in plain words, going only by that comment. Don't argue with it or promise anything it doesn't. If it points to another report that's still open or being worked on, follow_known_bug that one for them and say you'll keep them posted. One or two messages.`,
+Tell them what happened and why, in plain words, going only by that comment. Don't argue with it or promise anything it doesn't, and don't say it was ${idea ? "built or done" : "fixed"} unless the comment says so. Don't explain how you know or what wasn't said. If it points to another report that's still open or being worked on, follow_known_bug that one for them and say you'll keep them posted. One message, or two if you're following another report for them.`,
     wakeAt: Date.now(),
   });
 }
@@ -97,4 +109,23 @@ async function isDeveloper(ctx: MutationCtx, accountId: string) {
     .withIndex("by_account", (q) => q.eq("accountId", accountId))
     .unique();
   return reporter?.developer === true;
+}
+
+/**
+ * Sends `body` as the bot and, when there's an `aside` (a developer's
+ * link, say), puts it in that message's thread, out of the chat, so a
+ * tall link preview doesn't follow every update (Shawn, 2026-11-17).
+ */
+export async function sendWithAside(
+  ctx: MutationCtx,
+  bot: BotAccount,
+  conversationId: string,
+  body: string,
+  aside: string | null,
+) {
+  const messageId = await sendAsBot(ctx, bot, conversationId, body);
+  if (aside !== null) {
+    await sendAsBot(ctx, bot, conversationId, aside, { threadId: messageId });
+  }
+  return messageId;
 }
