@@ -5,6 +5,7 @@ import decode from "heic-decode";
 import jpeg from "jpeg-js";
 
 import {
+  isJpeg,
   JPEG_QUALITY,
   MAX_PIXELS,
   MAX_SIDE,
@@ -31,9 +32,10 @@ export const convert = internalAction({
       }
       const response = await fetch(source);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const decoded = await decode({
-        buffer: new Uint8Array(await response.arrayBuffer()),
-      });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const decoded = isJpeg(bytes)
+        ? jpeg.decode(bytes, { useTArray: true })
+        : await decode({ buffer: bytes });
       const image = shrink(decoded, MAX_SIDE);
       const encoded = jpeg.encode(
         { data: image.data, height: image.height, width: image.width },

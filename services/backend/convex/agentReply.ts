@@ -1,7 +1,7 @@
 import type { ToolSet } from "ai";
 
 import type { ActionCtx } from "./_generated/server";
-import type { Turn } from "./agentTools";
+import type { Chat, Turn } from "./agentTools";
 import type { BotAccount } from "./bots";
 import type { Tally } from "./usage";
 import { MAX_HISTORY } from "../assistant-history";
@@ -9,7 +9,12 @@ import { internal } from "./_generated/api";
 import { toAnswer } from "./agentHistory";
 import { generateReply } from "./agentModels";
 import { cachedPartHash, replyRequest } from "./agentRequest";
-import { keepTyping, messageSender } from "./agentTools";
+import {
+  Interrupted,
+  interruption,
+  keepTyping,
+  messageSender,
+} from "./agentTools";
 import { botAddress } from "./bots";
 import { recallOlder } from "./memory";
 import { usageOf } from "./usage";
@@ -17,8 +22,7 @@ import { veraAssistant } from "./vera";
 
 // One reply of an assistant's (agent.ts `run`): it reads the conversation,
 // hands it to the model with the assistant's instructions and tools
-// (`Prompt`, agentRequest.ts), and the model answers by calling
-// `send_message`.
+// (`Prompt`, agentRequest.ts), and the model answers by calling `reply`.
 
 export interface Assistant {
   /** Sets up one reply: what the model is told, and its tools. */
@@ -62,19 +66,20 @@ export interface Answered {
 }
 
 /**
- * The conversation's newest messages, oldest first, reaching back to
- * `from` (the window's start, assistant-history.ts) unless that's more
- * than the window holds, and whether there are older ones.
+ * The conversation's (or thread's) newest messages, oldest first, reaching
+ * back to `from` (the window's start, assistant-history.ts) unless that's
+ * more than the window holds, and whether there are older ones.
  */
 async function recentMessages(
   ctx: ActionCtx,
   bot: BotAccount,
-  conversationId: string,
+  { conversationId, threadId }: Chat,
   from: number | null,
 ) {
   let page = await ctx.runQuery(internal.bots.page, {
     bot: bot.username,
     conversationId,
+    threadId,
   });
   let messages = page.messages;
   while (
@@ -87,10 +92,32 @@ async function recentMessages(
       before: messages.at(0)?.sentAt,
       bot: bot.username,
       conversationId,
+      threadId,
     });
     messages = [...page.messages, ...messages];
   }
   return { hasOlder: page.hasOlder, messages };
+}
+
+/** Whether the person wrote in the chat (or its thread) after `since`. */
+async function wroteAgain(
+  ctx: ActionCtx,
+  bot: BotAccount,
+  { conversationId, threadId }: Chat,
+  since: number,
+) {
+  const self = botAddress(bot);
+  const page = await ctx.runQuery(internal.bots.page, {
+    bot: bot.username,
+    conversationId,
+    threadId,
+  });
+  return page.messages.some(
+    (message) =>
+      message.authorId !== self &&
+      message.deletedAt === undefined &&
+      message.sentAt > since,
+  );
 }
 
 /** What `claim` hands a reply (agent.ts). */
@@ -110,7 +137,7 @@ interface Claimed {
 async function conversationToAnswer(
   ctx: ActionCtx,
   bot: BotAccount,
-  conversationId: string,
+  chat: Chat,
   {
     answeredThrough,
     historyFrom,
@@ -118,7 +145,7 @@ async function conversationToAnswer(
     self,
   }: Omit<Claimed, "accountId"> & { readonly self: string },
 ) {
-  const recent = await recentMessages(ctx, bot, conversationId, historyFrom);
+  const recent = await recentMessages(ctx, bot, chat, historyFrom);
   const answering = toAnswer(recent.messages, self, {
     answeredThrough,
     // A note from the team is reason enough to write, even with nothing new.
@@ -141,17 +168,18 @@ async function conversationToAnswer(
 }
 
 /**
- * Answers the person's messages that no reply has seen yet. Returns
- * undefined when there were none.
+ * Answers the person's messages in a conversation (or a thread in it) that
+ * no reply has seen yet. Returns undefined when there were none.
  */
 export async function reply(
   ctx: ActionCtx,
   bot: BotAccount,
-  conversationId: string,
+  chat: Chat,
   claimed: Claimed,
 ): Promise<Answered | undefined> {
+  const { conversationId, threadId } = chat;
   const self = botAddress(bot);
-  const answering = await conversationToAnswer(ctx, bot, conversationId, {
+  const answering = await conversationToAnswer(ctx, bot, chat, {
     ...claimed,
     self,
   });
@@ -159,10 +187,11 @@ export async function reply(
   await ctx.runMutation(internal.bots.markRead, {
     bot: bot.username,
     conversationId,
+    threadId,
   });
-  const typing = keepTyping(ctx, bot, conversationId);
+  const typing = keepTyping(ctx, bot, chat);
   try {
-    const sender = messageSender(ctx, bot, conversationId, typing);
+    const sender = messageSender(ctx, bot, chat, typing);
     const tally: Tally = { memoryLookups: 0, searches: 0 };
     const started = Date.now();
     const turn: Turn = {
@@ -175,17 +204,27 @@ export async function reply(
       bot,
       conversationId,
       ctx,
+      interruption: interruption(() =>
+        wroteAgain(ctx, bot, chat, answering.newest.sentAt),
+      ),
       note: claimed.note,
       lastHeardAt: answering.newest.sentAt,
       name: answering.newest.authorName,
       oldestSentAt: answering.oldestSentAt,
-      recalled: await recallOlder(ctx, bot, conversationId, {
-        answeredThrough: claimed.answeredThrough,
-        hasOlder: answering.oldestSentAt !== null,
-        history: answering.history,
-        tally,
-      }),
+      // Memory holds the main chat, which a thread doesn't bring in by
+      // itself: there it's only searched when asked (search_memory).
+      recalled:
+        threadId === undefined
+          ? await recallOlder(ctx, bot, conversationId, {
+              answeredThrough: claimed.answeredThrough,
+              hasOlder: answering.oldestSentAt !== null,
+              history: answering.history,
+              tally,
+            })
+          : [],
       self,
+      ...(threadId !== undefined && { threadId }),
+      updatesIn: conversationId,
       timeZone: await ctx.runQuery(internal.timeZones.of, {
         accountId: claimed.accountId,
       }),
@@ -197,7 +236,16 @@ export async function reply(
       answering.history,
       prompt,
     );
-    const results = await generateReply(options, models, sender, bot);
+    let results;
+    try {
+      results = await generateReply(options, models, sender, bot);
+    } catch (error) {
+      if (!(error instanceof Interrupted)) throw error;
+      // Their newer message's reply answers this one too: it hasn't been
+      // answered, so the next reply sees it as new (agent.ts `finish`).
+      console.log(`${bot.username}'s reply in ${conversationId} gave way`);
+      return;
+    }
     await ctx.runMutation(internal.usage.record, {
       ...usageOf(results, tally),
       accountId: claimed.accountId,
@@ -205,6 +253,7 @@ export async function reply(
       cachedPart: await cachedPartHash(prompt.instructions, prompt.tools),
       conversationId,
       ms: Date.now() - started,
+      threadId,
     });
   } finally {
     await typing.stop();
