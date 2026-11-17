@@ -223,10 +223,26 @@ function dividerAfter(message: Message, root: ThreadRoot | undefined) {
 }
 
 /**
+ * Whether the rows get headers. A stacked thread has none: each message's
+ * own time says the day ("Yesterday · 9:15 PM"), and a day separator under
+ * the replies' divider would stack two rules. Bubbles keep their time
+ * headers, since their messages show the time only when dragged.
+ */
+function showsHeader(
+  layout: MessageLayout,
+  root: ThreadRoot | undefined,
+  [previous, item]: [Item | undefined, Item],
+) {
+  if (root !== undefined && layout === "stacked") return false;
+  return needsHeader(layout, previous, item);
+}
+
+/**
  * Interleaves headers with messages, oldest first: a time header after
- * each pause for bubbles, a day separator for stacked rows. In a thread,
- * the original comes first, then a divider counting its replies. A
- * group's notices sit between its messages, by time.
+ * each pause for bubbles, a day separator for stacked rows (but none in a
+ * stacked thread, see `showsHeader`). In a thread, the original comes
+ * first, then a divider counting its replies. A group's notices sit
+ * between its messages, by time.
  */
 export function buildMessageRows(
   messages: readonly Message[],
@@ -239,7 +255,7 @@ export function buildMessageRows(
   return items.flatMap((item, index): MessageRow[] => {
     const previous = items[index - 1];
     if (item.type === "notice") {
-      const header = needsHeader(layout, previous, item);
+      const header = showsHeader(layout, root, [previous, item]);
       return noticeRows(
         item.notice,
         header ? headerType : null,
@@ -253,7 +269,7 @@ export function buildMessageRows(
       !continues(layout, item, items[index + 1], root?.id),
     );
     const divider = dividerAfter(message, root);
-    if (!needsHeader(layout, previous, item)) {
+    if (!showsHeader(layout, root, [previous, item])) {
       built.set(message, { row });
       return [row, ...divider];
     }

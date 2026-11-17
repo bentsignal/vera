@@ -5,7 +5,7 @@ import type { IssueState } from "../bug-reports";
 import type { Turn } from "./agentTools";
 import type { GitHubConfig } from "./github";
 import type { Releases } from "./githubReleases";
-import { progressOf, releaseNeeds } from "../bug-reports";
+import { IDEA_LABEL, progressOf, releaseNeeds } from "../bug-reports";
 import { briefOf, statusOf } from "../known-bugs";
 import {
   githubConfig,
@@ -13,40 +13,42 @@ import {
   pullRequestFix,
   searchRepository,
 } from "./github";
-import { issuesChangedSince } from "./githubIssues";
+import { issuesChangedSince, openIssues } from "./githubIssues";
 import { delivered, lazyReleases } from "./githubReleases";
 import { followKnownBug } from "./supportFollow";
 
 // Vera's tools for what the team already knows. GitHub's issues are the
-// one record of bugs: Vera searches them before filing and follows a
-// match instead of filing a duplicate (supportFollow.ts). GitHub's search
-// can take a while to see a new issue, so ones filed in the last day come
-// from the issue list too, which has them at once.
+// one record of bugs: Vera checks them before filing and follows a match
+// instead of filing a duplicate (supportFollow.ts). It gets every open
+// issue's title, to compare by meaning, since keywords miss the same bug
+// in other words (#350 duplicated #343: "reconnecting" against "retry"),
+// and keyword matches among closed ones too. The open list comes from
+// GitHub's issue list, which has a new issue at once; search can take a
+// while to see one.
 
 /** Merged pull requests checked for whether they've shipped, per search. */
 const CHECKED_FIXES = 3;
 
-/** How far back the issue list covers what search may not see yet. */
-const RECENT = 24 * 60 * 60 * 1000;
-
 /**
  * This reply's look at GitHub, which filing needs first (supportAgent.ts):
- * when it was, and which issues it showed.
+ * when it was, which issues it showed, and whether the reply has filed or
+ * followed one since.
  */
 export interface KnownBugCheck {
+  acted: boolean;
   at: number | null;
   readonly seen: Set<number>;
 }
 
 export function newCheck(): KnownBugCheck {
-  return { at: null, seen: new Set() };
+  return { acted: false, at: null, seen: new Set() };
 }
 
 export function lookupTools(turn: Turn, check: KnownBugCheck) {
   return {
     search_known_bugs: tool({
       description:
-        "Search the team's bug reports and ideas on GitHub, before filing: issues matching your keywords (open and closed), every issue filed in the last day, and merged fixes. Compare by meaning, not wording. Required in the same reply as file_bug_report.",
+        "Check the team's bug reports and ideas on GitHub, before filing: every open one by title (allOpen), open and closed ones matching any of your keywords (matches), and merged fixes. Compare their problem with all of them by meaning, not wording. Required in the same reply as file_bug_report.",
       inputSchema: z.object({
         query: z
           .string()
@@ -56,7 +58,7 @@ export function lookupTools(turn: Turn, check: KnownBugCheck) {
     }),
     follow_known_bug: tool({
       description:
-        "Follow a GitHub issue for this person instead of filing a duplicate: they hear here when it's fixed and when the fix is out, the same as whoever reported it first. Optionally add what they told you to it.",
+        "Follow a GitHub issue for this person instead of filing a duplicate: they hear here when it's fixed and when the fix is out, the same as whoever reported it first. Call it before your reply, as soon as one matches. Optionally add what they told you to it.",
       inputSchema: z.object({
         issueNumber: z
           .number()
@@ -71,7 +73,11 @@ export function lookupTools(turn: Turn, check: KnownBugCheck) {
             "Anything new they told you, for developers, posted publicly. Leave out if nothing new.",
           ),
       }),
-      execute: (input) => followKnownBug(turn, input),
+      execute: async (input) => {
+        const result = await followKnownBug(turn, input);
+        if (typeof result !== "string") check.acted = true;
+        return result;
+      },
     }),
   };
 }
@@ -83,33 +89,35 @@ async function searchKnownBugs(check: KnownBugCheck, query: string) {
   }
   const at = Date.now();
   try {
-    const [found, recent] = await Promise.all([
-      searchRepository(config, query),
-      filedSince(config, at - RECENT),
+    const [found, open] = await Promise.all([
+      // Search has a tighter rate limit than the issue list (30 a minute);
+      // the open list alone still catches most duplicates.
+      searchRepository(config, query).catch((error: unknown) => {
+        console.error("GitHub search failed", error);
+        return { issues: [], pullRequests: [] };
+      }),
+      openIssues(config),
     ]);
-    const numbers = [
-      ...new Set([
-        ...recent.map((issue) => issue.number),
-        ...found.issues.map((issue) => issue.number),
-      ]),
-    ];
-    const issues = [...recent, ...found.issues].filter(
-      (issue, index, all) =>
-        all.findIndex((other) => other.number === issue.number) === index,
-    );
+    const numbers = found.issues.map((issue) => issue.number);
     const releases = lazyReleases(config);
     const states = await issueStates(config, numbers);
     check.at = at;
     for (const number of numbers) check.seen.add(number);
+    for (const issue of open) check.seen.add(issue.number);
     return {
-      issues: await Promise.all(
-        issues.map(async (issue) => ({
+      matches: await Promise.all(
+        found.issues.map(async (issue) => ({
           issue: issue.number,
           title: issue.title,
           about: issue.about,
+          link: issue.url,
           status: await statusFor(config, releases, states.get(issue.number)),
           reported: issue.createdAt.slice(0, 10),
         })),
+      ),
+      allOpen: open.map(
+        (issue) =>
+          `#${String(issue.number)} ${issue.title}${issue.labels.includes(IDEA_LABEL) && !issue.title.startsWith("Idea:") ? " (idea)" : ""}`,
       ),
       fixes: await Promise.all(
         found.pullRequests.slice(0, CHECKED_FIXES).map(async (pr) => ({
@@ -119,7 +127,7 @@ async function searchKnownBugs(check: KnownBugCheck, query: string) {
       ),
     };
   } catch (error) {
-    console.error("GitHub search failed", error);
+    console.error("Couldn't list GitHub's issues", error);
     return "GitHub isn't answering right now. Tell them you'll pass it on, and try again in a moment.";
   }
 }
@@ -134,6 +142,7 @@ export async function filedSince(config: GitHubConfig, since: number) {
       createdAt: new Date(issue.createdAt).toISOString(),
       number: issue.number,
       title: issue.title,
+      url: issue.url,
     }));
 }
 
