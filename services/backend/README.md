@@ -82,10 +82,19 @@ web through Parallel (`webSearch.ts`), and remembers the whole conversation
 
 It also takes bug reports and ideas for the app (`supportAgent.ts`). It
 asks for what's missing (what happened, where, how to repeat it, a
-screenshot), tells them reports are public and waits for their answer,
-checks GitHub for an existing issue or fix (following that issue instead of
-filing a duplicate), then files an anonymized GitHub issue labeled "user
-report" with the app version and device the app reported. Screenshots never
+screenshot), then checks GitHub (`supportLookup.ts`): it reads every open
+issue's title and compares by meaning, plus open and closed issues and
+merged fixes matching any of its keywords, and follows a match instead of
+filing a duplicate. Keywords alone missed the same bug in other words
+(#350 duplicated #343: "reconnecting" against "retry"). Only when nothing
+matches does it tell them, in its own words, in the same message as its
+question, that reports are posted publicly without their name or personal
+details: a reply marked `notice`, which has to say "public". Once they've
+answered, `file_bug_report` is offered, and it files an anonymized GitHub
+issue labeled "user report" with the app version and device the app
+reported. A reply that says a report went to the team when it filed and
+followed nothing is sent back to be rewritten once (Haiku and Kimi both
+claimed to have filed reports they hadn't). Screenshots never
 go in an issue: Vera describes what they show in words, without personal
 details. A cron (`crons.ts`, every 10 minutes) follows each issue and tells
 the reporter, in plain words, when it's picked up (assigned), being worked
@@ -227,8 +236,7 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   a reply that ends with neither a message nor `stay_quiet` is an error,
   and the model gets one more try, told why (`reply-outcome.ts`). At most
   3 messages per reply, each at most 600 characters (a longer one fails
-  the call and the model tries again), not counting canned ones like the
-  bug-report privacy notice. One call for the whole reply is what stopped
+  the call and the model tries again). One call for the whole reply is what stopped
   replies from losing their first message: with a tool call per message,
   models wrote the first as text outside a tool, took it as said, and
   sent only the rest (Grok 4.7 did in about 1 reply in 20, 2026-11-16).
@@ -241,15 +249,15 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   messages that arrive meanwhile get the next reply.
 - Models run through the Convex AI Gateway (`@convex-dev/ai-sdk-provider`
   and the AI SDK), billed on the Convex bill, with zero-data-retention
-  routing (`assistant-models.ts`). Kimi K3.1 Pro answers, and Claude
-  Haiku 5.5 takes over when it fails: each model gets two tries, or one
+  routing (`assistant-models.ts`). Claude Haiku 5.5 answers, and Kimi
+  K3.1 Pro takes over when it fails: each model gets two tries, or one
   when the error says retrying won't help (a rejected request), before
   the next. They were picked from 7 models compared on real
-  conversations: neither lost a message, both use tools reliably, and
-  Kimi writes closest to Grok's plain, short answers; Haiku is the
-  fastest and cheapest. `ASSISTANT_MODELS` (gateway model IDs,
-  comma-separated, in order) overrides them on a deployment, such as
-  `anthropic/claude-haiku-5.5` alone on a test backend. Gemini models
+  conversations: neither lost a message and both use tools reliably;
+  Haiku is the fastest and cheapest (about 2 to 4 seconds and a fifth of
+  a cent a reply), and Kimi writes closest to Grok's plain, short
+  answers. `ASSISTANT_MODELS` (gateway model IDs, comma-separated, in
+  order) overrides them on a deployment. Gemini models
   are out: their tool calls were unreliable. Claude Sonnet can't run
   here: its zero-retention endpoint requires reasoning, which Anthropic
   doesn't allow with a required tool call.

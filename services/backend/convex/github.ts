@@ -234,16 +234,28 @@ async function issueStatesOnce(
   return states;
 }
 
+/** Keywords GitHub's search takes in one query (it allows five ORs). */
+const SEARCH_WORDS = 6;
+
 /**
- * Open and closed issues, and merged pull requests, that match `query`,
- * best first: what support checks before filing a report.
+ * Open and closed issues, and merged pull requests, that match any of the
+ * words in `query`, best first: what support checks before filing a
+ * report. Any, not all: GitHub's search otherwise wants every word, and a
+ * report that says "reconnecting" missed one that said "retry"
+ * (#350, #343).
  */
 export async function searchRepository(config: GitHubConfig, query: string) {
   const repo = `repo:${config.owner}/${config.name}`;
+  const words = query
+    .replace(/["()]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !/^(AND|OR|NOT)$/.test(word))
+    .slice(0, SEARCH_WORDS)
+    .join(" OR ");
   async function search(filter: string): Promise<unknown[]> {
     const result = await github(
       config,
-      `/search/issues?per_page=5&q=${encodeURIComponent(`${query} ${repo} ${filter}`)}`,
+      `/search/issues?per_page=5&q=${encodeURIComponent(`${words} ${repo} ${filter}`)}`,
     );
     const items = read(result, "items");
     return Array.isArray(items) ? items.map((item: unknown) => item) : [];

@@ -1,7 +1,6 @@
 // How an assistant's reply ended (convex/agent.ts). The model talks to the
-// person only through tools: `reply`, and canned messages like
-// the bug-report privacy notice. Anything it writes outside a tool is never
-// sent. A reply that ends without sending anything or calling
+// person only through its `reply` tool. Anything it writes outside a tool
+// is never sent. A reply that ends without sending anything or calling
 // `stay_quiet` is an error, and the model gets its turn back.
 
 export type ReplyOutcome = "answered" | "quiet" | "noToolCall";

@@ -105,9 +105,8 @@ export async function replyRequest(
 }
 
 /**
- * Ends the reply after a step that answered (`reply`), stayed quiet, or
- * shared support's privacy notice: the model has said its piece and waits
- * for them. It goes on only after other tools, such as a search, whose
+ * Ends the reply after a step that answered (`reply`) or stayed quiet:
+ * the model has said its piece and waits for them. It goes on only after other tools, such as a search, whose
  * results it needs, and after a call that failed (a message over
  * `MAX_MESSAGE_LENGTH`), so it can try again. Without this, models keep
  * talking after their answer, even to themselves.
@@ -115,7 +114,7 @@ export async function replyRequest(
 function saidItsPiece({ steps }: { steps: StepResult<ToolSet>[] }) {
   const results = steps.at(-1)?.toolResults ?? [];
   return results.some((result) =>
-    ["reply", "share_privacy_notice", "stay_quiet"].includes(result.toolName),
+    ["reply", "stay_quiet"].includes(result.toolName),
   );
 }
 

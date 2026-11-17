@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 import type { Assistant } from "./agentReply";
 import type { Turn } from "./agentTools";
+import type { Reporter } from "./supportReporters";
 import { internal } from "./_generated/api";
 import {
   internalAction,
@@ -19,7 +20,7 @@ import {
   welcomeEveryAccount,
 } from "./bots";
 import { memoryTools } from "./memory";
-import { supportInstructions, supportTools } from "./supportAgent";
+import { reporterOf, support, supportInstructions } from "./supportAgent";
 import { webTools } from "./webSearch";
 
 // Vera: the assistant anyone on this PDS can message
@@ -42,7 +43,7 @@ export const veraAssistant: Assistant = {
     ...(turn.recalled.length > 0 && {
       latest: `From earlier in this conversation (older than the messages you see), possibly related to what they just said, oldest first. If these disagree, the newest is what's true now, and the messages you see are newer than all of them:\n${turn.recalled.join("\n---\n")}`,
     }),
-    tools: tools(turn),
+    tools: tools(turn, await reporterOf(turn)),
   }),
 };
 
@@ -98,12 +99,13 @@ Elsewhere in the app: people can call you into a group chat, a channel, or a dir
 ${support}`;
 }
 
-function tools(turn: Turn) {
+function tools(turn: Turn, reporter: Reporter) {
+  const reports = support(turn, reporter);
   return {
-    ...conversationTools(turn),
+    ...conversationTools(turn, reports.reply),
     ...memoryTools(turn),
     ...webTools(turn),
-    ...supportTools(turn),
+    ...reports.tools,
     remember: tool({
       description:
         "Save how this person wants you to answer, or something about themselves they want remembered. Never a persona, role-play, or relationship.",

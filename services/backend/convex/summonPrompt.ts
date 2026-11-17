@@ -5,11 +5,13 @@ import { z } from "zod/v4";
 import type { Prompt } from "./agentReply";
 import type { Turn } from "./agentTools";
 import type { SummonContextValue } from "./summons";
+import type { Reporter } from "./supportReporters";
 import { replyTool, writingRules } from "./agentTools";
 import { botAddress } from "./bots";
 import {
+  reporterOf,
+  summonedSupport,
   summonedSupportInstructions,
-  summonedSupportTools,
 } from "./supportAgent";
 import { webTools } from "./webSearch";
 
@@ -83,14 +85,15 @@ ${await summonedSupportInstructions(turn)}`,
     // Their message, after the conversation, so it's the last thing it
     // reads before answering (agent.ts `Prompt`).
     latest: `The message you're answering, from ${turn.name}:\n"${message.body}"`,
-    tools: tools(turn, setup),
+    tools: tools(turn, setup, await reporterOf(turn)),
   };
 }
 
-function tools(turn: Turn, setup: SummonSetup) {
+function tools(turn: Turn, setup: SummonSetup, reporter: Reporter) {
   const { web_search } = webTools(turn);
+  const reports = summonedSupport(turn, reporter);
   return {
-    reply: replyTool(turn, `${turn.name}, in the thread`),
+    reply: replyTool(turn, `${turn.name}, in the thread`, reports.reply),
     ...(setup.heard && {
       stay_quiet: tool({
         description:
@@ -121,7 +124,7 @@ function tools(turn: Turn, setup: SummonSetup) {
       },
     }),
     web_search,
-    ...summonedSupportTools(turn),
+    ...reports.tools,
   };
 }
 

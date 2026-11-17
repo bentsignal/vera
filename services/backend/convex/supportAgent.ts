@@ -10,7 +10,7 @@ import { SUPPORT_COMMENT } from "../issue-closures";
 import { internal } from "./_generated/api";
 import { commentOnIssue, createIssue, githubConfig } from "./github";
 import { filedSince, lookupTools, newCheck } from "./supportLookup";
-import { noticeShared, PRIVACY_NOTICE, whyNotFile } from "./supportRules";
+import { noticeShared, replyRules, whyNotFile } from "./supportRules";
 
 // Vera's bug reports (vera.ts adds these to its instructions and tools):
 // it helps someone describe a bug well, files it as a public, anonymized
@@ -61,7 +61,7 @@ Talking about it:
 - If they are a developer, you can be technical and share the links listed with their reports below.
 - If they ask how to do something in the app and you're not sure, say so. Don't invent features.
 
-Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.
+Privacy notice: ${noticeShared(reporter) ? "already shared; don't bring it up or ask permission again" : "never shared; tell them, with notice set on your reply, before filing. file_bug_report is there once they've answered it"}.
 
 Their app: ${app}
 
@@ -82,14 +82,14 @@ Getting a good report:
 - Never ask for their messages, contacts, passwords, or other personal information. You only need to know what the app did.
 
 Privacy, before anything is filed:
-- Reports are public. The first time, call share_privacy_notice when you ask for a screenshot, or, once you have enough and search_known_bugs found nothing that matches, before filing; it sends the notice for you, so don't repeat it in your own words. Ask whether they're OK with you sending the report to the team and wait for their answer: you can only file after they've replied to the notice.
+- Reports are public. The first time, tell them so in your reply when you ask for a screenshot, or, once you have enough and search_known_bugs found nothing that matches, when you ask whether they're OK with you sending it to the team, and set notice on that reply. Keep it to a sentence, like "Bug reports are posted publicly, without your name or personal details. OK if I send it?"; when asking for a screenshot, add that you describe it in words instead of posting it, so they can cross out anything private. Then wait for their answer: you can only file after they've replied.
 - Once they've seen the notice and gone ahead, that's their consent for later reports too. Don't share it or ask permission again; just file when you have enough.
 - Screenshots never go in a report. Describe what each one shows about the app instead, precisely enough that a developer could picture it: which screen, what's on it, what looks wrong.
 - In everything you file, never include their name or username, anyone else's name, message contents, faces, addresses, phone numbers, or links, including what you read in a screenshot. Describe instead ("a message from a friend", "a link to a video").
 
 Checking what the team already knows:
-- Once you understand the problem, search_known_bugs first, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Search again in the reply you file in. It searches the team's issues on GitHub by your keywords and lists everything filed in the last day. Compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "messages out of order when opening a chat" and "an older message shows at the bottom"). Keywords match words, so if nothing matches, try another set or two before deciding it's new.
-- A known bug that matches, open or fixed but not out yet: follow_known_bug instead of filing a new one, adding anything new they told you. Then tell them someone already reported it, where it stands, and that you'll message them ${updates} when it's fixed.
+- Once you understand the problem, search_known_bugs first, before the privacy notice: following a known bug puts nothing in public, so it doesn't need their consent (adding their details to it does). Search again in the reply you file in. It lists every open report by title (allOpen) and the open and closed ones matching your keywords (matches). Go through the whole open list and compare by meaning: the same thing going wrong in the same place is the same bug, however differently it's worded (say "stuck reconnecting after tapping a notification" and "opening from a notification gets stuck on retry"), even if the details differ a little (how often, which phone). Only the same problem counts: one that's merely related, or on the same screen, isn't a match, so file theirs. For a fix that's already out, if matches has nothing, try another set of keywords or two.
+- A known bug that matches, open or fixed but not out yet: call follow_known_bug right away, instead of filing a new one, with anything new they told you. Don't ask whether they want you to: following puts nothing in public, and it's what they came for. Only once it has returned, tell them someone already reported it, where it stands, and that you'll message them ${updates} when it's fixed; never promise that without following it.
 - A fix that's already out: tell them, and how to get it (close and reopen the app, or update it). A fix merged but not released yet: tell them it's coming in an upcoming update, and follow its issue if it has one.
 - Judge by what the bug or fix actually says, and by dates: a fix from before they reported it didn't fix their problem.
 - Only when nothing matches, file it.
@@ -123,47 +123,50 @@ Reports from here:
 - Their app version is attached to the report. If the bug happened on someone else's phone, say so in the details. In the report, never say who here found it or quote anyone here. Don't bring up their other reports here.
 - ${developer ? "They're a developer: you can be technical and share issue links." : `Keep it non-technical unless they ask: say "bug report" or "passed it to the team", not "issue", "GitHub", "ticket", "PR", or "merged". That's only so you don't bury them in details; when they ask for a link or anything technical, give it.`}
 
-Privacy notice: ${noticeShared(reporter) ? "already shared; don't share it or ask permission again" : "never shared; share it before filing"}.`;
+Privacy notice: ${noticeShared(reporter) ? "already shared; don't bring it up or ask permission again" : "never shared; tell them, with notice set on your reply, before filing. file_bug_report is there once they've answered it"}.`;
+}
+
+/** What Vera knows about this person as a reporter, for its tools. */
+export function reporterOf(turn: Turn): Promise<Reporter> {
+  return turn.ctx.runQuery(internal.supportReporters.reporter, {
+    accountId: turn.accountId,
+  });
 }
 
 /**
- * The report tools that act for the caller alone when Vera is called into
- * another conversation: no adding to their earlier reports, which it
- * can't list there.
+ * Bug reports for one reply: the tools, and what Vera's reply must say or
+ * mustn't (agentTools.ts `ReplyRules`), which share this reply's look at
+ * GitHub.
  */
-export function summonedSupportTools(turn: Turn) {
-  const {
-    file_bug_report,
-    follow_known_bug,
-    search_known_bugs,
-    share_privacy_notice,
-  } = supportTools(turn);
+export function support(turn: Turn, reporter: Reporter) {
+  const check = newCheck();
   return {
-    file_bug_report,
-    follow_known_bug,
-    search_known_bugs,
-    share_privacy_notice,
+    check,
+    reply: replyRules(turn, reporter, check),
+    tools: supportTools(turn, reporter, check),
   };
 }
 
-/** Filing and following bug reports. */
-export function supportTools(turn: Turn) {
-  const check = newCheck();
-  return {
+/**
+ * Bug reports when Vera is called into another conversation: for the
+ * caller alone, with no adding to their earlier reports, which it can't
+ * list there.
+ */
+export function summonedSupport(turn: Turn, reporter: Reporter) {
+  const { check, reply, tools } = support(turn, reporter);
+  const { add_to_bug_report: _, set_developer: __, ...summoned } = tools;
+  return { check, reply, tools: summoned };
+}
+
+/**
+ * Filing and following bug reports. Filing is there only once they've
+ * answered the privacy notice (supportRules.ts `whyNotFile`): offered
+ * before, Haiku tried to file first and, refused, sometimes told them it
+ * had (2026-11-17).
+ */
+function supportTools(turn: Turn, reporter: Reporter, check: KnownBugCheck) {
+  const tools = {
     ...lookupTools(turn, check),
-    share_privacy_notice: tool({
-      description:
-        "Send the notice that reports are public and screenshots are described, not posted. Required before file_bug_report.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        await turn.send(PRIVACY_NOTICE, { canned: true });
-        await turn.ctx.runMutation(internal.supportReporters.updateReporter, {
-          accountId: turn.accountId,
-          noticeShared: true,
-        });
-        return "Sent.";
-      },
-    }),
     set_developer: tool({
       description:
         "Record whether this person is a developer who wants technical details.",
@@ -176,6 +179,18 @@ export function supportTools(turn: Turn) {
         return "Saved.";
       },
     }),
+    add_to_bug_report: tool({
+      description: "Add details to one of their reports that's already filed.",
+      inputSchema: z.object({
+        reportId: z.string(),
+        details: z.string(),
+      }),
+      execute: (input) => addToBugReport(turn, input),
+    }),
+  };
+  if (whyNotFile(turn, reporter) !== null) return tools;
+  return {
+    ...tools,
     file_bug_report: tool({
       description:
         "File a bug report (or idea) for the team. It becomes a public, anonymized GitHub issue with their app version attached.",
@@ -197,14 +212,6 @@ export function supportTools(turn: Turn) {
         actual: z.string().optional(),
       }),
       execute: (input) => fileBugReport(turn, check, input),
-    }),
-    add_to_bug_report: tool({
-      description: "Add details to one of their reports that's already filed.",
-      inputSchema: z.object({
-        reportId: z.string(),
-        details: z.string(),
-      }),
-      execute: (input) => addToBugReport(turn, input),
     }),
   };
 }
@@ -237,7 +244,11 @@ async function fileBugReport(
   const unchecked = await uncheckedBugs(check);
   if (unchecked !== null) return unchecked;
   const issue = issueFor(input, turn.accountId, reporter.client);
-  const title = input.kind === "idea" ? `Idea: ${issue.title}` : issue.title;
+  // Models sometimes write the prefix themselves (#286: "Idea: Idea: …").
+  const title =
+    input.kind === "idea"
+      ? `Idea: ${issue.title.replace(/^idea:\s*/i, "")}`
+      : issue.title;
   const created = await openIssue(input.kind, title, issue.body);
   const filed = {
     issueNumber: created?.number,
@@ -246,6 +257,7 @@ async function fileBugReport(
     title,
   };
   if (created !== null) check.seen.add(created.number);
+  check.acted = true;
   const reportId = await turn.ctx.runMutation(internal.supportReports.insert, {
     ...filed,
     accountId: turn.accountId,

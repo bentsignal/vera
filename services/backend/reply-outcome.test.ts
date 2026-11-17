@@ -10,7 +10,6 @@ function step(...tools: string[]) {
 void test("a reply that sent something answered", () => {
   assert.equal(replyOutcome([step("reply")], 1), "answered");
   // The bug-report privacy notice alone is a message too.
-  assert.equal(replyOutcome([step("share_privacy_notice")], 1), "answered");
 });
 
 void test("a reply that called stay_quiet chose silence", () => {
