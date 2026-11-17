@@ -17,6 +17,18 @@ export function fail(code: string): never {
   throw new ConvexError({ code });
 }
 
+/**
+ * Whether an account is one the host answers people with, which anyone
+ * can @mention into a conversation they're in (assistants.ts).
+ */
+export async function isAssistant(ctx: QueryCtx, accountId: string) {
+  const row = await ctx.db
+    .query("assistants")
+    .withIndex("by_account", (index) => index.eq("accountId", accountId))
+    .unique();
+  return row !== null;
+}
+
 export function requireAccountId(
   identity: null | { accountId?: string; email?: string },
 ) {

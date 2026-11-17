@@ -5,7 +5,10 @@ import type { StoredAccount } from "~/features/session/account-store";
 import { forgetDrafts } from "~/features/conversation/drafts";
 import { forgetAccountNotifications } from "~/features/notifications/presented";
 import { getPushToken } from "~/features/notifications/push";
-import { closeAccountSession } from "~/features/session/account-session";
+import {
+  closeAccountSession,
+  forgetUnreachableAccount,
+} from "~/features/session/account-session";
 import {
   removeStoredAccount,
   storedAccounts,
@@ -39,7 +42,7 @@ async function endSession(session: AccountSession) {
  * ended there, so this only removes it from this device.
  */
 export function removeUnreachableAccount(account: StoredAccount) {
-  removeStoredAccount(account.address);
+  forgetUnreachableAccount(account);
   forgetDrafts(account.address);
   void forgetAccountNotifications(
     account.address,

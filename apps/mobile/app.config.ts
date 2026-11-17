@@ -22,6 +22,22 @@ const notificationExtension = process.env.VERA_NOTIFICATION_EXTENSION === "1";
 const EAS_PROJECT_ID = "5680db13-57a8-4b74-ae41-1f52abbda0b1";
 
 /**
+ * Each platform's runtime version: an over-the-air update reaches only the
+ * binaries built with the same one. Raise a platform's only when this
+ * JavaScript needs native code its older binaries don't have (a new native
+ * module, prop, event, dependency, config plugin, or permission string).
+ * Native changes the JavaScript doesn't depend on keep it, so older
+ * binaries keep every update and the change ships in the next store build.
+ * The first values are the native fingerprints of iOS build 12 and Play
+ * build 9; raise them to `ios-2`, `android-2`, and so on. See
+ * docs/releasing.md → Runtime versions.
+ */
+const RUNTIME_VERSION = {
+  ios: "251eec9a9649c31d0eec62ca3696fc6e76ee8b26",
+  android: "d6cd0d4b0106d90b8ca76a5aa5327d7432ff2bca",
+};
+
+/**
  * iOS alternate app icons, picked in Settings (src/features/preferences/app-icon.ts):
  * one per color theme but green, which is Vera's primary icon. Vera Dev's
  * primary icon is amber, so it offers green (`vera`) as an alternate too.
@@ -44,10 +60,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: "./assets/images/icon.png",
   userInterfaceStyle: "automatic",
   platforms: ["ios", "android"],
-  // Over-the-air updates (EAS Update) reach only binaries whose native code
-  // matches: the fingerprint changes whenever native code or config does.
-  // Each build profile has its own channel; see eas.json and docs/releasing.md.
-  runtimeVersion: { policy: "fingerprint" },
+  // Over-the-air updates (EAS Update) reach only binaries with the same
+  // runtime version (RUNTIME_VERSION, set per platform below). Each build
+  // profile has its own channel; see eas.json and docs/releasing.md.
   updates: {
     url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
     checkAutomatically: "ON_LOAD",
@@ -58,6 +73,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // alternates come from ALTERNATE_ICONS.
     icon: dev ? "./assets/icons/vera-dev.icon" : "./assets/icons/vera.icon",
     bundleIdentifier: BUNDLE_ID,
+    runtimeVersion: RUNTIME_VERSION.ios,
     supportsTablet: true,
     // Passkeys use the permanent relying party ID `vera.chat`, which also
     // hosts space invite links (`/join/*`, Vera Dev's `/dev/join/*`).
@@ -66,6 +82,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: BUNDLE_ID,
+    runtimeVersion: RUNTIME_VERSION.android,
     adaptiveIcon: {
       backgroundImage: dev
         ? "./assets/icons/vera-dev-android-background.png"
@@ -110,6 +127,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "./plugins/with-android-websocket-policy.cjs",
     // Adopts the UIScene life cycle the iOS 27 SDK requires; remove with SDK 58.
     "./plugins/with-ios-scene-lifecycle.cjs",
+    // App Shortcuts ("Open Chat"), in the app target.
+    "./plugins/with-app-intents.cjs",
     // React Native from source on iOS, for the repo's patch to it.
     "./plugins/with-react-native-from-source.cjs",
     ["./plugins/with-alternate-icons.cjs", { icons: ALTERNATE_ICONS }],

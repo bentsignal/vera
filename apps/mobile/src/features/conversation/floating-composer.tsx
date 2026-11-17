@@ -1,7 +1,6 @@
 import type { Ref } from "react";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
 
 import type { ComposerHandle } from "./composer";
 import type { ComposerReport } from "./composer-height";
@@ -29,6 +28,7 @@ import {
   readDraft,
   saveDraftFiles,
 } from "./drafts";
+import { KeyboardSticky } from "./keyboard-sticky";
 
 /** Calls `first` with each change to the text, then `then`. */
 function alsoTo(
@@ -140,9 +140,9 @@ export function FloatingComposer({
   }
 
   return (
-    <KeyboardStickyView
+    <KeyboardSticky
       // With the keyboard up, the inset below the bar goes behind it.
-      offset={{ closed: 0, opened: bottomInset }}
+      opened={bottomInset}
       // Floats over the messages, which scroll all the way to the bottom.
       style={{ bottom: 0, left: 0, position: "absolute", right: 0 }}
     >
@@ -178,6 +178,6 @@ export function FloatingComposer({
           return messageId;
         }}
       />
-    </KeyboardStickyView>
+    </KeyboardSticky>
   );
 }

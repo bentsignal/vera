@@ -27,10 +27,7 @@ const MAX_ISSUE_PAGES = 10;
  * first, or every issue when `since` is null. Unlike search, the list is
  * current the moment an issue is filed.
  */
-export async function issuesChangedSince(
-  config: GitHubConfig,
-  since: number | null,
-) {
+export function issuesChangedSince(config: GitHubConfig, since: number | null) {
   const query = new URLSearchParams({
     direction: "asc",
     per_page: "100",
@@ -38,8 +35,23 @@ export async function issuesChangedSince(
     state: "all",
     ...(since !== null && { since: new Date(since).toISOString() }),
   });
-  let path: string | null =
-    `/repos/${config.owner}/${config.name}/issues?${query.toString()}`;
+  return listIssues(
+    config,
+    `/repos/${config.owner}/${config.name}/issues?${query.toString()}`,
+  );
+}
+
+/** Every open issue (not pull request), newest first. */
+export function openIssues(config: GitHubConfig) {
+  return listIssues(
+    config,
+    `/repos/${config.owner}/${config.name}/issues?state=open&per_page=100`,
+  );
+}
+
+/** The issues on each page of a list, skipping its pull requests. */
+async function listIssues(config: GitHubConfig, first: string) {
+  let path: string | null = first;
   const issues: GitHubIssue[] = [];
   for (let page = 0; path !== null && page < MAX_ISSUE_PAGES; page++) {
     const response = await githubResponse(config, path);
