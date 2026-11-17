@@ -1,47 +1,131 @@
 import type { PdsRouterMutation } from "@decentralized-convex/server";
 
 import type { Doc } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Chat } from "./agentTools";
 import type { BotAccount } from "./bots";
+import { replyThread } from "../assistant-threads";
 import { internal } from "./_generated/api";
 import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
+import { mentionsAssistant, startSummon } from "./summons";
+import { heardInThread, mentionedInThread } from "./summonThreads";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
-// ones in a direct conversation with an assistant.
+// ones in a direct conversation with an assistant (a reply kept in a
+// thread there is answered in that thread, which keeps its own reply
+// state, assistant-threads.ts), to messages anywhere else that @mention
+// one (summons.ts), and to replies in its threads (summonThreads.ts).
 
 /** How long a reply waits for more messages, so a burst gets one answer. */
 const REPLY_DELAY = 1500;
 
 /**
  * The router's `afterMutation` (pds.ts): when someone on this PDS sends a
- * direct message to an assistant, its reply runs after a short pause. A
- * newer message moves the reply later, so it answers them together.
+ * direct message to an assistant, its reply runs after a short pause, in
+ * the thread when the message was kept there. A newer message moves the
+ * reply later, so it answers them together. A message anywhere else that
+ * mentions one gets its answer (summons.ts).
  */
 export async function afterPdsMutation(
   ctx: MutationCtx,
-  { identity, operation, plugin }: PdsRouterMutation,
+  { identity, operation, plugin, value }: PdsRouterMutation,
 ) {
   if (plugin !== "messages" || identity === null) return;
   const type = field(operation, "type");
-  const conversationId = field(field(operation, "args"), "conversationId");
+  const args = field(operation, "args");
+  const conversationId = field(args, "conversationId");
   if (typeof conversationId !== "string") return;
-  if (!conversationId.startsWith("direct:")) return;
+  if (!withAssistant(conversationId)) {
+    if (type === "send") {
+      await summonMentioned(ctx, identity.accountId, conversationId, args);
+    }
+    return;
+  }
   if (type === "editMessage" || type === "deleteMessage") {
     await forgetChangedMessage(ctx, conversationId, operation);
     return;
   }
   if (type !== "send" || identity.accountId === undefined) return;
-  await startReply(ctx, conversationId, identity.accountId);
+  await startReply(ctx, conversationId, sentThread(value), identity.accountId);
+}
+
+/**
+ * The thread a sent message is answered in, when it was kept in one
+ * (assistant-threads.ts): its original's, even for a reply to a reply.
+ */
+function sentThread(sent: unknown) {
+  const threadId = field(sent, "threadId");
+  const thread = replyThread({
+    threadId: typeof threadId === "string" ? threadId : undefined,
+    threadOnly: field(sent, "threadOnly") === true,
+  });
+  return thread ?? undefined;
+}
+
+/** A direct conversation's two members, or none for any other kind. */
+function directMembers(conversationId: string) {
+  return conversationId.startsWith("direct:")
+    ? conversationId.slice("direct:".length).split(":")
+    : [];
+}
+
+/** Whether it's someone's direct conversation with an assistant. */
+function withAssistant(conversationId: string) {
+  const members = directMembers(conversationId);
+  return ASSISTANTS.some((bot) => members.includes(botAddress(bot)));
+}
+
+/**
+ * Answers a message that mentions an assistant (summons.ts); in a thread,
+ * the assistant follows it from then on. A reply in a thread that mentions
+ * none goes to the thread's gate, in case an assistant follows the thread
+ * (summonThreads.ts).
+ */
+async function summonMentioned(
+  ctx: MutationCtx,
+  author: string | undefined,
+  conversationId: string,
+  args: unknown,
+) {
+  const body = field(args, "body");
+  const messageId = field(args, "messageId");
+  if (author === undefined) return;
+  if (typeof body !== "string" || typeof messageId !== "string") return;
+  const threadId = field(args, "threadId");
+  const bot = ASSISTANTS.find((candidate) =>
+    mentionsAssistant(candidate, body, field(args, "mentions")),
+  );
+  if (bot === undefined) {
+    if (typeof threadId === "string") {
+      await heardInThread(ctx, {
+        accountId: author,
+        conversationId,
+        messageId,
+        threadId,
+      });
+    }
+    return;
+  }
+  if (typeof threadId === "string") {
+    await mentionedInThread(ctx, bot, {
+      accountId: author,
+      conversationId,
+      messageId,
+      threadId,
+    });
+  }
+  await startSummon(ctx, { accountId: author, bot, conversationId, messageId });
 }
 
 /** Schedules an assistant's reply to someone's direct message to it. */
 async function startReply(
   ctx: MutationCtx,
   conversationId: string,
+  threadId: string | undefined,
   author: string,
 ) {
-  const members = conversationId.slice("direct:".length).split(":");
+  const members = directMembers(conversationId);
   if (!members.includes(author)) return;
   const bot = ASSISTANTS.find(
     (candidate) =>
@@ -53,14 +137,29 @@ async function startReply(
     accountId: author,
     bot: bot.username,
     conversationId,
+    threadId,
     wakeAt: Date.now() + REPLY_DELAY,
   });
 }
 
+/** The reply state of a DM with an assistant, or with `threadId`, of that thread. */
+export function replyRow(
+  ctx: QueryCtx,
+  conversationId: string,
+  threadId: string | undefined,
+) {
+  return ctx.db
+    .query("botConversations")
+    .withIndex("by_conversation", (q) =>
+      q.eq("conversationId", conversationId).eq("threadId", threadId),
+    )
+    .unique();
+}
+
 /**
- * Has the assistant reply in a conversation at `wakeAt`, optionally with a
- * note from the team (agent.ts `teamNote`). A later call moves the reply
- * later.
+ * Has the assistant reply in a conversation (or with `threadId`, in that
+ * thread) at `wakeAt`, optionally with a note from the team (agent.ts
+ * `teamNote`). A later call moves the reply later.
  */
 export async function scheduleReply(
   ctx: MutationCtx,
@@ -69,22 +168,21 @@ export async function scheduleReply(
     bot,
     conversationId,
     note,
+    threadId,
     wakeAt,
   }: {
     accountId: string;
     bot: BotAccount["username"];
     conversationId: string;
     note?: string;
+    threadId?: string;
     wakeAt: number;
   },
 ) {
-  const existing = await ctx.db
-    .query("botConversations")
-    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
-    .unique();
+  const existing = await replyRow(ctx, conversationId, threadId);
   const update = {
     ...(note !== undefined && { note }),
-    runId: await scheduleRun(ctx, conversationId, wakeAt),
+    runId: await scheduleRun(ctx, { conversationId, threadId }, wakeAt),
     waitingSince: undefined,
     wakeAt,
   };
@@ -94,6 +192,7 @@ export async function scheduleReply(
       accountId,
       bot,
       conversationId,
+      ...(threadId !== undefined && { threadId }),
     });
   } else {
     await ctx.db.patch(existing._id, update);
@@ -106,11 +205,12 @@ export async function scheduleReply(
  */
 export function scheduleRun(
   ctx: MutationCtx,
-  conversationId: string,
+  { conversationId, threadId }: Chat,
   wakeAt: number,
 ) {
   return ctx.scheduler.runAt(wakeAt, internal.agent.run, {
     conversationId,
+    ...(threadId !== undefined && { threadId }),
     wakeAt,
   });
 }
@@ -151,7 +251,7 @@ export async function waitWhileTyping(
     return false;
   }
   const response = await queryAsBot(ctx, VERA, {
-    args: { conversationId: row.conversationId },
+    args: { conversationId: row.conversationId, threadId: row.threadId },
     type: "typing",
   });
   const typing =
@@ -160,7 +260,7 @@ export async function waitWhileTyping(
   if (!typing) return false;
   const wakeAt = now + TYPING_RECHECK;
   await ctx.db.patch(row._id, {
-    runId: await scheduleRun(ctx, row.conversationId, wakeAt),
+    runId: await scheduleRun(ctx, row, wakeAt),
     wakeAt,
     waitingSince: row.waitingSince ?? now,
   });

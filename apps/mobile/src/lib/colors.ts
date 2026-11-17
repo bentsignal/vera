@@ -3,6 +3,8 @@
  * reads correctly in both light and dark mode.
  */
 export const nativeColors = {
+  /** System red, for something that's broken. */
+  destructive: "#FF3B30",
   secondaryLabel: "#8E8E93",
 };
 

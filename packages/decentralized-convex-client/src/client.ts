@@ -1,6 +1,6 @@
 import type { DiscoveredPds } from "@decentralized-convex/address";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
-import { accountDomain, discoverPds } from "@decentralized-convex/address";
+import { discoverPds } from "@decentralized-convex/address";
 
 import type { PdsMutationOptions } from "./optimistic.ts";
 import type {
@@ -33,6 +33,7 @@ import {
   withInitialResponseTimeout,
 } from "./query-execution.ts";
 import { RoutedPdsQueryObserver } from "./routed-pds-observer.ts";
+import { PdsDirectory, resolvedTargets, unresolvedSources } from "./routes.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
 import {
   groupFederationTargets,
@@ -43,20 +44,17 @@ import {
 export class DecentralizedConvexClient {
   readonly #connectionFactory;
   readonly #connections = new Map<string, FederationConnection>();
-  readonly #discoverPds;
   readonly #getAuthToken;
   readonly #home?: DiscoveredPds;
-  readonly #pdsByDomain = new Map<string, DiscoveredPds>();
-  readonly #pdsByUrl = new Map<string, DiscoveredPds>();
-  readonly #pdsResolutions = new Map<string, Promise<DiscoveredPds>>();
+  readonly #pds;
 
   constructor(options: FederationClientOptions = {}) {
     this.#connectionFactory =
       options.connectionFactory ?? createConvexFederationConnection;
-    this.#discoverPds = options.pds?.discover ?? discoverPds;
+    this.#pds = new PdsDirectory(options.pds?.discover ?? discoverPds);
     this.#getAuthToken = options.getAuthToken;
     this.#home = options.pds?.home;
-    if (this.#home !== undefined) this.#rememberPds(this.#home);
+    if (this.#home !== undefined) this.#pds.remember(this.#home);
   }
 
   watchQuery<Query extends FederationQueryReference, Combined>(
@@ -86,10 +84,10 @@ export class DecentralizedConvexClient {
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
       initialResponseTimeout: initialResponseTimeout(options),
-      knownPds: this.#pdsByDomain,
+      knownPds: this.#pds.byDomain,
       request,
       revealPartialResultsAfter: partialResultsDelay(options),
-      resolveRoutes: (routes) => this.#resolveRoutes(routes, request),
+      resolveRoutes: (routes) => this.#pds.resolveRoutes(routes, request),
     });
   }
 
@@ -174,16 +172,17 @@ export class DecentralizedConvexClient {
       responseTimeout,
       homeTarget.url,
     );
+    const routes = await this.#pds.resolveRoutes(homeResult.routes, request);
     const targets = groupFederationTargets([
       homeTarget,
-      ...(await this.#resolveRoutes(homeResult.routes, request)),
+      ...resolvedTargets(routes),
     ]);
     const included = includedOnHome(
       homeResult.included,
       homeTarget,
-      this.#pdsByDomain,
+      this.#pds.byDomain,
     );
-    const settled = await Promise.all(
+    const answered = await Promise.all(
       targets.map(async (target) => {
         if (target.url === homeGroup.url) {
           return { data: homeResult.data, status: "live" as const, target };
@@ -206,6 +205,7 @@ export class DecentralizedConvexClient {
         }
       }),
     );
+    const settled = [...unresolvedSources(routes), ...answered];
     const snapshot = createFederatedSnapshot<
       PdsRequestResult<Request>,
       DefaultCombinedPdsResult<Request>
@@ -257,22 +257,8 @@ export class DecentralizedConvexClient {
     this.#getConnection(this.#requireHome().manifest.deploymentUrl);
   }
 
-  async resolvePds(addressOrDomain: string) {
-    const domain = accountDomain(addressOrDomain);
-    const existing = this.#pdsByDomain.get(domain);
-    if (existing !== undefined) return existing;
-    const pending = this.#pdsResolutions.get(domain);
-    if (pending !== undefined) return pending;
-    const resolution = this.#discoverPds(addressOrDomain)
-      .then((resolved) => {
-        this.#rememberPds(resolved);
-        return resolved;
-      })
-      .finally(() => {
-        this.#pdsResolutions.delete(domain);
-      });
-    this.#pdsResolutions.set(domain, resolution);
-    return resolution;
+  resolvePds(addressOrDomain: string) {
+    return this.#pds.resolve(addressOrDomain);
   }
 
   async close() {
@@ -293,26 +279,11 @@ export class DecentralizedConvexClient {
         : (request: Parameters<typeof fetchAuthToken>[0]) =>
             fetchAuthToken({
               ...request,
-              pds: this.#pdsByUrl.get(url),
+              pds: this.#pds.byUrl.get(url),
             });
     const connection = this.#connectionFactory(url, getAuthToken);
     this.#connections.set(url, connection);
     return connection;
-  }
-
-  async #resolveRoutes(routes: readonly string[], request: AnyPdsQueryRequest) {
-    return Promise.all(
-      [...new Set(routes)].map(async (route) => {
-        const pds = await this.resolvePds(route);
-        assertPdsSupportsRequest(pds, request);
-        return pdsTarget(route, pds);
-      }),
-    );
-  }
-
-  #rememberPds(pds: DiscoveredPds) {
-    this.#pdsByDomain.set(pds.domain, pds);
-    this.#pdsByUrl.set(normalizeFederationUrl(pds.manifest.deploymentUrl), pds);
   }
 
   #requireHome() {

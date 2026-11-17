@@ -89,7 +89,23 @@ Mentions: `messages.send` takes `mentions`, each an `accountId` and the
 The PDS keeps only mentions of other members of the group or channel whose
 `@name` is in the body, stores them on the message (`mentions`), and notes
 each mentioned account in its `mentions` table so their activity finds
-it. Direct messages have none. Apps bold `@name` wherever it appears.
+it. Direct messages have none, apart from assistants'. Apps bold `@name`
+wherever it appears.
+
+Assistants: accounts the host answers people with (Vera's assistant, say)
+can be @mentioned in any conversation, direct messages included, without
+being members, and those mentions are kept. The host makes an account one
+with the Component mutation `assistants.setAssistant`, watches sends for
+mentions of it (the router's `afterMutation`), and answers through the
+Component's host-only functions: `assistants.summonContext` reads what
+the caller can see before their message (the thread it's in, or the
+conversation, with the original it replies to), `assistants.reply`
+posts the answer in that message's thread, `assistants.setTyping` shows
+it typing there, and `assistants.threadTyping` lists who else is typing
+there. Each checks that the message is the caller's own, in a
+conversation they're in. An assistant's reply doesn't join its thread:
+which later replies there it reads is the host's choice. Clients can't
+call any of these.
 
 Alerts: each group, channel, and space alerts an account about `all`
 messages, only ones that `mentions` them, or `none` (no activity and no

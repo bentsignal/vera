@@ -310,7 +310,16 @@ thread with the T3 `link_pull_request` tool. Review your own diff
 CI (`gh pr checks --watch`) and fix failures. Make sure the CI workflow
 actually ran (lint, typecheck, test, format, react-doctor, bundle), not just
 the fingerprint check. If the "📱 Native Change"
-label appears, say so: the next release then needs a store build. If the
+label appears, the "Native change" line can't say "no". Say "yes,
+compatible" only after running this JavaScript on a dev client without the
+native change (check out the native files from `origin/main`,
+`scripts/sim.sh up`, check the screens that call into it, restore), and
+put that in the evidence. Otherwise raise the platform's runtime version
+and say "yes, new runtime" (docs/releasing.md → Runtime versions); tell
+Shawn, since older binaries stop getting updates until people install
+the next store build. Prefer making a new native feature optional
+(reported by the native side, checked by the JavaScript) over raising the
+runtime. If the
 "💥 Breaking Backend" label is on it, say so too: the release must ship it
 with `--with-backend`, and open apps on older versions will show "Updating
 Vera…" for a few seconds when it does.
