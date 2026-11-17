@@ -1,7 +1,7 @@
 import type { ReplyRules, Turn } from "./agentTools";
 import type { KnownBugCheck } from "./supportLookup";
 import type { Reporter } from "./supportReporters";
-import { claimsFiled } from "../reply-claims";
+import { claimsFiled, promisesUpdates } from "../reply-claims";
 import { internal } from "./_generated/api";
 
 // What has to be true before Vera puts a bug report in public: the
@@ -40,6 +40,8 @@ export function whyNotFile(turn: Turn, reporter: Reporter) {
  * - That a report went to the team, only when this reply filed or
  *   followed one: Haiku and Kimi sometimes said they'd passed it on
  *   without filing anything (2026-11-17).
+ * - That they'll hear when it's fixed, only when they follow a report:
+ *   Haiku promised it after finding one it hadn't followed.
  */
 export function replyRules(
   turn: Turn,
@@ -69,6 +71,15 @@ export function replyRules(
       if (!warned && !check.acted && claimsFiled(messages)) {
         warned = true;
         return "Not sent: nothing was filed or followed in this reply, so don't say it was sent, filed, or passed to the team. If it's ready to file, ask whether it's OK to send it.";
+      }
+      if (
+        !warned &&
+        !check.acted &&
+        !reporter.following &&
+        promisesUpdates(messages)
+      ) {
+        warned = true;
+        return "Not sent: they don't follow any report, so nothing will tell them when it's fixed. If it matches a known bug, call follow_known_bug first; otherwise don't promise word on a fix.";
       }
       return null;
     },

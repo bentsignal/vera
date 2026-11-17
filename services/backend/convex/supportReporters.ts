@@ -57,9 +57,15 @@ export const reporter = internalQuery({
       .query("clientInfo")
       .withIndex("by_account", (q) => q.eq("accountId", accountId))
       .unique();
+    const followed = await ctx.db
+      .query("bugReports")
+      .withIndex("by_account", (q) => q.eq("accountId", accountId))
+      .filter((q) => q.eq(q.field("tracking"), true))
+      .first();
     return {
       client: client && clientDetails(client),
       developer: row?.developer ?? null,
+      following: followed !== null,
       noticeSharedAt: row?.noticeSharedAt ?? null,
     };
   },
@@ -98,6 +104,8 @@ export interface Reporter {
     update: string;
   } | null;
   readonly developer: boolean | null;
+  /** Whether they follow a report that isn't fixed yet, to hear when it is. */
+  readonly following: boolean;
   /** When Vera last told them reports are public. */
   readonly noticeSharedAt: number | null;
 }

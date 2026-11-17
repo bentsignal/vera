@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { claimsFiled, promisesToCheck } from "./reply-claims.ts";
+import {
+  claimsFiled,
+  promisesToCheck,
+  promisesUpdates,
+} from "./reply-claims.ts";
 
 void test("claimsFiled: saying a report went to the team, not asking", () => {
   // Said with nothing filed (2026-11-17 replays).
@@ -33,6 +37,29 @@ void test("claimsFiled: saying a report went to the team, not asking", () => {
     ]),
   );
   assert.ok(!claimsFiled(["Try the following steps first."]));
+});
+
+void test("claimsFiled and promisesToCheck: curly apostrophes too", () => {
+  // Kimi writes ’ (2026-11-17 replays).
+  assert.ok(
+    claimsFiled([
+      "That matches a bug someone already reported, so the team has it and I’ve linked your experience to it.",
+    ]),
+  );
+  assert.ok(claimsFiled(["It’s still open, so I’ve followed it for you."]));
+  assert.ok(promisesToCheck(["I’ll check whether anyone reported it."]));
+});
+
+void test("promisesUpdates: word when it's fixed, not other help", () => {
+  // Said after finding a report it never followed (2026-11-17 replays).
+  assert.ok(
+    promisesUpdates([
+      "Someone already reported this one. It's still open, and I'll message you here when it's fixed. Want me to add anything?",
+    ]),
+  );
+  assert.ok(promisesUpdates(["I’ll let you know once it’s resolved."]));
+  assert.ok(!promisesUpdates(["I'll tell you how to fix it."]));
+  assert.ok(!promisesUpdates(["Want me to message you here when it's fixed?"]));
 });
 
 void test("promisesToCheck: a reply that says it's about to look", () => {
