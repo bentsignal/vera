@@ -23,6 +23,68 @@ import type { FunctionReference } from "convex/server";
  */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
+    assistants: {
+      reply: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          assistantId: string;
+          assistantName: string;
+          body: string;
+          callerId: string;
+          conversationId: string;
+          inReplyTo: string;
+          messageId: string;
+        },
+        any,
+        Name
+      >;
+      setAssistant: FunctionReference<
+        "mutation",
+        "internal",
+        { accountId: string; assistant: boolean },
+        null,
+        Name
+      >;
+      setTyping: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          assistantId: string;
+          callerId: string;
+          conversationId: string;
+          inReplyTo: string;
+          typing: boolean;
+        },
+        null,
+        Name
+      >;
+      summonContext: FunctionReference<
+        "query",
+        "internal",
+        {
+          assistantId: string;
+          before?: number;
+          callerId: string;
+          conversationId: string;
+          messageId: string;
+        },
+        any,
+        Name
+      >;
+      threadTyping: FunctionReference<
+        "query",
+        "internal",
+        {
+          assistantId: string;
+          callerId: string;
+          conversationId: string;
+          messageId: string;
+        },
+        Array<string>,
+        Name
+      >;
+    };
     dispatcher: {
       dispatchMutation: FunctionReference<
         "mutation",
