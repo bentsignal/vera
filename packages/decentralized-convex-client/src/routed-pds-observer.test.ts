@@ -128,6 +128,57 @@ void test("publishes each update from home once while its routes stay the same",
   await client.close();
 });
 
+void test("answers from the PDSes it can find when a route's PDS is gone", async () => {
+  const connections = new Map<string, ControlledConnection>();
+  const lookups: string[] = [];
+  const client = new DecentralizedConvexClient({
+    connectionFactory: (url) => {
+      const connection = new ControlledConnection();
+      connections.set(url, connection);
+      return connection;
+    },
+    pds: {
+      discover: (address) => {
+        const domain = address.slice(address.lastIndexOf("@") + 1);
+        lookups.push(domain);
+        return domain === "gone.test"
+          ? Promise.reject(new Error("PDS manifest request failed (404)"))
+          : Promise.resolve(discoveredPds(domain));
+      },
+      home: discoveredPds("a.test"),
+    },
+  });
+  const observer = client.watchPdsQuery(listNotesRequest, {
+    revealPartialResultsAfter: 0,
+  });
+
+  const home = connections.get("https://a.test");
+  home?.emit([{ body: "a" }], ["someone@gone.test", "someone@b.test"]);
+  await wait(0);
+  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  await wait(0);
+
+  const snapshot = observer.getSnapshot();
+  assert.equal(snapshot.status, "partial");
+  assert.deepEqual(snapshot.data, [{ body: "a" }, { body: "b" }]);
+  const gone = snapshot.sources.find(
+    (source) => source.target.url === "https://gone.test",
+  );
+  assert.equal(gone?.status, "error");
+
+  // Another update from home doesn't look the gone domain up again.
+  home?.emit([{ body: "a2" }], ["someone@gone.test", "someone@b.test"]);
+  await wait(0);
+  assert.deepEqual(observer.getSnapshot().data, [
+    { body: "a2" },
+    { body: "b" },
+  ]);
+  assert.equal(lookups.filter((domain) => domain === "gone.test").length, 1);
+
+  observer.close();
+  await client.close();
+});
+
 const listNotesRequest = {
   lastChanged: corePackage.lastChanged,
   operation: { args: {}, type: "list" },
