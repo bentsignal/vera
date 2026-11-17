@@ -84,9 +84,10 @@ The phone holds one Vera Dev at a time:
   A new `Intent` has no categories set (`null`), so that copy throws.
   Expo fixed it in SDK 58 (`addCategory` per category). `sim.sh`'s
   `adb shell am start` link has no category, so emulators never hit it.
-  Patching it ourselves changes every native fingerprint (dev and
-  production, both platforms), which means a store build. So it waits for
-  the SDK 58 upgrade, or a release that needs a store build anyway.
+  Patching it ourselves is a native change, so it would reach phones only
+  in the next Android store build (a compatible one: the runtime version
+  stays). It waits for the SDK 58 upgrade, or rides along with a store
+  build.
 
   A worktree with an isolated backend serves
   that backend's domain, which starts with no accounts: sign in there by
@@ -312,6 +313,19 @@ notification. A real APNs push does run the extension on an Apple silicon
 simulator: register the simulator's device token with Expo
 (`getExpoPushTokenAsync`, or `POST https://exp.host/--/api/v2/push/getExpoPushToken`
 with `development: true`) and send to that token through the Expo push API.
+
+## App Shortcuts
+
+"Open Chat" (`plugins/app-intents/VeraIntents.swift`, added to the app
+target by `plugins/with-app-intents.cjs`) opens a chat you pick with the
+keyboard up, ready to type or dictate with the keyboard's microphone. It
+shows in the Shortcuts app, Siri, Spotlight, and the Action button's
+Shortcut setting, along with an "Open <chat> in Vera" shortcut for each
+recent chat. The chats come from the Inbox: JavaScript lists its 100 most
+recent in `UserDefaults` (`src/features/shortcuts`, `modules/shortcuts`),
+where the intent's query reads them. Running it opens the app and leaves
+the chat there; JavaScript opens it and focuses the field once its
+messages show. App Intents need no entitlement or App ID capability.
 
 ## Layout
 

@@ -6,6 +6,7 @@ import {
   decodeDnsTxtData,
   discoverPds,
   parsePdsTxtRecord,
+  PdsNotFoundError,
 } from "./discovery.ts";
 
 void test("extracts and validates an account domain", () => {
@@ -142,5 +143,43 @@ void test("rejects ambiguous or insecure discovery records", async () => {
   assert.throws(
     () => parsePdsTxtRecord("v=pds1;url=http://a.example/manifest"),
     /HTTPS/,
+  );
+});
+
+void test("tells a domain with no PDS from one that didn't answer", async () => {
+  function answering(dns: unknown, manifestStatus: number) {
+    return (input: string | URL | Request) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      return Promise.resolve(
+        url.startsWith("https://cloudflare-dns.com/dns-query")
+          ? Response.json(dns)
+          : new Response(null, { status: manifestStatus }),
+      );
+    };
+  }
+  const record = {
+    Answer: [{ data: '"v=pds1;url=https://a.example/manifest"', type: 16 }],
+    Status: 0,
+  };
+  // No such name, no record, and a manifest that's gone: no PDS.
+  for (const fetch of [
+    answering({ Status: 3 }, 200),
+    answering({ Status: 0 }, 200),
+    answering(record, 404),
+  ]) {
+    await assert.rejects(
+      discoverPds("a.vera.chat", { fetch }),
+      PdsNotFoundError,
+    );
+  }
+  // A server error might pass.
+  await assert.rejects(
+    discoverPds("a.vera.chat", { fetch: answering(record, 503) }),
+    (error) => !(error instanceof PdsNotFoundError),
   );
 });

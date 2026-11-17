@@ -6,9 +6,10 @@ import type { AssistantModel } from "../assistant-models";
 import type { BotAccount } from "./bots";
 import { GATEWAY_URL_IMAGES } from "../assistant-images";
 import { NO_TOOL_CALL, replyOutcome } from "../reply-outcome";
+import { Interrupted } from "./agentTools";
 
-// Calling the models for a reply (agent.ts), with Gemini taking over when
-// Grok fails (assistant-models.ts).
+// Calling the models for a reply (agent.ts), with the next model taking
+// over when one fails (assistant-models.ts).
 
 /** Tries per model before the next one takes over. */
 const TRIES = 2;
@@ -34,6 +35,14 @@ function gatewayModel(model: AssistantModel) {
     },
     model: convexGateway(model.id, { zdr: true }),
   });
+}
+
+/**
+ * Ends a reply the person interrupted (agentTools.ts `interruption`)
+ * instead of trying again or handing it to the next model.
+ */
+function stopIfInterrupted(signal: AbortSignal | undefined) {
+  if (signal?.aborted === true) throw new Interrupted();
 }
 
 /** False when the provider says trying the same request again won't help. */
@@ -68,8 +77,11 @@ export async function generateReply(
             messages: [...messages, ...more],
             model: gatewayModel(model),
           });
+          stopIfInterrupted(options.abortSignal);
           return { index, model, result };
         } catch (error: unknown) {
+          // They wrote again first: the next reply answers it all.
+          stopIfInterrupted(options.abortSignal);
           // Once something went out, another try would say it again.
           if (sender.sent() > 0) throw error;
           console.warn(`${bot.username} failed on ${model.id}`, error);

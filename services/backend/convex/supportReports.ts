@@ -11,6 +11,7 @@ import {
   isNewStage,
   platformOf,
   progressOf,
+  updateLink,
   updateMessage,
 } from "../bug-reports";
 import { internal } from "./_generated/api";
@@ -19,11 +20,11 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { sendAsBot, VERA } from "./bots";
+import { VERA } from "./bots";
 import { githubConfig, issueStates } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";
 import { reportStage } from "./schema";
-import { explainClosure } from "./supportClosures";
+import { explainClosure, sendWithAside } from "./supportClosures";
 
 // The bug reports Vera files (supportAgent.ts) and how they're
 // going. A cron (crons.ts) reads each open report's GitHub issue and tells
@@ -153,6 +154,8 @@ const progressValidator = v.object({
   ),
   pullRequest: v.optional(v.object({ number: v.number(), url: v.string() })),
   release: v.optional(v.string()),
+  /** An idea for something new, not a bug (its issue's label). */
+  idea: v.optional(v.boolean()),
   stage: reportStage,
   stateReason: v.optional(v.union(v.null(), v.string())),
   /** Why the team closed it, in their words (supportClosures.ts). */
@@ -185,6 +188,7 @@ export const advance = internalMutation({
     if (progress.stage === "closed" && progress.closingComment !== undefined) {
       await explainClosure(ctx, updated, {
         comment: progress.closingComment,
+        idea: progress.idea === true,
         stateReason: progress.stateReason,
       });
     } else {
@@ -203,7 +207,7 @@ async function tellReporter(
     .query("supportReporters")
     .withIndex("by_account", (q) => q.eq("accountId", report.accountId))
     .unique();
-  const message = updateMessage(report.stage, {
+  const context = {
     ...progress,
     developer: reporter?.developer === true,
     platform: await platformFor(ctx, report.accountId),
@@ -211,9 +215,16 @@ async function tellReporter(
     pullRequest: report.pullRequest,
     sha: report.fix?.sha,
     summary: report.summary,
-  });
+  };
+  const message = updateMessage(report.stage, context);
   if (message !== null) {
-    await sendAsBot(ctx, VERA, report.conversationId, message);
+    await sendWithAside(
+      ctx,
+      VERA,
+      report.conversationId,
+      message,
+      updateLink(report.stage, context),
+    );
   }
 }
 
@@ -260,6 +271,7 @@ async function checkReport(
 ) {
   if (state.state === "CLOSED" && state.duplicateOf !== null) {
     await ctx.runMutation(internal.supportClosures.followOriginal, {
+      idea: state.idea,
       issueNumber: state.duplicateOf,
       issueUrl: `https://github.com/${config.owner}/${config.name}/issues/${String(state.duplicateOf)}`,
       reportId: report._id,
@@ -292,7 +304,7 @@ async function progressFrom(
   platform: Platform,
 ): Promise<Progress> {
   const found = progressOf(state);
-  const base = { ...found, stateReason: state.stateReason };
+  const base = { ...found, idea: state.idea, stateReason: state.stateReason };
   if (found.stage === "fixed" && found.fix !== undefined) {
     return {
       ...base,
@@ -302,7 +314,7 @@ async function progressFrom(
   if (found.stage === "closed" && state.closingComment !== null) {
     return { ...base, closingComment: state.closingComment };
   }
-  return found.stage === "live" ? { ...base, delivery: "unknown" } : base;
+  return base;
 }
 
 /**

@@ -1,10 +1,11 @@
 name: Release steps
 
 # Every PR says whether it adds steps the next release must do beyond
-# `pnpm release`, and puts them in docs/next-release.md, and whether it's a
-# breaking backend change (scripts/check-release-steps.ts). A PR that raises
-# BREAKING_VERSION gets the "💥 Breaking Backend" label. Reruns when the
-# description is edited.
+# `pnpm release`, and puts them in docs/next-release.md, whether it's a
+# breaking backend change, and whether it raises the app's runtime version
+# (scripts/check-release-steps.ts). A PR that raises BREAKING_VERSION gets
+# the "💥 Breaking Backend" label; one that raises RUNTIME_VERSION gets
+# "⛔ New Runtime". Reruns when the description is edited.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
@@ -55,6 +56,21 @@ jobs:
           label="💥 Breaking Backend"
           gh label create "$label" --color b60205 --force \
             --description "Raises BREAKING_VERSION: ship with pnpm release ota production --with-backend" \
+            --repo "$GITHUB_REPOSITORY"
+          if [ -n "$before" ] && [ "$before" != "$after" ]; then
+            gh pr edit "$PR" --add-label "$label" --repo "$GITHUB_REPOSITORY"
+          else
+            gh pr edit "$PR" --remove-label "$label" --repo "$GITHUB_REPOSITORY" || true
+          fi
+          runtimes() {
+            git show "$1:apps/mobile/app.config.ts" 2>/dev/null \
+              | sed -n '/const RUNTIME_VERSION = {/,/};/p' || true
+          }
+          before="$(runtimes "$BASE_SHA")"
+          after="$(runtimes HEAD)"
+          label="⛔ New Runtime"
+          gh label create "$label" --color 5319e7 --force \
+            --description "Raises the runtime version: older binaries stop getting updates until they install a store build" \
             --repo "$GITHUB_REPOSITORY"
           if [ -n "$before" ] && [ "$before" != "$after" ]; then
             gh pr edit "$PR" --add-label "$label" --repo "$GITHUB_REPOSITORY"
