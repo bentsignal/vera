@@ -11,6 +11,7 @@ import {
   isNewStage,
   platformOf,
   progressOf,
+  updateLink,
   updateMessage,
 } from "../bug-reports";
 import { internal } from "./_generated/api";
@@ -19,11 +20,11 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { sendAsBot, VERA } from "./bots";
+import { VERA } from "./bots";
 import { githubConfig, issueStates } from "./github";
 import { delivered, lazyReleases } from "./githubReleases";
 import { reportStage } from "./schema";
-import { explainClosure } from "./supportClosures";
+import { explainClosure, sendWithAside } from "./supportClosures";
 
 // The bug reports Vera files (supportAgent.ts) and how they're
 // going. A cron (crons.ts) reads each open report's GitHub issue and tells
@@ -206,7 +207,7 @@ async function tellReporter(
     .query("supportReporters")
     .withIndex("by_account", (q) => q.eq("accountId", report.accountId))
     .unique();
-  const message = updateMessage(report.stage, {
+  const context = {
     ...progress,
     developer: reporter?.developer === true,
     platform: await platformFor(ctx, report.accountId),
@@ -214,9 +215,16 @@ async function tellReporter(
     pullRequest: report.pullRequest,
     sha: report.fix?.sha,
     summary: report.summary,
-  });
+  };
+  const message = updateMessage(report.stage, context);
   if (message !== null) {
-    await sendAsBot(ctx, VERA, report.conversationId, message);
+    await sendWithAside(
+      ctx,
+      VERA,
+      report.conversationId,
+      message,
+      updateLink(report.stage, context),
+    );
   }
 }
 

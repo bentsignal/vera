@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { updateMessage } from "./bug-reports.ts";
+import { updateLink, updateMessage } from "./bug-reports.ts";
 
 // What Vera tells someone as their report moves along (bug-reports.ts).
 
@@ -21,10 +21,21 @@ void test("updates are plain for most people and add links for developers", () =
     "We're working on a fix for the bug you reported (photos showing sideways).",
   );
   assert.ok(!/github|issue|PR/i.test(plain));
+  // A developer gets the same message, and the link goes in its thread.
   assert.equal(
     updateMessage("inProgress", { ...context, developer: true }),
-    `${plain}\nPR: ${pr.url}`,
+    plain,
   );
+  assert.equal(updateLink("inProgress", context), null);
+  assert.equal(
+    updateLink("inProgress", { ...context, developer: true }),
+    `PR: ${pr.url}`,
+  );
+  assert.equal(
+    updateLink("pickedUp", { ...context, developer: true }),
+    context.issueUrl,
+  );
+  assert.equal(updateLink("reported", { ...context, developer: true }), null);
   assert.match(
     updateMessage("live", { ...context, delivery: "update" }) ?? "",
     /is live now\.$/,

@@ -261,51 +261,58 @@ export interface UpdateContext {
 
 /**
  * What support tells the reporter when their bug reaches a new stage, in
- * plain words; developers also get the links. Null for no message.
+ * plain words. Null for no message.
  */
 export function updateMessage(stage: ReportStage, context: UpdateContext) {
-  const lines = UPDATES[stage](context);
-  return lines.length === 0 ? null : lines.join("\n");
+  return UPDATES[stage](context).text;
 }
 
-/** Each stage's message, then a developer's link when there is one. */
-const UPDATES: Record<ReportStage, (context: UpdateContext) => string[]> = {
-  reported: () => [],
-  pickedUp: (context) => [
-    `Quick update on ${subject(context)}: someone on the team picked it up.`,
-    ...developerLink(context, context.issueUrl),
-  ],
-  inProgress: (context) => [
-    context.idea === true
-      ? `We're working on ${subject(context)}.`
-      : `We're working on a fix for ${subject(context)}.`,
-    ...developerLink(
-      context,
-      context.pullRequest && `PR: ${context.pullRequest.url}`,
-    ),
-  ],
-  fixed: (context) => [
-    context.idea === true
-      ? `${capitalized(subject(context))} is done. It will reach you in an upcoming update, and I'll tell you when it's out.`
-      : `${capitalized(subject(context))} is fixed. The fix will reach you in an upcoming update, and I'll tell you when it's out.`,
-    ...developerLink(
-      context,
-      context.pullRequest
-        ? `Merged: ${context.pullRequest.url}`
-        : context.sha && `Fixed in ${context.sha.slice(0, 7)}`,
-    ),
-  ],
-  live: (context) => [
-    liveMessage(context),
-    ...developerLink(
-      context,
-      context.release && `Shipped in ${context.release}`,
-    ),
-  ],
-  closed: (context) => [
-    closedMessage(context),
-    ...developerLink(context, context.issueUrl),
-  ],
+/**
+ * The link a developer also gets for that stage (the issue, its PR, the
+ * release), or null. Vera sends it as a reply in the update's thread, so
+ * its preview doesn't fill the chat.
+ */
+export function updateLink(stage: ReportStage, context: UpdateContext) {
+  const { link, text } = UPDATES[stage](context);
+  return context.developer && text !== null && link ? link : null;
+}
+
+interface Update {
+  readonly link?: string;
+  readonly text: string | null;
+}
+
+/** Each stage's message, and a developer's link when there is one. */
+const UPDATES: Record<ReportStage, (context: UpdateContext) => Update> = {
+  reported: () => ({ text: null }),
+  pickedUp: (context) => ({
+    link: context.issueUrl,
+    text: `Quick update on ${subject(context)}: someone on the team picked it up.`,
+  }),
+  inProgress: (context) => ({
+    link: context.pullRequest && `PR: ${context.pullRequest.url}`,
+    text:
+      context.idea === true
+        ? `We're working on ${subject(context)}.`
+        : `We're working on a fix for ${subject(context)}.`,
+  }),
+  fixed: (context) => ({
+    link: context.pullRequest
+      ? `Merged: ${context.pullRequest.url}`
+      : context.sha && `Fixed in ${context.sha.slice(0, 7)}`,
+    text:
+      context.idea === true
+        ? `${capitalized(subject(context))} is done. It will reach you in an upcoming update, and I'll tell you when it's out.`
+        : `${capitalized(subject(context))} is fixed. The fix will reach you in an upcoming update, and I'll tell you when it's out.`,
+  }),
+  live: (context) => ({
+    link: context.release && `Shipped in ${context.release}`,
+    text: liveMessage(context),
+  }),
+  closed: (context) => ({
+    link: context.issueUrl,
+    text: closedMessage(context),
+  }),
 };
 
 /** What the reporter sent, as messages name it. */
@@ -339,10 +346,6 @@ function closedMessage(context: UpdateContext) {
   return idea
     ? `About ${what}: the team closed it. Thanks for suggesting it.`
     : `About ${what}: the team closed it. If you still see it, tell me.`;
-}
-
-function developerLink(context: UpdateContext, line: string | undefined) {
-  return context.developer && line ? [line] : [];
 }
 
 /** Where someone gets a store build, by their phone. */

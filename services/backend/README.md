@@ -104,7 +104,8 @@ when an over-the-air update or backend deploy shipped it, or "update it
 from TestFlight or the App Store" (Google Play on Android, from the OS
 their app reported) when it took a store build. A PR labeled "📱 Native
 Change" only counts as out once that phone's store build has it. People who
-say they're developers also get the links. See the `support-inbox` agent
+say they're developers also get the links, as a reply in the update's
+thread so the link preview stays out of the chat. See the `support-inbox` agent
 skill for the operator commands.
 
 Until October 2026 bug reports went to a separate account, Vera Support

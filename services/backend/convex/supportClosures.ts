@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import type { BotAccount } from "./bots";
 import { internalMutation } from "./_generated/server";
 import { scheduleReply } from "./assistantHook";
 import { sendAsBot, VERA } from "./bots";
@@ -58,16 +59,14 @@ export const followOriginal = internalMutation({
       tracking: true,
     });
     const developer = await isDeveloper(ctx, report.accountId);
-    await sendAsBot(
+    await sendWithAside(
       ctx,
       VERA,
       report.conversationId,
-      [
-        idea === true
-          ? `Update on the idea you suggested (${report.summary}): it turned out to be the same as another idea the team has, so I'll follow that one for you and let you know when it's done.`
-          : `Update on the bug you reported (${report.summary}): it turned out to be the same as another report the team is tracking, so I'll follow that one for you and let you know when it's fixed.`,
-        ...(developer ? [issueUrl] : []),
-      ].join("\n"),
+      idea === true
+        ? `Update on the idea you suggested (${report.summary}): it turned out to be the same as another idea the team has, so I'll follow that one for you and let you know when it's done.`
+        : `Update on the bug you reported (${report.summary}): it turned out to be the same as another report the team is tracking, so I'll follow that one for you and let you know when it's fixed.`,
+      developer ? issueUrl : null,
     );
   },
 });
@@ -110,4 +109,23 @@ async function isDeveloper(ctx: MutationCtx, accountId: string) {
     .withIndex("by_account", (q) => q.eq("accountId", accountId))
     .unique();
   return reporter?.developer === true;
+}
+
+/**
+ * Sends `body` as the bot and, when there's an `aside` (a developer's
+ * link, say), puts it in that message's thread, out of the chat, so a
+ * tall link preview doesn't follow every update (Shawn, 2026-11-17).
+ */
+export async function sendWithAside(
+  ctx: MutationCtx,
+  bot: BotAccount,
+  conversationId: string,
+  body: string,
+  aside: string | null,
+) {
+  const messageId = await sendAsBot(ctx, bot, conversationId, body);
+  if (aside !== null) {
+    await sendAsBot(ctx, bot, conversationId, aside, { threadId: messageId });
+  }
+  return messageId;
 }
