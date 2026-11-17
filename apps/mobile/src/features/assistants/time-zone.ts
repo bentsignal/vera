@@ -1,10 +1,8 @@
 import { directConversationId } from "@decentralized-convex/messages";
 import { api } from "@vera/backend/api";
 
+import { assistantsOf } from "~/features/assistants/assistants";
 import { useAccount } from "~/features/messaging/account";
-
-/** Vera's assistant accounts, by username on the account's own domain. */
-const ASSISTANTS = ["vera"];
 
 /** The time zone each account last sent this session, so it's sent once. */
 const sent = new Map<string, string>();
@@ -17,11 +15,9 @@ const sent = new Map<string, string>();
 export function useReportTimeZone() {
   const { address, session } = useAccount();
   return (conversationId: string) => {
-    const domain = address.slice(address.lastIndexOf("@") + 1);
-    const toAssistant = ASSISTANTS.some(
-      (username) =>
-        conversationId ===
-        directConversationId(address, `${username}@${domain}`),
+    const toAssistant = assistantsOf(address).some(
+      (assistant) =>
+        conversationId === directConversationId(address, assistant),
     );
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!toAssistant || sent.get(address) === timeZone) return;

@@ -22,7 +22,7 @@ const MIN_REFRESH_MS = 1_000;
 /** Timed-out rows of other accounts deleted per `setTyping`. */
 const MAX_PRUNED = 10;
 /** At most this many typists are listed per PDS. */
-const MAX_TYPISTS = 50;
+export const MAX_TYPISTS = 50;
 
 function typingRow(ctx: QueryCtx, accountId: string, conversationId: string) {
   return ctx.db
@@ -39,8 +39,19 @@ export async function setTyping(
   self: string,
   args: Args<"setTyping">,
 ) {
-  const { conversationId, threadId, typing } = args;
-  await requireAccess(ctx, conversationId, self);
+  await requireAccess(ctx, args.conversationId, self);
+  return writeTyping(ctx, self, args);
+}
+
+/**
+ * `setTyping` once the typist may write there: `setTyping` checks the
+ * caller, and an assistant's host checks its own (assistants.ts).
+ */
+export async function writeTyping(
+  ctx: MutationCtx,
+  self: string,
+  { conversationId, threadId, typing }: Args<"setTyping">,
+) {
   const now = Date.now();
   const existing = await typingRow(ctx, self, conversationId);
   if (!typing) {
