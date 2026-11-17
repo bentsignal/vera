@@ -212,7 +212,7 @@ export default defineSchema({
     accountId: v.string(),
     /** Whether they want technical details (GitHub links); unknown until asked. */
     developer: v.optional(v.boolean()),
-    /** When support told them reports are public (`share_privacy_notice`). */
+    /** When Vera told them reports are public (supportAgent.ts `privacyNotice`). */
     noticeSharedAt: v.optional(v.number()),
   }).index("by_account", ["accountId"]),
   /**

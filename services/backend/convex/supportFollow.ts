@@ -28,7 +28,7 @@ const FOLLOWED: Record<ReportStage, string> = {
     "Tell them someone already reported this and it's fixed, coming in an upcoming update, and that you'll tell them here when it's out.",
   live: "The fix is already out: tell them how to get it (close and reopen Vera, or update it from their app store). If they still see it after that, it may be a different bug.",
   closed:
-    "The team closed this without a change: tell them it was reported before and isn't being changed for now.",
+    "The team closed this without a change linked to it: tell them it was reported before and the team closed it. Don't say it was fixed.",
 };
 
 /** For a bug whose fix went out while the team kept its issue open. */

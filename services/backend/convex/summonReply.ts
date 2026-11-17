@@ -7,7 +7,7 @@ import type { Tally } from "./usage";
 import { internal } from "./_generated/api";
 import { generateReply } from "./agentModels";
 import { cachedPartHash, replyRequest } from "./agentRequest";
-import { pacedSender, typingWith } from "./agentTools";
+import { pacedSender, typingWith, uninterrupted } from "./agentTools";
 import { botAddress } from "./bots";
 import { summonedPrompt } from "./summonPrompt";
 import { summonArgs } from "./summons";
@@ -85,6 +85,8 @@ export async function answer(
         else tally.memoryLookups += 1;
       },
       ctx,
+      // A summons answers one message; a newer one gets its own.
+      interruption: uninterrupted(),
       lastHeardAt: found.message.sentAt,
       name: found.message.authorName,
       note: null,

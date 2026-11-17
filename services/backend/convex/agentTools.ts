@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 import type { ActionCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
+import { CHECK_FIRST, promisesToCheck } from "../reply-claims";
 import { internal } from "./_generated/api";
 import { botAddress } from "./bots";
 import { localTime } from "./timeZones";
@@ -15,6 +16,13 @@ import { localTime } from "./timeZones";
 
 /** The most messages one reply sends. */
 export const MAX_MESSAGES_PER_TURN = 3;
+
+/**
+ * The longest message the model may send: a few sentences, like a text.
+ * Asked for a long guide, Kimi otherwise wrote 2,000 to 4,000 characters
+ * (2026-11-16); a longer one fails the tool call and it tries again.
+ */
+export const MAX_MESSAGE_LENGTH = 600;
 
 /**
  * Where a reply goes: a conversation, or with `threadId`, a thread in it,
@@ -49,21 +57,134 @@ export interface Turn extends Chat {
   readonly timeZone: string | null;
   /** The oldest message the model was given, for `read_earlier_messages`. */
   readonly oldestSentAt: number | null;
-  /**
-   * Sends a message to the person, pacing several like someone typing.
-   * `canned` messages (the bug-report privacy notice) aren't the model's own
-   * and don't count toward `MAX_MESSAGES_PER_TURN`.
-   */
-  readonly send: (
-    body: string,
-    options?: { canned?: boolean },
-  ) => Promise<void>;
-  /** How many messages this turn has sent, canned ones included. */
+  /** Sends a message to the person, pacing several like someone typing. */
+  readonly send: (body: string) => Promise<void>;
+  /** How many messages this turn has sent. */
   readonly sent: () => number;
-  /** How many of those the model wrote itself. */
-  readonly written: () => number;
   /** Counts a paid lookup for the reply's usage record (usage.ts). */
   readonly counted: (what: "memory" | "search") => void;
+  /** Stops the reply when the person writes again first (`interruption`). */
+  readonly interruption: Interruption;
+}
+
+/** Why a reply stopped: the person wrote again before it sent anything. */
+export class Interrupted extends Error {
+  constructor() {
+    super("They wrote again before the reply was sent");
+    this.name = "Interrupted";
+  }
+}
+
+export type Interruption = ReturnType<typeof interruption>;
+
+/**
+ * A reply's way to stop when the person writes again before it has sent
+ * anything, so the next reply answers everything together instead of two
+ * replies answering half each. `check` says whether they have; `stop`
+ * aborts the reply's model calls (agentRequest.ts passes `signal`).
+ */
+export function interruption(check: () => Promise<boolean>) {
+  const controller = new AbortController();
+  return {
+    check,
+    signal: controller.signal,
+    stop: () => controller.abort(new Interrupted()),
+  };
+}
+
+/** For replies nothing interrupts (a summons answers one message). */
+export function uninterrupted() {
+  return interruption(() => Promise.resolve(false));
+}
+
+/**
+ * What a reply's messages must or mustn't say (supportRules.ts, for bug
+ * reports). `refuse` says why they can't go as they are, which fails the
+ * call so the model writes them again. `notice`, when there's something
+ * they must be told, is a flag the model sets on the reply that tells
+ * them, in its own words, with `shared` run once it's sent.
+ */
+export interface ReplyRules {
+  readonly notice: {
+    readonly describe: string;
+    readonly shared: () => Promise<void>;
+  } | null;
+  readonly refuse: (
+    messages: readonly string[],
+    marked: boolean,
+  ) => string | null;
+}
+
+const replyMessages = z
+  .array(
+    z
+      .string()
+      .max(MAX_MESSAGE_LENGTH)
+      .describe(
+        `One message: plain text, no markdown, a few sentences at most (${MAX_MESSAGE_LENGTH} characters).`,
+      ),
+  )
+  .min(1)
+  .max(MAX_MESSAGES_PER_TURN);
+
+/**
+ * The tool every assistant speaks through: all of a reply's messages in one
+ * call. Models that also write text outside a tool sometimes treat that
+ * text as said and send only what follows it; with one call holding the
+ * whole reply, there's no "rest of it" to send (2026-11-16 comparison).
+ * With `rules`, a reply that breaks them fails, and one marked `notice`
+ * tells them what it must in the model's own words: one message, not its
+ * question and then a canned notice repeating it (Haiku paraphrased the
+ * notice either way, 2026-11-17).
+ */
+export function replyTool(turn: Turn, to: string, rules?: ReplyRules) {
+  const description = `Send your reply to ${to}: one to ${MAX_MESSAGES_PER_TURN} short messages, in order, as plain text. Call it once, with every message in it.`;
+  let nudged = false;
+  async function send(messages: readonly string[], marked: boolean) {
+    // Once: a false alarm costs a rewrite, not the reply.
+    if (!nudged && promisesToCheck(messages)) {
+      nudged = true;
+      throw new Error(CHECK_FIRST);
+    }
+    const refused = rules?.refuse(messages, marked) ?? null;
+    // Thrown, so the call fails and the model writes it again.
+    if (refused !== null) throw new Error(refused);
+    const result = await sendReply(turn, messages);
+    if (marked && result === "Sent.") await rules?.notice?.shared();
+    return result;
+  }
+  const notice = rules?.notice ?? null;
+  if (notice === null) {
+    return tool({
+      description,
+      inputSchema: z.object({ messages: replyMessages }),
+      execute: ({ messages }) => send(messages, false),
+    });
+  }
+  return tool({
+    description,
+    inputSchema: z.object({
+      messages: replyMessages,
+      notice: z.boolean().optional().describe(notice.describe),
+    }),
+    execute: ({ messages, notice: marked = false }) => send(messages, marked),
+  });
+}
+
+async function sendReply(turn: Turn, messages: readonly string[]) {
+  if (turn.sent() >= MAX_MESSAGES_PER_TURN) return "Not sent.";
+  // Tools can't throw out of a reply (the AI SDK hands the error to the
+  // model), so this aborts it instead.
+  if (turn.sent() === 0 && (await turn.interruption.check())) {
+    turn.interruption.stop();
+    return "Not sent.";
+  }
+  for (const text of messages.slice(0, MAX_MESSAGES_PER_TURN - turn.sent())) {
+    await turn.send(text);
+  }
+  // Nothing else: models read instructions in a tool result as someone
+  // trying to steer them, and answer them to the person.
+  return "Sent.";
 }
 
 /**
@@ -93,7 +214,7 @@ ${writingRules({ quiet: true })}`;
  */
 export function writingRules({ quiet }: { quiet: boolean }) {
   return `How you write:
-- People see only what you send with the send_message tool. Anything else you write is discarded.
+- People see only what you send with the reply tool: call it once, with all your messages. Anything else you write is discarded.
 - Write like a person texting: plain text only. No markdown, headings, bold, bullet symbols, numbered lists, tables, or code fences. Links are fine written out as plain URLs.
 - Text like a person would: usually one short message, two when it really helps (a quick answer, then one detail). A sentence or two each, no paragraphs. If there's more to say, give the gist and let them ask.
 - Don't repeat yourself, and don't end with offers like "let me know if you need anything else".${
@@ -122,24 +243,9 @@ export function currentTime(turn: Turn) {
 }
 
 /** Reading and writing this conversation, which every assistant has. */
-export function conversationTools(turn: Turn) {
+export function conversationTools(turn: Turn, rules?: ReplyRules) {
   return {
-    send_message: tool({
-      description:
-        "Send one message to the person, as plain text. Call it several times to send several short messages.",
-      inputSchema: z.object({
-        text: z.string().describe("The message, plain text, no markdown."),
-      }),
-      execute: async ({ text }) => {
-        if (turn.written() >= MAX_MESSAGES_PER_TURN) {
-          return "Not sent.";
-        }
-        await turn.send(text);
-        // Nothing else: Grok reads instructions in a tool result as someone
-        // trying to steer it, and answers them to the person.
-        return "Sent.";
-      },
-    }),
+    reply: replyTool(turn, "the person", rules),
     stay_quiet: tool({
       description:
         "Send nothing this time, when the conversation seems to have ended or they clearly have more to say. Never when they're asking for something or expecting an answer.",
@@ -279,10 +385,9 @@ export function pacedSender(
   post: (body: string) => Promise<unknown>,
 ) {
   let sent = 0;
-  let written = 0;
   let queue = Promise.resolve();
   return {
-    send: (text: string, { canned = false }: { canned?: boolean } = {}) => {
+    send: (text: string) => {
       const body = text.trim().slice(0, 4000);
       if (body.length === 0) return queue;
       queue = queue.then(async () => {
@@ -293,11 +398,9 @@ export function pacedSender(
         await post(body);
         typing.sent();
         sent += 1;
-        if (!canned) written += 1;
       });
       return queue;
     },
     sent: () => sent,
-    written: () => written,
   };
 }

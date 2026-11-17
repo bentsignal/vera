@@ -288,7 +288,7 @@ export async function welcomeEveryAccount(
 }
 
 /**
- * Sends a message as the bot (agent.ts's `send_message`, support updates),
+ * Sends a message as the bot (an assistant's `reply`, support updates),
  * or with `threadId`, to that thread.
  */
 export const post = internalMutation({

@@ -64,9 +64,10 @@ export function visibleImageTypes(
 /**
  * The conversation as the model sees it: the person's messages as user
  * turns, with their newest images attached (those in a format the model
- * reads), and the assistant's own as the `send_message` calls that sent
- * them, so it keeps answering that way. With `speakers` (a conversation
- * it was called into, summons.ts), each message says who wrote it.
+ * reads), and the assistant's own as the `reply` calls that sent them, one
+ * per run of its messages, so it keeps answering that way. With
+ * `speakers` (a conversation it was called into, summons.ts), each message
+ * says who wrote it.
  */
 export function toModelMessages(
   history: readonly Message[],
@@ -76,30 +77,36 @@ export function toModelMessages(
   { speakers = false }: { speakers?: boolean } = {},
 ) {
   const messages: ModelMessage[] = [];
-  let pendingCalls: { body: string; id: string }[] = [];
+  let pending: { body: string; id: string }[] = [];
   function flush() {
-    if (pendingCalls.length === 0) return;
+    const first = pending.at(0);
+    if (first === undefined) return;
+    const toolCallId = `m-${first.id}`;
     messages.push(
       {
-        content: pendingCalls.map(({ body, id }) => ({
-          input: { text: body },
-          toolCallId: id,
-          toolName: "send_message",
-          type: "tool-call" as const,
-        })),
+        content: [
+          {
+            input: { messages: pending.map(({ body }) => body) },
+            toolCallId,
+            toolName: "reply",
+            type: "tool-call" as const,
+          },
+        ],
         role: "assistant",
       },
       {
-        content: pendingCalls.map(({ id }) => ({
-          output: { type: "text" as const, value: "Sent." },
-          toolCallId: id,
-          toolName: "send_message",
-          type: "tool-result" as const,
-        })),
+        content: [
+          {
+            output: { type: "text" as const, value: "Sent." },
+            toolCallId,
+            toolName: "reply",
+            type: "tool-result" as const,
+          },
+        ],
         role: "tool",
       },
     );
-    pendingCalls = [];
+    pending = [];
   }
   const visible = new Set(visibleImages(history, self));
   for (const message of history) {
@@ -112,7 +119,7 @@ export function toModelMessages(
       continue;
     }
     if (message.authorId === self) {
-      pendingCalls.push({ body: message.body, id: `m-${message.messageId}` });
+      pending.push({ body: message.body, id: message.messageId });
       continue;
     }
     flush();
