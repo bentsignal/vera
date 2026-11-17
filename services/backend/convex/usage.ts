@@ -2,6 +2,7 @@ import type { ProviderMetadata } from "ai";
 import { v } from "convex/values";
 
 import { internalMutation, internalQuery } from "./_generated/server";
+import { replyRow } from "./assistantHook";
 import { botName, storedBotName } from "./schema";
 
 // What assistant replies cost: tokens and dollars per reply, from the AI
@@ -71,14 +72,11 @@ export const record = internalMutation({
     outputTokens: v.number(),
     searches: v.number(),
     steps: v.number(),
+    /** A thread in the conversation, whose reply state is its own. */
+    threadId: v.optional(v.string()),
   },
-  handler: async (ctx, { cachedPart, conversationId, ...usage }) => {
-    const conversation = await ctx.db
-      .query("botConversations")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", conversationId),
-      )
-      .unique();
+  handler: async (ctx, { cachedPart, conversationId, threadId, ...usage }) => {
+    const conversation = await replyRow(ctx, conversationId, threadId);
     const previous = conversation?.cachedPart;
     if (conversation !== null && previous !== cachedPart) {
       await ctx.db.patch(conversation._id, { cachedPart });
