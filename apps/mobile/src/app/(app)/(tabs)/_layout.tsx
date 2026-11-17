@@ -8,6 +8,7 @@ import {
   blurNativeSearch,
   focusNativeSearch,
 } from "~/features/search/native-search";
+import { useSession } from "~/features/session/session-provider";
 
 // Home is the tab the app opens to, even when the reversed tab bar puts it
 // last.
@@ -19,6 +20,9 @@ export default function TabsLayout() {
   // that you haven't seen yet.
   const home = useHomeBadge();
   const activity = useActivityBadge();
+  // More's counts the accounts whose servers can't be reached, which it
+  // lists in red.
+  const unreachable = useSession().unreachable.length;
   const reversed = usePreference("reverseTabBar");
   const tabs = [
     // Native tabs give a tab's first scroll view the tab bar's inset; on
@@ -53,6 +57,11 @@ export default function TabsLayout() {
         sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
         md="grid_view"
       />
+      {unreachable > 0 && (
+        <NativeTabs.Trigger.Badge>
+          {String(unreachable)}
+        </NativeTabs.Trigger.Badge>
+      )}
     </NativeTabs.Trigger>,
   ];
   return (

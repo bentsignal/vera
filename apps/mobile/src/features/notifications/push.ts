@@ -227,7 +227,11 @@ export function useNotificationRouting() {
 
 type Router = ReturnType<typeof useRouter>;
 
-function openConversation(
+/**
+ * Opens the conversation, replacing any other chat on screen, or updates
+ * it if it's already the one showing.
+ */
+export function openConversation(
   router: Router,
   conversationId: string,
   params: { account?: string; messageId?: string },

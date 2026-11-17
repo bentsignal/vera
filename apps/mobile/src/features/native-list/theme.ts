@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { Platform, useWindowDimensions } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 import type { Behavior, Theme } from "./contract";
@@ -48,6 +48,8 @@ const MONOGRAM = { bottom: "#858994", top: "#a6abb8" };
 
 /** Bubbles' corners (`BUBBLE_RADIUS`). */
 const BUBBLE_RADIUS = 20;
+/** A text bubble's padding above and below its text (Measure.swift). */
+const BUBBLE_PADDING = 8;
 
 /** Spacing per layout, as `row-header.ts` and the rows have it. */
 const METRICS = {
@@ -97,8 +99,15 @@ function colorAt(values: readonly unknown[], index: number) {
   return typeof value === "string" && value !== "" ? value : LIGHT[index];
 }
 
-/** The theme from the variables' values, in `VARIABLES` order. */
-export function themeOf(values: readonly unknown[], layout: MessageLayout) {
+/**
+ * The theme from the variables' values, in `VARIABLES` order, at the
+ * system text size's `fontScale`.
+ */
+export function themeOf(
+  values: readonly unknown[],
+  layout: MessageLayout,
+  fontScale = 1,
+) {
   function color(index: number) {
     return colorAt(values, index) ?? "#000000";
   }
@@ -122,14 +131,28 @@ export function themeOf(values: readonly unknown[], layout: MessageLayout) {
       textIncoming: color(1),
       textOutgoing: color(7),
     },
-    metrics: METRICS[layout],
+    metrics: {
+      ...METRICS[layout],
+      bubbleRadius: bubbleRadius(layout, fontScale),
+    },
     type: TYPE[layout],
   } satisfies Theme;
 }
 
-/** The theme in the current color scheme and accent, for `layout`. */
+/**
+ * No more than half a one-line bubble's height: smaller text makes the
+ * bubble shorter, and iOS draws corners over half the height with a notch
+ * on each end (Android rounds them down itself).
+ */
+function bubbleRadius(layout: MessageLayout, fontScale: number) {
+  const height = BUBBLE_PADDING * 2 + TYPE[layout].body.lineHeight * fontScale;
+  return Math.min(BUBBLE_RADIUS, Math.floor(height / 2));
+}
+
+/** The theme in the current color scheme, accent, and text size, for `layout`. */
 export function useNativeTheme(layout: MessageLayout) {
-  return themeOf(useCSSVariable([...VARIABLES]), layout);
+  const { fontScale } = useWindowDimensions();
+  return themeOf(useCSSVariable([...VARIABLES]), layout, fontScale);
 }
 
 /** The list's timings, and how far ahead it loads pages. */

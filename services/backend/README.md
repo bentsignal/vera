@@ -82,10 +82,20 @@ web through Parallel (`webSearch.ts`), and remembers the whole conversation
 
 It also takes bug reports and ideas for the app (`supportAgent.ts`). It
 asks for what's missing (what happened, where, how to repeat it, a
-screenshot), tells them reports are public and waits for their answer,
-checks GitHub for an existing issue or fix (following that issue instead of
-filing a duplicate), then files an anonymized GitHub issue labeled "user
-report" with the app version and device the app reported. Screenshots never
+screenshot), then checks GitHub (`supportLookup.ts`): it reads every open
+issue's title and compares by meaning, plus open and closed issues and
+merged fixes matching any of its keywords, and follows a match instead of
+filing a duplicate. Keywords alone missed the same bug in other words
+(#350 duplicated #343: "reconnecting" against "retry"). Only when nothing
+matches does it tell them, in its own words, in the same message as its
+question, that reports are posted publicly without their name or personal
+details: a reply marked `notice`, which has to say "public". Once they've
+answered, `file_bug_report` is offered, and it files an anonymized GitHub
+issue labeled "user report" with the app version and device the app
+reported. A reply that says a report went to the team when it filed and
+followed nothing is sent back to be rewritten once (Haiku and Kimi both
+claimed to have filed reports they hadn't; so is one promising word on a
+fix to someone who follows no report). Screenshots never
 go in an issue: Vera describes what they show in words, without personal
 details. A cron (`crons.ts`, every 10 minutes) follows each issue and tells
 the reporter, in plain words, when it's picked up (assigned), being worked
@@ -94,7 +104,8 @@ when an over-the-air update or backend deploy shipped it, or "update it
 from TestFlight or the App Store" (Google Play on Android, from the OS
 their app reported) when it took a store build. A PR labeled "📱 Native
 Change" only counts as out once that phone's store build has it. People who
-say they're developers also get the links. See the `support-inbox` agent
+say they're developers also get the links, as a reply in the update's
+thread so the link preview stays out of the chat. See the `support-inbox` agent
 skill for the operator commands.
 
 Until October 2026 bug reports went to a separate account, Vera Support
@@ -140,6 +151,62 @@ the input came from the prompt cache (`cacheHitRate`), and how often a
 reply's instructions or tools changed since the one before it in its
 conversation (`cachedPartChangeRate`; see "Keeping replies cheap" below).
 
+### Calling Vera into other conversations
+
+Anyone can @mention Vera in a group, a channel, or a direct message with
+someone else (the app's mention picker lists it everywhere), and Vera
+answers that message in a thread on it (`convex/summons.ts`,
+`summonReply.ts`, `summonPrompt.ts`). It never answers in the chat
+itself. It isn't a member: the messages plugin's assistant functions let
+it read what the caller can see before their message and answer it (see
+its README, "Assistants").
+
+- **Vera follows any thread it's mentioned in**, one that starts with a
+  mention and one where someone mentions it in a reply. Every reply there
+  reaches it from then on, mentioned or not (`convex/summonThreads.ts`). A reply waits
+  2.5 seconds for more, and while anyone's typing in the thread (up to 30
+  seconds), so a quick back-and-forth gets one look once it pauses. Then
+  a gate (`thread-gate.ts`) asks Jev, a cheap decision model on the AI
+  Gateway, which new reply, if any, is meant for Vera: a question to it
+  or a follow-up to its answer, not people talking to each other, and
+  only clearly so when they're going back and forth quickly. Only that
+  one is answered, by the main model, which may still stay quiet. Nothing
+  shows Vera typing until the gate says yes. A decision costs about
+  $0.00003 and takes about 150 ms; `botThreads` counts each thread's.
+- **In the chat itself, only a mention reaches it.** Each message is answered once (`botSummons`), even if the app
+  retries the send.
+- It reads the 30 messages before theirs, from the thread they wrote in or
+  from the conversation (with the original their reply quotes), with each
+  message's author named, and can read further back.
+- Everyone there reads the answer, so it knows nothing private about
+  anyone: no notes, no memory of anyone's chats with Vera, no list of
+  anyone's bug reports, and no tools to save or look any of it up. Those
+  live only in each person's direct message with Vera. Asked about
+  someone's memories, it says it can't share that there.
+- It answers only the person whose message it's answering. Other
+  people's messages are context, not requests, and every tool acts for
+  that person alone and takes no account or conversation, so no one can
+  point it at someone else's data.
+- It can search the web and take bug reports: searching GitHub, following
+  a known issue, or filing one (the privacy notice first, as in a direct
+  message, posted in the thread). A report belongs to whoever asked for
+  it: updates on it go to their direct message with Vera, never the
+  group. Someone else in the thread follows it too by asking to hear when
+  it's fixed, and anyone who asks gets its GitHub link, since reports are
+  public.
+- Asked why it didn't answer something, it says how people reach it (it
+  doesn't bring that up otherwise). In a direct message, Vera explains
+  how to call it into other conversations when someone asks.
+- Each answer counts toward the person's hourly limit, shared with their
+  direct messages; the gate's looks don't.
+- Like direct messages, only people on this PDS can call it, and it sees
+  only messages stored here.
+
+In a direct message's bubbles, the app names no one, since it's just the
+two of you. Once Vera has written or is typing there (in a thread), every
+sender is named, as in a group, so its messages and the other person's
+can't be confused (`map-rows.ts`).
+
 When an issue is closed without a fix, Vera follows the original issue
 if it was marked as a duplicate. If the team left a comment when closing
 it, Vera's model explains that comment to the reporter in plain words
@@ -164,29 +231,50 @@ How it works (`convex/bots.ts`, `convex/agent.ts`):
   (`agent:watch` asks the scheduler about its job): the next message's
   reply takes over, or with nothing new the person hears that something
   went wrong. Before, the conversation stayed locked for 10 minutes.
-  The model answers only through `send_message`, which can write to that
-  one conversation and nowhere else; no tool takes an account or
-  conversation, so nothing can reach another person's messages. Text it
-  writes outside a tool is never sent: a reply that ends with neither a
-  message nor `stay_quiet` is an error, and the model gets one more try,
-  told why (`reply-outcome.ts`). At most 3 messages per reply, not
-  counting canned ones like the bug-report privacy notice. Messages that
-  arrive during a reply get the next one.
+  The model answers only through `reply`, one call with all of the
+  reply's messages, which can write to that one conversation and nowhere
+  else; no tool takes an account or conversation, so nothing can reach
+  another person's messages. Text it writes outside a tool is never sent:
+  a reply that ends with neither a message nor `stay_quiet` is an error,
+  and the model gets one more try, told why (`reply-outcome.ts`). At most
+  3 messages per reply, each at most 600 characters (a longer one fails
+  the call and the model tries again). One call for the whole reply is what stopped
+  replies from losing their first message: with a tool call per message,
+  models wrote the first as text outside a tool, took it as said, and
+  sent only the rest (Grok 4.7 did in about 1 reply in 20, 2026-11-16).
+- A person who writes again before the reply has sent anything
+  interrupts it: before each model step after the first and before
+  sending, the reply checks for a newer message from them, and if there
+  is one it stops (`agentTools.ts` `interruption`), unanswered, so the
+  next reply answers everything together instead of two replies
+  answering half each. Once it has started sending it finishes, and
+  messages that arrive meanwhile get the next reply.
 - Models run through the Convex AI Gateway (`@convex-dev/ai-sdk-provider`
   and the AI SDK), billed on the Convex bill, with zero-data-retention
-  routing (`assistant-models.ts`). Grok 4.7 answers, and Gemini 4 Argon
-  takes over when it fails: each model gets two tries, or one when the
-  error says retrying won't help (a rejected request), before the next.
+  routing (`assistant-models.ts`). Gemini 4 Hydrogen answers, and GPT-6.2
+  Sol, from another provider, takes over when it fails: each model gets
+  two tries, or one when the error says retrying won't help (a rejected
+  request), before the next. They were picked from 12 models replayed
+  through the real reply code on chats and bug reports (2026-11-17):
+  both answer in about 5 to 7 seconds from the person's message, never
+  lost a reply, and never claimed to have filed or followed a report they
+  hadn't. Claude Haiku 5.5 was as fast but did (4 in 30 bug reports), and
+  Hydrogen writes the shortest, most natural replies. `ASSISTANT_MODELS`
+  (gateway model IDs, comma-separated, in order) overrides them on a
+  deployment. Claude Sonnet and Opus 5.5 can't run here: they refuse a
+  required tool call, with or without zero retention. Qwen4 Max has no
+  zero-retention endpoint.
   The model sees the newest few images in the conversation, in the formats
   it reads. The gateway fetches each by its URL; nothing is sent inside
   the request, which ran replies out of Convex's 64 MB (a 2.4 MB iPhone
   photo did, 2026-10-26). HEIC photos (how iPhones save them) are
   converted once to a JPEG of at most 1568 pixels a side, in a Node
   action (`assistantImagesNode.ts`, about a second), kept in Convex file
-  storage, and reused (`assistant-images.ts`). Grok can't read GIF, so
-  Gemini answers first while one is among them; a format neither reads
-  shows as a note. One image a model can't read fails the whole request,
-  which is what took both assistants down on 2026-10-23.
+  storage, and reused (`assistant-images.ts`). Both models read JPEG,
+  PNG, WebP, and GIF; a model that can't read one of the images shown
+  goes after one that can, and a format none reads shows as a note. One
+  image a model can't read fails the whole request, which is what took
+  both assistants down on 2026-10-23.
 - The app sends the device's time zone after a message to Vera
   (`timeZones:report`), so it knows the person's date and time.
 - Each person gets at most 300 replies an hour from Vera, on a rolling
@@ -211,8 +299,8 @@ dev and production deployments without any key.
 
 Every model call sends the whole prompt again: tools, instructions, and
 the conversation. The provider's prompt cache bills what it has seen
-before at a quarter of the price (Grok 4.7: $0.50 per million input tokens
-against $2), but only while the prompt stays the same at the start and
+before for much less (a quarter of the price on Grok 4.7, which Vera
+used before), but only while the prompt stays the same at the start and
 the conversation only grows at the end. Measured through the gateway
 (2026-10-26): appending messages reused everything before them; changing
 the end of the instructions reused what came before the change; changing
