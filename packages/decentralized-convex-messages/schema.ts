@@ -15,6 +15,11 @@ import {
 } from "./protocol.ts";
 
 export default defineSchema({
+  // Accounts the host answers people with, which anyone can @mention into
+  // a conversation they're in without it being a member (assistants.ts).
+  assistants: defineTable({ accountId: v.string() }).index("by_account", [
+    "accountId",
+  ]),
   conversations: defineTable({
     conversationId: v.string(),
     createdBy: v.string(),

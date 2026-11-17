@@ -64,40 +64,49 @@ export function visibleImageTypes(
 /**
  * The conversation as the model sees it: the person's messages as user
  * turns, with their newest images attached (those in a format the model
- * reads), and the assistant's own as the `send_message` calls that sent
- * them, so it keeps answering that way.
+ * reads), and the assistant's own as the `reply` calls that sent them, one
+ * per run of its messages, so it keeps answering that way. With
+ * `speakers` (a conversation it was called into, summons.ts), each message
+ * says who wrote it.
  */
 export function toModelMessages(
   history: readonly Message[],
   self: string,
   model: AssistantModel,
   shown: ShownImages,
+  { speakers = false }: { speakers?: boolean } = {},
 ) {
   const messages: ModelMessage[] = [];
-  let pendingCalls: { body: string; id: string }[] = [];
+  let pending: { body: string; id: string }[] = [];
   function flush() {
-    if (pendingCalls.length === 0) return;
+    const first = pending.at(0);
+    if (first === undefined) return;
+    const toolCallId = `m-${first.id}`;
     messages.push(
       {
-        content: pendingCalls.map(({ body, id }) => ({
-          input: { text: body },
-          toolCallId: id,
-          toolName: "send_message",
-          type: "tool-call" as const,
-        })),
+        content: [
+          {
+            input: { messages: pending.map(({ body }) => body) },
+            toolCallId,
+            toolName: "reply",
+            type: "tool-call" as const,
+          },
+        ],
         role: "assistant",
       },
       {
-        content: pendingCalls.map(({ id }) => ({
-          output: { type: "text" as const, value: "Sent." },
-          toolCallId: id,
-          toolName: "send_message",
-          type: "tool-result" as const,
-        })),
+        content: [
+          {
+            output: { type: "text" as const, value: "Sent." },
+            toolCallId,
+            toolName: "reply",
+            type: "tool-result" as const,
+          },
+        ],
         role: "tool",
       },
     );
-    pendingCalls = [];
+    pending = [];
   }
   const visible = new Set(visibleImages(history, self));
   for (const message of history) {
@@ -110,35 +119,65 @@ export function toModelMessages(
       continue;
     }
     if (message.authorId === self) {
-      pendingCalls.push({ body: message.body, id: `m-${message.messageId}` });
+      pending.push({ body: message.body, id: message.messageId });
       continue;
     }
     flush();
-    const lines = [`${sentLabel(message.sentAt)}${message.body}`];
-    if (message.quote !== undefined) {
-      lines.push(`(replying to: "${message.quote.body.slice(0, 200)}")`);
-    }
-    const attached: Exclude<UserContent, string> = [];
-    for (const attachment of message.attachments) {
-      const part = attachmentPart(
-        attachment,
-        visible.has(attachment) && shownAs(shown, attachment.url),
+    messages.push(
+      userMessage(message, {
         model,
-      );
-      if (typeof part === "string") lines.push(part);
-      else attached.push(part);
-    }
-    const text = lines.filter(Boolean).join("\n");
-    messages.push({
-      content: [
-        { text: text.length > 0 ? text : "(an image)", type: "text" },
-        ...attached,
-      ],
-      role: "user",
-    });
+        shown,
+        speaker: speakers ? message.authorName : null,
+        visible,
+      }),
+    );
   }
   flush();
   return messages;
+}
+
+/**
+ * Someone's message as the model reads it: its text, what it replies to,
+ * and its attachments (the visible images, or notes), after who wrote it
+ * when that's `speaker`.
+ */
+function userMessage(
+  message: Message,
+  {
+    model,
+    shown,
+    speaker,
+    visible,
+  }: {
+    model: AssistantModel;
+    shown: ShownImages;
+    speaker: string | null;
+    visible: ReadonlySet<Message["attachments"][number]>;
+  },
+): ModelMessage {
+  const from = speaker === null ? "" : `${speaker}: `;
+  const lines = [`${sentLabel(message.sentAt)}${from}${message.body}`];
+  if (message.quote !== undefined) {
+    lines.push(`(replying to: "${message.quote.body.slice(0, 200)}")`);
+  }
+  const attached: Exclude<UserContent, string> = [];
+  for (const attachment of message.attachments) {
+    const part = attachmentPart(
+      attachment,
+      visible.has(attachment) && shownAs(shown, attachment.url),
+      model,
+    );
+    if (typeof part === "string") lines.push(part);
+    else attached.push(part);
+  }
+  const text = lines.filter(Boolean).join("\n");
+  return {
+    content: [
+      { text: text.length > 0 ? text : "(an image)", type: "text" },
+      ...attached,
+    ],
+    role: "user",
+  };
 }
 
 /** How a visible image is shown: by a URL and format, or null when it can't be. */

@@ -1,0 +1,138 @@
+diff --git a/ios/Cropper.swift b/ios/Cropper.swift
+index e78db08c0ed9035fe61d47b12a392ff9f9f17801..3a5d49a4f09e102535940b842ce8bcdbbaf8d16c 100644
+--- a/ios/Cropper.swift
++++ b/ios/Cropper.swift
+@@ -105,6 +105,9 @@ class Cropper: NSObject, CropViewControllerDelegate {
+     let cropVc = Mantis.cropViewController(image: image, config: config)
+     cropVc.delegate = self
+     cropVc.modalPresentationStyle = .fullScreen
++    // Fades in over the picker closing and out over the app, instead of
++    // sliding up and back down.
++    cropVc.modalTransitionStyle = .crossDissolve
+     self.cropVc = cropVc
+   }
+ 
+@@ -112,42 +115,34 @@ class Cropper: NSObject, CropViewControllerDelegate {
+     _ cropViewController: Mantis.CropViewController, cropped: UIImage,
+     transformation: Mantis.Transformation, cropInfo: Mantis.CropInfo
+   ) {
+-    var data: Data?
+-
+-    if self.options.format == "jpeg" {
+-      data = cropped.jpegData(compressionQuality: CGFloat(self.options.compressImageQuality))
+-    } else if self.options.format == "png" {
+-      data = cropped.pngData()
+-    }
+-
+-    guard let data = data else {
+-      onError(CropperError.getData)
+-      return
+-    }
+-
+-    var ext = "png"
+-    if self.options.format == "jpeg" {
+-      ext = "jpg"
+-    }
+-    guard let tempUrl = Self.getTempUrl(ext: ext) else {
+-      onError(CropperError.getTempUrl)
+-      return
+-    }
+-
+-    do {
+-      try data.write(to: tempUrl)
+-      let res = OpenCropperResult()
+-      res.path = tempUrl.absoluteString
+-      res.width = Float(cropped.size.width)
+-      res.height = Float(cropped.size.height)
+-      res.size = data.count
+-      res.mimeType = "image/\(self.options.format)"
+-      onCrop(res)
+-    } catch {
+-      onError(CropperError.writeData)
+-    }
+-
++    // Closes right away and saves the image after, so Done responds at
++    // once instead of waiting on the encode.
+     cropViewController.dismiss(animated: true)
++    let format = self.options.format
++    let quality = CGFloat(self.options.compressImageQuality)
++    DispatchQueue.global(qos: .userInitiated).async {
++      let data = format == "jpeg" ? cropped.jpegData(compressionQuality: quality) : cropped.pngData()
++      guard let data = data else {
++        self.onError(CropperError.getData)
++        return
++      }
++      guard let tempUrl = Self.getTempUrl(ext: format == "jpeg" ? "jpg" : "png") else {
++        self.onError(CropperError.getTempUrl)
++        return
++      }
++      do {
++        try data.write(to: tempUrl)
++        let res = OpenCropperResult()
++        res.path = tempUrl.absoluteString
++        res.width = Float(cropped.size.width)
++        res.height = Float(cropped.size.height)
++        res.size = data.count
++        res.mimeType = "image/\(format)"
++        self.onCrop(res)
++      } catch {
++        self.onError(CropperError.writeData)
++      }
++    }
+   }
+ 
+   public func cropViewControllerDidCancel(
+@@ -167,8 +162,52 @@ class Cropper: NSObject, CropViewControllerDelegate {
+     }
+ 
+     DispatchQueue.main.async {
+-      rootVc.topmostViewController().present(cropVc, animated: true)
++      self.present(cropVc, from: rootVc, attempts: 40)
++    }
++  }
++
++  // Presents once nothing is being dismissed. expo-image-picker hands back
++  // the photo while its picker is still animating away, and UIKit drops a
++  // presentation made during that, which left the promise waiting forever.
++  private func present(_ cropVc: UIViewController, from rootVc: UIViewController, attempts: Int) {
++    let top = rootVc.topmostViewController()
++    guard attempts > 0, let dismissing = top.presentedViewController, dismissing.isBeingDismissed else {
++      Self.darkenMask(of: cropVc, in: top.view.window?.bounds ?? UIScreen.main.bounds)
++      top.present(cropVc, animated: true)
++      return
++    }
++    if let coordinator = dismissing.transitionCoordinator {
++      coordinator.animate(alongsideTransition: nil) { _ in
++        self.present(cropVc, from: rootVc, attempts: attempts - 1)
++      }
++    } else {
++      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
++        self.present(cropVc, from: rootVc, attempts: attempts - 1)
++      }
++    }
++  }
++
++  // Mantis's dark blur around the crop reads as gray over a photo, and its
++  // plain-color masks don't line up with the crop circle. So the blur
++  // stays and gets a black layer inside it, which the blur's mask clips.
++  // The mask views exist after the first layout, so it's laid out here,
++  // before it's presented.
++  private static func darkenMask(of cropVc: UIViewController, in bounds: CGRect) {
++    cropVc.loadViewIfNeeded()
++    cropVc.view.frame = bounds
++    cropVc.view.layoutIfNeeded()
++    func visit(_ view: UIView) {
++      if let effectView = view as? UIVisualEffectView,
++        String(describing: type(of: effectView)) == "CropMaskVisualEffectView" {
++        let tint = UIView(frame: effectView.contentView.bounds)
++        tint.autoresizingMask = [.flexibleWidth, .flexibleHeight]
++        tint.backgroundColor = UIColor.black.withAlphaComponent(0.55)
++        tint.isUserInteractionEnabled = false
++        effectView.contentView.addSubview(tint)
++      }
++      view.subviews.forEach(visit)
+     }
++    visit(cropVc.view)
+   }
+ 
+   private func getRootViewController() -> UIViewController? {

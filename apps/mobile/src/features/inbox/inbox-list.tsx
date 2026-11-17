@@ -9,7 +9,7 @@ import { useInbox } from "~/features/messaging/inbox";
 import { useInboxThreads } from "~/features/messaging/thread-lists";
 import { isDefaultInboxKinds } from "~/features/preferences/inbox-kinds";
 import { usePreference } from "~/features/preferences/store";
-import { useHomeOffline } from "~/features/saved/offline-pill";
+import { useHomePill } from "~/features/saved/offline-pill";
 import { useSavedHome } from "~/features/saved/show-saved";
 
 function Empty({ title, detail }: { title: string; detail: string }) {
@@ -30,7 +30,7 @@ function Empty({ title, detail }: { title: string; detail: string }) {
 export function InboxList() {
   const { conversations, isLoading } = useInbox();
   useSavedHome(isLoading);
-  const offline = useHomeOffline();
+  const pill = useHomePill();
   const showAccount = useVisibleAccounts().length > 1;
   const show = usePreference("inboxShow");
   const kinds = usePreference("inboxIncludes");
@@ -71,7 +71,8 @@ export function InboxList() {
 
   return (
     <ScreenList
-      offline={offline}
+      offline={pill.offline}
+      pill={pill.shown}
       ready={!isLoading}
       steady
       data={items}

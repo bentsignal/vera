@@ -1,5 +1,6 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
+import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx } from "./_generated/server.js";
 import type { messagesProtocol } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
@@ -57,43 +58,80 @@ export async function send(
   const retried = await alreadySent(ctx, self, args.messageId);
   if (retried !== null) return retried;
 
-  const sentAt = Date.now();
   const reply =
     args.threadId === undefined
       ? undefined
       : await replyTo(ctx, args.conversationId, args.threadId, args.threadOnly);
-  const linkPreviews = await startLinkCards(ctx, args.messageId, body, sentAt);
-  const mentions = await validMentions(ctx, access, self, body, args.mentions);
-  const message = {
+  const message = await storeMessage(ctx, {
     attachments: args.attachments,
     authorId: self,
     authorName,
     body,
     conversationId: args.conversationId,
-    linkPreview: linkPreviews?.[0]?.preview ?? undefined,
-    linkPreviews,
-    mentions,
+    mentions: await validMentions(ctx, access, self, body, args.mentions),
     messageId: args.messageId,
-    sentAt,
-    ...replyFields(reply),
-  };
-  await ctx.db.insert("messages", message);
-  // In the same write as the message, so no reader sees both at once.
-  await stopTyping(ctx, self, args.conversationId);
-  await recordMentions(ctx, message);
-  if (reply !== undefined) {
-    await addReply(ctx, { ...reply, authorId: self, sentAt });
-  }
+    reply,
+  });
   // Nothing shared is written: the message itself moves the conversation
   // up the inbox and marks it changed (see `toConversation`), so sends to
   // a busy conversation never conflict, and only queries whose results
   // they change run again. A reply kept in its thread isn't what was last
   // read there.
   if (reply?.threadOnly !== true) {
-    await markReadUpTo(ctx, access, self, sentAt);
+    await markReadUpTo(ctx, access, self, message.sentAt);
+  }
+  return message;
+}
+
+/**
+ * Stores a new message, with its link cards, mentions, and place in its
+ * thread, and sends its pushes. `send` checks the author may write here;
+ * an assistant's reply (assistants.ts) is checked by its host.
+ */
+export async function storeMessage(
+  ctx: MutationCtx,
+  {
+    reply,
+    ...fields
+  }: Pick<
+    Doc<"messages">,
+    | "attachments"
+    | "authorId"
+    | "authorName"
+    | "body"
+    | "conversationId"
+    | "mentions"
+    | "messageId"
+  > & { readonly reply: Awaited<ReturnType<typeof replyTo>> | undefined },
+  { joinsThread = true }: { joinsThread?: boolean } = {},
+) {
+  const sentAt = Date.now();
+  const linkPreviews = await startLinkCards(
+    ctx,
+    fields.messageId,
+    fields.body,
+    sentAt,
+  );
+  const message = {
+    ...fields,
+    linkPreview: linkPreviews?.[0]?.preview ?? undefined,
+    linkPreviews,
+    sentAt,
+    ...replyFields(reply),
+  };
+  await ctx.db.insert("messages", message);
+  // In the same write as the message, so no reader sees both at once.
+  await stopTyping(ctx, fields.authorId, fields.conversationId);
+  await recordMentions(ctx, message);
+  if (reply !== undefined) {
+    await addReply(
+      ctx,
+      { ...reply, authorId: fields.authorId, sentAt },
+      { authorJoins: joinsThread },
+    );
   }
   await ctx.scheduler.runAfter(0, internal.notifications.send, {
-    messageId: args.messageId,
+    messageId: fields.messageId,
   });
   return { ...message, linkPreview: message.linkPreview ?? null };
 }
@@ -102,7 +140,11 @@ export async function send(
  * A retried send's message, already stored. Another author's ID is
  * taken.
  */
-async function alreadySent(ctx: MutationCtx, self: string, messageId: string) {
+export async function alreadySent(
+  ctx: MutationCtx,
+  self: string,
+  messageId: string,
+) {
   const existing = await ctx.db
     .query("messages")
     .withIndex("by_message", (index) => index.eq("messageId", messageId))

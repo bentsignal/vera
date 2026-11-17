@@ -13,18 +13,18 @@ import { Pending, usePending } from "./pending";
 import { ScreenListInsets } from "./screen-list-insets";
 import { useSteadyData } from "./steady-data";
 
-/** Room above the rows for the `OfflinePill`, while it shows. */
+/** Room above the rows for the screen's pill, while it shows. */
 const OFFLINE_ROOM = 44;
 
 /** How far past the screen, in points, rows are drawn ahead of time. */
 const DRAW_DISTANCE = 1000;
 
 /**
- * Room above the rows for the `OfflinePill` while it shows. A header, not
+ * Room above the rows for the screen's pill while it shows. A header, not
  * padding, which Legend List doesn't measure again.
  */
-function OfflineRoom({ offline }: { offline: boolean }) {
-  return <View style={{ height: offline ? OFFLINE_ROOM : 0 }} />;
+function PillRoom({ offline, pill }: { offline: boolean; pill?: boolean }) {
+  return <View style={{ height: (pill ?? offline) ? OFFLINE_ROOM : 0 }} />;
 }
 
 /**
@@ -55,6 +55,7 @@ function PendingRows({ phase }: { phase: ReturnType<typeof usePending> }) {
 export function ScreenList<Item>({
   ready = true,
   offline = false,
+  pill,
   ref,
   steady = false,
   ...props
@@ -65,6 +66,11 @@ export function ScreenList<Item>({
    * spinner doesn't say it too.
    */
   offline?: boolean;
+  /**
+   * A pill is up over the rows (`OfflinePill`, or Home's
+   * `UnreachablePill`): the rows make room for it. `offline` by default.
+   */
+  pill?: boolean;
   ref?: Ref<LegendListRef>;
   /** Rows don't move under the finger as data changes (`useSteadyData`). */
   steady?: boolean;
@@ -97,7 +103,7 @@ export function ScreenList<Item>({
         // phone doesn't outrun them and show them appearing at the edges.
         drawDistance={DRAW_DISTANCE}
         recycleItems={false}
-        ListHeaderComponent={<OfflineRoom offline={offline} />}
+        ListHeaderComponent={<PillRoom offline={offline} pill={pill} />}
         {...props}
         {...(steady && { ...held.listProps, data: held.data })}
         style={[

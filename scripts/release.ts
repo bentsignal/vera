@@ -157,9 +157,26 @@ function binaryTagPattern(platform: Platform, channel: Channel) {
 }
 
 /**
- * The runtime version (native fingerprint) of the checked-out code for a
- * channel's binaries. Vera Dev has its own bundle ID, so its runtime differs
- * from the store build's.
+ * The runtime version app.config.ts sets for a platform (`RUNTIME_VERSION`):
+ * an update reaches only binaries built with the same one. Both channels
+ * use it; their updates are kept apart by channel.
+ */
+function runtimeVersion(platform: Platform) {
+  const source = readFileSync(join(MOBILE, "app.config.ts"), "utf8");
+  const block = /const RUNTIME_VERSION = \{([\s\S]*?)\};/.exec(source)?.[1];
+  const value = new RegExp(`${platform}: "([^"]+)"`).exec(block ?? "")?.[1];
+  if (value === undefined) {
+    throw new Error(`no ${platform} entry in app.config.ts's RUNTIME_VERSION`);
+  }
+  return value;
+}
+
+/**
+ * The native fingerprint of the checked-out code for a channel's binaries:
+ * changes whenever a binary would build differently. Store builds record
+ * it, so `plan` can say whether native changes are waiting for one. Vera
+ * Dev has its own bundle ID, so its fingerprint differs from the store
+ * build's.
  */
 function fingerprint(platform: Platform, channel: Channel) {
   const json = output(
@@ -206,6 +223,18 @@ function tagDate(tag: string) {
 
 function runtimeOf(tag: string | undefined) {
   return tag === undefined ? undefined : field(tagMessage(tag), "runtime");
+}
+
+/**
+ * Whether a binary was built from different native code than the checkout:
+ * yes, no, or unknown for builds from before runtime versions were set by
+ * hand, whose tags have no `fingerprint:` line (their `runtime:` was the
+ * fingerprint, hashed with the old runtime policy, so it can't compare).
+ */
+function nativeChangedSince(tag: string, platform: Platform, channel: Channel) {
+  const built = field(tagMessage(tag), "fingerprint");
+  if (built === undefined) return "unknown";
+  return built === fingerprint(platform, channel) ? "no" : "yes";
 }
 
 /** Files that differ from the last production backend deploy. */
@@ -288,23 +317,32 @@ function plan() {
     `last release: ${release === undefined ? "none" : `${release} (${tagDate(release)})`}`,
   );
   for (const platform of PLATFORMS) {
+    const runtime = runtimeVersion(platform);
     const [binary] = tags(binaryTagPattern(platform, "production"));
-    const shippedRuntime = runtimeOf(binary);
-    console.log(
-      `${platform}: last production build ${binary ?? "none"}; ${
-        shippedRuntime === fingerprint(platform, "production")
-          ? "ota (no native change since it)"
-          : "store-build (native code changed, or no expo-updates build has shipped)"
-      }`,
-    );
+    if (binary === undefined || runtimeOf(binary) !== runtime) {
+      console.log(
+        `${platform}: store-build required: the runtime is ${runtime}, and the last production build ${binary ?? "(none)"} has ${runtimeOf(binary) ?? "none"}, so no update reaches it`,
+      );
+    } else {
+      const native = nativeChangedSince(binary, platform, "production");
+      console.log(
+        `${platform}: ota (runtime ${runtime}, the same as ${binary} and every binary on it); native changes waiting for a store build: ${
+          native === "unknown"
+            ? `unknown (${binary} predates set runtime versions; see the merged PRs' "Native change" lines)`
+            : native === "yes"
+              ? "yes (optional: older binaries on this runtime keep getting updates)"
+              : "none"
+        }`,
+      );
+    }
     const [internal] = tags(binaryTagPattern(platform, "internal"));
     console.log(
       `${platform}: internal build ${
         internal === undefined
           ? "none (only needed to check update or channel behavior)"
-          : runtimeOf(internal) === fingerprint(platform, "internal")
+          : runtimeOf(internal) === runtime
             ? `${internal} (matches; an internal OTA reaches it)`
-            : `${internal} (older native code)`
+            : `${internal} (older runtime)`
       }`,
     );
   }
@@ -399,8 +437,9 @@ function ipaRuntime(ipa: string) {
 }
 
 /**
- * With the fingerprint policy the binary declares `file:fingerprint`, and
- * the hash computed at build time sits in a file inside it.
+ * Binaries from before runtime versions were set by hand (the fingerprint
+ * policy) declare `file:fingerprint`, and the hash computed at build time
+ * sits in a file inside them. Others declare the runtime itself.
  */
 function resolveRuntime(declared: string, archive: string, file: string) {
   if (declared !== "file:fingerprint") return declared;
@@ -472,7 +511,7 @@ function build(profile: string | undefined, flags: string[]) {
         },
       },
     );
-  const runtime = requireRuntime(ipaRuntime(ipa), "ios", profile);
+  const runtime = requireRuntime(ipaRuntime(ipa), "ios");
   const buildNumber = output("sh", [
     "-c",
     `unzip -p "${ipa}" 'Payload/*.app/Info.plist' | plutil -extract CFBundleVersion raw -`,
@@ -499,7 +538,11 @@ function build(profile: string | undefined, flags: string[]) {
       apple.EXPO_ASC_ISSUER_ID ?? "",
     ]);
   }
-  tag(name, [`runtime: ${runtime}`, `commit: ${git("rev-parse", "HEAD")}`]);
+  tag(name, [
+    `runtime: ${runtime}`,
+    `fingerprint: ${fingerprint("ios", profile)}`,
+    `commit: ${git("rev-parse", "HEAD")}`,
+  ]);
   console.log(`ipa: ${ipa}\nbuild: ${buildNumber}\nruntime: ${runtime}`);
 }
 
@@ -517,11 +560,11 @@ function installPage(artifact: string, prefix: string, description: string) {
 }
 
 /** Fails before anything is uploaded if updates could never reach the build. */
-function requireRuntime(runtime: string, platform: Platform, channel: Channel) {
-  const expected = fingerprint(platform, channel);
+function requireRuntime(runtime: string, platform: Platform) {
+  const expected = runtimeVersion(platform);
   if (runtime !== expected) {
     throw new Error(
-      `the build's runtime ${runtime} is not this checkout's ${platform} fingerprint ${expected}; updates would never reach it`,
+      `the build's runtime ${runtime} is not this checkout's ${platform} runtime version ${expected} (app.config.ts); updates would never reach it`,
     );
   }
   return runtime;
@@ -578,7 +621,7 @@ function buildAndroid(profile: Channel, artifact: string | undefined) {
     );
   const { runtime: declared, versionCode } =
     profile === "internal" ? apkInfo(archive) : bundleInfo(archive);
-  const runtime = requireRuntime(declared, "android", profile);
+  const runtime = requireRuntime(declared, "android");
   const name = binaryTagPattern("android", profile).replace("*", versionCode);
   requireNewTag(name);
   if (profile === "internal") {
@@ -607,7 +650,11 @@ function buildAndroid(profile: Channel, artifact: string | undefined) {
       },
     );
   }
-  tag(name, [`runtime: ${runtime}`, `commit: ${git("rev-parse", "HEAD")}`]);
+  tag(name, [
+    `runtime: ${runtime}`,
+    `fingerprint: ${fingerprint("android", profile)}`,
+    `commit: ${git("rev-parse", "HEAD")}`,
+  ]);
   console.log(
     `${extension}: ${archive}\nversion code: ${versionCode}\nruntime: ${runtime}`,
   );
@@ -631,23 +678,44 @@ function apkInfo(apk: string) {
 
 /**
  * An app bundle's runtime and versionCode. aapt2 can't read an .aab, and
- * bundletool isn't installed. The fingerprint policy declares
- * `file:fingerprint` (see resolveRuntime), so the runtime is the hash in
- * base/assets/fingerprint; requireRuntime catches anything else.
+ * bundletool isn't installed, so both come from the bundle's protobuf files
+ * (aapt2's Resources.proto).
+ *
+ * The runtime is the `expo_runtime_version` string resource, in
+ * base/resources.pb: a ResourceTable whose packages (field 2) hold types
+ * (3), each with a name (2) and entries (3); an entry has a name (2) and
+ * config values (6), whose value (2) holds an item (4) whose string (2)
+ * holds the text (1). A bundle from before runtime versions were set by
+ * hand says `file:fingerprint` there (see resolveRuntime).
  *
  * The versionCode comes from the bundle's own manifest rather than EAS
  * (whose remote counter may have moved on since the build, as with
  * --artifact). In a bundle, base/manifest/AndroidManifest.xml is aapt2's
- * protobuf XmlNode (Resources.proto): field 1 is the root <manifest>
- * element, its field 4 the attributes, and each attribute has a name
- * (field 2) and its value as written (field 3), "5" for versionCode 5.
+ * protobuf XmlNode: field 1 is the root <manifest> element, its field 4
+ * the attributes, and each attribute has a name (field 2) and its value as
+ * written (field 3), "5" for versionCode 5.
  */
 function bundleInfo(aab: string) {
-  const runtime = output("unzip", [
-    "-p",
-    aab,
-    "base/assets/fingerprint",
-  ]).trim();
+  const table = execFileSync("unzip", ["-p", aab, "base/resources.pb"], {
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  const declared = protobufFields(table, 2)
+    .flatMap((pkg) => protobufFields(pkg, 3))
+    .filter((type) => protobufFields(type, 2)[0]?.toString() === "string")
+    .flatMap((type) => protobufFields(type, 3))
+    .filter(
+      (entry) =>
+        protobufFields(entry, 2)[0]?.toString() === "expo_runtime_version",
+    )
+    .flatMap((entry) => protobufFields(entry, 6))
+    .flatMap((config) => protobufFields(config, 2))
+    .flatMap((value) => protobufFields(value, 4))
+    .flatMap((item) => protobufFields(item, 2))
+    .map((text) => protobufFields(text, 1)[0]?.toString())[0];
+  if (declared === undefined) {
+    throw new Error(`no expo_runtime_version in ${aab}'s resources`);
+  }
+  const runtime = resolveRuntime(declared, aab, "base/assets/fingerprint");
   const manifest = execFileSync(
     "unzip",
     ["-p", aab, "base/manifest/AndroidManifest.xml"],
@@ -711,7 +779,7 @@ function ota(channel: string | undefined, message: string | undefined) {
   // none does.
   const targets = PLATFORMS.filter((platform) => {
     const [binary] = tags(binaryTagPattern(platform, channel));
-    const current = fingerprint(platform, channel);
+    const current = runtimeVersion(platform);
     const matches = runtimeOf(binary) === current;
     console.log(
       `${platform}: ${matches ? "publishing" : "skipped"} (latest ${channel} binary ${binary ?? "none"}, runtime ${runtimeOf(binary) ?? "none"}; current ${current})`,
@@ -765,8 +833,8 @@ function ota(channel: string | undefined, message: string | undefined) {
       "--non-interactive",
       "--json",
     ],
-    // The fingerprint must match the channel's binaries, which have the
-    // extension (and, on internal, the dev variant).
+    // The same app config as the channel's binaries: their PDS, the
+    // extension, and on internal the dev variant.
     { cwd: MOBILE, env },
   );
   const updates = JSON.parse(json) as {
