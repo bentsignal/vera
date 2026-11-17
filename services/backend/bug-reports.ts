@@ -135,7 +135,12 @@ export interface IssueState {
   readonly closingComment: string | null;
   /** The issue this one was marked a duplicate of (`duplicateOf`). */
   readonly duplicateOf: number | null;
+  /** Labeled "enhancement": an idea for something new, not a bug. */
+  readonly idea: boolean;
 }
+
+/** GitHub's label for an idea (supportAgent.ts files ideas with it). */
+export const IDEA_LABEL = "enhancement";
 
 /** A fix's commit and what it needs before people have it. */
 export interface Fix {
@@ -178,13 +183,9 @@ export function progressOf(issue: IssueState): ReportProgress {
     };
   }
   if (issue.state === "CLOSED") {
-    if (
-      issue.stateReason === "NOT_PLANNED" ||
-      issue.stateReason === "DUPLICATE"
-    ) {
-      return { stage: "closed" };
-    }
-    if (issue.closingCommit !== null) {
+    const done =
+      issue.stateReason !== "NOT_PLANNED" && issue.stateReason !== "DUPLICATE";
+    if (done && issue.closingCommit !== null) {
       return {
         fix: {
           app: true,
@@ -195,8 +196,9 @@ export function progressOf(issue: IssueState): ReportProgress {
         stage: "fixed",
       };
     }
-    // Closed as done with nothing to follow: take its word for it.
-    return { stage: "live" };
+    // Closed with nothing that changed it, even if marked completed:
+    // closing a report as "completed" is also how the team says no.
+    return { stage: "closed" };
   }
   const open = issue.pullRequests.find((pr) => pr.open);
   if (open !== undefined) return { pullRequest: open.ref, stage: "inProgress" };
@@ -247,6 +249,8 @@ export interface UpdateContext {
   readonly delivery?: Delivery;
   readonly platform?: Platform;
   readonly developer: boolean;
+  /** An idea for something new, not a bug: it gets built, not fixed. */
+  readonly idea?: boolean;
   readonly issueUrl?: string;
   readonly pullRequest?: PullRequestRef;
   readonly release?: string;
@@ -268,18 +272,22 @@ export function updateMessage(stage: ReportStage, context: UpdateContext) {
 const UPDATES: Record<ReportStage, (context: UpdateContext) => string[]> = {
   reported: () => [],
   pickedUp: (context) => [
-    `Quick update on the bug you reported (${context.summary}): someone on the team picked it up.`,
+    `Quick update on ${subject(context)}: someone on the team picked it up.`,
     ...developerLink(context, context.issueUrl),
   ],
   inProgress: (context) => [
-    `We're working on a fix for the bug you reported (${context.summary}).`,
+    context.idea === true
+      ? `We're working on ${subject(context)}.`
+      : `We're working on a fix for ${subject(context)}.`,
     ...developerLink(
       context,
       context.pullRequest && `PR: ${context.pullRequest.url}`,
     ),
   ],
   fixed: (context) => [
-    `The bug you reported (${context.summary}) is fixed. The fix will reach you in an upcoming update, and I'll tell you when it's out.`,
+    context.idea === true
+      ? `${capitalized(subject(context))} is done. It will reach you in an upcoming update, and I'll tell you when it's out.`
+      : `${capitalized(subject(context))} is fixed. The fix will reach you in an upcoming update, and I'll tell you when it's out.`,
     ...developerLink(
       context,
       context.pullRequest
@@ -295,12 +303,43 @@ const UPDATES: Record<ReportStage, (context: UpdateContext) => string[]> = {
     ),
   ],
   closed: (context) => [
-    context.stateReason === "DUPLICATE"
-      ? `Update on the bug you reported (${context.summary}): it turned out to be the same as another report the team is already on.`
-      : `About the bug you reported (${context.summary}): the team looked into it and isn't planning to change it for now. Thanks for flagging it.`,
+    closedMessage(context),
     ...developerLink(context, context.issueUrl),
   ],
 };
+
+/** What the reporter sent, as messages name it. */
+function subject({ idea, summary }: UpdateContext) {
+  return idea === true
+    ? `the idea you suggested (${summary})`
+    : `the bug you reported (${summary})`;
+}
+
+function capitalized(text: string) {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+/**
+ * A report closed with nothing that changed it. Closed as completed
+ * without a fix says no more than closed: it never claims it's done.
+ */
+function closedMessage(context: UpdateContext) {
+  const what = subject(context);
+  const idea = context.idea === true;
+  if (context.stateReason === "DUPLICATE") {
+    return idea
+      ? `Update on ${what}: it turned out to be the same as another idea the team already has.`
+      : `Update on ${what}: it turned out to be the same as another report the team is already on.`;
+  }
+  if (context.stateReason === "NOT_PLANNED") {
+    return idea
+      ? `About ${what}: the team looked at it and isn't planning to build it for now. Thanks for suggesting it.`
+      : `About ${what}: the team looked into it and isn't planning to change it for now. Thanks for flagging it.`;
+  }
+  return idea
+    ? `About ${what}: the team closed it. Thanks for suggesting it.`
+    : `About ${what}: the team closed it. If you still see it, tell me.`;
+}
 
 function developerLink(context: UpdateContext, line: string | undefined) {
   return context.developer && line ? [line] : [];
@@ -313,16 +352,17 @@ const STORES: Record<NonNullable<Platform> | "unknown", string> = {
   unknown: "your app store",
 };
 
-function liveMessage({ delivery, platform, summary }: UpdateContext) {
-  const what = `the bug you reported (${summary})`;
-  switch (delivery ?? "unknown") {
+function liveMessage(context: UpdateContext) {
+  const what = subject(context);
+  const it = context.idea === true ? capitalized(what) : `The fix for ${what}`;
+  switch (context.delivery ?? "unknown") {
     case "update":
     case "server":
       // An update over the air: reading this in Vera, they have it.
-      return `The fix for ${what} is live now.`;
+      return `${it} is live now.`;
     case "build":
-      return `The fix for ${what} is out in the newest version of Vera. Update it from ${STORES[platform ?? "unknown"]} to get it.`;
+      return `${it} is out in the newest version of Vera. Update it from ${STORES[context.platform ?? "unknown"]} to get it.`;
     case "unknown":
-      return `${what.charAt(0).toUpperCase()}${what.slice(1)} is fixed now.`;
+      return `${it} is out now.`;
   }
 }

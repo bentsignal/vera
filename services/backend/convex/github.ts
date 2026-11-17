@@ -1,4 +1,5 @@
 import type { IssueState } from "../bug-reports";
+import { IDEA_LABEL } from "../bug-reports";
 import { closingCommentOf, duplicateOf } from "../issue-closures";
 import { optionalEnvironment } from "./lib";
 
@@ -144,6 +145,7 @@ async function issueStatesOnce(
       (number) => `i${String(number)}: issue(number: ${String(number)}) {
         number state stateReason closedAt
         assignees(first: 1) { totalCount }
+        labels(first: 20) { nodes { name } }
         comments(last: 10) { nodes { authorAssociation body createdAt } }
         duplicates: timelineItems(last: 20, itemTypes: [MARKED_AS_DUPLICATE_EVENT, UNMARKED_AS_DUPLICATE_EVENT]) {
           nodes {
@@ -220,6 +222,9 @@ async function issueStatesOnce(
           marked: read(event, "__typename") === "MarkedAsDuplicateEvent",
         })),
         number,
+      ),
+      idea: nodes(read(issue, "labels")).some(
+        (label) => read(label, "name") === IDEA_LABEL,
       ),
       pullRequests,
       state: read(issue, "state") === "CLOSED" ? "CLOSED" : "OPEN",
