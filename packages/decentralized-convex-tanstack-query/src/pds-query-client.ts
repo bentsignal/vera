@@ -251,7 +251,10 @@ export class PdsQueryClient {
   /**
    * Caches the results that came with another query, before that query's
    * own result shows, so a screen showing both has them at once. A query
-   * this client is watching is left alone: its live result is as new.
+   * this client is watching that already has a result is left alone: its
+   * live result is as new. One still waiting for its first takes this one,
+   * or a screen that started watching it while the other was on its way
+   * (a chat opening while its pages load) would wait a round trip more.
    */
   #cacheIncluded(included: readonly IncludedPdsQuery[] = []) {
     for (const queryClient of this.#connections.keys()) {
@@ -262,7 +265,8 @@ export class PdsQueryClient {
           .find({ exact: true, queryKey });
         if (
           existing !== undefined &&
-          this.#activeQueries.has(existing.queryHash)
+          this.#activeQueries.has(existing.queryHash) &&
+          hasResult(existing.state.data)
         ) {
           continue;
         }

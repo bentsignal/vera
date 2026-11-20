@@ -74,3 +74,41 @@ void test("a query's first answer comes with what it includes, before its subscr
   unsubscribe();
   disconnect();
 });
+
+void test("a query watched before what includes it arrives takes the included answer", async () => {
+  // Its own first answers are slow; the query that includes it answers
+  // first.
+  const { transport } = memoryTransport("a.test", {
+    answerAfter: 300,
+    queryAfter: (owner) => (owner === "included" ? 300 : 20),
+  });
+  const queryClient = new QueryClient();
+  const disconnect = new PdsQueryClient(transport).connect(queryClient);
+  const options = { revealPartialResultsAfter: 0 };
+  const included = new QueryObserver(
+    queryClient,
+    pdsQuery({ args: { owner: "included" }, options, query: listNotes }),
+  );
+  const unsubscribeIncluded = included.subscribe(() => undefined);
+  const withIncluded = new QueryObserver(
+    queryClient,
+    pdsQuery({ args: { owner: "with-included" }, options, query: listNotes }),
+  );
+  const unsubscribe = withIncluded.subscribe(() => undefined);
+  const includedQuery = pdsQuery({
+    args: { owner: "included" },
+    options,
+    query: listNotes,
+  });
+  await until(() => withIncluded.getCurrentResult().data?.status === "success");
+  const shown = queryClient.getQueryData<PdsQueryData<Note[], readonly Note[]>>(
+    includedQuery.queryKey,
+  );
+  assert.ok(
+    shown?.status === "success" &&
+      shown.result.some((note) => note.body === "included"),
+  );
+  unsubscribe();
+  unsubscribeIncluded();
+  disconnect();
+});

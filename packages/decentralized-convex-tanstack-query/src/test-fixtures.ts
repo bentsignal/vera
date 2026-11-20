@@ -51,7 +51,10 @@ export function memoryTransport(
   {
     answerAfter,
     queryAfter,
-  }: { answerAfter?: number; queryAfter?: number } = {},
+  }: {
+    answerAfter?: number;
+    queryAfter?: number | ((owner: string | undefined) => number);
+  } = {},
 ) {
   const connections = new Map<string, MemoryConnection>();
   const transport = new DecentralizedConvexClient({
@@ -89,7 +92,11 @@ export class MemoryConnection implements FederationConnection {
   /** The last mutation's optimistic update, for tests to apply. */
   optimisticUpdate: PdsConnectionMutationOptions["optimisticUpdate"];
 
-  constructor(url: string, answerAfter?: number, queryAfter?: number) {
+  constructor(
+    url: string,
+    answerAfter?: number,
+    queryAfter?: number | ((owner: string | undefined) => number),
+  ) {
     this.#answerAfter = answerAfter;
     this.#queryAfter = queryAfter;
     this.#url = url;
@@ -116,8 +123,12 @@ export class MemoryConnection implements FederationConnection {
     _query: Query,
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
-    if (this.#queryAfter !== undefined) await wait(this.#queryAfter);
     const owner = operationArgs(args).owner;
+    const delay =
+      typeof this.#queryAfter === "function"
+        ? this.#queryAfter(owner)
+        : this.#queryAfter;
+    if (delay !== undefined) await wait(delay);
     const result = {
       included: includedWith(this.#url, owner),
       routes: this.#url === "https://a.test" ? ["a.test", "b.test"] : [],
