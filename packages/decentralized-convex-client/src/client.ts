@@ -258,6 +258,16 @@ export class DecentralizedConvexClient {
     this.#getConnection(this.#requireHome().manifest.deploymentUrl);
   }
 
+  /**
+   * Signs every open connection in again with the token the fetcher has
+   * now (see `FederationConnection.reauthenticate`).
+   */
+  reauthenticate() {
+    for (const connection of this.#connections.values()) {
+      connection.reauthenticate?.();
+    }
+  }
+
   resolvePds(addressOrDomain: string) {
     return this.#pds.resolve(addressOrDomain);
   }

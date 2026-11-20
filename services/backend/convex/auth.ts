@@ -58,6 +58,10 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
         authConfig,
         jwksRotateOnTokenGenerationError: true,
         jwt: {
+          // An hour, not the plugin's 15 minutes: a phone coming back
+          // after longer has to get a new one before anything loads
+          // (apps/mobile/src/features/session/account-session.ts).
+          expirationSeconds: 60 * 60,
           definePayload: ({ user }) => ({
             accountId: actorFromEmail(user.email),
             email: user.email,

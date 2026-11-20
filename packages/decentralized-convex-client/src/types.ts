@@ -111,6 +111,13 @@ export type FederationAuthTokenFetcher = (
 
 export interface FederationConnection {
   close: () => Promise<void>;
+  /**
+   * Signs in again with the token the fetcher has now (asked for without
+   * `forceRefreshToken`), as when the app wakes with a fresh one ready, so
+   * the connection doesn't present an expired one first and wait for the
+   * PDS to refuse it.
+   */
+  reauthenticate?: () => void;
   mutation: <Mutation extends FederationMutationReference>(
     mutation: Mutation,
     args: FunctionArgs<Mutation>,
