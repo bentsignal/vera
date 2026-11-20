@@ -12,6 +12,12 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_account_key: ["accountId", "key", "seenAt"],
     by_account_seen: ["accountId", "seenAt"],
   },
+  chatSequence: {
+    by_conversation_deleted_seq: ["conversationId", "deleted", "seq"],
+    by_conversation_sent: ["conversationId", "sentAt"],
+    by_conversation_seq: ["conversationId", "seq"],
+    by_message: ["messageId"],
+  },
   conversationChanges: { by_conversation: ["conversationId"] },
   conversations: {
     by_conversation: ["conversationId"],
@@ -34,11 +40,22 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_chat_sent: ["conversationId", "threadOnly", "sentAt"],
     by_conversation_sent: ["conversationId", "sentAt"],
     by_message: ["messageId"],
+    by_quote_author_conversation_sent: [
+      "quote.authorId",
+      "conversationId",
+      "sentAt",
+    ],
     by_quote_author_sent: ["quote.authorId", "sentAt"],
     by_thread_sent: ["threadId", "sentAt"],
   },
   notificationSettings: { by_account: ["accountId"] },
+  pushBadges: { by_account: ["accountId"] },
   reactions: {
+    by_author_conversation_reacted: [
+      "messageAuthorId",
+      "conversationId",
+      "reactedAt",
+    ],
     by_author_reacted: ["messageAuthorId", "reactedAt"],
     by_conversation_reacted: ["conversationId", "reactedAt"],
     by_message: ["messageId"],
@@ -67,6 +84,7 @@ const INDEXES: Record<string, Record<string, string[]>> = {
   typing: {
     by_account_conversation: ["accountId", "conversationId"],
     by_conversation: ["conversationId", "typedAt"],
+    by_conversation_thread_typed: ["conversationId", "threadId", "typedAt"],
   },
 };
 
@@ -89,20 +107,32 @@ function compare(left: unknown, right: unknown) {
   return String(left).localeCompare(String(right));
 }
 
-function results(found: Row[]) {
+/** Documents read, as Convex counts them: each one a query returns. */
+interface ReadCount {
+  documents: number;
+}
+
+function results(found: Row[], count: ReadCount) {
+  function read(rows: Row[]) {
+    count.documents += rows.length;
+    return rows;
+  }
   return {
     [Symbol.asyncIterator]: async function* () {
-      yield* found;
+      for (const row of found) {
+        count.documents += 1;
+        yield row;
+      }
       await Promise.resolve();
     },
-    collect: () => Promise.resolve(found),
-    first: () => Promise.resolve(found[0] ?? null),
+    collect: () => Promise.resolve(read(found)),
+    first: () => Promise.resolve(read(found.slice(0, 1))[0] ?? null),
     order: (direction: "asc" | "desc") =>
-      results(direction === "desc" ? [...found].reverse() : found),
-    take: (count: number) => Promise.resolve(found.slice(0, count)),
+      results(direction === "desc" ? [...found].reverse() : found, count),
+    take: (most: number) => Promise.resolve(read(found.slice(0, most))),
     unique: () => {
       if (found.length > 1) throw new Error("Not unique");
-      return Promise.resolve(found[0] ?? null);
+      return Promise.resolve(read(found)[0] ?? null);
     },
   };
 }
@@ -116,6 +146,7 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
   const rows: Record<string, Row[]> = {};
   // Every write after setup, as "<table> <insert|patch|delete>".
   const writes: string[] = [];
+  const reads: ReadCount = { documents: 0 };
   function insert(table: string, value: Record<string, unknown>) {
     const row = { _creationTime: (clock += 1), _id: `${table}:${clock}` };
     (rows[table] ??= []).push({ ...row, ...value });
@@ -148,6 +179,10 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
       },
       gt: (field: string, value: number) => {
         filters.push((row) => Number(valueAt(row, field)) > value);
+        return builder;
+      },
+      gte: (field: string, value: number) => {
+        filters.push((row) => Number(valueAt(row, field)) >= value);
         return builder;
       },
       lt: (field: string, value: number) => {
@@ -192,7 +227,7 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
         ) => {
           const builder = range();
           build(builder);
-          return results(select(table, index, builder.filters));
+          return results(select(table, index, builder.filters), reads);
         },
       }),
     },
@@ -204,5 +239,7 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
     rows: (table: string) => rows[table] ?? [],
     /** The writes made since setup, as "<table> <insert|patch|delete>". */
     writes: () => [...writes],
+    /** How many documents have been read since setup. */
+    documentsRead: () => reads.documents,
   };
 }

@@ -132,6 +132,20 @@ function useProfilesSettled(loaded: boolean, profilesIn: boolean) {
  * A conversation, and the profiles of its members and of the people its
  * `messages` show (see `peopleShown`).
  */
+/**
+ * The members whose names a conversation loads with it: a direct
+ * conversation's and a group's. A channel's are everyone in its space;
+ * their names load once someone starts typing, for @mentions (see
+ * `useMentionNames`).
+ */
+function membersShown(
+  conversation: Pick<Conversation, "kind" | "members"> | null | undefined,
+) {
+  return conversation == null || conversation.kind === "channel"
+    ? []
+    : conversation.members;
+}
+
 export function useConversation(
   conversationId: string,
   messages: readonly ShownMessage[] = [],
@@ -150,7 +164,7 @@ export function useConversation(
   const members = known?.members ?? [];
   // Assistants too, for @mentions (mentionable.ts).
   const { isLoaded, profileOf } = useProfileState([
-    ...members,
+    ...membersShown(known),
     ...shown,
     ...assistantsOf(address),
   ]);
@@ -159,8 +173,7 @@ export function useConversation(
   }
   const profilesLoaded = useProfilesSettled(
     data != null,
-    // A channel's members are everyone in its space, so it waits only for
-    // the people its messages show; the rest load for @mentions.
+    // A channel waits only for the people its messages show.
     (known?.kind === "channel" ? shown : [...members, ...shown]).every(
       isLoaded,
     ),

@@ -44,15 +44,22 @@ export function createNote(args: {
 /**
  * `answerAfter` delays each subscription's first answer by that many
  * milliseconds, like a real connection; otherwise it answers at once.
+ * `queryAfter` does the same for one-shot queries.
  */
 export function memoryTransport(
   home: string,
-  { answerAfter }: { answerAfter?: number } = {},
+  {
+    answerAfter,
+    queryAfter,
+  }: {
+    answerAfter?: number;
+    queryAfter?: number | ((owner: string | undefined) => number);
+  } = {},
 ) {
   const connections = new Map<string, MemoryConnection>();
   const transport = new DecentralizedConvexClient({
     connectionFactory: (url) => {
-      const connection = new MemoryConnection(url, answerAfter);
+      const connection = new MemoryConnection(url, answerAfter, queryAfter);
       connections.set(url, connection);
       return connection;
     },
@@ -78,12 +85,20 @@ function includedWith(url: string, owner: string | undefined) {
 export class MemoryConnection implements FederationConnection {
   readonly #answerAfter;
   readonly #publishers = new Set<(body: string) => void>();
+  readonly #queryAfter;
   readonly #url;
+  /** The arguments of every subscription, oldest first. */
+  readonly subscribed: unknown[] = [];
   /** The last mutation's optimistic update, for tests to apply. */
   optimisticUpdate: PdsConnectionMutationOptions["optimisticUpdate"];
 
-  constructor(url: string, answerAfter?: number) {
+  constructor(
+    url: string,
+    answerAfter?: number,
+    queryAfter?: number | ((owner: string | undefined) => number),
+  ) {
     this.#answerAfter = answerAfter;
+    this.#queryAfter = queryAfter;
     this.#url = url;
   }
 
@@ -104,11 +119,16 @@ export class MemoryConnection implements FederationConnection {
     return Promise.resolve(result) as Promise<FunctionReturnType<Mutation>>;
   }
 
-  query<Query extends FederationQueryReference>(
+  async query<Query extends FederationQueryReference>(
     _query: Query,
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
     const owner = operationArgs(args).owner;
+    const delay =
+      typeof this.#queryAfter === "function"
+        ? this.#queryAfter(owner)
+        : this.#queryAfter;
+    if (delay !== undefined) await wait(delay);
     const result = {
       included: includedWith(this.#url, owner),
       routes: this.#url === "https://a.test" ? ["a.test", "b.test"] : [],
@@ -116,7 +136,7 @@ export class MemoryConnection implements FederationConnection {
     };
     // The fake connection cannot derive a concrete result from an arbitrary reference.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    return Promise.resolve(result) as Promise<FunctionReturnType<Query>>;
+    return result as FunctionReturnType<Query>;
   }
 
   subscribe<Query extends FederationQueryReference>(
@@ -126,10 +146,12 @@ export class MemoryConnection implements FederationConnection {
   ) {
     const routes = this.#url === "https://a.test" ? ["a.test", "b.test"] : [];
     const url = this.#url;
+    this.subscribed.push(args);
+    const include = Reflect.get(Object(args), "include") !== false;
     function publish(body: string) {
       const owner = operationArgs(args).owner;
       const result = {
-        included: includedWith(url, owner),
+        included: include ? includedWith(url, owner) : [],
         routes,
         value: [{ body, id: owner }],
       };
@@ -176,6 +198,19 @@ export function discoveredPds(domain: string) {
 
 export function wait(delay: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, delay));
+}
+
+/**
+ * Waits until `done` holds, checking every few milliseconds, or fails after
+ * `timeout`: a test waits on what it's waiting for, not a guess at how long
+ * that takes on a busy machine.
+ */
+export async function until(done: () => boolean, timeout = 2000) {
+  const start = Date.now();
+  while (!done()) {
+    if (Date.now() - start > timeout) throw new Error("Timed out waiting");
+    await wait(5);
+  }
 }
 
 export function nextTask() {

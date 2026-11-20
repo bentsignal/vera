@@ -12,7 +12,7 @@
 // message arriving changes no query's key.
 
 export type PageCursor =
-  | { readonly after: number }
+  | { readonly after: number; readonly limit?: number }
   | { readonly around: string }
   | { readonly before: number };
 
@@ -66,6 +66,14 @@ export interface View {
   readonly followed: readonly string[];
 }
 
+/**
+ * How many messages a page of the newest messages holds before the next
+ * one starts (the PDS's pages hold 50). Each message sent resends the
+ * whole page it lands in, so the page that's live stays small; a reopened
+ * window more than this behind opens afresh at the latest (`advance`).
+ */
+export const LIVE_PAGE_SIZE = 10;
+
 /** The most pages a window reopens with; past this it starts afresh. */
 export const MAX_REUSED_PAGES = 6;
 
@@ -82,7 +90,7 @@ function asView(view: View) {
 /** The window over the latest messages as of `openedAt`. */
 export function latestView(openedAt: number) {
   const opened = { before: openedAt + 1 };
-  const pages = [opened, { after: openedAt }];
+  const pages = [opened, { after: openedAt, limit: LIVE_PAGE_SIZE }];
   return asView({
     anchor: undefined,
     followed: [],
@@ -158,6 +166,39 @@ export function pageAfter(message: WindowMessage) {
 }
 
 /**
+ * The pages to ask for ahead of the list reaching them: once the reader
+ * has scrolled past the pages the window opened with (it added one), the
+ * next page further that way, so it's there when they get to it. Each
+ * needs the page before it (its cursor is that page's last message), so
+ * it's one ahead.
+ */
+export function pagesAhead(
+  view: Pick<View, "initial" | "liveSince" | "pages">,
+  pages: readonly (PageData | undefined)[],
+) {
+  const opened = new Set(view.initial.map(pageKey));
+  function added(cursor: PageCursor | undefined) {
+    return cursor !== undefined && !opened.has(pageKey(cursor));
+  }
+  const first = pages[0];
+  const last = pages.at(-1);
+  const oldest = first?.hasOlder === true ? first.messages[0] : undefined;
+  // At the latest messages, newer pages follow by themselves (`advance`).
+  const newest =
+    view.liveSince === undefined && last?.hasNewer === true
+      ? last.messages.at(-1)
+      : undefined;
+  return [
+    ...(added(view.pages[0]) && oldest !== undefined
+      ? [{ before: oldest.sentAt }]
+      : []),
+    ...(added(view.pages.at(-1)) && newest !== undefined
+      ? [pageAfter(newest)]
+      : []),
+  ];
+}
+
+/**
  * The window's newest page has nothing newer: it's followed from now on,
  * and the window is at the latest messages, if it wasn't already.
  */
@@ -189,7 +230,11 @@ function filled(view: View, key: string, last: PageData) {
   if (!view.followed.includes(key)) return "behind" as const;
   const newest = last.messages.at(-1);
   if (newest === undefined) return undefined;
-  const next = withPage(view, pageAfter(newest), "end");
+  const next = withPage(
+    view,
+    { ...pageAfter(newest), limit: LIVE_PAGE_SIZE },
+    "end",
+  );
   return next === view ? undefined : { view: next };
 }
 
@@ -283,6 +328,13 @@ export function windowParts<Message extends WindowMessage>(
     liveIds: live.map((message) => message.messageId),
     liveThreadIds: threadsOf(live),
     since: liveSince,
+    /**
+     * Whether every page has answered. The newest page's answer includes
+     * what's reacted to and replied to since `liveSince` (see `include`
+     * on the PDS), so those are asked for only once it hasn't: asked for
+     * alongside the pages, they'd be asked for twice.
+     */
+    sinceDue: pages.every((page) => page !== undefined),
   };
 }
 

@@ -3,6 +3,7 @@ import type { OperationArgs } from "@decentralized-convex/plugin";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { ConversationAccess } from "./model.ts";
 import type { messagesProtocol } from "./protocol.ts";
+import type { SpaceReads } from "./spaceReads.ts";
 import { alertsFor } from "./alerts.ts";
 import {
   fail,
@@ -11,7 +12,9 @@ import {
   toConversation,
   upsertMember,
 } from "./model.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { notificationSettings } from "./settings.ts";
+import { spaceReads } from "./spaceReads.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
 type Queries = (typeof messagesProtocol)["queries"];
@@ -37,6 +40,7 @@ export async function setShowInInbox(
   self: string,
   args: Args<"setShowInInbox">,
 ) {
+  await forgetBadge(ctx, self);
   const access = await requireAccess(ctx, args.conversationId, self);
   if (access.conversation.kind !== "channel") fail("CHANNEL_REQUIRED");
   await upsertMember(ctx, access, self, {
@@ -54,6 +58,7 @@ export async function inboxAccess(
   ctx: QueryCtx,
   self: string,
   channels: boolean,
+  spaces: SpaceReads = spaceReads(ctx),
 ) {
   // Every conversation is read concurrently; reading them one at a time made
   // a large inbox take a second, and every write to it waits for that.
@@ -71,19 +76,19 @@ export async function inboxAccess(
       access !== null && access.conversation.kind !== "channel",
   );
   if (!channels) return found;
-  const spaces = await ctx.db
+  const memberOf = await ctx.db
     .query("spaceMembers")
     .withIndex("by_account", (index) => index.eq("accountId", self))
     .collect();
   const spaceChannels = await Promise.all(
-    spaces.map(async ({ spaceId }) => {
+    memberOf.map(async ({ spaceId }) => {
       const conversations = await ctx.db
         .query("conversations")
         .withIndex("by_space", (index) => index.eq("spaceId", spaceId))
         .collect();
       return Promise.all(
         conversations.map((channel) =>
-          findAccess(ctx, channel.conversationId, self),
+          findAccess(ctx, channel.conversationId, self, spaces),
         ),
       );
     }),
@@ -101,11 +106,27 @@ export async function inbox(
   self: string,
   args: OperationArgs<Queries["inbox"]>,
 ) {
-  const settings = await notificationSettings(ctx, self);
-  const conversations = await Promise.all(
-    (await inboxAccess(ctx, self, args.channels === true)).map((access) =>
-      toConversation(ctx, access, self, alertsFor(access, settings)),
-    ),
+  const spaces = spaceReads(ctx);
+  const conversations = await inboxRows(
+    ctx,
+    self,
+    await inboxAccess(ctx, self, args.channels === true, spaces),
+    spaces,
   );
   return conversations.sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+/** The inbox's rows, each as `conversation` answers it. */
+export async function inboxRows(
+  ctx: QueryCtx,
+  self: string,
+  accesses: readonly ConversationAccess[],
+  spaces: SpaceReads,
+) {
+  const settings = await notificationSettings(ctx, self);
+  return Promise.all(
+    accesses.map((access) =>
+      toConversation(ctx, access, self, alertsFor(access, settings), spaces),
+    ),
+  );
 }

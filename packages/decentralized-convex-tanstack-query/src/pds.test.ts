@@ -17,6 +17,7 @@ import {
   listNotes,
   memoryTransport,
   nextTask,
+  until,
   wait,
 } from "./test-fixtures.ts";
 
@@ -99,9 +100,11 @@ void test("produces native TanStack query and mutation options", async () => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- The fake implements the methods PDS updates use.
   connections.get("https://a.test")?.optimisticUpdate?.(store as never);
   assert.deepEqual(seen, ["draft"]);
+  // As subscriptions ask for it (without what it includes), since it
+  // isn't loaded yet.
   assert.deepEqual(set, [
     {
-      args: listNotes({ owner: "alice" }),
+      args: { ...listNotes({ owner: "alice" }), include: false },
       value: { routes: [], value: [{ body: "draft", id: "draft" }] },
     },
   ]);
@@ -163,7 +166,7 @@ void test("a query shown again keeps its cached result while it resubscribes", a
 
   const first = new QueryObserver(queryClient, query);
   const unsubscribeFirst = first.subscribe(() => undefined);
-  await wait(60);
+  await until(() => first.getCurrentResult().data?.status === "success");
   assert.equal(first.getCurrentResult().data?.status, "success");
   unsubscribeFirst();
 

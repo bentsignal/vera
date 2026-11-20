@@ -1,7 +1,7 @@
 import { defineOperation } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
 
-import { activityItem } from "./activityShapes.ts";
+import { activityItem, compactActivity } from "./activityShapes.ts";
 import {
   conversation,
   linkCard,
@@ -32,6 +32,18 @@ export const queries = {
     returns: v.array(conversation),
   }),
   /**
+   * The conversations in your inbox (as `inbox` lists them), by ID, in no
+   * particular order. It changes only when the list does (joining,
+   * leaving, a rename, a pin); each row is its `conversation` query,
+   * which changes with its messages. Its first answer includes every row,
+   * already worked out, and the people they show, so an inbox opens in
+   * one round trip.
+   */
+  inboxConversations: defineOperation({
+    args: v.object({ channels: v.optional(v.boolean()) }),
+    returns: v.array(v.string()),
+  }),
+  /**
    * What happened while you were away, newest first: messages from others
    * (one item per conversation) and others' reactions to your messages
    * (one per message). With `threads`, also new replies in threads
@@ -42,15 +54,18 @@ export const queries = {
    * Each conversation shows what it alerts you about, and channels left
    * out of the inbox show only mentions and replies. An item lasts until a
    * day after you saw it (see `markActivitySeen`), and nothing older than
-   * `ACTIVITY_HORIZON` shows.
+   * `ACTIVITY_HORIZON` shows. With `compact`, each conversation is listed
+   * once (`compactActivity`) and its items point at it, rather than each
+   * repeating it.
    */
   activity: defineOperation({
     args: v.object({
       aboutYou: v.optional(v.boolean()),
+      compact: v.optional(v.boolean()),
       mentions: v.optional(v.boolean()),
       threads: v.optional(v.boolean()),
     }),
-    returns: v.array(activityItem),
+    returns: v.union(v.array(activityItem), compactActivity),
   }),
   /** Which pushes you get (see `setNotificationSettings`). */
   notificationSettings: defineOperation({
@@ -64,11 +79,15 @@ export const queries = {
   list: defineOperation({
     // At most one cursor: older than `before`, newer than `after`, centered
     // on the `around` message ID, or the latest page when none is given.
+    // `limit` makes a page newer than `after` smaller than
+    // `MESSAGE_PAGE_SIZE`: an app following the newest messages keeps its
+    // newest page small, since every message sent resends all of it.
     args: v.object({
       after: v.optional(v.number()),
       around: v.optional(v.string()),
       before: v.optional(v.number()),
       conversationId: v.string(),
+      limit: v.optional(v.number()),
     }),
     returns: messagePage,
   }),
@@ -107,13 +126,15 @@ export const queries = {
   /**
    * A thread: its original message and one page of replies, oldest
    * first, gathered from every member's PDS. At most one cursor: older
-   * than `before`, newer than `after`, or the latest page.
+   * than `before`, newer than `after`, or the latest page. `limit` as in
+   * `list`.
    */
   thread: defineOperation({
     args: v.object({
       after: v.optional(v.number()),
       before: v.optional(v.number()),
       conversationId: v.string(),
+      limit: v.optional(v.number()),
       threadId: v.string(),
     }),
     returns: threadPage,

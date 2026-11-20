@@ -4,7 +4,7 @@ import { ConvexError, v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { currentSends, takeSend } from "../send-limits";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { field } from "./bots";
+import { field } from "./botAccounts";
 
 // How fast one person can send messages (`SEND_BURST` and `SEND_REFILL_MS`
 // in send-limits.ts). Checked by the PDS router before a client's send

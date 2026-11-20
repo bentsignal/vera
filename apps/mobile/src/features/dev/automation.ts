@@ -4,8 +4,7 @@ import { router } from "expo-router";
 
 import type { Preferences } from "~/features/preferences/store";
 import { env } from "~/env";
-import { inboxQuery } from "~/features/messaging/inbox";
-import { cachedSelected } from "~/features/messaging/results";
+import { liveInbox } from "~/features/messaging/inbox-rows";
 import { setPreference } from "~/features/preferences/store";
 import { queryClient } from "~/features/session/account-session";
 import { storedAccounts } from "~/features/session/account-store";
@@ -13,6 +12,7 @@ import { devConversation } from "./dev-conversation";
 import { devList, startStalls, stopStalls } from "./dev-list";
 import { devSignInPath } from "./dev-sign-in-path";
 import { frameReport, startFrames, stopFrames } from "./frames";
+import { openTimings, timeOpening } from "./open-timing";
 import { photoTiming } from "./photo-timing";
 import { sendTiming } from "./send-timing";
 
@@ -31,6 +31,7 @@ export function installDevAutomation() {
     veraDev: {
       open(path: string) {
         if (!path.startsWith("/")) throw new Error(`Not an app path: ${path}`);
+        timeOpening();
         const target = devSignInPath(path, storedAccounts().length > 0);
         if (isAppPath(target)) router.push(target);
       },
@@ -50,6 +51,8 @@ export function installDevAutomation() {
       list: devList,
       /** The JavaScript thread's stalls: `start()`, then `stop()`. */
       stalls: { start: startStalls, stop: stopStalls },
+      /** How long screens took to show, since opening: see open-timing.ts. */
+      timings: openTimings,
       /** `scripts/sim.sh frames start` and `stop`: see frames.ts. */
       frames: { report: frameReport, start: startFrames, stop: stopFrames },
       /** Opening a photo from the list, timed: see photo-timing.ts. */
@@ -63,9 +66,11 @@ export function installDevAutomation() {
       firstGroup() {
         const account = storedAccounts()[0];
         if (account === undefined) return null;
-        const inbox = cachedSelected(queryClient, inboxQuery(account.address));
+        const inbox = liveInbox(queryClient, account.address) ?? [];
         return (
-          inbox?.find((conversation) => conversation.kind === "group")
+          inbox
+            .filter((conversation) => conversation.kind === "group")
+            .sort((left, right) => right.updatedAt - left.updatedAt)[0]
             ?.conversationId ?? null
         );
       },

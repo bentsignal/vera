@@ -1,5 +1,6 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
+import { AppState } from "react-native";
 import { partialMatchKey } from "@tanstack/react-query";
 import { pdsSessionQueryKey } from "@decentralized-convex/tanstack-query";
 
@@ -114,12 +115,27 @@ function noteAnswer(
 }
 
 /**
+ * Coming back to the app, screens stop saying the account can't connect
+ * until its PDS has gone unanswered for `OFFLINE_AFTER_MS` again: what
+ * they said dates from before the phone slept, and the network is still
+ * waking. Screens still show what's saved at once.
+ */
+function waitAgain(address: string) {
+  if (!shownSince.delete(address)) return;
+  notify();
+  markUnanswered(address);
+}
+
+/**
  * Watches an account's queries for an answer from its PDS while it's
  * counted as not answering. Returns a function that stops.
  */
 export function watchAnswers(queryClient: QueryClient, address: string) {
   const cache = queryClient.getQueryCache();
-  return cache.subscribe((event) => {
+  const woken = AppState.addEventListener("change", (state) => {
+    if (state === "active") waitAgain(address);
+  });
+  const answers = cache.subscribe((event) => {
     if (
       !unanswered.has(address) ||
       event.type !== "updated" ||
@@ -130,4 +146,8 @@ export function watchAnswers(queryClient: QueryClient, address: string) {
     const query = cache.get(event.query.queryHash);
     if (query !== undefined) noteAnswer(address, query);
   });
+  return () => {
+    woken.remove();
+    answers();
+  };
 }

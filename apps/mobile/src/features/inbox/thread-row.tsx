@@ -29,7 +29,7 @@ export function ThreadRowContent({
       <View className="w-6 items-center">
         {unreadCount > 0 && (
           <View
-            accessibilityLabel={`${unreadCount} unread`}
+            accessibilityLabel="Unread"
             className="bg-accent size-[10px] rounded-full"
           />
         )}

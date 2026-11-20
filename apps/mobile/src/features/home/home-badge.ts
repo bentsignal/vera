@@ -3,6 +3,7 @@ import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { useVisibleAccounts } from "~/features/messaging/account";
+import { useInboxes } from "~/features/messaging/inbox-rows";
 import { pdsResultOr } from "~/features/messaging/results";
 import { usePreference } from "~/features/preferences/store";
 import { homeCount } from "./home-count";
@@ -10,21 +11,13 @@ import { homeCount } from "./home-count";
 /**
  * What Home's badge counts, for each of these accounts: its Inbox (null
  * if its PDS failed), and the threads it's in while the Inbox lists them.
- * The same queries as the Inbox's, so they share its data.
+ * The same queries as the Inbox's (its list and rows), so they share its
+ * data.
  */
 export function useHomeQueries(accounts: readonly string[]) {
   const kinds = usePreference("inboxIncludes");
   const threadsShown = kinds.includes("threads");
-  const inboxes = useQueries({
-    queries: accounts.map((session) =>
-      pdsQuery({
-        args: { channels: true },
-        options: { select: (result) => pdsResultOr(result, null) },
-        query: pds.messages.inbox,
-        session,
-      }),
-    ),
-  });
+  const inboxes = useInboxes(accounts);
   const threads = useQueries({
     queries: accounts.map((session) =>
       pdsQuery({
@@ -40,7 +33,7 @@ export function useHomeQueries(accounts: readonly string[]) {
     ),
   });
   const loaded =
-    inboxes.every((result) => result.data !== undefined) &&
+    inboxes.every((result) => result.data !== undefined && result.complete) &&
     (!threadsShown || threads.every((result) => result.data !== undefined));
   return {
     count: homeCount({

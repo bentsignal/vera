@@ -103,21 +103,36 @@ export function pdsOptimisticLocalStore(
       );
     },
     getQuery<Request extends AnyPdsQueryRequest>(request: Request) {
+      const found =
+        store.getQuery(query, lean(request)) ?? store.getQuery(query, request);
       // The request's phantom result is defined by the same protocol that created its payload.
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      return store.getQuery(query, request)?.value as
-        | PdsRequestResult<Request>
-        | undefined;
+      return found?.value as PdsRequestResult<Request> | undefined;
     },
     setQuery(request, value) {
-      const routes = store.getQuery(query, request)?.routes ?? [];
-      store.setQuery(
-        query,
-        request,
-        value === undefined ? undefined : { routes, value },
-      );
+      // Subscriptions ask without what's included (`include: false`); one
+      // asked for as made, if it's loaded, shows the change too.
+      for (const args of [lean(request), request]) {
+        const current = store.getQuery(query, args);
+        if (args === request && current === undefined) continue;
+        store.setQuery(
+          query,
+          args,
+          value === undefined
+            ? undefined
+            : { routes: current?.routes ?? [], value },
+        );
+      }
     },
   };
+}
+
+/**
+ * A request as subscriptions make it: without what its result includes
+ * (see `include` on the PDS router).
+ */
+function lean(request: SerializedPdsRequest) {
+  return request.include === false ? request : { ...request, include: false };
 }
 
 function isRequest(value: unknown): value is SerializedPdsRequest {

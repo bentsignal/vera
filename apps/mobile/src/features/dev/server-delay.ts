@@ -77,6 +77,10 @@ class DelayedConnection implements FederationConnection {
     return this.#connection.close();
   }
 
+  reauthenticate() {
+    this.#connection.reauthenticate?.();
+  }
+
   mutation<Mutation extends FederationMutationReference>(
     mutation: Mutation,
     args: FunctionArgs<Mutation>,

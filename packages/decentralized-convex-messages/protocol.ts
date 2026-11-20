@@ -176,6 +176,16 @@ export const messagesProtocol = definePluginProtocol({
       args: v.object({ conversationId: v.string(), readAt: v.number() }),
       returns: v.null(),
     }),
+    /**
+     * Clears the app icon badge: marks read, through now, everything it
+     * counts (the conversations and threads it counts, and every Activity
+     * item not yet seen). Pending space invitations still count until
+     * they're answered.
+     */
+    clearBadge: defineOperation({
+      args: v.object({}),
+      returns: v.null(),
+    }),
     /** `setAlerts` with `none` (muted) or `all`, for older apps. */
     setMuted: defineOperation({
       args: v.object({ conversationId: v.string(), muted: v.boolean() }),

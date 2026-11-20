@@ -7,12 +7,14 @@ import {
 import { mutation, query } from "./_generated/server.js";
 import * as activity from "./activity.ts";
 import * as alerts from "./alerts.ts";
+import { clearBadge } from "./badgeClear.ts";
 import * as conversations from "./conversations.ts";
 import * as editing from "./editing.ts";
 import * as inbox from "./inbox.ts";
 import {
   conversationIncludes,
   inboxIncludes,
+  inboxRowIncludes,
   liveCursor,
   memberEventIncludes,
   pageIncludes,
@@ -28,6 +30,7 @@ import * as reactions from "./reactions.ts";
 import * as sending from "./sending.ts";
 import * as settings from "./settings.ts";
 import * as sightings from "./sightings.ts";
+import { spaceReads } from "./spaceReads.ts";
 import * as spaces from "./spaces.ts";
 import * as threadLists from "./threadLists.ts";
 import * as threads from "./threads.ts";
@@ -43,6 +46,8 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           conversations.addGroupMembers(ctx, requireAccountId(identity), args),
         addSpaceMembers: (ctx, { args, identity }) =>
           spaces.addSpaceMembers(ctx, requireAccountId(identity), args),
+        clearBadge: (ctx, { identity }) =>
+          clearBadge(ctx, requireAccountId(identity)),
         createChannel: (ctx, { args, identity }) =>
           spaces.createChannel(ctx, requireAccountId(identity), args),
         createGroup: (ctx, { args, identity }) =>
@@ -142,8 +147,14 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           push.unregisterPushToken(ctx, requireAccountId(identity), args.token),
       },
       queries: {
-        activity: (ctx, { args, identity }) =>
-          activity.activity(ctx, requireAccountId(identity), args),
+        activity: async (ctx, { args, identity }) => {
+          const items = await activity.activity(
+            ctx,
+            requireAccountId(identity),
+            args,
+          );
+          return args.compact === true ? activity.compacted(items) : items;
+        },
         conversation: async (ctx, { args, identity }) => {
           const self = requireAccountId(identity);
           const found = await conversations.conversation(ctx, self, args);
@@ -160,6 +171,28 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           const found = await inbox.inbox(ctx, self, args);
           return queryResult(found, { include: inboxIncludes(self, found) });
         },
+        inboxConversations: async (ctx, { args, identity }) => {
+          const self = requireAccountId(identity);
+          const spaces = spaceReads(ctx);
+          const accesses = await inbox.inboxAccess(
+            ctx,
+            self,
+            args.channels === true,
+            spaces,
+          );
+          return queryResult(
+            accesses.map(({ conversation }) => conversation.conversationId),
+            {
+              // Only for its first answer (see `include` on the router):
+              // its subscription follows just the list.
+              include: async () =>
+                inboxRowIncludes(
+                  self,
+                  await inbox.inboxRows(ctx, self, accesses, spaces),
+                ),
+            },
+          );
+        },
         inboxThreads: (ctx, { identity }) =>
           threadLists.inboxThreads(ctx, requireAccountId(identity)),
         list: async (ctx, { args, identity }) => {
@@ -169,12 +202,13 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
             args,
           );
           return queryResult(page, {
-            include: await pageIncludes(
-              ctx,
-              args.conversationId,
-              page.messages,
-              liveCursor(args, page),
-            ),
+            include: () =>
+              pageIncludes(
+                ctx,
+                args.conversationId,
+                page.messages,
+                liveCursor(args, page),
+              ),
             routes,
           });
         },
@@ -209,13 +243,14 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
             args,
           );
           return queryResult(found.page, {
-            include: await threadPageIncludes(
-              ctx,
-              args,
-              found.page.root,
-              found.page.messages,
-              liveCursor(args, found.page),
-            ),
+            include: () =>
+              threadPageIncludes(
+                ctx,
+                args,
+                found.page.root,
+                found.page.messages,
+                liveCursor(args, found.page),
+              ),
             routes: found.routes,
           });
         },

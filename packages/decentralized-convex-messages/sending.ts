@@ -10,6 +10,7 @@ import { recordMentions, validMentions } from "./mentions.ts";
 import { fail, requireAccess, toMessage } from "./model.ts";
 import { startFetches } from "./previews.ts";
 import { markReadUpTo } from "./readStates.ts";
+import { scheduleNumbering } from "./sequences.ts";
 import { addReply, replyTo } from "./threads.ts";
 import { stopTyping } from "./typing.ts";
 import { validateMessage } from "./validation.ts";
@@ -120,6 +121,11 @@ export async function storeMessage(
     ...replyFields(reply),
   };
   await ctx.db.insert("messages", message);
+  // A message the conversation shows gets its number once it settles
+  // (sequences.ts); a reply kept in its thread doesn't count there.
+  if (reply?.threadOnly !== true) {
+    await scheduleNumbering(ctx, fields.conversationId);
+  }
   // In the same write as the message, so no reader sees both at once.
   await stopTyping(ctx, fields.authorId, fields.conversationId);
   await recordMentions(ctx, message);

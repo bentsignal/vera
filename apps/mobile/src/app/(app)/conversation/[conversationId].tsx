@@ -23,6 +23,7 @@ import { useEditing } from "~/features/conversation/use-editing";
 import { useReactionsSheet } from "~/features/conversation/use-reactions-sheet";
 import { useReplies } from "~/features/conversation/use-replies";
 import { useDevConversation } from "~/features/dev/dev-conversation";
+import { markShown } from "~/features/dev/open-timing";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useMemberNotices } from "~/features/messaging/member-events";
@@ -153,6 +154,7 @@ function useOpening(
 ) {
   const { address } = useAccount();
   useSavedConversation(conversationId, messages, !shown);
+  markShown("conversation", shown);
   const pending = useAccountPending(!shown);
   useShortcutFocus(
     draftKey(address, conversationId),

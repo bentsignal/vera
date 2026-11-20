@@ -13,6 +13,7 @@ import { OptimisticChoice } from "~/components/optimistic-choice";
 import { OptimisticSwitch } from "~/components/optimistic-switch";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { ALERT_CHOICES } from "~/features/messaging/alerts";
+import { ClearBadgeSection } from "~/features/settings/clear-badge-section";
 import { useNotificationSettings } from "~/features/settings/notification-settings";
 import { secondaryTextStyle } from "~/lib/colors";
 
@@ -36,7 +37,8 @@ const DEFAULTS = [
 /**
  * Which kinds of notifications you get, or none at all, the words that
  * alert you (your name, your keywords), and what groups and channels
- * alert you about unless they say otherwise.
+ * alert you about unless they say otherwise. At the bottom, Mark All as Read,
+ * for a badge that counts something you can't find to read.
  */
 export default function NotificationSettingsScreen() {
   const router = useRouter();
@@ -130,6 +132,7 @@ export default function NotificationSettingsScreen() {
                   />
                 ))}
               </FieldGroup.Section>
+              <ClearBadgeSection />
             </FieldList>
           </NativeHost>
         </Animated.View>

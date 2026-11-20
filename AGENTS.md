@@ -199,6 +199,16 @@ Two more rules, also enforced by lint:
 captions, or hint text that explain an option, button, or field whose
 label already says what it does. Add one only when Shawn asks for it.
 
+**Keep what every PDS request loads small.** Convex loads all the code a
+function's module imports on every call, so the PDS router
+(`services/backend/convex/pds.ts`), its hooks, and the plugins' dispatchers
+import only what dispatching needs. Anything heavier (models, the AI SDK,
+zod, Effect, telemetry or vendor SDKs) goes in a function they schedule or
+call by reference, never in an import. Importing the assistants' code once
+added 100–350 ms to every query and mutation.
+`services/backend/function-bundles.test.ts` enforces a budget; see
+[docs/architecture.md](docs/architecture.md#function-bundles).
+
 ## Decentralized Convex release invariant
 
 All official `@decentralized-convex/*` packages and the wire protocol use one

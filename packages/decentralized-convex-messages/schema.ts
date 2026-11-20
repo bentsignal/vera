@@ -118,8 +118,34 @@ export default defineSchema({
     // What the conversation shows: `threadOnly` undefined.
     .index("by_chat_sent", ["conversationId", "threadOnly", "sentAt"])
     .index("by_thread_sent", ["threadId", "sentAt"])
-    // Replies to an account's messages, so their activity finds them.
-    .index("by_quote_author_sent", ["quote.authorId", "sentAt"]),
+    // Replies to an account's messages, so their activity finds them,
+    // and reading a conversation sees those in it.
+    .index("by_quote_author_sent", ["quote.authorId", "sentAt"])
+    .index("by_quote_author_conversation_sent", [
+      "quote.authorId",
+      "conversationId",
+      "sentAt",
+    ]),
+  // Each message a conversation shows (not one kept in its thread), with
+  // its number in sent order, so unread messages are counted without
+  // reading them (see sequences.ts).
+  chatSequence: defineTable({
+    conversationId: v.string(),
+    // Deleted since it was numbered: no longer counted.
+    deleted: v.optional(v.boolean()),
+    messageId: v.string(),
+    sentAt: v.number(),
+    seq: v.number(),
+  })
+    .index("by_conversation_seq", ["conversationId", "seq"])
+    .index("by_conversation_sent", ["conversationId", "sentAt"])
+    .index("by_conversation_deleted_seq", ["conversationId", "deleted", "seq"])
+    .index("by_message", ["messageId"]),
+  // One-time work's progress, by key (see sequences.ts).
+  sequencing: defineTable({ done: v.boolean(), key: v.string() }).index(
+    "by_key",
+    ["key"],
+  ),
   // One per account a message @mentions, or says the name or a keyword
   // of (`said`), so their activity finds it.
   mentions: defineTable({
@@ -199,6 +225,13 @@ export default defineSchema({
     .index("by_message", ["messageId"])
     .index("by_message_account", ["messageId", "accountId"])
     .index("by_author_reacted", ["messageAuthorId", "reactedAt"])
+    // Reactions to an account's messages in one conversation, which
+    // reading it sees (see `seeConversationActivity`).
+    .index("by_author_conversation_reacted", [
+      "messageAuthorId",
+      "conversationId",
+      "reactedAt",
+    ])
     // Reactions since a time, for the newest messages (see `reactions`).
     .index("by_conversation_reacted", ["conversationId", "reactedAt"]),
   // Who among this PDS's accounts is typing, one row per account and
@@ -212,6 +245,12 @@ export default defineSchema({
     typedAt: v.number(),
   })
     .index("by_conversation", ["conversationId", "typedAt"])
+    // Who's typing in the conversation itself (no thread) or one thread.
+    .index("by_conversation_thread_typed", [
+      "conversationId",
+      "threadId",
+      "typedAt",
+    ])
     .index("by_account_conversation", ["accountId", "conversationId"]),
   // Each time an account saw an activity item (`key`) on screen, through
   // the newest activity in it then. Only the newest sighting older than a
@@ -292,4 +331,29 @@ export default defineSchema({
   })
     .index("by_account", ["accountId"])
     .index("by_token", ["token"]),
+  // Each account's app icon badge as its pushes last counted it, for the
+  // pushes right after to build on rather than count again (see
+  // badgeCache.ts). One row an account, written by its pushes, and by its
+  // own changes for a few seconds after one.
+  pushBadges: defineTable({
+    accountId: v.string(),
+    // Each kind of app's count (see `badgeKey`), when it was counted, and
+    // what each row Home counts added to it.
+    counts: v.array(
+      v.object({
+        count: v.number(),
+        countedAt: v.number(),
+        key: v.string(),
+        rows: v.array(
+          v.object({ conversationId: v.string(), count: v.number() }),
+        ),
+      }),
+    ),
+    // Until when the account's changes to what the badge counts move
+    // `version` (a while after each push), so a count read before one
+    // isn't saved.
+    liveUntil: v.number(),
+    // Moved by every write, so a count read before one isn't saved.
+    version: v.number(),
+  }).index("by_account", ["accountId"]),
 });

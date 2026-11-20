@@ -10,6 +10,7 @@ import {
   leftForMention,
   messageById,
   seenState,
+  undescribed,
 } from "./activityScope.ts";
 import { alerts, alertsFor } from "./alerts.ts";
 import { inboxAccess } from "./inbox.ts";
@@ -18,6 +19,7 @@ import { mentionItems, reactionItems, replyItems } from "./personalActivity.ts";
 import { ACTIVITY_HORIZON, MAX_ACTIVITY_MESSAGES } from "./protocol.ts";
 import { notificationSettings } from "./settings.ts";
 import { messagesKey, threadKey } from "./sightings.ts";
+import { spaceReads } from "./spaceReads.ts";
 
 /** Messages read to fill one conversation's item, the caller's included. */
 const MAX_MESSAGES_SCANNED = 300;
@@ -46,13 +48,15 @@ function countsInItem(
 
 /**
  * The newest of others' messages `newer` lists that `counts`, at most
- * `MAX_ACTIVITY_MESSAGES` of them.
+ * `MAX_ACTIVITY_MESSAGES` of them, or only the newest when items are
+ * only counted (whether one is unseen depends only on its newest).
  */
 async function othersNewest(
   scope: Scope,
   newer: AsyncIterable<Doc<"messages">>,
   counts: (message: Doc<"messages">) => boolean,
 ) {
+  const most = scope.counting ? 1 : MAX_ACTIVITY_MESSAGES;
   const theirs = new Array<Doc<"messages">>();
   let scanned = 0;
   for await (const message of newer) {
@@ -64,10 +68,7 @@ async function othersNewest(
       theirs.push(message);
     }
     scanned += 1;
-    if (
-      theirs.length >= MAX_ACTIVITY_MESSAGES ||
-      scanned >= MAX_MESSAGES_SCANNED
-    ) {
+    if (theirs.length >= most || scanned >= MAX_MESSAGES_SCANNED) {
       break;
     }
   }
@@ -118,12 +119,12 @@ async function messagesItem(
 
 /** Messages others sent, an item per conversation in the inbox. */
 async function messagesItems(ctx: QueryCtx, scope: Scope) {
-  const conversations = (await inboxAccess(ctx, scope.self, true)).flatMap(
-    (access) => {
-      const level = alertsFor(access, scope.settings);
-      return isHeard(access, level) ? [{ access, level }] : [];
-    },
-  );
+  const conversations = (
+    await inboxAccess(ctx, scope.self, true, scope.spaces)
+  ).flatMap((access) => {
+    const level = alertsFor(access, scope.settings);
+    return isHeard(access, level) ? [{ access, level }] : [];
+  });
   return Promise.all(
     conversations.map(({ access, level }) =>
       messagesItem(ctx, scope, access, level),
@@ -201,6 +202,27 @@ async function threadItems(ctx: QueryCtx, scope: Scope) {
   );
 }
 
+/**
+ * Activity with each conversation listed once and its items pointing at
+ * it (see `compact` in the protocol). Items keep their order and stay
+ * separate.
+ */
+export function compacted(items: readonly ActivityItem[]) {
+  const conversations = new Map(
+    items.map(({ conversation }) => [
+      conversation.conversationId,
+      conversation,
+    ]),
+  );
+  return {
+    conversations: [...conversations.values()],
+    items: items.map(({ conversation, ...item }) => ({
+      ...item,
+      conversationId: conversation.conversationId,
+    })),
+  };
+}
+
 /** What the app asking for activity shows (see `activity`). */
 export interface ActivityOptions {
   readonly aboutYou?: boolean;
@@ -230,15 +252,20 @@ export async function activity(
   ctx: QueryCtx,
   self: string,
   options: ActivityOptions = {},
+  /** Only counted (the badge): conversations go undescribed. */
+  { counting = false } = {},
 ) {
+  const spaces = spaceReads(ctx);
   const scope: Scope = {
     aboutYou: options.aboutYou === true,
-    accessTo: accessFinder(ctx, self),
-    describe: conversationDescriber(ctx),
+    accessTo: accessFinder(ctx, self, spaces),
+    counting,
+    describe: counting ? undescribed : conversationDescriber(ctx, spaces),
     mentions: options.mentions === true,
     now: Date.now(),
     self,
     settings: await notificationSettings(ctx, self),
+    spaces,
     threads: options.threads === true,
   };
   const [messages, reactions, mentions, replies, threads] = await Promise.all([

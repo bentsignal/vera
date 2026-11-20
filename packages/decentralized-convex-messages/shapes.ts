@@ -202,6 +202,11 @@ export const conversation = v.object({
   spaceId: v.union(v.null(), v.string()),
   /** Channels only: the space's name. */
   spaceName: v.optional(v.string()),
+  /**
+   * Others' messages since the caller's place that still show: how many
+   * in a direct message or a group; in a channel, 1 if any (its row shows
+   * a dot, and a badge counts a channel once).
+   */
   unreadCount: v.number(),
   updatedAt: v.number(),
 });
@@ -376,9 +381,10 @@ const threadListingFields = {
   root: v.union(v.null(), message),
   threadId: v.string(),
   /**
-   * Others' replies here after `lastReadAt`, leaving out the first (which
-   * shows, and is read, in the conversation), at most `MAX_THREAD_UNREAD`.
-   * Zero when the caller isn't following it.
+   * 1 if others replied here after `lastReadAt` (leaving out the first,
+   * which shows, and is read, in the conversation), else 0: rows show a
+   * dot. Zero when the caller isn't following it. (PDSs before this
+   * counted them, at most `MAX_THREAD_UNREAD`.)
    */
   unreadCount: v.number(),
 };

@@ -9,7 +9,7 @@ import { ConvexError, v } from "convex/values";
 
 import type { DispatcherComponents } from "./dispatcher-types.ts";
 import type { DispatcherIdentity } from "./dispatcher.ts";
-import { answerIncluded } from "./query-dispatch.ts";
+import { includedWith } from "./query-dispatch.ts";
 
 // The host's PDS router: every client request passes through it to the
 // plugin Component that answers it.
@@ -28,6 +28,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
   components,
   mutation,
   query,
+  trace,
 }: {
   /**
    * Runs in the same transaction before each plugin write a client asks
@@ -50,6 +51,13 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
   readonly components: unknown;
   readonly mutation: MutationBuilder<DataModel, "public">;
   readonly query: QueryBuilder<DataModel, "public">;
+  /**
+   * Whether to log each request's operation, so the function logs show
+   * what each run of the router was for (its cost is in the same log
+   * entry). Logs the operation's type and the shape of its arguments,
+   * never their values.
+   */
+  readonly trace?: () => boolean;
 }) {
   const installed = readDispatcherComponents(components);
   return {
@@ -63,6 +71,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       returns: v.any(),
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
+        if (trace?.() === true) logOperation("mutation", request);
         const identity = await resolveIdentity(ctx);
         await beforeMutation?.(ctx, {
           identity,
@@ -87,6 +96,14 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
     }),
     dispatchQuery: query({
       args: {
+        /**
+         * False leaves out the queries the result includes. An app asks
+         * with them once, for its first answer, and subscribes without
+         * them: everything included would otherwise be part of what reruns
+         * the query (and is resent with it), and the app follows each
+         * included query on its own anyway.
+         */
+        include: v.optional(v.boolean()),
         lastChanged: v.string(),
         operation: v.any(),
         plugin: v.string(),
@@ -95,20 +112,20 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       returns: v.any(),
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
+        if (trace?.() === true) logOperation("query", request);
         const identity = await resolveIdentity(ctx);
+        const include = request.include !== false;
         const response = await ctx.runQuery(component.query, {
           identity,
+          ...(include ? {} : { include: false }),
           lastChanged: request.lastChanged,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           operation: request.operation,
           version: request.version,
         });
-        const included = await answerIncluded(
-          ctx,
-          installed,
-          identity,
-          response.include ?? [],
-        );
+        const included = include
+          ? await includedWith(ctx, installed, identity, response)
+          : [];
         return {
           ...(included.length > 0 ? { included } : {}),
           routes: response.routes ?? [],
@@ -117,6 +134,28 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       },
     }),
   } as const;
+}
+
+/**
+ * Logs which operation a request is for, with its arguments' shape: each
+ * argument's name, and an array's length, but no values.
+ */
+function logOperation(
+  kind: "mutation" | "query",
+  request: { readonly operation: unknown; readonly plugin: string },
+) {
+  const { operation, plugin } = request;
+  const type: unknown = Reflect.get(Object(operation), "type");
+  const args: unknown = Reflect.get(Object(operation), "args");
+  const shape = Object.fromEntries(
+    Object.entries(typeof args === "object" && args !== null ? args : {}).map(
+      ([name, value]: [string, unknown]) => [
+        name,
+        Array.isArray(value) ? value.length : typeof value,
+      ],
+    ),
+  );
+  console.log("pds", kind, plugin, String(type), JSON.stringify(shape));
 }
 
 function readDispatcherComponents(components: unknown): DispatcherComponents {

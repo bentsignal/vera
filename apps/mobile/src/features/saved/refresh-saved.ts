@@ -1,11 +1,10 @@
 import type { Conversation } from "@decentralized-convex/messages";
 import type { QueryClient } from "@tanstack/react-query";
 
-import { inboxQuery } from "~/features/messaging/inbox";
+import { isInboxQuery, liveInbox } from "~/features/messaging/inbox-rows";
 import { refetchConversation } from "~/features/messaging/prefetch";
 import { isLive } from "~/features/messaging/stay-live";
 import { recentConversations, versionOf } from "./recent";
-import { liveSelected } from "./saved-cache";
 import { readVersions } from "./saved-files";
 import { isUnanswered } from "./unanswered";
 
@@ -97,16 +96,13 @@ export function refreshSaved(
     if (!isUnanswered(address)) next();
   }
 
-  const inboxHash = queryClient
-    .getQueryCache()
-    .build(queryClient, inboxQuery(address)).queryHash;
   const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
     const watched =
-      (event.type === "updated" && event.query.queryHash === inboxHash) ||
+      (event.type === "updated" && isInboxQuery(event.query, address)) ||
       // A conversation's screen closed, or stopped staying live.
       (event.type === "observerRemoved" && !event.query.isActive());
     if (!watched) return;
-    const conversations = liveSelected(queryClient, inboxQuery(address));
+    const conversations = liveInbox(queryClient, address);
     if (conversations !== undefined) check(conversations);
   });
   return () => {

@@ -8,7 +8,12 @@ import { pdsQuery, pdsQueryKey } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import type { Saved, SavedEntry } from "./saved-files";
-import { inboxQuery, rowProfiles } from "~/features/messaging/inbox";
+import { rowProfiles } from "~/features/messaging/inbox";
+import {
+  inboxListQuery,
+  inboxRowQuery,
+  liveInbox,
+} from "~/features/messaging/inbox-rows";
 import {
   latestOpenedAt,
   latestPageParts,
@@ -41,6 +46,7 @@ import {
   writeSaved,
   writeVersions,
 } from "./saved-files";
+import { showSavedHome } from "./show-saved";
 import { watchAnswers } from "./unanswered";
 
 interface Account {
@@ -120,15 +126,22 @@ function inboxSaved(
   address: string,
   profiles: ReadonlyMap<string, SavedEntry>,
 ) {
-  const inbox = inboxQuery(address);
-  const conversations = liveSelected(queryClient, inbox);
+  const conversations = liveInbox(queryClient, address);
   if (conversations === undefined) return undefined;
   const people = new Set(
     conversations.flatMap((conversation) => rowProfiles(address, conversation)),
   );
   const rows = complete([...people].map((person) => profiles.get(person)));
-  const main = entryOf(queryClient, inbox.queryKey);
-  if (rows === undefined || main === undefined) return undefined;
+  // The Inbox's list, and each of its rows.
+  const list = inboxListQuery(address);
+  const ids = liveSelected(queryClient, list) ?? [];
+  const inbox = complete([
+    entryOf(queryClient, list.queryKey),
+    ...ids.map((conversationId) =>
+      entryOf(queryClient, inboxRowQuery(address, conversationId).queryKey),
+    ),
+  ]);
+  if (rows === undefined || inbox === undefined) return undefined;
   // Home's other lists, when they've loaded.
   const extras = [
     pdsQueryKey(pds.messages.spaces({}), address),
@@ -137,7 +150,7 @@ function inboxSaved(
   return {
     recent: recentConversations(conversations),
     saved: {
-      entries: [main, ...extras, ...rows],
+      entries: [...inbox, ...extras, ...rows],
       savedAt: Date.now(),
     } satisfies Saved,
   };
@@ -335,6 +348,8 @@ function startSaving(queryClient: QueryClient, account: Account) {
  */
 export function installSaving() {
   onAccountSession((account) => {
+    // The app opens on what's saved, at once (see `showSavedHome`).
+    showSavedHome(queryClient, account.storagePrefix);
     const stopSaving = startSaving(queryClient, account);
     const stopWatching = watchAnswers(queryClient, account.address);
     const stopRefreshing = refreshSaved(queryClient, account);

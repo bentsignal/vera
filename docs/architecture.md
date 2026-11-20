@@ -97,6 +97,44 @@ A write follows the same path through `pds:dispatchMutation`, targeting only the
 author's home PDS. The root router resolves identity once and passes the small
 identity value across one Component boundary.
 
+### Function bundles
+
+Convex loads all the code a function's module imports each time the
+function runs, so what a module imports adds to the latency of every call
+to it, whatever the call reads. Every request to a PDS goes through the
+router (`pds.ts`) and a plugin's dispatcher, so their imports are paid on
+every query and mutation the app makes. Measured on a Vera deployment
+(Nov 2026), uncached, on the server:
+
+| Module                                   | Bundled  | A 7-document query |
+| ---------------------------------------- | -------- | ------------------ |
+| A tiny query (`release.ts`)              | 32 KB    | 0–7 ms             |
+| The messages plugin's dispatcher         | 120 KB   | 16–36 ms           |
+| The router, importing the assistants' AI | 1.6 MB   | 120–385 ms         |
+| The router, without it                   | 45 KB    | about 20 ms        |
+
+The router's `afterMutation` hook had pulled in the AI SDK and zod through
+the assistant code it starts. Opening a chat paid for it four times over,
+one for each query a chat opens with.
+
+So:
+
+- The router, its hooks, and the plugins import only what dispatching and
+  deciding need. Work a hook starts goes in another function, scheduled by
+  reference (`ctx.scheduler.runAfter(0, internal.x.y, …)`); importing a
+  module for its `internal` reference costs nothing, importing it for a
+  helper loads all of it. Helpers that both sides need go in a small module
+  of their own (as `botAccounts.ts`, `summonStart.ts`, and `threadFollow.ts`
+  are split from what they start).
+- Libraries for models, schemas, telemetry, or effects (the AI SDK, zod,
+  Effect, OpenTelemetry, vendor SDKs) stay off that path entirely: in
+  actions, or in modules only actions import. Server logging on that path
+  is a plain `console.log` of one line.
+- `services/backend/function-bundles.test.ts` bundles the router and both
+  plugin dispatchers and fails past each one's budget, naming the largest
+  packages. Raise a budget only after measuring what the extra code costs a
+  call.
+
 ## Package boundaries
 
 `@decentralized-convex/plugin` knows about contracts, not React, authentication,

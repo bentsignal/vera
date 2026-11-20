@@ -9,6 +9,7 @@ import { previewedUrls } from "./links.ts";
 import { recordMentions, validMentions } from "./mentions.ts";
 import { fail, requireAccess, toMessage } from "./model.ts";
 import { MAX_REPLIERS } from "./protocol.ts";
+import { markNumberDeleted } from "./sequences.ts";
 import {
   messageById,
   QUOTE_LENGTH,
@@ -309,6 +310,8 @@ export async function deleteMessage(
     deleted: true,
   }));
   await removeReply(ctx, message);
+  if (message.threadOnly !== true)
+    await markNumberDeleted(ctx, message.messageId);
   // Only an original has a thread of its own.
   const thread =
     message.threadId === undefined

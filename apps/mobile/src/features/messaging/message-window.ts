@@ -20,7 +20,12 @@ import {
   windowParts,
   withPage,
 } from "./window-model";
-import { cachedPage, listPageQuery, pageQuery } from "./window-pages";
+import {
+  cachedPage,
+  listPageQuery,
+  pageQuery,
+  usePagesAhead,
+} from "./window-pages";
 
 // The pages a screen shows of a conversation or a thread, and how they
 // follow new messages: see window-model.ts.
@@ -353,6 +358,7 @@ export function useMessageWindow(
   );
   const { next, view } = state;
   const shown = shownPages(view, results.slice(0, view.pages.length));
+  usePagesAhead(session, source, view, results);
   return {
     ...windowActions(setState, windowKeyOf(session, source), shown),
     anchor: view.anchor,

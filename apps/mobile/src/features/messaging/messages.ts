@@ -24,13 +24,12 @@ import { summariesCached, useThreadSummaries } from "./threads";
 import { unconfirmedSends } from "./unconfirmed";
 
 /**
- * The pages whose messages show. The pages the window opened with wait for
- * their messages' reactions and threads too, so the conversation never
- * appears and then grows under them. Pages loaded later show as soon as
- * their messages arrive: they load past the edge of the screen, where rows
- * that grow move nothing you're looking at, and waiting would leave you at
- * the top of the list longer. Once shown, a page stays, even while its
- * reactions reload.
+ * The pages whose messages show: each once its messages' reactions and
+ * threads are in too, so nothing appears and then grows under them, and
+ * nothing looks like it's loading apart. They come together anyway: a
+ * page's first answer brings them with it (see `include` on the PDS), and
+ * the next page is asked for ahead (`pagesAhead`). Once shown, a page
+ * stays, even while its reactions reload.
  */
 function useSettledPages(
   pages: ReturnType<typeof useMessageWindow>["pages"],
@@ -38,9 +37,7 @@ function useSettledPages(
 ) {
   const [settled, setSettled] = useState<ReadonlySet<string>>(new Set());
   const ready = pages.filter(
-    (page) =>
-      page.data !== undefined &&
-      (!page.initial || isComplete(page.data.messages)),
+    (page) => page.data !== undefined && isComplete(page.data.messages),
   );
   const newlyReady = ready.filter((page) => !settled.has(page.key));
   if (newlyReady.length > 0) {

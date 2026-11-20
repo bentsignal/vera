@@ -4,11 +4,20 @@ import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { CreatedKind } from "./naming.ts";
 import type { AlertLevel, Conversation, Message } from "./protocol.ts";
+import type { SpaceReads } from "./spaceReads.ts";
 import { chosenAlerts } from "./alertChoice.ts";
 import { changedAtOf } from "./changes.ts";
-import { latestMessage, unreadCount } from "./chatMessages.ts";
+import { hasUnread, latestMessage, unreadCount } from "./chatMessages.ts";
 import { createdId, isCreatedId } from "./naming.ts";
 import { readPosition } from "./readStates.ts";
+import {
+  getSpace,
+  getSpaceMember,
+  spaceMemberAddresses,
+  spaceOf,
+} from "./spaceReads.ts";
+
+export { getSpace, getSpaceMember };
 
 const ADDRESS_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const MAX_NAME_LENGTH = 80;
@@ -115,40 +124,6 @@ export function getMember(
     .unique();
 }
 
-export function getSpace(ctx: QueryCtx, spaceId: string) {
-  return ctx.db
-    .query("spaces")
-    .withIndex("by_space", (index) => index.eq("spaceId", spaceId))
-    .unique();
-}
-
-export function getSpaceMember(
-  ctx: QueryCtx,
-  spaceId: string,
-  accountId: string,
-) {
-  return ctx.db
-    .query("spaceMembers")
-    .withIndex("by_space_account", (index) =>
-      index.eq("spaceId", spaceId).eq("accountId", accountId),
-    )
-    .unique();
-}
-
-/** The account's invitations to spaces that still exist, with the space. */
-export async function pendingInvites(ctx: QueryCtx, accountId: string) {
-  const invites = await ctx.db
-    .query("spaceInvites")
-    .withIndex("by_account", (index) => index.eq("accountId", accountId))
-    .collect();
-  const pending = [];
-  for (const invite of invites) {
-    const space = await getSpace(ctx, invite.spaceId);
-    if (space !== null) pending.push({ invite, space });
-  }
-  return pending;
-}
-
 export interface ConversationAccess {
   /** The caller's own choice of alerts for it, if they made one. */
   readonly alerts: AlertLevel | undefined;
@@ -175,6 +150,7 @@ export async function findAccess(
   ctx: QueryCtx,
   conversationId: string,
   accountId: string,
+  spaces?: SpaceReads,
 ): Promise<ConversationAccess | null> {
   const [conversation, member] = await Promise.all([
     getConversation(ctx, conversationId),
@@ -193,7 +169,7 @@ export async function findAccess(
           spaceAlerts: undefined,
         };
   }
-  return channelAccess(ctx, conversation, member, accountId);
+  return channelAccess(ctx, conversation, member, accountId, spaces);
 }
 
 /** A channel's access comes from membership of its space. */
@@ -202,11 +178,14 @@ async function channelAccess(
   conversation: Doc<"conversations">,
   member: Doc<"members"> | null,
   accountId: string,
+  spaces?: SpaceReads,
 ): Promise<ConversationAccess | null> {
+  const { spaceId } = conversation;
   const spaceMember =
-    conversation.spaceId === undefined
+    spaceId === undefined
       ? null
-      : await getSpaceMember(ctx, conversation.spaceId, accountId);
+      : await (spaces?.member(spaceId, accountId) ??
+          getSpaceMember(ctx, spaceId, accountId));
   if (spaceMember === null) return null;
   return {
     alerts: chosenAlerts(member),
@@ -265,15 +244,12 @@ export async function upsertMember(
 export async function memberAddresses(
   ctx: QueryCtx,
   conversation: Doc<"conversations">,
+  spaces?: SpaceReads,
 ) {
   if (conversation.kind === "channel") {
-    if (conversation.spaceId === undefined) return [];
-    const spaceId = conversation.spaceId;
-    const members = await ctx.db
-      .query("spaceMembers")
-      .withIndex("by_space_account", (index) => index.eq("spaceId", spaceId))
-      .collect();
-    return members.map((member) => member.accountId);
+    const { spaceId } = conversation;
+    if (spaceId === undefined) return [];
+    return spaces?.members(spaceId) ?? spaceMemberAddresses(ctx, spaceId);
   }
   const members = await ctx.db
     .query("members")
@@ -305,6 +281,24 @@ export function toMessage(message: Doc<"messages">): Message {
 }
 
 /**
+ * A row's unread: how many for a direct message or a group (the app's
+ * badge counts each message), and for a channel only whether anything is
+ * (it shows as a dot, and the badge counts a channel once).
+ */
+async function unreadOf(
+  ctx: QueryCtx,
+  conversation: Doc<"conversations">,
+  accountId: string,
+  readAt: number,
+) {
+  const { conversationId, kind } = conversation;
+  if (kind !== "channel") {
+    return unreadCount(ctx, conversationId, accountId, readAt);
+  }
+  return (await hasUnread(ctx, conversationId, accountId, readAt)) ? 1 : 0;
+}
+
+/**
  * `alerts` is what the conversation alerts the caller about (see
  * `alertsFor`), which the caller works out once for all they convert.
  */
@@ -313,17 +307,16 @@ export async function toConversation(
   access: ConversationAccess,
   accountId: string,
   alerts: AlertLevel,
+  spaces?: SpaceReads,
 ): Promise<Conversation> {
   const { conversation, member } = access;
   // Concurrent reads: an inbox converts every conversation it lists.
   const [latest, space, members, unread, changedAt] = await Promise.all([
     latestMessage(ctx, conversation.conversationId),
-    conversation.spaceId === undefined
-      ? null
-      : getSpace(ctx, conversation.spaceId),
-    memberAddresses(ctx, conversation),
+    spaceOf(ctx, conversation.spaceId, spaces),
+    memberAddresses(ctx, conversation, spaces),
     readPosition(ctx, access, accountId).then((readAt) =>
-      unreadCount(ctx, conversation.conversationId, accountId, readAt),
+      unreadOf(ctx, conversation, accountId, readAt),
     ),
     changedAtOf(ctx, conversation),
   ]);

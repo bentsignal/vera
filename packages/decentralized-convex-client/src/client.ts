@@ -83,6 +83,7 @@ export class DecentralizedConvexClient {
     return new RoutedPdsQueryObserver({
       getConnection: (url) => this.#getConnection(url),
       home: pdsTarget(home.domain, home),
+      include: options.include,
       initialResponseTimeout: initialResponseTimeout(options),
       knownPds: this.#pds.byDomain,
       request,
@@ -255,6 +256,16 @@ export class DecentralizedConvexClient {
    */
   connectHome() {
     this.#getConnection(this.#requireHome().manifest.deploymentUrl);
+  }
+
+  /**
+   * Signs every open connection in again with the token the fetcher has
+   * now (see `FederationConnection.reauthenticate`).
+   */
+  reauthenticate() {
+    for (const connection of this.#connections.values()) {
+      connection.reauthenticate?.();
+    }
   }
 
   resolvePds(addressOrDomain: string) {

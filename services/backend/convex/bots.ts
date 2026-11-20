@@ -3,11 +3,13 @@ import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { v } from "convex/values";
 
 import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
+import type { AnyBotAccount, BotAccount } from "./botAccounts";
 import { threadMessages } from "../assistant-threads";
 import { components, internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { createAuth } from "./auth";
-import { actorFromEmail, requireEnvironment } from "./lib";
+import { botAccount, botAddress, field, isBotAddress } from "./botAccounts";
+import { actorFromEmail } from "./lib";
 import { botName } from "./schema";
 
 // Vera's own accounts: ordinary, verified accounts on this PDS that act
@@ -15,33 +17,15 @@ import { botName } from "./schema";
 // answers people with a model (agent.ts) whenever someone sends it a direct
 // message; nothing it does reaches past that one conversation.
 
-export interface BotAccount extends AnyBotAccount {
-  readonly username: "vera";
-}
-
-/** Any of Vera's accounts, including the retired support account (mergeSupport.ts). */
-export interface AnyBotAccount {
-  readonly name: string;
-  readonly username: string;
-}
-
-export const VERA = { name: "Vera", username: "vera" } as const;
-
-/** The accounts that answer direct messages with a model. */
-export const ASSISTANTS: readonly BotAccount[] = [VERA];
-
-export function botAccount(username: BotAccount["username"]) {
-  return { vera: VERA }[username];
-}
-
-/** Whether an address is one of Vera's own accounts. */
-export function isBotAddress(accountId: string) {
-  return ASSISTANTS.some((bot) => botAddress(bot) === accountId);
-}
-
-export function botAddress(bot: AnyBotAccount) {
-  return `${bot.username}@${requireEnvironment("FEDERATION_DOMAIN").toLowerCase()}`;
-}
+export type { AnyBotAccount, BotAccount } from "./botAccounts";
+export {
+  ASSISTANTS,
+  botAccount,
+  botAddress,
+  field,
+  isBotAddress,
+  VERA,
+} from "./botAccounts";
 
 export function botIdentity(bot: AnyBotAccount) {
   const accountId = botAddress(bot);
@@ -352,9 +336,3 @@ export const page = internalQuery({
       ? pageAsBot(ctx, botAccount(bot), conversationId, before)
       : threadPageAsBot(ctx, botAccount(bot), conversationId, threadId, before),
 });
-
-export function field(value: unknown, name: string): unknown {
-  return typeof value === "object" && value !== null
-    ? Reflect.get(value, name)
-    : undefined;
-}

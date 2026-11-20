@@ -7,6 +7,7 @@ import {
   prefetchLatestMessages,
   refetchLatestMessages,
 } from "./message-window";
+import { typingQuery } from "./typing";
 
 function conversationQuery(session: string, conversationId: string) {
   return pdsQuery({
@@ -18,12 +19,14 @@ function conversationQuery(session: string, conversationId: string) {
 
 /**
  * Starts loading a conversation the moment a finger lands on its row, so
- * its messages are often there by the time the screen is.
+ * its messages (and anyone already typing) are often there by the time
+ * the screen is.
  */
 export function usePrefetchConversation() {
   const queryClient = useQueryClient();
   return (session: string, conversationId: string) => {
     void queryClient.prefetchQuery(conversationQuery(session, conversationId));
+    void queryClient.prefetchQuery(typingQuery(session, conversationId));
     prefetchLatestMessages(queryClient, session, conversationId);
   };
 }

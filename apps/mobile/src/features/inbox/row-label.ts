@@ -29,7 +29,7 @@ export function conversationLabel(
     conversation.affiliated && "Verified",
     conversation.pinnedAt !== null && "Pinned",
     alertsIcon(conversation.alerts)?.label,
-    unreadCount > 0 && `${unreadCount} unread`,
+    unreadCount > 0 && "Unread",
     conversation.lastMessage,
     account,
     formatInboxTimestamp(conversation.lastActivityAt, now),
@@ -48,7 +48,7 @@ export function threadLabel(
   const replies = replyCountLabel(thread.replyCount);
   return spoken([
     `${thread.rootAuthor.name}, thread in ${thread.conversationTitle}`,
-    thread.unreadCount > 0 && `${thread.unreadCount} unread`,
+    thread.unreadCount > 0 && "Unread",
     thread.rootText,
     thread.latestReply.length > 0
       ? `${replies}: ${thread.latestReply}`

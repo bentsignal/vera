@@ -1,13 +1,16 @@
 import type { ActivityItem } from "@decentralized-convex/messages";
 import type * as Notifications from "expo-notifications";
 import { useEffect, useEffectEvent } from "react";
+import { AppState } from "react-native";
 import { setBadgeCountAsync } from "expo-notifications";
 import { useQueries } from "@tanstack/react-query";
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { ACTIVITY_ARGS, isUnseen } from "~/features/activity/activity";
+import { activityItems } from "~/features/activity/activity-result";
 import { useHomeQueries } from "~/features/home/home-badge";
+import { countedChats, countsOnItsOwn } from "~/features/home/home-count";
 import { useAccounts } from "~/features/messaging/account";
 import { pdsResultOr } from "~/features/messaging/results";
 import { deliveredAt, dismissPresented, stringField } from "./presented";
@@ -86,16 +89,18 @@ function isAnswered(
 
 /**
  * Keeps the app icon badge equal to the Home and Activity tabs' together:
- * the Inbox rows Home lists with something unread, plus activity not yet
- * seen and pending space invitations, summed over every signed-in account
- * (the tabs follow the account filter; the icon doesn't). These are live
+ * Home's unread messages (see `homeCount`), plus activity not yet seen
+ * (but a mention or reply in a chat Home counts message by message only
+ * once, as one of its unread messages), and pending space invitations,
+ * summed over every signed-in account (the tabs follow the account
+ * filter; the icon doesn't). These are live
  * queries, so reading a conversation, seeing a row, or answering an
  * invite, here or on another device, updates it.
  *
  * A push sets the badge to its own account's count, because the server
  * knows nothing of the device's other accounts. With several accounts the
  * icon can read low while the app is closed, and is exact again once the
- * app opens.
+ * app opens: coming back to the app syncs it even when nothing changed.
  *
  * Also clears delivered notifications nobody needs anymore: a
  * conversation's once it has nothing unread, a reaction's or a thread
@@ -121,7 +126,12 @@ export function useAppBadge() {
     queries: accounts.map((session) =>
       pdsQuery({
         args: ACTIVITY_ARGS,
-        options: { select: (result) => pdsResultOr(result, null) },
+        options: {
+          select: (result) => {
+            const found = pdsResultOr(result, null);
+            return found == null ? found : activityItems(found);
+          },
+        },
         query: pds.messages.activity,
         session,
       }),
@@ -131,9 +141,15 @@ export function useAppBadge() {
   const loaded =
     home.loaded &&
     [...invites, ...activity].every((result) => result.data !== undefined);
+  // A mention or reply in a chat Home counts message by message is one
+  // of its unread messages already.
+  const counted = countedChats(
+    inboxes.flatMap((result) => result.data ?? []),
+    home.kinds,
+  );
   const unseen = activity
     .flatMap((result) => result.data ?? [])
-    .filter(isUnseen).length;
+    .filter((item) => isUnseen(item) && countsOnItsOwn(item, counted)).length;
   const pending = invites.reduce(
     (sum, result) => sum + (result.data?.length ?? 0),
     0,
@@ -181,4 +197,11 @@ export function useAppBadge() {
   useEffect(() => {
     sync();
   }, [total, version]);
+  // eslint-disable-next-line no-restricted-syntax -- A push that came in the background set the icon to its own account's count; coming back with nothing changed doesn't rerun the sync above, so only this puts the app's count back.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") sync();
+    });
+    return () => subscription.remove();
+  }, []);
 }

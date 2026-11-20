@@ -6,8 +6,8 @@ import type { Answered } from "./agentReply";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
 import { reply } from "./agentReply";
-import { replyRow, scheduleRun, waitWhileTyping } from "./assistantHook";
-import { botAccount, sendAsBot } from "./bots";
+import { replyRow, scheduleRun } from "./assistantHook";
+import { botAccount, queryAsBot, sendAsBot, VERA } from "./bots";
 import { takeReply } from "./rateLimits";
 
 // The harness every assistant runs on. A direct message to one schedules
@@ -239,4 +239,41 @@ async function endRun(
     runId: await scheduleRun(ctx, row, wakeAt),
     wakeAt,
   });
+}
+
+/** How often a reply checks whether they've stopped typing, and for how long. */
+const TYPING_RECHECK = 2500;
+const MAX_TYPING_WAIT = 30_000;
+
+/**
+ * Holds a reply while the person is typing, like someone letting the other
+ * finish: pushes its wake-up a few seconds later and returns true. Gives up
+ * waiting after 30 seconds, in case typing never clears.
+ */
+async function waitWhileTyping(
+  ctx: MutationCtx,
+  row: Doc<"botConversations">,
+  now: number,
+) {
+  if (
+    row.waitingSince !== undefined &&
+    now - row.waitingSince >= MAX_TYPING_WAIT
+  ) {
+    return false;
+  }
+  const response = await queryAsBot(ctx, VERA, {
+    args: { conversationId: row.conversationId, threadId: row.threadId },
+    type: "typing",
+  });
+  const typing =
+    response.type === "typing" &&
+    response.value.some((typist) => typist.accountId === row.accountId);
+  if (!typing) return false;
+  const wakeAt = now + TYPING_RECHECK;
+  await ctx.db.patch(row._id, {
+    runId: await scheduleRun(ctx, row, wakeAt),
+    wakeAt,
+    waitingSince: row.waitingSince ?? now,
+  });
+  return true;
 }

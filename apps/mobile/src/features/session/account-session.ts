@@ -1,4 +1,5 @@
 import type { DiscoveredPds } from "@decentralized-convex/client";
+import { AppState } from "react-native";
 import { notifyManager, QueryClient } from "@tanstack/react-query";
 import { DecentralizedConvexClient } from "@decentralized-convex/client";
 import {
@@ -17,7 +18,6 @@ import { createHomeAuthClient } from "./auth-client";
 import {
   createFederationAuthTokenFetcher,
   forgetHomeToken,
-  homeToken,
 } from "./federation-auth";
 
 /**
@@ -109,13 +109,14 @@ export function onAccountSession(start: SessionStart) {
 
 function createAccountSession(stored: StoredAccount, home: DiscoveredPds) {
   const authClient = createHomeAuthClient(home, stored.storagePrefix);
+  const tokens = createFederationAuthTokenFetcher(
+    authClient,
+    home,
+    stored.storagePrefix,
+  );
   const transport = new DecentralizedConvexClient({
     ...(env.devTools && { connectionFactory: delayedConnection }),
-    getAuthToken: createFederationAuthTokenFetcher(
-      authClient,
-      home,
-      stored.storagePrefix,
-    ),
+    getAuthToken: tokens.fetchToken,
     pds: { home },
   });
   const pdsClient = new PdsQueryClient(transport, {
@@ -125,7 +126,10 @@ function createAccountSession(stored: StoredAccount, home: DiscoveredPds) {
   // Connects and signs in while the first screen renders, rather than once
   // its queries start.
   transport.connectHome();
-  const started = [...sessionStarts].map((start) => start(stored));
+  const started = [
+    ...[...sessionStarts].map((start) => start(stored)),
+    keepTokenFresh(tokens, transport),
+  ];
   // The Better Auth client is a Proxy that answers every property, so it
   // stays out of this object: in development React reads the props it
   // re-renders with to log them, and turning the proxy's `name` into text
@@ -139,7 +143,7 @@ function createAccountSession(stored: StoredAccount, home: DiscoveredPds) {
     /** A Convex client for the home deployment, signed in as this account. */
     convex: async () => {
       const client = new ConvexHttpClient(home.manifest.deploymentUrl);
-      const token = await homeToken(authClient);
+      const token = await tokens.homeToken();
       if (token !== null) client.setAuth(token);
       return client;
     },
@@ -152,6 +156,48 @@ function createAccountSession(stored: StoredAccount, home: DiscoveredPds) {
     storagePrefix: stored.storagePrefix,
     transport,
     username: stored.address.slice(0, stored.address.lastIndexOf("@")),
+  };
+}
+
+/**
+ * How long before it expires the home token is renewed. It lasts a day
+ * (`services/backend/convex/auth.ts`), so it's renewed about twice a day
+ * of use.
+ */
+const RENEW_WITHIN_S = 12 * 60 * 60;
+/** How often an open app checks whether the home token is due. */
+const RENEW_CHECK_MS = 15 * 60 * 1_000;
+
+/**
+ * Keeps a home token ready before the connection needs one: renewed in
+ * the background whenever the app is open or left with less than half a
+ * day on it, so coming back finds one and nothing waits on a request.
+ * The connection keeps its own token until that one runs low; when the
+ * app comes back to it lapsing, it signs in again at once with the
+ * renewed one (asking for a new one only if that's gone too, after more
+ * than a day away) rather than presenting the expired one and waiting to
+ * be turned down.
+ */
+function keepTokenFresh(
+  tokens: ReturnType<typeof createFederationAuthTokenFetcher>,
+  transport: DecentralizedConvexClient,
+) {
+  function renew() {
+    void tokens.refreshWithin(RENEW_WITHIN_S);
+  }
+  const check = setInterval(() => {
+    if (AppState.currentState === "active") renew();
+  }, RENEW_CHECK_MS);
+  const subscription = AppState.addEventListener("change", (state) => {
+    if (state === "active" && tokens.needsSignIn(60)) {
+      transport.reauthenticate();
+    }
+    if (state === "active" || state === "background") renew();
+  });
+  renew();
+  return () => {
+    clearInterval(check);
+    subscription.remove();
   };
 }
 

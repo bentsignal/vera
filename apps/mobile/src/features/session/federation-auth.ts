@@ -74,11 +74,43 @@ async function exchangeToken(
   return exchangeOf(await exchange.json());
 }
 
+/** How long to wait before each new try of a failed token request. */
+const TOKEN_RETRY_MS = [500, 1_500, 3_000];
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Whether a failed token request might work if tried again: no answer
+ * (no network yet, as a phone wakes) or the PDS failing, not the PDS
+ * saying the session is gone.
+ */
+function worthRetrying(status: number | undefined) {
+  return status === undefined || status === 0 || status >= 500;
+}
+
+/**
+ * A new home token, or null once the session is gone. A request that gets
+ * no answer is tried again a few times first: null tells Convex's client
+ * the account is signed out, and it stops asking (#343).
+ */
 export async function homeToken(authClient: HomeAuthClient) {
-  const { data } = await authClient.convex.token({
-    fetchOptions: { throw: false },
-  });
-  return data?.token ?? null;
+  for (let attempt = 0; ; attempt += 1) {
+    let status: number | undefined;
+    try {
+      const { data, error } = await authClient.convex.token({
+        fetchOptions: { throw: false },
+      });
+      if (typeof data?.token === "string") return data.token;
+      status = error?.status;
+    } catch {
+      status = undefined;
+    }
+    const delay = TOKEN_RETRY_MS[attempt];
+    if (delay === undefined || !worthRetrying(status)) return null;
+    await wait(delay);
+  }
 }
 
 function expiryIn(payload: unknown) {
@@ -131,19 +163,41 @@ export function createFederationAuthTokenFetcher(
 ) {
   const cache = new Map<string, CachedToken>();
   const key = homeTokenKey(storagePrefix);
+  let current = SecureStore.getItem(key);
+  /** The home token the connection was last given (at first, the saved one). */
+  let given = current;
+  /** The one request for a new home token, while it's on its way. */
+  let requesting: Promise<string | null> | undefined;
+
+  function freshFor(token: string | null, seconds: number) {
+    return token !== null && expiryOf(token) > Date.now() / 1_000 + seconds;
+  }
+
+  /** A new home token, from the one request everything asking shares. */
+  function requestHomeToken() {
+    requesting ??= homeToken(authClient)
+      .then((token) => {
+        if (token !== null) {
+          current = token;
+          // Saved without waiting. A failed request (offline, say) leaves
+          // the last one, which lapses on its own or goes on sign-out.
+          void SecureStore.setItemAsync(key, token).catch(() => null);
+        }
+        return token;
+      })
+      .finally(() => {
+        requesting = undefined;
+      });
+    return requesting;
+  }
 
   async function savedHomeToken(forceRefreshToken: boolean) {
-    const saved = forceRefreshToken ? null : SecureStore.getItem(key);
-    if (saved !== null && expiryOf(saved) > Date.now() / 1_000 + 60) {
-      return saved;
-    }
-    const token = await homeToken(authClient);
-    // Saved without waiting. A failed request (offline, say) leaves the
-    // last one, which lapses on its own or goes when the account signs out.
-    if (token !== null) {
-      void SecureStore.setItemAsync(key, token).catch(() => null);
-    }
-    return token;
+    if (requesting !== undefined) return requesting;
+    // Turned down: a newer one the connection hasn't had yet (fetched as
+    // the app woke) is the answer; otherwise ask for one.
+    const usable =
+      freshFor(current, 60) && (!forceRefreshToken || current !== given);
+    return usable ? current : requestHomeToken();
   }
 
   function cached(url: string, forceRefreshToken: boolean) {
@@ -158,7 +212,8 @@ export function createFederationAuthTokenFetcher(
     url,
   }: Parameters<FederationAuthTokenFetcher>[0]) {
     if (url === home.manifest.deploymentUrl) {
-      return savedHomeToken(forceRefreshToken);
+      given = await savedHomeToken(forceRefreshToken);
+      return given;
     }
     if (pds === undefined) return null;
     const reused = cached(url, forceRefreshToken);
@@ -167,5 +222,21 @@ export function createFederationAuthTokenFetcher(
     if (token !== null) cache.set(url, token);
     return token?.token ?? null;
   }
-  return fetchToken;
+
+  return {
+    fetchToken,
+    /** The home token, shared with the connection's (for HTTP calls). */
+    homeToken: () => savedHomeToken(false),
+    /**
+     * Whether the connection should sign in again: the token it has
+     * doesn't last another `seconds`. Signing in takes the newest token
+     * held if it's fresh, and otherwise asks for one and holds the
+     * connection back until it comes.
+     */
+    needsSignIn: (seconds: number) => !freshFor(given, seconds),
+    /** Gets a new home token now if the one held expires within `seconds`. */
+    async refreshWithin(seconds: number) {
+      if (!freshFor(current, seconds)) await requestHomeToken();
+    },
+  };
 }

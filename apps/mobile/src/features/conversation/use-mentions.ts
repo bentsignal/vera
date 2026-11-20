@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import type { MentionCandidate } from "./mention-text";
 import { readDraft, saveDraftMentions } from "./drafts";
+import { useMentionNames } from "./mention-names";
 import {
   deleteWholeMention,
   insertMention,
@@ -31,10 +32,11 @@ interface Selection {
  */
 export function useMentions(
   draft: string,
-  mentionable: readonly MentionCandidate[] | undefined,
+  candidates: readonly MentionCandidate[] | undefined,
   draftKey: string,
   input: RefObject<TextInput | null>,
 ) {
+  const mentionable = useMentionNames(candidates, draft.length > 0);
   const [mentions, setPicked] = useState<readonly Mention[]>(
     () => readDraft(draftKey).mentions,
   );

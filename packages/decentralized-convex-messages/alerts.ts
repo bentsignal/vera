@@ -12,6 +12,7 @@ import {
   requireAccess,
   upsertMember,
 } from "./model.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { notificationSettings } from "./settings.ts";
 
 // What each conversation alerts an account about: everything, only
@@ -97,6 +98,7 @@ export async function setAlerts(
   self: string,
   args: Args<"setAlerts">,
 ) {
+  await forgetBadge(ctx, self);
   const access = await requireAccess(ctx, args.conversationId, self);
   if (access.conversation.kind === "direct" && args.alerts === "mentions") {
     fail("INVALID_ALERTS");
@@ -133,6 +135,7 @@ export async function setSpaceAlerts(
   self: string,
   args: Args<"setSpaceAlerts">,
 ) {
+  await forgetBadge(ctx, self);
   const member = await getSpaceMember(ctx, args.spaceId, self);
   if (member === null) fail("SPACE_NOT_FOUND");
   const { channelAlerts } = await notificationSettings(ctx, self);

@@ -1,7 +1,23 @@
-import type { QueryRequest } from "@decentralized-convex/plugin";
+import type { AnsweredQuery, QueryRequest } from "@decentralized-convex/plugin";
 import type { Value } from "convex/values";
 
 const RoutedQueryResultMarker = Symbol("RoutedQueryResult");
+
+/**
+ * The queries a result includes, or a function that works them out, so a
+ * query asked for without its includes (a live subscription; see
+ * `include` on the router) doesn't read what only they need.
+ */
+export type IncludedQueries =
+  | readonly IncludedQuery[]
+  | (() => Promise<readonly IncludedQuery[]> | readonly IncludedQuery[]);
+
+/**
+ * A query a result includes: a request the PDS answers, or one the query
+ * already answered while working out its own result (so it isn't worked
+ * out twice).
+ */
+export type IncludedQuery = AnsweredQuery | QueryRequest;
 
 export interface RoutedQueryResult<Result> {
   readonly [RoutedQueryResultMarker]: true;
@@ -11,7 +27,7 @@ export interface RoutedQueryResult<Result> {
    * shows. The PDS answers them with this one, so the client has them
    * without another round trip.
    */
-  readonly include: readonly QueryRequest[];
+  readonly include: IncludedQueries;
   readonly routes: readonly string[];
 }
 
@@ -25,7 +41,7 @@ export function queryResult<Result>(
     include = [],
     routes = [],
   }: {
-    readonly include?: readonly QueryRequest[];
+    readonly include?: IncludedQueries;
     readonly routes?: readonly string[];
   },
 ): RoutedQueryResult<Result> {

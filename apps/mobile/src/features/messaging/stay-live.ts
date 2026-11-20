@@ -47,6 +47,17 @@ export function isLive(
 }
 
 /**
+ * Whether a query is worth keeping live after its screen closes: not
+ * who's typing, which changes every few seconds while someone types and
+ * is asked for again when the screen opens (typists shown from before
+ * run out on their own).
+ */
+function keepsLive(query: Query) {
+  const request = query.queryKey[5];
+  return fieldOf(fieldOf(request, "operation"), "type") !== "typing";
+}
+
+/**
  * Keeps `queries` live for `STAY_LIVE_MS`, as if their screen were still
  * open: the PDS keeps sending what changes, so it's there when the
  * conversation opens again.
@@ -57,7 +68,7 @@ function stayLive(
   queries: readonly Query[],
 ) {
   staying.get(key)?.();
-  const stops = queries.map((query) =>
+  const stops = queries.filter(keepsLive).map((query) =>
     new QueryObserver(queryClient, {
       ...query.options,
       queryKey: query.queryKey,
@@ -75,7 +86,7 @@ function stayLive(
 
 /**
  * Keeps what a conversation's screen showed live for a few minutes after
- * it closes (new messages, reactions, who's typing), so opening it again
+ * it closes (new messages, reactions), so opening it again
  * shows them at once instead of catching up as it fades in. Opening it
  * again lets go of the earlier ones, which its own screen takes over. With
  * `threadId`, the same for a thread in it.

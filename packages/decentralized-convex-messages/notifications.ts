@@ -7,6 +7,7 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server.js";
+import { badgeFor, settleBadge } from "./badgeCache.ts";
 import { badgeCount } from "./badges.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
 import { listeners } from "./listeners.ts";
@@ -120,22 +121,54 @@ function replyBody(reply: ReplyPush, body: string) {
 }
 
 /**
- * The account's app icon badge (see `badgeCount`), read in its own query so
- * a push to a large space doesn't count every member in one transaction.
+ * The account's app icon badge for a push (see `countBadge`), read in its
+ * own query so a push to a large space doesn't count every member in one
+ * transaction. For an app with a Home badge (`inbox`), built on the count
+ * saved moments before when it can be, with what to settle it with
+ * (`settleBadge`, badgeCache.ts).
  */
 export const badge = internalQuery({
   args: {
     accountId: v.string(),
     inbox: v.optional(v.array(inboxKind)),
+    key: v.string(),
+    messageId: v.optional(v.string()),
     threads: v.optional(v.boolean()),
   },
-  handler: (ctx, { accountId, inbox, threads }) =>
-    badgeCount(
-      ctx,
+  handler: async (ctx, { accountId, inbox, key, messageId, threads }) => {
+    if (inbox === undefined) {
+      const shows = { mentions: true, threads: threads === true };
+      return { count: await badgeCount(ctx, accountId, shows), settle: null };
+    }
+    return badgeFor(ctx, {
       accountId,
-      { mentions: true, threads: threads === true },
       inbox,
-    ),
+      key,
+      messageId,
+      threads: threads === true,
+    });
+  },
+});
+
+/** Saves what `badge` found for the pushes after it (see `settleBadge`). */
+export const settledBadge = internalMutation({
+  args: {
+    accountId: v.string(),
+    settle: v.object({
+      entry: v.object({
+        count: v.number(),
+        countedAt: v.number(),
+        key: v.string(),
+        rows: v.array(
+          v.object({ conversationId: v.string(), count: v.number() }),
+        ),
+      }),
+      fresh: v.boolean(),
+      live: v.boolean(),
+      version: v.union(v.number(), v.null()),
+    }),
+  },
+  handler: (ctx, { accountId, settle }) => settleBadge(ctx, accountId, settle),
 });
 
 /** Who to tell about new space invitations, and the space's name. */
@@ -197,7 +230,7 @@ export const send = internalAction({
     if (recipients.length === 0) return;
     const [sender, badges, memberNames] = await Promise.all([
       accountProfile(target.senderId),
-      badgeCounts(ctx, recipients),
+      badgeCounts(ctx, recipients, messageId),
       displayNames([...(target.unnamedGroupMembers ?? [])].sort()),
     ]);
     const senderName = sender?.displayName ?? target.senderName;
