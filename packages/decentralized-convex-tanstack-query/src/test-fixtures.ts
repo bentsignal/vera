@@ -189,6 +189,19 @@ export function wait(delay: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, delay));
 }
 
+/**
+ * Waits until `done` holds, checking every few milliseconds, or fails after
+ * `timeout`: a test waits on what it's waiting for, not a guess at how long
+ * that takes on a busy machine.
+ */
+export async function until(done: () => boolean, timeout = 2000) {
+  const start = Date.now();
+  while (!done()) {
+    if (Date.now() - start > timeout) throw new Error("Timed out waiting");
+    await wait(5);
+  }
+}
+
 export function nextTask() {
   return new Promise<void>((resolve) => setTimeout(resolve, 0));
 }

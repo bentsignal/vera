@@ -3,14 +3,13 @@ import { v } from "convex/values";
 
 import type { MutationCtx } from "./_generated/server";
 import type { BotAccount } from "./bots";
-import { mentionsAssistant as mentionsWritten } from "../assistant-mentions";
 import { components, internal } from "./_generated/api";
 import {
   internalAction,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
-import { botAccount, botAddress, isBotAddress } from "./bots";
+import { botAccount, botAddress } from "./bots";
 import { takeReply } from "./rateLimits";
 import { botName } from "./schema";
 import { answer } from "./summonReply";
@@ -31,64 +30,6 @@ import { answer } from "./summonReply";
 
 const FAILURE_NOTICE =
   "Sorry, something went wrong on my end. Try again in a moment.";
-
-/** Whether a message @mentions an assistant (assistant-mentions.ts). */
-export function mentionsAssistant(
-  bot: BotAccount,
-  body: string,
-  mentions: unknown,
-) {
-  return mentionsWritten(
-    { address: botAddress(bot), username: bot.username },
-    body,
-    mentions,
-  );
-}
-
-/**
- * The router's `afterMutation` (assistantHook.ts) saw a message that
- * mentions an assistant outside its own direct messages, or the gate
- * judged a reply in its thread was for it (`heard`, summonThreads.ts):
- * it's answered once, right away. A send retried with the same ID isn't
- * answered again.
- */
-export async function startSummon(
-  ctx: MutationCtx,
-  {
-    accountId,
-    bot,
-    conversationId,
-    heard,
-    messageId,
-  }: {
-    accountId: string;
-    bot: BotAccount;
-    conversationId: string;
-    heard?: true;
-    messageId: string;
-  },
-) {
-  if (isBotAddress(accountId)) return;
-  const existing = await ctx.db
-    .query("botSummons")
-    .withIndex("by_message", (q) => q.eq("messageId", messageId))
-    .unique();
-  if (existing !== null) return;
-  // Assistants become one on setup (bots.ts); this covers one set up
-  // before there were summons.
-  await ctx.runMutation(components.messages.assistants.setAssistant, {
-    accountId: botAddress(bot),
-    assistant: true,
-  });
-  await ctx.db.insert("botSummons", {
-    accountId,
-    bot: bot.username,
-    conversationId,
-    heard,
-    messageId,
-  });
-  await ctx.scheduler.runAfter(0, internal.summons.run, { messageId });
-}
 
 export const run = internalAction({
   args: { messageId: v.string() },

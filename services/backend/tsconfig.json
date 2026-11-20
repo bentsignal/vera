@@ -15,6 +15,7 @@
     "./assistant-threads.test.ts",
     "./bug-reports.ts",
     "./bug-reports.test.ts",
+    "./function-bundles.test.ts",
     "./issue-closures.ts",
     "./known-bugs.ts",
     "./known-bugs.test.ts",

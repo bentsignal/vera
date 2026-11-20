@@ -1,14 +1,13 @@
 import type { PdsRouterMutation } from "@decentralized-convex/server";
 
-import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Chat } from "./agentTools";
-import type { BotAccount } from "./bots";
+import type { BotAccount } from "./botAccounts";
 import { replyThread } from "../assistant-threads";
 import { internal } from "./_generated/api";
-import { ASSISTANTS, botAddress, field, queryAsBot, VERA } from "./bots";
-import { mentionsAssistant, startSummon } from "./summons";
-import { heardInThread, mentionedInThread } from "./summonThreads";
+import { ASSISTANTS, botAddress, field, VERA } from "./botAccounts";
+import { mentionsAssistant, startSummon } from "./summonStart";
+import { heardInThread, mentionedInThread } from "./threadFollow";
 
 // What starts an assistant's work: the PDS router's `afterMutation`
 // (pds.ts) sees every write someone on this PDS makes, and reacts to the
@@ -16,6 +15,11 @@ import { heardInThread, mentionedInThread } from "./summonThreads";
 // thread there is answered in that thread, which keeps its own reply
 // state, assistant-threads.ts), to messages anywhere else that @mention
 // one (summons.ts), and to replies in its threads (summonThreads.ts).
+//
+// It runs in every PDS mutation and its module loads with every PDS query
+// (pds.ts), so it imports only what deciding and scheduling need: the
+// replies themselves, and the models, run later in their own functions,
+// referenced by name (docs/architecture.md, "Function bundles").
 
 /** How long a reply waits for more messages, so a burst gets one answer. */
 const REPLY_DELAY = 1500;
@@ -228,41 +232,4 @@ async function forgetChangedMessage(
   const messageId = field(field(operation, "args"), "messageId");
   if (typeof messageId !== "string") return;
   await ctx.scheduler.runAfter(0, internal.memoryBuild.rebuild, { messageId });
-}
-
-/** How often a reply checks whether they've stopped typing, and for how long. */
-const TYPING_RECHECK = 2500;
-const MAX_TYPING_WAIT = 30_000;
-
-/**
- * Holds a reply while the person is typing, like someone letting the other
- * finish: pushes its wake-up a few seconds later and returns true. Gives up
- * waiting after 30 seconds, in case typing never clears.
- */
-export async function waitWhileTyping(
-  ctx: MutationCtx,
-  row: Doc<"botConversations">,
-  now: number,
-) {
-  if (
-    row.waitingSince !== undefined &&
-    now - row.waitingSince >= MAX_TYPING_WAIT
-  ) {
-    return false;
-  }
-  const response = await queryAsBot(ctx, VERA, {
-    args: { conversationId: row.conversationId, threadId: row.threadId },
-    type: "typing",
-  });
-  const typing =
-    response.type === "typing" &&
-    response.value.some((typist) => typist.accountId === row.accountId);
-  if (!typing) return false;
-  const wakeAt = now + TYPING_RECHECK;
-  await ctx.db.patch(row._id, {
-    runId: await scheduleRun(ctx, row, wakeAt),
-    wakeAt,
-    waitingSince: row.waitingSince ?? now,
-  });
-  return true;
 }

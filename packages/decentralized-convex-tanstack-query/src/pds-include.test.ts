@@ -6,7 +6,12 @@ import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import type { Note } from "./test-fixtures.ts";
 import { PdsQueryClient } from "./pds-query-client.ts";
 import { pdsQuery } from "./pds.ts";
-import { listNotes, memoryTransport, nextTask, wait } from "./test-fixtures.ts";
+import {
+  listNotes,
+  memoryTransport,
+  nextTask,
+  until,
+} from "./test-fixtures.ts";
 
 void test("a query's first answer comes with what it includes, before its subscription's", async () => {
   // The subscription answers at once; the one-shot fetch, with what the
@@ -37,7 +42,12 @@ void test("a query's first answer comes with what it includes, before its subscr
     "loading",
   );
   // Its home and its route each take that long.
-  await wait(120);
+  await until(
+    () =>
+      queryClient.getQueryData<PdsQueryData<Note[], readonly Note[]>>(
+        options.queryKey,
+      )?.status === "success",
+  );
   const shown = queryClient.getQueryData<PdsQueryData<Note[], readonly Note[]>>(
     options.queryKey,
   );

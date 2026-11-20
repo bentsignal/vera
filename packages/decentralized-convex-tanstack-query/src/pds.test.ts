@@ -17,6 +17,7 @@ import {
   listNotes,
   memoryTransport,
   nextTask,
+  until,
   wait,
 } from "./test-fixtures.ts";
 
@@ -165,7 +166,7 @@ void test("a query shown again keeps its cached result while it resubscribes", a
 
   const first = new QueryObserver(queryClient, query);
   const unsubscribeFirst = first.subscribe(() => undefined);
-  await wait(60);
+  await until(() => first.getCurrentResult().data?.status === "success");
   assert.equal(first.getCurrentResult().data?.status, "success");
   unsubscribeFirst();
 
