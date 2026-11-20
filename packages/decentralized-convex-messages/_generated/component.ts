@@ -197,6 +197,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 args: { conversationId: string; readAt: number };
                 type: "markRead";
               }
+            | { args: {}; type: "clearBadge" }
             | {
                 args: { conversationId: string; muted: boolean };
                 type: "setMuted";
@@ -467,6 +468,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         | { routes?: Array<string>; type: "setTyping"; value: null }
         | { routes?: Array<string>; type: "markActivitySeen"; value: null }
         | { routes?: Array<string>; type: "markRead"; value: null }
+        | { routes?: Array<string>; type: "clearBadge"; value: null }
         | { routes?: Array<string>; type: "setMuted"; value: null }
         | { routes?: Array<string>; type: "setAlerts"; value: null }
         | { routes?: Array<string>; type: "setSpaceMuted"; value: null }
