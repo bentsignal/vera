@@ -1,6 +1,7 @@
 import type { ActivityItem } from "@decentralized-convex/messages";
 import type * as Notifications from "expo-notifications";
 import { useEffect, useEffectEvent } from "react";
+import { AppState } from "react-native";
 import { setBadgeCountAsync } from "expo-notifications";
 import { useQueries } from "@tanstack/react-query";
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
@@ -99,7 +100,7 @@ function isAnswered(
  * A push sets the badge to its own account's count, because the server
  * knows nothing of the device's other accounts. With several accounts the
  * icon can read low while the app is closed, and is exact again once the
- * app opens.
+ * app opens: coming back to the app syncs it even when nothing changed.
  *
  * Also clears delivered notifications nobody needs anymore: a
  * conversation's once it has nothing unread, a reaction's or a thread
@@ -196,4 +197,11 @@ export function useAppBadge() {
   useEffect(() => {
     sync();
   }, [total, version]);
+  // eslint-disable-next-line no-restricted-syntax -- A push that came in the background set the icon to its own account's count; coming back with nothing changed doesn't rerun the sync above, so only this puts the app's count back.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") sync();
+    });
+    return () => subscription.remove();
+  }, []);
 }
