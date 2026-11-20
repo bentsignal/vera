@@ -14,6 +14,8 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.util.ReflectionHelpers
+import android.animation.ValueAnimator
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE)
@@ -186,5 +188,61 @@ class ListMotionTest {
     // Stacked chips go under the message.
     assertFalse(reactionsGrowAtTop(deckMessage(thumbs, stacked = true), deckMessage(emptyList(), stacked = true)))
     assertFalse(reactionsGrowAtTop(null, deckMessage(thumbs)))
+  }
+
+  private fun changeClip(preHeight: Int, postHeight: Int, moved: Int): Int? {
+    val context = RuntimeEnvironment.getApplication()
+    val row = View(context).apply { layout(0, 0, 400, postHeight) }
+    val holder = Holder(row)
+    val pre = RecyclerView.ItemAnimator.ItemHolderInfo().apply { top = 500; bottom = 500 + preHeight }
+    val post = RecyclerView.ItemAnimator.ItemHolderInfo().apply { top = 500 - moved; bottom = 500 - moved + postHeight }
+    val animator = ListItemAnimator(Units(context)).apply { growsAtTop = { false } }
+    assertTrue(animator.animateChange(holder, holder, pre, post))
+    animator.runPendingAnimations()
+    val clock = ReflectionHelpers.getField<Map<RecyclerView.ViewHolder, ValueAnimator>>(animator, "running")[holder]!!
+    clock.currentPlayTime = 1
+    val clip = row.clipBounds?.bottom
+    animator.endAnimations()
+    return clip
+  }
+
+  @Test fun aMessageSentUnderYoursLeavesTheOneAboveDrawn() {
+    // Yours loses its tail as another of yours goes under it: a change, and
+    // it moves up by the new message's height. Before, it was clipped by
+    // that whole move, hiding the bubble (a box of background) until it landed.
+    val clip = changeClip(preHeight = 80, postHeight = 80, moved = 120)
+    assertTrue("clipped to $clip", clip == null || clip >= 80)
+  }
+
+  @Test fun aRowThatGrowsShowsItsNewRoomAsItOpens() {
+    // A reply line under it: 30 more at its bottom, revealed as rows below move.
+    val clip = changeClip(preHeight = 80, postHeight = 110, moved = 30)
+    assertEquals(80f, clip!!.toFloat(), 1f)
+    // The same growth while it also moves up for an arrival under it.
+    val moving = changeClip(preHeight = 80, postHeight = 110, moved = 150)
+    assertEquals(80f, moving!!.toFloat(), 1f)
+  }
+
+  @Test fun aRowReboundAsItMovesKeepsItsClock() {
+    // A message you sent is confirmed while it's still rising: the same row,
+    // rebound where it already is. Before, it started over: its fade ended
+    // at once and its move restarted behind the rows around it.
+    val context = RuntimeEnvironment.getApplication()
+    val row = View(context).apply { layout(0, 400, 400, 500) }
+    val holder = Holder(row)
+    val animator = ListItemAnimator(Units(context)).apply { growsAtTop = { false } }
+    assertTrue(animator.animateMove(holder, 0, 500, 0, 400))
+    animator.runPendingAnimations()
+    val running = ReflectionHelpers.getField<Map<RecyclerView.ViewHolder, ValueAnimator>>(animator, "running")
+    val clock = running[holder]!!
+    clock.currentPlayTime = 100
+    val midway = row.translationY
+    assertTrue(midway > 0f && midway < 100f)
+
+    val here = RecyclerView.ItemAnimator.ItemHolderInfo().apply { top = 400; bottom = 500 }
+    assertFalse(animator.animateChange(holder, holder, here, here))
+    assertTrue(running[holder] === clock && clock.isRunning)
+    assertEquals(midway, row.translationY, 0f)
+    animator.endAnimations()
   }
 }

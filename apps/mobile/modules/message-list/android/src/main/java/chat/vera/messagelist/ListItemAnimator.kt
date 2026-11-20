@@ -50,7 +50,11 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
   /** A message growing out of the typing bubble it replaces (see `MessageCell.growFromTyping`). */
   var handoff: String? = null
 
-  private class Pending(val holder: RecyclerView.ViewHolder, val kind: Int, val clip: Boolean)
+  /**
+   * `reveal`: the room a changed row grew at its bottom, hidden until it
+   * opens (0 for none).
+   */
+  private class Pending(val holder: RecyclerView.ViewHolder, val kind: Int, val reveal: Int = 0)
 
   private val pending = ArrayList<Pending>()
   private val running = HashMap<RecyclerView.ViewHolder, Animator>()
@@ -72,7 +76,7 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
       dispatchRemoveFinished(holder)
       return false
     }
-    pending.add(Pending(holder, REMOVE, false))
+    pending.add(Pending(holder, REMOVE))
     return true
   }
 
@@ -95,15 +99,31 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
       id in rising -> ADD_RISING
       else -> ADD
     }
-    pending.add(Pending(holder, kind, false))
+    pending.add(Pending(holder, kind))
     return true
   }
 
   override fun animateMove(holder: RecyclerView.ViewHolder, fromX: Int, fromY: Int, toX: Int, toY: Int): Boolean =
-    move(holder, fromY, toY, clip = false, change = false)
+    move(holder, fromY, toY, grew = 0, change = false)
 
-  private fun move(holder: RecyclerView.ViewHolder, fromY: Int, toY: Int, clip: Boolean, change: Boolean): Boolean {
+  /**
+   * Slides a row from `fromY` to `toY`. `grew` is how much taller it got at
+   * its bottom (a changed row), which only shows as the space under it
+   * opens. It's not the distance moved: a row that both changes and moves
+   * up for a message sent under it (the tail it loses) would otherwise be
+   * hidden for as far as it moves, the whole bubble at first.
+   */
+  private fun move(holder: RecyclerView.ViewHolder, fromY: Int, toY: Int, grew: Int, change: Boolean): Boolean {
     val view = holder.itemView
+    // Rebound while it's still on its way, with its place and height the
+    // same (a message you sent, confirmed as it rises): it carries on, on
+    // the clock it shares with the rows around it. Starting over would end
+    // its fade at once and restart its move behind theirs, so it popped in
+    // and the list shifted twice.
+    if (fromY == toY && grew == 0 && running.containsKey(holder)) {
+      if (change) dispatchChangeFinished(holder, true) else dispatchMoveFinished(holder)
+      return false
+    }
     val from = fromY + view.translationY.toInt()
     endAnimation(holder)
     val delta = from - toY
@@ -113,7 +133,7 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
       return false
     }
     view.translationY = delta.toFloat()
-    pending.add(Pending(holder, if (change) CHANGE else MOVE, clip && delta > 0))
+    pending.add(Pending(holder, if (change) CHANGE else MOVE, if (delta > 0) grew.coerceIn(0, delta) else 0))
     return true
   }
 
@@ -131,9 +151,10 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
     // The edge that stays: the bottom when the row grows at its top
     // (tapbacks), else the top, so what's under it opens below.
     return if (growsAtTop(newHolder)) {
-      move(newHolder, preLayoutInfo.bottom, postLayoutInfo.bottom, clip = false, change = true)
+      move(newHolder, preLayoutInfo.bottom, postLayoutInfo.bottom, grew = 0, change = true)
     } else {
-      move(newHolder, preLayoutInfo.top, postLayoutInfo.top, clip = true, change = true)
+      val grew = (postLayoutInfo.bottom - postLayoutInfo.top) - (preLayoutInfo.bottom - preLayoutInfo.top)
+      move(newHolder, preLayoutInfo.top, postLayoutInfo.top, grew = grew, change = true)
     }
   }
 
@@ -145,7 +166,8 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
     toLeft: Int,
     toTop: Int,
   ): Boolean {
-    if (newHolder == null || oldHolder === newHolder) return move(oldHolder, fromTop, toTop, clip = true, change = true)
+    // Without the row's heights, it's taken to have grown by as far as it moved.
+    if (newHolder == null || oldHolder === newHolder) return move(oldHolder, fromTop, toTop, grew = fromTop - toTop, change = true)
     dispatchChangeFinished(oldHolder, true)
     dispatchChangeFinished(newHolder, false)
     return false
@@ -214,9 +236,9 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
         }
         else -> {
           view.translationY = startY * (1f - eased(moveMs))
-          if (item.clip) {
-            // What's under the row's content shows only as its space opens.
-            clip.set(-view.width, -view.height, view.width * 2, view.height - view.translationY.toInt())
+          if (item.reveal > 0) {
+            // What it grew shows only as its space opens.
+            clip.set(-view.width, -view.height, view.width * 2, view.height - (item.reveal * (1f - eased(moveMs))).toInt())
             view.clipBounds = clip
           }
         }
