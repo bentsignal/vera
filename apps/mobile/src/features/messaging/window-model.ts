@@ -328,6 +328,13 @@ export function windowParts<Message extends WindowMessage>(
     liveIds: live.map((message) => message.messageId),
     liveThreadIds: threadsOf(live),
     since: liveSince,
+    /**
+     * Whether every page has answered. The newest page's answer includes
+     * what's reacted to and replied to since `liveSince` (see `include`
+     * on the PDS), so those are asked for only once it hasn't: asked for
+     * alongside the pages, they'd be asked for twice.
+     */
+    sinceDue: pages.every((page) => page !== undefined),
   };
 }
 

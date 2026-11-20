@@ -80,10 +80,11 @@ export function summariesSinceQuery(
   session: string,
   conversationId: string,
   since: number,
+  enabled = true,
 ) {
   return pdsQuery({
     args: { conversationId, since },
-    options: { select: (result) => pdsResultOr(result, [])?.flat() },
+    options: { enabled, select: (result) => pdsResultOr(result, [])?.flat() },
     query: pds.messages.threadSummaries,
     session,
   });
@@ -117,6 +118,8 @@ export interface ThreadSources {
   readonly since: number | undefined;
   /** The loaded messages' threads `since` covers. */
   readonly liveThreadIds: readonly string[];
+  /** Whether to ask for `since` (see `windowParts`); asked for if absent. */
+  readonly sinceDue?: boolean;
 }
 
 /**
@@ -127,22 +130,26 @@ export interface ThreadSources {
 export function useThreadSummaries(
   session: string,
   conversationId: string,
-  { liveThreadIds, since, threadIds }: ThreadSources,
+  { liveThreadIds, since, sinceDue = true, threadIds }: ThreadSources,
   /** The window opening instead, if any (see `useReactions`). */
   ahead?: Pick<ThreadSources, "since" | "threadIds">,
 ) {
   const batches = threadIds.flatMap(chunks);
-  function queriesFor(ids: readonly (readonly string[])[], after?: number) {
+  function queriesFor(
+    ids: readonly (readonly string[])[],
+    after?: number,
+    due = true,
+  ) {
     return [
       ...ids.map((batch) => summariesQuery(session, conversationId, batch)),
       ...(after === undefined
         ? []
-        : [summariesSinceQuery(session, conversationId, after)]),
+        : [summariesSinceQuery(session, conversationId, after, due)]),
     ];
   }
   const { loaded, threads } = useQueries({
     queries: [
-      ...queriesFor(batches, since),
+      ...queriesFor(batches, since, sinceDue),
       ...queriesFor(ahead?.threadIds.flatMap(chunks) ?? [], ahead?.since),
     ],
     combine: (results) => {

@@ -147,10 +147,11 @@ export function reactionsSinceQuery(
   session: string,
   conversationId: string,
   since: number,
+  enabled = true,
 ) {
   return pdsQuery({
     args: { conversationId, since },
-    options: { select: (result) => pdsResultOr(result, [])?.flat() },
+    options: { enabled, select: (result) => pdsResultOr(result, [])?.flat() },
     query: pds.messages.reactions,
     session,
   });
@@ -184,6 +185,8 @@ export interface ReactionSources {
   readonly since: number | undefined;
   /** The loaded messages `since` covers. */
   readonly liveIds: readonly string[];
+  /** Whether to ask for `since` (see `windowParts`); asked for if absent. */
+  readonly sinceDue?: boolean;
 }
 
 /**
@@ -195,7 +198,7 @@ export interface ReactionSources {
 export function useReactions(
   session: string,
   conversationId: string,
-  { liveIds, messageIds, since }: ReactionSources,
+  { liveIds, messageIds, since, sinceDue = true }: ReactionSources,
   /**
    * The window opening instead, if any (see `jumpToLatest`): asked for
    * too, so they're there when it shows.
@@ -210,17 +213,21 @@ export function useReactions(
   const pending = useRef<ReadonlyMap<string, Pending>>(overrides);
   const toggles = useRef(0);
   const batches = messageIds.flatMap(chunks);
-  function queriesFor(ids: readonly (readonly string[])[], after?: number) {
+  function queriesFor(
+    ids: readonly (readonly string[])[],
+    after?: number,
+    due = true,
+  ) {
     return [
       ...ids.map((batch) => reactionsQuery(session, conversationId, batch)),
       ...(after === undefined
         ? []
-        : [reactionsSinceQuery(session, conversationId, after)]),
+        : [reactionsSinceQuery(session, conversationId, after, due)]),
     ];
   }
   const { loaded, reactions } = useQueries({
     queries: [
-      ...queriesFor(batches, since),
+      ...queriesFor(batches, since, sinceDue),
       ...queriesFor(ahead?.messageIds.flatMap(chunks) ?? [], ahead?.since),
     ],
     // TanStack shares this structurally with the last result, so a message
