@@ -124,7 +124,12 @@ export function getMember(
     .unique();
 }
 
-/** The account's invitations to spaces that still exist, with the space. */
+/**
+ * The account's invitations to spaces that still exist, with the space.
+ * One to a space it's in already (added by a member after being invited)
+ * isn't pending: there's nothing to answer, and it would count on the
+ * badge for good.
+ */
 export async function pendingInvites(ctx: QueryCtx, accountId: string) {
   const invites = await ctx.db
     .query("spaceInvites")
@@ -132,8 +137,11 @@ export async function pendingInvites(ctx: QueryCtx, accountId: string) {
     .collect();
   const pending = [];
   for (const invite of invites) {
-    const space = await getSpace(ctx, invite.spaceId);
-    if (space !== null) pending.push({ invite, space });
+    const [space, member] = await Promise.all([
+      getSpace(ctx, invite.spaceId),
+      getSpaceMember(ctx, invite.spaceId, accountId),
+    ]);
+    if (space !== null && member === null) pending.push({ invite, space });
   }
   return pending;
 }

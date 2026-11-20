@@ -104,6 +104,14 @@ export async function addSpaceMembers(
         spaceId: args.spaceId,
       });
     }
+    // In the space, they've nothing left to answer.
+    const invite = await ctx.db
+      .query("spaceInvites")
+      .withIndex("by_space_account", (index) =>
+        index.eq("spaceId", args.spaceId).eq("accountId", accountId),
+      )
+      .unique();
+    if (invite !== null) await ctx.db.delete(invite._id);
   }
   return null;
 }

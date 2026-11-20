@@ -265,3 +265,44 @@ void test("with threads in the Inbox, counts those with unread replies", async (
   assert.equal(await badgeCount(ctx, ME, shows, ["chats"]), 1);
   assert.equal(await badgeCount(ctx, ME, shows, ["chats", "threads"]), 2);
 });
+
+void test("an invitation to a space you're in already doesn't count", async (t) => {
+  at(t);
+  const { ctx } = fakeCtx({
+    spaceInvites: [{ accountId: ME, invitedBy: FRIEND, spaceId: "space:1" }],
+    // Added by a member after being invited.
+    spaceMembers: [{ accountId: ME, role: "member", spaceId: "space:1" }],
+    spaces: [{ createdBy: FRIEND, name: "One", spaceId: "space:1" }],
+  });
+  assert.equal(await badgeCount(ctx, ME, { threads: true }), 0);
+});
+
+void test("a deleted reply to you doesn't count", async (t) => {
+  at(t);
+  const reply = {
+    ...message("group:b", FRIEND, NOW - HOUR),
+    quote: { authorId: ME, messageId: "mine" },
+    threadId: "mine",
+  };
+  const { ctx } = fakeCtx({
+    conversations: [conversation("group:b", "group")],
+    members: [member("group:b", { alerts: "mentions", lastReadAt: NOW })],
+    messages: [
+      { ...message("group:b", ME, NOW - 2 * HOUR), messageId: "mine" },
+      // Deleted, but kept emptied for the replies in its own thread.
+      { ...reply, body: "", deletedAt: NOW - HOUR / 2 },
+    ],
+  });
+  const shows = { mentions: true, threads: true };
+  assert.equal(await badgeCount(ctx, ME, shows, ["chats"]), 0);
+  // Not deleted, it would.
+  const { ctx: kept } = fakeCtx({
+    conversations: [conversation("group:b", "group")],
+    members: [member("group:b", { alerts: "mentions", lastReadAt: NOW })],
+    messages: [
+      { ...message("group:b", ME, NOW - 2 * HOUR), messageId: "mine" },
+      reply,
+    ],
+  });
+  assert.equal(await badgeCount(kept, ME, shows, ["chats"]), 1);
+});
