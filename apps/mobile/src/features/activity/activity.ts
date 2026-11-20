@@ -183,7 +183,7 @@ interface Sighting {
 }
 
 /** Shows the items as seen in the account's loaded activity. */
-function showSeen(
+export function showSeen(
   store: PdsOptimisticLocalStore,
   sightings: readonly Sighting[],
   seenAt: number,

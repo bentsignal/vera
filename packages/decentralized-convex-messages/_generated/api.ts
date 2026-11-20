@@ -16,6 +16,7 @@ import type * as alertChoice from "../alertChoice.js";
 import type * as alerts from "../alerts.js";
 import type * as assistants from "../assistants.js";
 import type * as badgeCache from "../badgeCache.js";
+import type * as badgeClear from "../badgeClear.js";
 import type * as badges from "../badges.js";
 import type * as changes from "../changes.js";
 import type * as chatMessages from "../chatMessages.js";
@@ -79,6 +80,7 @@ const fullApi: ApiFromModules<{
   alerts: typeof alerts;
   assistants: typeof assistants;
   badgeCache: typeof badgeCache;
+  badgeClear: typeof badgeClear;
   badges: typeof badges;
   changes: typeof changes;
   chatMessages: typeof chatMessages;
