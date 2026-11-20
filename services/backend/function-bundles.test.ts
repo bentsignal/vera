@@ -1,7 +1,47 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { build } from "esbuild";
+
+/** What this reads of an esbuild build: each output's size and inputs. */
+interface Built {
+  readonly metafile: {
+    readonly outputs: Record<
+      string,
+      {
+        readonly bytes: number;
+        readonly inputs: Record<string, { readonly bytesInOutput: number }>;
+      }
+    >;
+  };
+}
+
+type Build = (options: Record<string, unknown>) => Promise<Built>;
+
+function isBuild(value: unknown): value is Build {
+  return typeof value === "function";
+}
+
+/**
+ * The esbuild Convex bundles functions with, from Convex's own
+ * dependencies, so the measurement matches what it deploys (and the app's
+ * lockfile doesn't change for a test).
+ */
+function convexEsbuild() {
+  const convex = createRequire(import.meta.url).resolve("convex/package.json");
+  const esbuild: unknown = createRequire(convex)("esbuild");
+  if (
+    typeof esbuild === "object" &&
+    esbuild !== null &&
+    "build" in esbuild &&
+    isBuild(esbuild.build)
+  ) {
+    return esbuild.build;
+  }
+  throw new Error("Convex's esbuild wasn't found");
+}
+
+const build = convexEsbuild();
 
 // What runs on every request to this PDS stays small. Convex loads all the
 // code a function's module imports each time the function runs, so a
