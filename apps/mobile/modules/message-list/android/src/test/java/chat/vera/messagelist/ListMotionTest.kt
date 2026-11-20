@@ -1,5 +1,6 @@
 package chat.vera.messagelist
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.view.View
 import android.view.ViewGroup
@@ -15,7 +16,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
-import android.animation.ValueAnimator
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], manifest = Config.NONE)
