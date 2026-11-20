@@ -678,9 +678,9 @@ aren't numbered yet (read one by one, as counting afresh does too). An
 ordinary push now costs one more function call (the saving mutation) and
 at most one small write.
 
-### 17. Clear Badge, and badges nothing could clear
+### 17. Mark All as Read, and badges nothing could clear
 
-Notification settings end with Clear Badge (after a confirmation): each
+Notification settings end with Mark All as Read (after a confirmation): each
 signed-in account's PDS marks read, through now, everything the badge
 counts (`clearBadge`: the Inbox's conversations alerting about every
 message, followed threads, every unseen Activity item), and the phone

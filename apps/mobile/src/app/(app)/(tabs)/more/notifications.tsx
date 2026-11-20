@@ -37,7 +37,7 @@ const DEFAULTS = [
 /**
  * Which kinds of notifications you get, or none at all, the words that
  * alert you (your name, your keywords), and what groups and channels
- * alert you about unless they say otherwise. At the bottom, Clear Badge,
+ * alert you about unless they say otherwise. At the bottom, Mark All as Read,
  * for a badge that counts something you can't find to read.
  */
 export default function NotificationSettingsScreen() {

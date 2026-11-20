@@ -91,8 +91,8 @@ export function useClearBadge() {
       const addresses = failed.filter((address) => address !== null);
       if (addresses.length === 0) return;
       Alert.alert(
-        "Couldn't Clear the Badge",
-        `The server for ${addresses.join(", ")} didn't clear it. Try again later.`,
+        "Couldn't Mark All as Read",
+        `The server for ${addresses.join(", ")} didn't. Try again later.`,
       );
     });
   };

@@ -5,26 +5,26 @@ import { DestructiveButton } from "~/components/destructive-button";
 import { useClearBadge } from "~/features/notifications/clear-badge";
 
 /**
- * Clears the app icon badge (see `useClearBadge`), at the bottom of the
- * notification settings, once you've confirmed it.
+ * Mark All as Read, at the bottom of the notification settings: clears
+ * the app icon badge (see `useClearBadge`) once you've confirmed it.
  */
 export function ClearBadgeSection() {
   const clearBadge = useClearBadge();
 
   function confirm() {
     Alert.alert(
-      "Clear the Badge?",
-      "Everything it counts is marked as read, on all your devices.",
+      "Mark All as Read?",
+      "Everything unread is marked as read, on all your devices.",
       [
         { style: "cancel", text: "Cancel" },
-        { onPress: clearBadge, style: "destructive", text: "Clear Badge" },
+        { onPress: clearBadge, style: "destructive", text: "Mark All as Read" },
       ],
     );
   }
 
   return (
     <FieldGroup.Section>
-      <DestructiveButton label="Clear Badge" onPress={confirm} />
+      <DestructiveButton label="Mark All as Read" onPress={confirm} />
     </FieldGroup.Section>
   );
 }
