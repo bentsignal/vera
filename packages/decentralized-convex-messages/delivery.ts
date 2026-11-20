@@ -36,10 +36,14 @@ function badgeKey(recipient: Recipient) {
   return `${recipient.accountId} ${appKey(recipient)}`;
 }
 
+/** Tries at building on the saved badge before counting afresh. */
+const BUILD_ON_TRIES = 2;
+
 /**
  * One account's badge for one kind of app. An app with a Home badge
  * builds on the count a push saved moments before (see badgeCache.ts),
- * or counts afresh and saves that.
+ * which is right only once it's saved; if another push saved first, it
+ * tries again, then counts afresh.
  */
 async function badgeOf(
   ctx: ActionCtx,
@@ -49,29 +53,21 @@ async function badgeOf(
   const args = {
     accountId,
     inbox: inbox === undefined ? undefined : [...inbox],
+    key: appKey({ inbox, threads }),
     threads: threads === true,
   };
-  if (args.inbox === undefined) {
-    return (await ctx.runQuery(internal.notifications.badge, args)).count;
+  for (let tries = 0; ; tries += 1) {
+    const found = await ctx.runQuery(internal.notifications.badge, {
+      ...args,
+      messageId: tries < BUILD_ON_TRIES ? messageId : undefined,
+    });
+    if (found.settle === null) return found.count;
+    const saved = await ctx.runMutation(internal.notifications.settledBadge, {
+      accountId,
+      settle: found.settle,
+    });
+    if (saved || found.settle.fresh) return found.count;
   }
-  const key = appKey(args);
-  const cached = await ctx.runMutation(internal.notifications.cachedBadge, {
-    accountId,
-    inbox: args.inbox,
-    key,
-    messageId,
-  });
-  if ("count" in cached) return cached.count;
-  const counted = await ctx.runQuery(internal.notifications.badge, args);
-  await ctx.runMutation(internal.notifications.savedBadge, {
-    ...cached,
-    accountId,
-    count: counted.count,
-    countedAt: counted.countedAt,
-    key,
-    rows: counted.rows,
-  });
-  return counted.count;
 }
 
 /**

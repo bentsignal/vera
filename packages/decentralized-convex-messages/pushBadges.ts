@@ -14,10 +14,12 @@ export function pushBadgeRow(ctx: QueryCtx, accountId: string) {
 }
 
 /**
- * Forgets the account's saved badge counts, and any being counted, after
- * it changed what they count (read something, saw it, answered an
- * invitation, changed what alerts it). Writes only while one could still
- * be used, so most changes read one document and write nothing.
+ * Forgets the account's saved badge counts after it changed what they
+ * count (read something, saw it, answered an invitation, changed what
+ * alerts it), so no push builds on them, and no count read before the
+ * change is saved. Writes only for a few seconds after a push to the
+ * account (`liveUntil`), so most changes read one document and write
+ * nothing.
  */
 export async function forgetBadge(ctx: MutationCtx, accountId: string) {
   const row = await pushBadgeRow(ctx, accountId);

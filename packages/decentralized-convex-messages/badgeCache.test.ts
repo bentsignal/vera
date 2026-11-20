@@ -4,7 +4,7 @@ import type { TestContext } from "node:test";
 
 import type { MutationCtx } from "./_generated/server.js";
 import type { InboxKind } from "./protocol.ts";
-import { BADGE_REUSE_MS, badgeFromCache, saveBadge } from "./badgeCache.ts";
+import { BADGE_REUSE_MS, badgeFor, settleBadge } from "./badgeCache.ts";
 import { busyAccount, FRIEND, ME, message, NOW } from "./badges.testing.ts";
 import { countBadge } from "./badges.ts";
 import { markRead } from "./conversations.ts";
@@ -19,25 +19,19 @@ async function fresh(ctx: MutationCtx) {
   return (await countBadge(ctx, ME, SHOWS, INBOX)).count;
 }
 
-/** A push's badge, the way `badgeCounts` gets it (see delivery.ts). */
+/** A push's badge, the way `badgeOf` gets it (see delivery.ts). */
 async function pushBadge(ctx: MutationCtx, messageId?: string) {
-  const cached = await badgeFromCache(ctx, {
-    accountId: ME,
-    inbox: INBOX,
-    key: KEY,
-    messageId,
-  });
-  if ("count" in cached) return cached.count;
-  const counted = await countBadge(ctx, ME, SHOWS, INBOX);
-  await saveBadge(ctx, {
-    ...cached,
-    accountId: ME,
-    count: counted.count,
-    countedAt: Date.now(),
-    key: KEY,
-    rows: counted.rows,
-  });
-  return counted.count;
+  for (let tries = 0; ; tries += 1) {
+    const found = await badgeFor(ctx, {
+      accountId: ME,
+      inbox: INBOX,
+      key: KEY,
+      messageId: tries < 2 ? messageId : undefined,
+      threads: true,
+    });
+    const saved = await settleBadge(ctx, ME, found.settle);
+    if (saved || found.settle.fresh) return found.count;
+  }
 }
 
 /** A push's badge, and how many documents getting it read. */
@@ -71,6 +65,18 @@ function at(t: TestContext) {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
 }
 
+/**
+ * Two pushes to the account: the first finds nothing saved and saves
+ * nothing (nothing forgot its changes before it), the second saves its
+ * count for the pushes after. Resolves to the second's badge.
+ */
+async function warm(t: TestContext, ctx: MutationCtx) {
+  t.mock.timers.tick(100);
+  await pushBadge(ctx, await sent(ctx, "group:9"));
+  t.mock.timers.tick(100);
+  return pushBadge(ctx, await sent(ctx, "group:9"));
+}
+
 void test("a burst's pushes read a few documents each, with the badge exact", async (t) => {
   at(t);
   const { ctx, documentsRead } = fakeCtx(busyAccount());
@@ -86,22 +92,26 @@ void test("a burst's pushes read a few documents each, with the badge exact", as
     assert.equal(badge, await fresh(ctx));
     counted.push(documentsRead() - beforeFresh);
   }
-  const [first = 0, ...rest] = perPush;
+  const [first = 0, second = 0, ...rest] = perPush;
   t.diagnostic(`counting afresh: ${counted.join(", ")} documents`);
-  t.diagnostic(`first push: ${first}; the next nine: ${rest.join(", ")}`);
-  // The first counts it (and reads the saved row); the rest build on it,
-  // reading its row again. Messages too new to be numbered yet are read
-  // one by one (see `unreadCount`), so that grows through the burst, as
-  // counting afresh does.
-  assert.ok(first > Math.min(...counted));
+  t.diagnostic(
+    `pushes: ${first}, ${second}, then ${rest.join(", ")} documents`,
+  );
+  // The first two count it (the second saves it); the rest build on it.
+  // Messages too new to be numbered yet are read one by one (see
+  // `unreadCount`), so that grows through the burst, as counting afresh
+  // does.
+  assert.ok(first >= Math.min(...counted));
+  assert.ok(second >= Math.min(...counted));
   rest.forEach((reads, index) => {
-    assert.ok(reads <= 8 + index, `${reads} documents`);
+    assert.ok(reads <= 10 + index, `${reads} documents`);
   });
 });
 
 void test("pushes out of order count their message once", async (t) => {
   at(t);
   const { ctx } = fakeCtx(busyAccount());
+  await warm(t, ctx);
   t.mock.timers.tick(100);
   const first = await sent(ctx, "group:9");
   t.mock.timers.tick(100);
@@ -122,8 +132,7 @@ void test("pushes out of order count their message once", async (t) => {
 void test("reading between pushes counts afresh", async (t) => {
   at(t);
   const { ctx, documentsRead } = fakeCtx(busyAccount());
-  t.mock.timers.tick(100);
-  const badge = await pushBadge(ctx, await sent(ctx, "group:9"));
+  const badge = await warm(t, ctx);
   t.mock.timers.tick(100);
   // Read somewhere else: the next push in the window mustn't keep it.
   await read(ctx, "direct:0");
@@ -139,26 +148,43 @@ void test("reading between pushes counts afresh", async (t) => {
 void test("a read while a count is under way keeps it from being saved", async (t) => {
   at(t);
   const { ctx, documentsRead } = fakeCtx(busyAccount());
-  t.mock.timers.tick(100);
+  await warm(t, ctx);
+  // Past the window, so the next push counts afresh.
+  t.mock.timers.tick(BADGE_REUSE_MS);
   const messageId = await sent(ctx, "group:9");
-  const cached = await badgeFromCache(ctx, {
+  const found = await badgeFor(ctx, {
     accountId: ME,
     inbox: INBOX,
     key: KEY,
     messageId,
+    threads: true,
   });
-  assert.ok("version" in cached);
-  const counted = await countBadge(ctx, ME, SHOWS, INBOX);
+  assert.ok(found.settle.fresh && found.settle.live);
   // Read after the count read everything, before it's saved.
   await read(ctx, "direct:0");
-  await saveBadge(ctx, {
-    ...cached,
+  assert.equal(await settleBadge(ctx, ME, found.settle), false);
+  t.mock.timers.tick(100);
+  const next = await sent(ctx, "group:9");
+  const pushed = await measured(ctx, documentsRead, next);
+  assert.equal(pushed.badge, await fresh(ctx));
+  assert.ok(pushed.documents > 50, "counted afresh");
+});
+
+void test("a count from before anything was saved isn't saved", async (t) => {
+  at(t);
+  const { ctx, documentsRead } = fakeCtx(busyAccount());
+  t.mock.timers.tick(100);
+  const found = await badgeFor(ctx, {
     accountId: ME,
-    count: counted.count,
-    countedAt: Date.now(),
+    inbox: INBOX,
     key: KEY,
-    rows: counted.rows,
+    messageId: await sent(ctx, "group:9"),
+    threads: true,
   });
+  assert.ok(!found.settle.live);
+  // Nothing was saved, so this read forgets nothing.
+  await read(ctx, "direct:0");
+  assert.equal(await settleBadge(ctx, ME, found.settle), false);
   t.mock.timers.tick(100);
   const next = await sent(ctx, "group:9");
   const pushed = await measured(ctx, documentsRead, next);
@@ -169,8 +195,7 @@ void test("a read while a count is under way keeps it from being saved", async (
 void test("after the window, the next push counts afresh", async (t) => {
   at(t);
   const { ctx, documentsRead } = fakeCtx(busyAccount());
-  t.mock.timers.tick(100);
-  await pushBadge(ctx, await sent(ctx, "group:9"));
+  await warm(t, ctx);
   t.mock.timers.tick(BADGE_REUSE_MS);
   const next = await sent(ctx, "group:9");
   const pushed = await measured(ctx, documentsRead, next);
@@ -181,8 +206,7 @@ void test("after the window, the next push counts afresh", async (t) => {
 void test("what a message can't be told to change counts afresh", async (t) => {
   at(t);
   const { ctx, documentsRead } = fakeCtx(busyAccount());
-  t.mock.timers.tick(100);
-  await pushBadge(ctx, await sent(ctx, "group:9"));
+  await warm(t, ctx);
   const cases: [string, Record<string, unknown>][] = [
     // A mention at Mentions: Activity counts it, not its row.
     ["group:3", { mentions: [{ accountId: ME, name: "Me" }] }],
@@ -208,14 +232,13 @@ void test("what a message can't be told to change counts afresh", async (t) => {
   const plain = await sent(ctx, "channel:space:a:1");
   const pushed = await measured(ctx, documentsRead, plain);
   assert.equal(pushed.badge, await fresh(ctx));
-  assert.ok(pushed.documents <= 12, `built on: ${pushed.documents}`);
+  assert.ok(pushed.documents <= 14, `built on: ${pushed.documents}`);
 });
 
 void test("a push about something else counts afresh and saves it", async (t) => {
   at(t);
   const { ctx, documentsRead } = fakeCtx(busyAccount());
-  t.mock.timers.tick(100);
-  await pushBadge(ctx, await sent(ctx, "group:9"));
+  await warm(t, ctx);
   // A reaction to your message: its push has no message to build on.
   t.mock.timers.tick(100);
   await ctx.db.insert("reactions", {
@@ -231,5 +254,5 @@ void test("a push about something else counts afresh and saves it", async (t) =>
   const next = await sent(ctx, "direct:0");
   const pushed = await measured(ctx, documentsRead, next);
   assert.equal(pushed.badge, await fresh(ctx));
-  assert.ok(pushed.documents <= 12, `built on: ${pushed.documents}`);
+  assert.ok(pushed.documents <= 14, `built on: ${pushed.documents}`);
 });

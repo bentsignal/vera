@@ -1,11 +1,10 @@
 import type { Doc } from "./_generated/dataModel.js";
-import type { MutationCtx } from "./_generated/server.js";
-import type { RowCount } from "./badges.ts";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { ConversationAccess } from "./model.ts";
 import type { InboxKind } from "./protocol.ts";
 import type { AccountSettings } from "./settings.ts";
 import { mentionedBy } from "./alerts.ts";
-import { countsRow, rowCount } from "./badges.ts";
+import { countBadge, countsRow, rowCount } from "./badges.ts";
 import { findAccess } from "./model.ts";
 import { pushBadgeRow } from "./pushBadges.ts";
 import { notificationSettings } from "./settings.ts";
@@ -29,17 +28,23 @@ import { notificationSettings } from "./settings.ts";
 //   what others change elsewhere without a push (a deleted message, say)
 //   is missed at most that long, and the next push after counts afresh.
 //
-// Every write moves `version`, and a count is saved only if nothing was
-// written since it started (`saveBadge`), so a count read before a change
-// never replaces what came after.
+// The reading is a query (`badgeFor`), so it never conflicts with the
+// sends it reads; a small mutation then saves what it found
+// (`settleBadge`), only if the saved row is the version the query read.
+// Every write moves `version`, so a count read before a change never
+// replaces what came after. The account's changes write only for
+// `LIVE_MS` after a push (`liveUntil`), so a push to an account that
+// had none just before counts afresh without saving (a change made while
+// it counted wouldn't have moved `version`), and the next push's count
+// is saved.
 
 /** How long pushes build on a counted badge before counting it again. */
 export const BADGE_REUSE_MS = 2000;
-/** How long a count may take to be saved once started. */
-const COUNTING_MS = 30_000;
+/** How long after a push the account's changes are forgotten. */
+const LIVE_MS = 10_000;
 /**
- * Slack between one mutation's clock and another's: a change this soon
- * after a count stops being usable still forgets it.
+ * Slack between one function's clock and another's: a count is saved
+ * only this long before the account's changes stop being forgotten.
  */
 const CLOCK_SLACK_MS = 5000;
 
@@ -91,7 +96,7 @@ function countedNow(
  * exactly: the message's row counted again, the rest as saved.
  */
 async function recount(
-  ctx: MutationCtx,
+  ctx: QueryCtx,
   badge: BadgeFor,
   saved: Saved,
   messageId: string,
@@ -120,98 +125,106 @@ async function recount(
   };
 }
 
-/** Until when saved counts can be built on (see `CLOCK_SLACK_MS`). */
-function usableUntil(counts: readonly Saved[]) {
-  return Math.max(
-    0,
-    ...counts.map(
-      ({ countedAt }) => countedAt + BADGE_REUSE_MS + CLOCK_SLACK_MS,
-    ),
-  );
+/** What `badgeFor` found, for `settleBadge`. */
+export interface Settle {
+  readonly entry: Saved;
+  /** Counted afresh, rather than built on the saved count. */
+  readonly fresh: boolean;
+  /** Whether the account's changes were being forgotten when it read. */
+  readonly live: boolean;
+  /** The saved row's version it read; null when there was none. */
+  readonly version: number | null;
 }
 
 /**
- * A push's badge built on the one saved moments before (see above), or
- * when it can't be, what to save a fresh count with (`saveBadge`). Without
- * `messageId` (a push about anything else), always the latter.
+ * A push's badge, built on the one saved moments before when it can be
+ * (see above), otherwise counted afresh; and what to settle it with.
+ * Without `messageId` (a push about anything else), always afresh.
  */
-export async function badgeFromCache(
-  ctx: MutationCtx,
-  badge: BadgeFor & { messageId?: string },
-): Promise<{ count: number } | { since: number; version: number }> {
+export async function badgeFor(
+  ctx: QueryCtx,
+  badge: BadgeFor & { messageId?: string; threads: boolean },
+): Promise<{ count: number; settle: Settle }> {
   const now = Date.now();
   const row = await pushBadgeRow(ctx, badge.accountId);
+  const version = row?.version ?? null;
   const saved = row?.counts.find(({ key }) => key === badge.key);
   if (
-    row !== null &&
     saved !== undefined &&
     badge.messageId !== undefined &&
     now - saved.countedAt < BADGE_REUSE_MS
   ) {
-    const updated = await recount(ctx, badge, saved, badge.messageId);
-    if (updated !== null) {
-      const counts = row.counts.map((each) =>
-        each === saved ? updated : each,
-      );
-      await ctx.db.patch(row._id, {
-        counts,
-        liveUntil: usableUntil(counts),
-        version: row.version + 1,
-      });
-      return { count: updated.count };
+    const entry = await recount(ctx, badge, saved, badge.messageId);
+    if (entry !== null) {
+      const settle = { entry, fresh: false, live: true, version };
+      return { count: entry.count, settle };
     }
   }
-  // Counted afresh: until it's saved, the account's changes must move
-  // `version`, so one made meanwhile keeps it from being saved.
-  const liveUntil = now + COUNTING_MS + CLOCK_SLACK_MS;
-  if (row === null) {
-    await ctx.db.insert("pushBadges", {
-      accountId: badge.accountId,
-      counts: [],
-      liveUntil,
-      version: 0,
-    });
-    return { since: now, version: 0 };
-  }
-  if (row.liveUntil < liveUntil) await ctx.db.patch(row._id, { liveUntil });
-  return { since: now, version: row.version };
+  const counted = await countBadge(
+    ctx,
+    badge.accountId,
+    { mentions: true, threads: badge.threads },
+    badge.inbox,
+  );
+  const entry = {
+    count: counted.count,
+    countedAt: now,
+    key: badge.key,
+    rows: counted.rows,
+  };
+  // Live long enough for `settleBadge` to save it.
+  const live = row !== null && row.liveUntil > now + CLOCK_SLACK_MS;
+  return {
+    count: counted.count,
+    settle: { entry, fresh: true, live, version },
+  };
 }
 
 /**
- * Saves a fresh count for the pushes after it, unless anything was
- * written since it started (`version`), or it took too long.
+ * Saves what `badgeFor` found for the pushes after it, unless the saved
+ * row changed since it read it, and forgets the account's changes for
+ * `LIVE_MS` from now. A badge built on the saved count is right only if
+ * this saves it (true); one counted afresh is right either way.
  */
-export async function saveBadge(
+export async function settleBadge(
   ctx: MutationCtx,
-  args: Omit<BadgeFor, "inbox"> & {
-    count: number;
-    countedAt: number;
-    rows: readonly RowCount[];
-    since: number;
-    version: number;
-  },
+  accountId: string,
+  { entry, fresh, live, version }: Settle,
 ) {
-  const row = await pushBadgeRow(ctx, args.accountId);
-  if (row?.version !== args.version) return;
-  if (Date.now() > args.since + COUNTING_MS) return;
-  const fresh: Saved = {
-    count: args.count,
-    countedAt: args.countedAt,
-    key: args.key,
-    rows: [...args.rows],
-  };
-  // Every other count being counted started before this write, so none
-  // will be saved now: only the saved counts need to stay forgettable.
-  const counts = [
-    ...row.counts.filter(
-      ({ countedAt, key }) =>
-        key !== args.key && Date.now() - countedAt < BADGE_REUSE_MS,
-    ),
-    fresh,
-  ];
+  const now = Date.now();
+  const row = await pushBadgeRow(ctx, accountId);
+  const liveUntil = now + LIVE_MS;
+  // Only while the account's changes were being forgotten from when the
+  // query read until now (with slack for clocks) did each change since
+  // move `version`.
+  const unchanged =
+    live &&
+    row !== null &&
+    row.version === version &&
+    now <= row.liveUntil - CLOCK_SLACK_MS;
+  if (!unchanged) {
+    if (row === null) {
+      await ctx.db.insert("pushBadges", {
+        accountId,
+        counts: [],
+        liveUntil,
+        version: 0,
+      });
+    } else if (fresh && row.liveUntil < liveUntil) {
+      await ctx.db.patch(row._id, { liveUntil });
+    }
+    return false;
+  }
   await ctx.db.patch(row._id, {
-    counts,
-    liveUntil: usableUntil(counts),
+    counts: [
+      ...row.counts.filter(
+        ({ countedAt, key }) =>
+          key !== entry.key && now - countedAt < BADGE_REUSE_MS,
+      ),
+      entry,
+    ],
+    liveUntil: Math.max(row.liveUntil, liveUntil),
     version: row.version + 1,
   });
+  return true;
 }
