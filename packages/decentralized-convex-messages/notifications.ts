@@ -7,7 +7,8 @@ import {
   internalMutation,
   internalQuery,
 } from "./_generated/server.js";
-import { badgeCount } from "./badges.ts";
+import { badgeFromCache, saveBadge } from "./badgeCache.ts";
+import { countBadge } from "./badges.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
 import { listeners } from "./listeners.ts";
 import { noteWordsSaid, saysWord, wordCandidates } from "./mentions.ts";
@@ -120,8 +121,9 @@ function replyBody(reply: ReplyPush, body: string) {
 }
 
 /**
- * The account's app icon badge (see `badgeCount`), read in its own query so
+ * The account's app icon badge (see `countBadge`), read in its own query so
  * a push to a large space doesn't count every member in one transaction.
+ * With what each row Home counts added, and when, for `saveBadge`.
  */
 export const badge = internalQuery({
   args: {
@@ -129,13 +131,40 @@ export const badge = internalQuery({
     inbox: v.optional(v.array(inboxKind)),
     threads: v.optional(v.boolean()),
   },
-  handler: (ctx, { accountId, inbox, threads }) =>
-    badgeCount(
+  handler: async (ctx, { accountId, inbox, threads }) => ({
+    ...(await countBadge(
       ctx,
       accountId,
       { mentions: true, threads: threads === true },
       inbox,
-    ),
+    )),
+    countedAt: Date.now(),
+  }),
+});
+
+/** A push's badge from the one saved before it (see badgeCache.ts). */
+export const cachedBadge = internalMutation({
+  args: {
+    accountId: v.string(),
+    inbox: v.array(inboxKind),
+    key: v.string(),
+    messageId: v.optional(v.string()),
+  },
+  handler: (ctx, args) => badgeFromCache(ctx, args),
+});
+
+/** Saves a fresh count for the pushes right after (see `saveBadge`). */
+export const savedBadge = internalMutation({
+  args: {
+    accountId: v.string(),
+    count: v.number(),
+    countedAt: v.number(),
+    key: v.string(),
+    rows: v.array(v.object({ conversationId: v.string(), count: v.number() })),
+    since: v.number(),
+    version: v.number(),
+  },
+  handler: (ctx, args) => saveBadge(ctx, args),
 });
 
 /** Who to tell about new space invitations, and the space's name. */
@@ -197,7 +226,7 @@ export const send = internalAction({
     if (recipients.length === 0) return;
     const [sender, badges, memberNames] = await Promise.all([
       accountProfile(target.senderId),
-      badgeCounts(ctx, recipients),
+      badgeCounts(ctx, recipients, messageId),
       displayNames([...(target.unnamedGroupMembers ?? [])].sort()),
     ]);
     const senderName = sender?.displayName ?? target.senderName;

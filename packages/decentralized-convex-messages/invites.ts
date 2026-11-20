@@ -16,6 +16,7 @@ import {
   pendingInvites,
 } from "./model.ts";
 import { MAX_INVITE_LINK_LIFETIME } from "./protocol.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { requireSpaceRole } from "./spaces.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
@@ -104,6 +105,7 @@ export async function acceptSpaceInvite(
   self: string,
   args: Args<"acceptSpaceInvite">,
 ) {
+  await forgetBadge(ctx, self);
   const invite = await getInvite(ctx, args.spaceId, self);
   if (invite === null || (await getSpace(ctx, args.spaceId)) === null) {
     fail("SPACE_INVITE_NOT_FOUND");
@@ -117,6 +119,7 @@ export async function declineSpaceInvite(
   self: string,
   args: Args<"declineSpaceInvite">,
 ) {
+  await forgetBadge(ctx, self);
   const invite = await getInvite(ctx, args.spaceId, self);
   if (invite !== null) await ctx.db.delete(invite._id);
   return null;
@@ -283,6 +286,7 @@ export async function joinSpaceWithLink(
   self: string,
   args: Args<"joinSpaceWithLink">,
 ) {
+  await forgetBadge(ctx, self);
   const link = await getLink(ctx, args.code);
   if (link === null || (await getSpace(ctx, link.spaceId)) === null) {
     fail("SPACE_INVITE_LINK_NOT_FOUND");

@@ -26,35 +26,76 @@ export function recipientOf(row: Doc<"pushTokens">) {
   };
 }
 
-function badgeKey({ accountId, inbox, threads }: Recipient) {
+/** The kind of app a badge is counted for. */
+function appKey({ inbox, threads }: Omit<Recipient, "accountId">) {
   const home = inbox === undefined ? "" : inbox.join(",");
-  return `${accountId} ${threads === true ? "threads" : ""} ${home}`;
+  return `${threads === true ? "threads" : ""} ${home}`;
+}
+
+function badgeKey(recipient: Recipient) {
+  return `${recipient.accountId} ${appKey(recipient)}`;
+}
+
+/**
+ * One account's badge for one kind of app. An app with a Home badge
+ * builds on the count a push saved moments before (see badgeCache.ts),
+ * or counts afresh and saves that.
+ */
+async function badgeOf(
+  ctx: ActionCtx,
+  { accountId, inbox, threads }: Recipient,
+  messageId: string | undefined,
+) {
+  const args = {
+    accountId,
+    inbox: inbox === undefined ? undefined : [...inbox],
+    threads: threads === true,
+  };
+  if (args.inbox === undefined) {
+    return (await ctx.runQuery(internal.notifications.badge, args)).count;
+  }
+  const key = appKey(args);
+  const cached = await ctx.runMutation(internal.notifications.cachedBadge, {
+    accountId,
+    inbox: args.inbox,
+    key,
+    messageId,
+  });
+  if ("count" in cached) return cached.count;
+  const counted = await ctx.runQuery(internal.notifications.badge, args);
+  await ctx.runMutation(internal.notifications.savedBadge, {
+    ...cached,
+    accountId,
+    count: counted.count,
+    countedAt: counted.countedAt,
+    key,
+    rows: counted.rows,
+  });
+  return counted.count;
 }
 
 /**
  * Each recipient's badge, counting threads only for apps that show them,
- * and Home only for apps that badge it. A failed count leaves that push
- * without a badge rather than holding up the notification.
+ * and Home only for apps that badge it. `messageId` is the message a push
+ * is about, if it's about one. A failed count leaves that push without a
+ * badge rather than holding up the notification.
  */
 export async function badgeCounts(
   ctx: ActionCtx,
   recipients: readonly Recipient[],
+  messageId?: string,
 ) {
   const unique = new Map(
     recipients.map((recipient) => [badgeKey(recipient), recipient]),
   );
   const counts = await Promise.all(
-    [...unique].map(async ([key, { accountId, inbox, threads }]) => {
-      const count = await ctx
-        .runQuery(internal.notifications.badge, {
-          accountId,
-          inbox: inbox === undefined ? undefined : [...inbox],
-          threads: threads === true,
-        })
-        .catch((error: unknown) => {
+    [...unique].map(async ([key, recipient]) => {
+      const count = await badgeOf(ctx, recipient, messageId).catch(
+        (error: unknown) => {
           console.error("Badge count failed", error);
           return undefined;
-        });
+        },
+      );
       return [key, count] as const;
     }),
   );

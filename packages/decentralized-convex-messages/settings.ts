@@ -9,6 +9,7 @@ import type {
 } from "./protocol.ts";
 import { fail } from "./model.ts";
 import { MAX_KEYWORD_LENGTH, MAX_KEYWORDS } from "./protocol.ts";
+import { forgetBadge } from "./pushBadges.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
 type Args<Operation extends keyof Mutations> = OperationArgs<
@@ -113,6 +114,7 @@ export async function setNotificationSettings(
   self: string,
   args: Args<"setNotificationSettings">,
 ) {
+  await forgetBadge(ctx, self);
   const { channelAlerts, channels, groupAlerts, groups, keywords, ...kinds } =
     args;
   const patch: Partial<Doc<"notificationSettings">> = { ...kinds };

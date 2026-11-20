@@ -1,6 +1,8 @@
 import type { QueryCtx } from "./_generated/server.js";
 import type { ActivityOptions } from "./activity.ts";
+import type { ConversationAccess } from "./model.ts";
 import type { ActivityItem, InboxKind } from "./protocol.ts";
+import type { AccountSettings } from "./settings.ts";
 import { activity, isUnseen } from "./activity.ts";
 import { alertsFor } from "./alerts.ts";
 import { hasUnread, unreadCount } from "./chatMessages.ts";
@@ -10,15 +12,51 @@ import { readPosition } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
 import { unreadThreadCount } from "./threadLists.ts";
 
+/** What Home counts of one Inbox row. */
+export interface RowCount {
+  readonly conversationId: string;
+  readonly count: number;
+}
+
+/**
+ * Whether Home counts a conversation the Inbox lists with these kinds:
+ * one that alerts about its every message. One at `mentions` or muted
+ * keeps its unread dot without counting, and its mentions and replies to
+ * you count in activity instead.
+ */
+export function countsRow(
+  access: ConversationAccess,
+  settings: AccountSettings,
+  kinds: readonly InboxKind[],
+) {
+  const kind = access.conversation.kind === "channel" ? "channels" : "chats";
+  return kinds.includes(kind) && alertsFor(access, settings) === "all";
+}
+
+/**
+ * What a row Home counts adds to it: a direct message's or group's every
+ * unread message, a channel's 1 if anything in it is unread.
+ */
+export async function rowCount(
+  ctx: QueryCtx,
+  access: ConversationAccess,
+  accountId: string,
+) {
+  const { conversationId, kind } = access.conversation;
+  const readAt = await readPosition(ctx, access, accountId);
+  if (kind !== "channel") {
+    return unreadCount(ctx, conversationId, accountId, readAt);
+  }
+  return (await hasUnread(ctx, conversationId, accountId, readAt)) ? 1 : 0;
+}
+
 /**
  * Home's part of the badge, counted the way the app counts its Home
  * tab's: every unread message in the direct messages and groups (`chats`)
  * the Inbox lists, one for each channel with anything unread, and (with
- * `threads`) one for each thread you're in with unread replies. Only
- * conversations that alert about every message count; one at `mentions`
- * or muted keeps its unread dot without counting, and its mentions and
- * replies to you count in activity instead. `counted` are the chats
- * counted message by message.
+ * `threads`) one for each thread you're in with unread replies. Only the
+ * rows `countsRow` says count; `rows` is what each of those adds.
+ * `counted` are the chats counted message by message.
  */
 async function homeCount(
   ctx: QueryCtx,
@@ -28,25 +66,9 @@ async function homeCount(
   const settings = await notificationSettings(ctx, accountId);
   const listed = (
     await inboxAccess(ctx, accountId, kinds.includes("channels"))
-  ).filter(
-    (access) =>
-      kinds.includes(
-        access.conversation.kind === "channel" ? "channels" : "chats",
-      ) && alertsFor(access, settings) === "all",
-  );
+  ).filter((access) => countsRow(access, settings, kinds));
   const [unread, threads] = await Promise.all([
-    Promise.all(
-      listed.map(async (access) => {
-        const { conversationId, kind } = access.conversation;
-        const readAt = await readPosition(ctx, access, accountId);
-        if (kind !== "channel") {
-          return unreadCount(ctx, conversationId, accountId, readAt);
-        }
-        return (await hasUnread(ctx, conversationId, accountId, readAt))
-          ? 1
-          : 0;
-      }),
-    ),
+    Promise.all(listed.map((access) => rowCount(ctx, access, accountId))),
     kinds.includes("threads") ? unreadThreadCount(ctx, accountId) : 0,
   ]);
   return {
@@ -55,6 +77,12 @@ async function homeCount(
       listed
         .filter(({ conversation }) => conversation.kind !== "channel")
         .map(({ conversation }) => conversation.conversationId),
+    ),
+    rows: listed.map(
+      ({ conversation }, index): RowCount => ({
+        conversationId: conversation.conversationId,
+        count: unread[index] ?? 0,
+      }),
     ),
   };
 }
@@ -88,7 +116,7 @@ function countsOnItsOwn(item: ActivityItem, counted: ReadonlySet<string>) {
  * carries only its own account's count. A device signed into several
  * accounts shows the sum once the app is open.
  */
-export async function badgeCount(
+export async function countBadge(
   ctx: QueryCtx,
   accountId: string,
   /** What the app shows (older ones can't clear the items they don't). */
@@ -107,11 +135,25 @@ export async function badgeCount(
     ),
     pendingInvites(ctx, accountId),
     inbox === undefined
-      ? { count: 0, counted: new Set<string>() }
+      ? { count: 0, counted: new Set<string>(), rows: [] }
       : homeCount(ctx, accountId, inbox),
   ]);
   const unseen = items.filter(
     (item) => isUnseen(item) && countsOnItsOwn(item, home.counted),
   );
-  return unseen.length + invites.length + home.count;
+  return {
+    count: unseen.length + invites.length + home.count,
+    /** What each row Home counts adds (none without `inbox`). */
+    rows: home.rows,
+  };
+}
+
+/** The app icon badge for one account (see `countBadge`). */
+export async function badgeCount(
+  ctx: QueryCtx,
+  accountId: string,
+  shows: ActivityOptions,
+  inbox?: readonly InboxKind[],
+) {
+  return (await countBadge(ctx, accountId, shows, inbox)).count;
 }

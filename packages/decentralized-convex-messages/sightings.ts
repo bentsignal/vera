@@ -8,6 +8,7 @@ import {
   ACTIVITY_SEEN_LIFETIME,
   MAX_ACTIVITY_SIGHTINGS,
 } from "./protocol.ts";
+import { forgetBadge } from "./pushBadges.ts";
 
 // Recording that activity items were seen: on screen in an activity view
 // (`markActivitySeen`), or by reading their conversation.
@@ -95,6 +96,7 @@ export async function markActivitySeen(
   self: string,
   args: Args,
 ) {
+  await forgetBadge(ctx, self);
   if (args.items.length > MAX_ACTIVITY_SIGHTINGS) fail("TOO_MANY_ITEMS");
   const now = Date.now();
   for (const { key, through } of args.items) {
