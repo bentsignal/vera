@@ -16,7 +16,11 @@ void test("clearing the badge leaves only pending invitations, for every app", a
   const account = busyAccount();
   const { ctx } = fakeCtx({
     ...account,
-    spaceInvites: [{ accountId: ME, invitedBy: FRIEND, spaceId: "space:a" }],
+    spaceInvites: [{ accountId: ME, invitedBy: FRIEND, spaceId: "space:c" }],
+    spaces: [
+      ...account.spaces,
+      { createdBy: FRIEND, name: "Not yours", spaceId: "space:c" },
+    ],
   });
   const apps = [
     () => badgeCount(ctx, ME, SHOWS, ["chats", "channels", "threads"]),

@@ -7,7 +7,7 @@ import { activity, isUnseen } from "./activity.ts";
 import { alertsFor } from "./alerts.ts";
 import { hasUnread, unreadCount } from "./chatMessages.ts";
 import { inboxAccess } from "./inbox.ts";
-import { pendingInvites } from "./model.ts";
+import { pendingInvites } from "./pendingInvites.ts";
 import { readPosition } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
 import { unreadThreadCount } from "./threadLists.ts";

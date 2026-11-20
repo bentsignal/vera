@@ -40,6 +40,7 @@ import type * as naming from "../naming.js";
 import type * as notifications from "../notifications.js";
 import type * as opengraph from "../opengraph.js";
 import type * as paging from "../paging.js";
+import type * as pendingInvites from "../pendingInvites.js";
 import type * as personalActivity from "../personalActivity.js";
 import type * as previews from "../previews.js";
 import type * as protocol from "../protocol.js";
@@ -104,6 +105,7 @@ const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   opengraph: typeof opengraph;
   paging: typeof paging;
+  pendingInvites: typeof pendingInvites;
   personalActivity: typeof personalActivity;
   previews: typeof previews;
   protocol: typeof protocol;

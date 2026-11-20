@@ -8,13 +8,8 @@ import type {
   SpaceInviteLink,
 } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
-import {
-  fail,
-  getSpace,
-  getSpaceMember,
-  normalizeMembers,
-  pendingInvites,
-} from "./model.ts";
+import { fail, getSpace, getSpaceMember, normalizeMembers } from "./model.ts";
+import { pendingInvites } from "./pendingInvites.ts";
 import { MAX_INVITE_LINK_LIFETIME } from "./protocol.ts";
 import { forgetBadge } from "./pushBadges.ts";
 import { requireSpaceRole } from "./spaces.ts";

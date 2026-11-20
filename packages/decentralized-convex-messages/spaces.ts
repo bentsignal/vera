@@ -18,6 +18,7 @@ import {
   normalizeName,
 } from "./model.ts";
 import { channelName } from "./naming.ts";
+import { clearInvite } from "./pendingInvites.ts";
 import { forgetBadge } from "./pushBadges.ts";
 import { readAt } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
@@ -105,13 +106,7 @@ export async function addSpaceMembers(
       });
     }
     // In the space, they've nothing left to answer.
-    const invite = await ctx.db
-      .query("spaceInvites")
-      .withIndex("by_space_account", (index) =>
-        index.eq("spaceId", args.spaceId).eq("accountId", accountId),
-      )
-      .unique();
-    if (invite !== null) await ctx.db.delete(invite._id);
+    await clearInvite(ctx, args.spaceId, accountId);
   }
   return null;
 }

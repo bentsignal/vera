@@ -124,28 +124,6 @@ export function getMember(
     .unique();
 }
 
-/**
- * The account's invitations to spaces that still exist, with the space.
- * One to a space it's in already (added by a member after being invited)
- * isn't pending: there's nothing to answer, and it would count on the
- * badge for good.
- */
-export async function pendingInvites(ctx: QueryCtx, accountId: string) {
-  const invites = await ctx.db
-    .query("spaceInvites")
-    .withIndex("by_account", (index) => index.eq("accountId", accountId))
-    .collect();
-  const pending = [];
-  for (const invite of invites) {
-    const [space, member] = await Promise.all([
-      getSpace(ctx, invite.spaceId),
-      getSpaceMember(ctx, invite.spaceId, accountId),
-    ]);
-    if (space !== null && member === null) pending.push({ invite, space });
-  }
-  return pending;
-}
-
 export interface ConversationAccess {
   /** The caller's own choice of alerts for it, if they made one. */
   readonly alerts: AlertLevel | undefined;
