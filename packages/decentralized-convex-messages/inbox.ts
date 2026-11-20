@@ -12,6 +12,7 @@ import {
   toConversation,
   upsertMember,
 } from "./model.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { notificationSettings } from "./settings.ts";
 import { spaceReads } from "./spaceReads.ts";
 
@@ -39,6 +40,7 @@ export async function setShowInInbox(
   self: string,
   args: Args<"setShowInInbox">,
 ) {
+  await forgetBadge(ctx, self);
   const access = await requireAccess(ctx, args.conversationId, self);
   if (access.conversation.kind !== "channel") fail("CHANNEL_REQUIRED");
   await upsertMember(ctx, access, self, {

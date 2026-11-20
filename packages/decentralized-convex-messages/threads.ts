@@ -10,6 +10,7 @@ import {
   MAX_REPLIERS,
   MAX_SINCE_RESULTS,
 } from "./protocol.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { recordSighting, seeMentions, threadKey } from "./sightings.ts";
 
 // Replies and threads. A reply is a message with `threadId`, the ID of its
@@ -284,6 +285,7 @@ export async function markThreadRead(
   self: string,
   args: Args<"markThreadRead">,
 ) {
+  await forgetBadge(ctx, self);
   await requireAccess(ctx, args.conversationId, self);
   const readAt = Math.min(args.readAt, Date.now());
   const member = await threadMember(ctx, args.threadId, self);
@@ -306,6 +308,7 @@ export async function setThreadFollowed(
   self: string,
   args: Args<"setThreadFollowed">,
 ) {
+  await forgetBadge(ctx, self);
   await requireAccess(ctx, args.conversationId, self);
   const member = await threadMember(ctx, args.threadId, self);
   if (member !== null) {

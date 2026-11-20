@@ -10,7 +10,7 @@ import { pds } from "@vera/backend/pds";
 
 import { fieldOf } from "~/features/saved/fields";
 import { liveSelected } from "~/features/saved/saved-cache";
-import { pdsResult, pdsResultOr } from "./results";
+import { pdsResultOr } from "./results";
 
 // An account's Inbox as two kinds of query: its list (which conversations,
 // `inboxConversations`), which changes only when the list does, and a row
@@ -34,7 +34,15 @@ export function inboxListQuery(session: string) {
 export function inboxRowQuery(session: string, conversationId: string) {
   return pdsQuery({
     args: { conversationId },
-    options: { select: (result) => pdsResult(result)?.[0] },
+    // A row its PDS failed to answer is left out rather than waited for:
+    // the Inbox's list waits only for its first load, but its badge waits
+    // for every row (see `InboxSnapshot.complete`).
+    options: {
+      select: (result) => {
+        const found = pdsResultOr(result, null);
+        return found === null ? null : found?.[0];
+      },
+    },
     query: pds.messages.conversation,
     session,
   });

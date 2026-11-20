@@ -21,6 +21,7 @@ import {
 } from "./model.ts";
 import { directConversationId } from "./naming.ts";
 import { around, pageOf } from "./paging.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { markReadUpTo } from "./readStates.ts";
 import { numberIfUnnumbered } from "./sequences.ts";
 import { notificationSettings } from "./settings.ts";
@@ -152,6 +153,7 @@ export async function leaveConversation(
   self: string,
   args: Args<"leaveConversation">,
 ) {
+  await forgetBadge(ctx, self);
   const { member } = await requireGroup(ctx, args.conversationId, self);
   if (member !== null) {
     await ctx.db.delete(member._id);
@@ -199,6 +201,7 @@ export async function markRead(
   self: string,
   args: Args<"markRead">,
 ) {
+  await forgetBadge(ctx, self);
   const access = await requireAccess(ctx, args.conversationId, self);
   const readAt = Math.min(args.readAt, Date.now());
   await markReadUpTo(ctx, access, self, readAt);

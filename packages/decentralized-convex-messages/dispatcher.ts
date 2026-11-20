@@ -7,6 +7,7 @@ import {
 import { mutation, query } from "./_generated/server.js";
 import * as activity from "./activity.ts";
 import * as alerts from "./alerts.ts";
+import { clearBadge } from "./badgeClear.ts";
 import * as conversations from "./conversations.ts";
 import * as editing from "./editing.ts";
 import * as inbox from "./inbox.ts";
@@ -45,6 +46,8 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           conversations.addGroupMembers(ctx, requireAccountId(identity), args),
         addSpaceMembers: (ctx, { args, identity }) =>
           spaces.addSpaceMembers(ctx, requireAccountId(identity), args),
+        clearBadge: (ctx, { identity }) =>
+          clearBadge(ctx, requireAccountId(identity)),
         createChannel: (ctx, { args, identity }) =>
           spaces.createChannel(ctx, requireAccountId(identity), args),
         createGroup: (ctx, { args, identity }) =>

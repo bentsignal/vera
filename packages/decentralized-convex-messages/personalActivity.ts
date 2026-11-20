@@ -119,12 +119,14 @@ async function mentionItems(ctx: QueryCtx, scope: Scope) {
 
 /**
  * Whether a reply to the caller is someone else's, sent in the
- * conversation, and doesn't mention them (its mention shows instead).
+ * conversation, still there (a deleted one with replies of its own stays,
+ * emptied), and doesn't mention them (its mention shows instead).
  */
 function isReplyFromOthers(scope: Scope, reply: Doc<"messages">) {
   return (
     reply.authorId !== scope.self &&
     reply.threadOnly !== true &&
+    reply.deletedAt === undefined &&
     !leftForMention(scope, reply)
   );
 }

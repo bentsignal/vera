@@ -124,20 +124,6 @@ export function getMember(
     .unique();
 }
 
-/** The account's invitations to spaces that still exist, with the space. */
-export async function pendingInvites(ctx: QueryCtx, accountId: string) {
-  const invites = await ctx.db
-    .query("spaceInvites")
-    .withIndex("by_account", (index) => index.eq("accountId", accountId))
-    .collect();
-  const pending = [];
-  for (const invite of invites) {
-    const space = await getSpace(ctx, invite.spaceId);
-    if (space !== null) pending.push({ invite, space });
-  }
-  return pending;
-}
-
 export interface ConversationAccess {
   /** The caller's own choice of alerts for it, if they made one. */
   readonly alerts: AlertLevel | undefined;

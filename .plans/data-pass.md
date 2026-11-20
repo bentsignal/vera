@@ -636,3 +636,73 @@ messages"), a conversation's `changedAt` (what's saved on the device
 catches up by it), DM and group unread numbers (the badge), the Spaces
 tab's channel numbers (shown), and a channel's members on its
 `conversation` query (the @mention list).
+
+### 16. Pushes build on the badge (E, without coalescing)
+
+Shawn's rule: every message still gets its push; only the badge on it
+may be batched in a burst. A push now saves the badge it counted
+(`pushBadges`, one row an account), and a push to the same account in
+the next 2 s builds on it when it can tell exactly what its message
+changed: one from someone else, shown in a conversation Home counts (not
+a reply, not in a thread, not a channel's that mentions you). That
+conversation's row is counted again and the rest is as saved, so the
+order pushes land in doesn't matter. Anything else (reactions,
+invitations, thread replies, older apps) counts afresh and saves that.
+See `badgeCache.ts`.
+
+A running count per account (option b) was ruled out: too many things
+change the badge without a push (a reaction with reaction pushes off, a
+deleted message, a DM with DM pushes off), so it would drift. Building on
+a count at most 2 s old misses those for at most 2 s, and the next push
+after counts afresh.
+
+- The account's own changes to what the badge counts (`markRead`,
+  `markActivitySeen`, `markThreadRead`, invitations, alerts, settings,
+  Show in Inbox, leaving, being removed from a space) forget the saved
+  count. They write only for 10 s after a push to the account; otherwise
+  they read one document.
+- Reading is a query, so it never conflicts with the sends it reads; a
+  mutation reading only the account's row saves the result if the row
+  is still the version the query read. A push to an account with no
+  push in the 10 s before counts afresh without saving (a change while
+  it counted couldn't be caught), and the next push saves.
+
+| One recipient's badge, busy test account (`badgeCache.test.ts`) | Documents |
+| --------------------------------------------------------------- | --------: |
+| Counting afresh (every push before)                             |   208–217 |
+| First two pushes of a burst                                     |  208, 211 |
+| Each push after, in the window                                  |     10–17 |
+
+The pushes after grow by one a message only because the test's messages
+aren't numbered yet (read one by one, as counting afresh does too). An
+ordinary push now costs one more function call (the saving mutation) and
+at most one small write.
+
+### 17. Clear Badge, and badges nothing could clear
+
+Notification settings end with Clear Badge (after a confirmation): each
+signed-in account's PDS marks read, through now, everything the badge
+counts (`clearBadge`: the Inbox's conversations alerting about every
+message, followed threads, every unseen Activity item), and the phone
+sets its badge to 0 and clears delivered notifications. Pending space
+invitations still count until answered.
+
+Found while looking for a badge stuck at 1 with nothing to read, and
+fixed:
+
+- An invitation to a space you were already in (a member added you after
+  you were invited) counted for good. Adding a member now deletes it, and
+  one to a space you're in isn't pending.
+- A deleted reply to you, kept emptied for its thread, stayed an Activity
+  item ("a file").
+- The app set its icon only when its counts changed, so after a push in
+  the background, coming back with nothing new left the push's number.
+  It now syncs on coming to the front.
+- One Inbox row whose PDS failed kept the app from ever setting the icon
+  (it waited for every row). A failed row is now left out.
+
+Left as they are: the icon sums every signed-in account while the tabs
+follow the account filter (as documented); a slow (not failed) PDS still
+holds the icon; Activity and Inbox rows wait for their people's profiles
+while the badge counts them; the push badge counts thread memberships
+whose thread row is gone (the app's own count corrects it).

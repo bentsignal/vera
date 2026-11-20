@@ -18,6 +18,8 @@ import {
   normalizeName,
 } from "./model.ts";
 import { channelName } from "./naming.ts";
+import { clearInvite } from "./pendingInvites.ts";
+import { forgetBadge } from "./pushBadges.ts";
 import { readAt } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
 import { deleteThreads } from "./threads.ts";
@@ -103,6 +105,8 @@ export async function addSpaceMembers(
         spaceId: args.spaceId,
       });
     }
+    // In the space, they've nothing left to answer.
+    await clearInvite(ctx, args.spaceId, accountId);
   }
   return null;
 }
@@ -114,6 +118,8 @@ export async function removeSpaceMember(
   args: Args<"removeSpaceMember">,
 ) {
   const target = normalizeAddress(args.accountId);
+  // Their badge stops counting the space's channels.
+  await forgetBadge(ctx, target);
   const { member } = await requireSpaceRole(
     ctx,
     args.spaceId,

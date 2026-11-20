@@ -331,4 +331,29 @@ export default defineSchema({
   })
     .index("by_account", ["accountId"])
     .index("by_token", ["token"]),
+  // Each account's app icon badge as its pushes last counted it, for the
+  // pushes right after to build on rather than count again (see
+  // badgeCache.ts). One row an account, written by its pushes, and by its
+  // own changes for a few seconds after one.
+  pushBadges: defineTable({
+    accountId: v.string(),
+    // Each kind of app's count (see `badgeKey`), when it was counted, and
+    // what each row Home counts added to it.
+    counts: v.array(
+      v.object({
+        count: v.number(),
+        countedAt: v.number(),
+        key: v.string(),
+        rows: v.array(
+          v.object({ conversationId: v.string(), count: v.number() }),
+        ),
+      }),
+    ),
+    // Until when the account's changes to what the badge counts move
+    // `version` (a while after each push), so a count read before one
+    // isn't saved.
+    liveUntil: v.number(),
+    // Moved by every write, so a count read before one isn't saved.
+    version: v.number(),
+  }).index("by_account", ["accountId"]),
 });
