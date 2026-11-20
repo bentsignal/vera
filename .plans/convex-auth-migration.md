@@ -25,10 +25,10 @@ from Convex components and fits Vera better than Better Auth does:
   or everywhere but here), and listing, renaming, and revoking passkeys.
 - **Less backend code.** Measured with esbuild, minified:
 
-  | | Better Auth | Convex Auth |
-  |---|---|---|
-  | Phone client | 42 KB (15 KB gz) | 14–18 KB (5–6 KB gz) |
-  | Backend auth code | 1.27 MB (330 KB gz) | ~300 KB (~95 KB gz) |
+  |                   | Better Auth         | Convex Auth          |
+  | ----------------- | ------------------- | -------------------- |
+  | Phone client      | 42 KB (15 KB gz)    | 14–18 KB (5–6 KB gz) |
+  | Backend auth code | 1.27 MB (330 KB gz) | ~300 KB (~95 KB gz)  |
 
   The phone saves about 10 KB gzipped, which doesn't matter. The backend
   saving matters, because Convex loads a function's whole import graph on
@@ -57,11 +57,21 @@ with us yet.
 The data pass reworks the app's token fetcher while still on Better Auth.
 The migration keeps all of it and only swaps what fetches the token:
 
-1. **The home token lasts 1 hour** instead of Better Auth's default 15
-   minutes. That's Convex Auth's default too, so keep it.
+1. **The home token lasts 24 hours**, not Better Auth's default 15
+   minutes, and the app renews it ahead of time. With under 12 hours left
+   it renews every 15 minutes while the app is open, on coming to the
+   front, and on leaving (`keepTokenFresh` in `account-session.ts`). So a
+   wake rarely waits on a token request.
    (Measured: opening a chat from a notification spent about 400 ms getting
    a new token before any query ran, because the 15-minute token had almost
-   always expired.)
+   always expired.) **This conflicts with Convex Auth:** `ctx.auth.signJwt`
+   allows at most 1 hour, so its access tokens can't last 24 hours. After
+   any sleep over an hour, the wake waits for one refresh mutation. Measure
+   that mutation, warm and cold, against what Better Auth costs today:
+   signing a token cold took ~650 ms after an idle night, mostly cold reads
+   of the Better Auth component. Keep the refresh in parallel with the
+   reconnect. If the wait is still noticeable, ask Shawn before going
+   further (a longer-lived token signed some other way, say).
 2. **It's refreshed as the app wakes**, if it has expired or is about to,
    while reconnecting. It doesn't wait for the server to reject the old one.
 3. **There's one shared token request per account.** At launch, several
@@ -72,9 +82,52 @@ The migration keeps all of it and only swaps what fetches the token:
    up for good, and the app sits at "Retrying…" (#343). Details are in the
    observability thread's `.plans/observability.md`.
 
-All four live in the token fetcher: `apps/mobile/src/features/session/federation-auth.ts`,
+All of these live in the token fetcher: `apps/mobile/src/features/session/federation-auth.ts`,
 `account-session.ts`, and the `getAuthToken` given to
 `DecentralizedConvexClient`. That interface doesn't change under Convex Auth.
+
+## Checking a token takes no HTTP fetch (from the data pass, 2026-11-20)
+
+Measured on Shawn's phone against an isolated backend. Today
+`auth.config.ts` uses the OIDC form (`domain: CONVEX_SITE_URL`), so after
+every reconnect from sleep, Convex fetches the deployment's own
+`/.well-known/openid-configuration` and then `/api/auth/convex/jwks` before
+it accepts the token. That's about 130–270 ms per wake. The data pass didn't
+fix it. Better Auth's static keys (`getAuthConfigProvider({ jwks })`,
+`convex({ jwks })`) work only with RS256, and Vera's single EdDSA key also
+signs the federation assertions that remote PDSs verify through
+`/api/auth/convex/jwks`.
+
+Convex Auth's `convexAuthProvider()` **does not fix this by itself**. It's
+a `customJwt` provider whose `jwks` is a URL
+(`${CONVEX_CLOUD_URL}/.well-known/jwks.json`). In the open-source backend,
+`crates/authentication/src/lib.rs` (`fetch_jwks`) fetches that URL on each
+check. Only a `data:` URI is read without a fetch. The cloud may cache it,
+but nothing shows that. So the migration must:
+
+- inline the deployment's JWKS as a data URI in `auth.config.ts`. Read it
+  from `/.well-known/jwks.json` at deploy time, and redo that when the key
+  generation changes, or the checks fail. Or show by measuring that Convex
+  caches the URL fetch. Then check the logs on a phone: a wake should make
+  no JWKS or discovery request.
+- keep federation keys separate from session-token keys. Under Convex
+  Auth, the deployment's `/.well-known/jwks.json` keeps serving every
+  key generation no matter what `auth.config.ts` inlines. Federation
+  assertions use that URL in the discovery descriptor, so inlining the
+  session keys can't break cross-PDS checks. Their audiences differ
+  (`convex-auth` against the remote PDS's domain), so a token can't be
+  passed off as the other kind. If federation ever needs its own key,
+  give it its own JWKS URL in the descriptor.
+
+## Better Auth re-checks sessions on every reconnect (from the data pass)
+
+The data pass turned off `refetchOnWindowFocus` in `createHomeAuthClient`.
+The Better Auth client still refetches `get-session` whenever the network
+comes back, for every account client, through a shared broadcast channel.
+It has no option to stop that: about 6 requests per wake on a three-account
+phone, and nothing in the app needs them. Shawn is fine leaving it until
+the migration. The Convex Auth `AuthClient` shouldn't do this. Check that
+it doesn't call the server on reconnect unless a token needs renewing.
 
 ## Keep auth out of the hot import graph
 
@@ -99,7 +152,8 @@ docs/architecture.md explain it (both arrive with PR #267).
 3. **Everyone signs in once more.** Better Auth sessions don't carry over.
    With migrated passkeys that's one tap.
 4. **Federation assertions move to `ctx.auth.signJwt`.** It runs only in
-   mutations, uses ES256, allows at most 1 hour, and sets `iss` itself. The
+   mutations, uses ES256, allows at most 1 hour (which also caps the home
+   token, see above), and sets `iss` itself. The
    issuer changes to `CONVEX_CLOUD_URL`. That's fine while Vera's PDS is
    the only one. Claims starting with `convex` or `cvx` are reserved.
 5. **It's a breaking backend change.** It ships with `--with-backend`.
@@ -113,6 +167,8 @@ docs/architecture.md explain it (both arrive with PR #267).
      `react-custom` ceremonies on `react-native-passkey`
    - copy a real Better Auth passkey into the passkey component and sign
      in with it
+   - measure a wake after more than an hour asleep: the refresh mutation
+     (warm and cold), and that checking the token makes no JWKS fetch
 2. If both work, build the migration: the backend auth setup and dev
    sign-in, a Convex Auth PDS adapter package, the phone session files
    (keeping the token handling above), and a one-off script that copies
