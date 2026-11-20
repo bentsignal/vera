@@ -9,9 +9,10 @@ import { cn } from "~/lib/cn";
 const PENDING_MS = 1000;
 /**
  * How long the spinner stays once shown, even if the screen loads sooner,
- * so it never flickers in and straight back out.
+ * so it never flickers in and straight back out: long enough to read as
+ * a spinner, short enough not to hold back a screen that's ready.
  */
-const PENDING_MIN_MS = 1000;
+const PENDING_MIN_MS = 400;
 /** How long a screen loads before it says something is wrong. */
 const TROUBLE_MS = 6000;
 
