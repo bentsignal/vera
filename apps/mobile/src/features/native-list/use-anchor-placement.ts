@@ -38,7 +38,7 @@ export function useAnchorPlacement(
       placement.ready({
         anchor,
         present: messages.some((message) => message.id === anchor),
-        show: () => loaded.set(withTiming(1, { duration: 220 })),
+        show: () => loaded.set(withTiming(1, { duration: 120 })),
         failed: () =>
           Alert.alert("Couldn't Open Message", "Please try opening it again."),
       }),
