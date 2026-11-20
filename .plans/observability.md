@@ -63,6 +63,39 @@ to a third party.
   lines log conversation IDs or whole error objects. The router's line
   carries the pseudonym, never an account ID or email.
 
+## Keep the server's request path small (from the data pass, 2026-11-19)
+
+Convex loads a function's whole module graph on every request, so what a
+function imports is part of its latency. Measured on the data-pass test
+backend:
+
+| Function                                                  | Bundle | Time       |
+| --------------------------------------------------------- | -----: | ---------- |
+| `release:breakingVersion`                                 |  32 KB | 0–7 ms     |
+| "Who's typing" on the messages component, called directly | 120 KB | 16–36 ms   |
+| The same query through `pds:dispatchQuery`                | 1.6 MB | 120–385 ms |
+
+`services/backend/convex/pds.ts` imports the assistant hook
+(`afterPdsMutation`), and through it the AI SDK (about 600 KB) and zod
+(about 800 KB). Every query and mutation pays for that, the largest part
+of the ~1 s a chat takes to open. The data pass is shrinking the router
+to import only what dispatching needs, with the AI code behind scheduled
+functions referenced by name, and adding a bundle-size guard and a note
+in the docs.
+
+Rules for this work:
+
+- No Effect, Confect, Axiom SDK, OpenTelemetry or any other library in
+  the router, the plugins, or any module they import.
+- Server logging on that path is a plain `console.log` of one structured
+  line. The log stream does the rest.
+- Anything heavier (forwarding or enriching events) goes in its own
+  module or an action, called by function reference, never imported.
+- Check the bundle size of `pds.ts` and the plugin dispatchers before
+  and after any backend change.
+- Effect on the client is a separate question: it costs app bundle size
+  and startup time, not time on every server call.
+
 ## Events wanted
 
 Cold start, opening from a notification, opening a chat, sending,
