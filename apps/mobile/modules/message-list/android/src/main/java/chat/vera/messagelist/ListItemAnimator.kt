@@ -119,8 +119,8 @@ class ListItemAnimator(private val units: Units) : SimpleItemAnimator() {
     // same (a message you sent, confirmed as it rises): it carries on, on
     // the clock it shares with the rows around it. Starting over would end
     // its fade at once and restart its move behind theirs, so it popped in
-    // and the list shifted twice.
-    if (fromY == toY && grew == 0 && running.containsKey(holder)) {
+    // and the list shifted twice. (Not in a firehose: then it all lands.)
+    if (animate && fromY == toY && grew == 0 && running.containsKey(holder)) {
       if (change) dispatchChangeFinished(holder, true) else dispatchMoveFinished(holder)
       return false
     }
