@@ -160,24 +160,45 @@ function createAccountSession(stored: StoredAccount, home: DiscoveredPds) {
 }
 
 /**
- * The home token lasts an hour. Leaving the app, one with less than a
- * quarter of an hour left is replaced while iOS still lets the app run, so
- * coming back within the hour finds it ready. Coming back later, the
- * connection signs in again at once: that asks for the new token alongside
- * reconnecting and holds the connection back until it comes, rather than
- * presenting the expired one and waiting to be turned down.
+ * How long before it expires the home token is renewed. It lasts a day
+ * (`services/backend/convex/auth.ts`), so it's renewed about twice a day
+ * of use.
+ */
+const RENEW_WITHIN_S = 12 * 60 * 60;
+/** How often an open app checks whether the home token is due. */
+const RENEW_CHECK_MS = 15 * 60 * 1_000;
+
+/**
+ * Keeps a home token ready before the connection needs one: renewed in
+ * the background whenever the app is open or left with less than half a
+ * day on it, so coming back finds one and nothing waits on a request.
+ * The connection keeps its own token until that one runs low; when the
+ * app comes back to it lapsing, it signs in again at once with the
+ * renewed one (asking for a new one only if that's gone too, after more
+ * than a day away) rather than presenting the expired one and waiting to
+ * be turned down.
  */
 function keepTokenFresh(
   tokens: ReturnType<typeof createFederationAuthTokenFetcher>,
   transport: DecentralizedConvexClient,
 ) {
+  function renew() {
+    void tokens.refreshWithin(RENEW_WITHIN_S);
+  }
+  const check = setInterval(() => {
+    if (AppState.currentState === "active") renew();
+  }, RENEW_CHECK_MS);
   const subscription = AppState.addEventListener("change", (state) => {
-    if (state === "background") void tokens.refreshWithin(15 * 60);
     if (state === "active" && tokens.needsSignIn(60)) {
       transport.reauthenticate();
     }
+    if (state === "active" || state === "background") renew();
   });
-  return () => subscription.remove();
+  renew();
+  return () => {
+    clearInterval(check);
+    subscription.remove();
+  };
 }
 
 export type AccountSession = ReturnType<typeof createAccountSession>;

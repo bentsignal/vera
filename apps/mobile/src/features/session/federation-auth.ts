@@ -228,13 +228,12 @@ export function createFederationAuthTokenFetcher(
     /** The home token, shared with the connection's (for HTTP calls). */
     homeToken: () => savedHomeToken(false),
     /**
-     * Whether the connection should sign in again: the token held doesn't
-     * last another `seconds` (signing in asks for a new one, and holds the
-     * connection back until it comes), or it's newer than the one the
-     * connection has.
+     * Whether the connection should sign in again: the token it has
+     * doesn't last another `seconds`. Signing in takes the newest token
+     * held if it's fresh, and otherwise asks for one and holds the
+     * connection back until it comes.
      */
-    needsSignIn: (seconds: number) =>
-      !freshFor(current, seconds) || current !== given,
+    needsSignIn: (seconds: number) => !freshFor(given, seconds),
     /** Gets a new home token now if the one held expires within `seconds`. */
     async refreshWithin(seconds: number) {
       if (!freshFor(current, seconds)) await requestHomeToken();
