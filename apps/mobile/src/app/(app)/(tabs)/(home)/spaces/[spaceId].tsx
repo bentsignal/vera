@@ -64,7 +64,7 @@ function Space({ name, spaceId }: { name?: string; spaceId: string }) {
       {/* Fades in once loaded instead of popping in. */}
       <Animated.View entering={FadeIn.duration(220)} style={{ flex: 1 }}>
         <NativeHost style={{ flex: 1 }}>
-          <FieldList>
+          <FieldList clearsTabBar>
             <ChannelsSection space={space} />
             <AlertsSection space={space} />
             <MembersSection space={space} />

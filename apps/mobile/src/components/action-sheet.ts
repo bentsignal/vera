@@ -7,10 +7,14 @@ export interface SheetAction {
 }
 
 /**
- * Shows the platform's native action sheet. Actions run after it closes, so
- * they can present their own screens (such as the photo picker).
+ * Shows the platform's native action sheet, under `title` if given.
+ * Actions run after it closes, so they can present their own screens
+ * (such as the photo picker).
  */
-export function showActionSheet(actions: readonly SheetAction[]) {
+export function showActionSheet(
+  actions: readonly SheetAction[],
+  title?: string,
+) {
   if (Platform.OS === "ios") {
     const destructiveIndex = actions.findIndex((action) => action.destructive);
     ActionSheetIOS.showActionSheetWithOptions(
@@ -19,13 +23,14 @@ export function showActionSheet(actions: readonly SheetAction[]) {
         destructiveButtonIndex:
           destructiveIndex === -1 ? undefined : destructiveIndex,
         options: [...actions.map((action) => action.label), "Cancel"],
+        title,
       },
       (index) => actions[index]?.onPress(),
     );
     return;
   }
   Alert.alert(
-    "",
+    title ?? "",
     undefined,
     [
       ...actions.map((action) => ({
