@@ -10,13 +10,13 @@ import {
   MAX_UPLOAD_BYTES,
   MAX_VIDEO_SECONDS,
 } from "@vera/backend/upload-limits";
-import { ConvexError } from "convex/values";
 
 import type { AccountSession } from "~/features/session/account-session";
 import type { PastedImage } from "~/lib/paste-images";
 import { formatBytes } from "~/lib/format";
 import { useAccount } from "./account";
 import { cropPhoto, cropsAfterPicking, cropsInPicker } from "./crop-photo";
+import { attachmentError, limitsSentence } from "./upload-errors";
 import { sendUpload } from "./upload-transports";
 
 /** The most attachments one message can carry (the PDS's limit too). */
@@ -46,17 +46,7 @@ export interface StagedFile extends LocalFile {
   readonly poster?: LocalFile;
 }
 
-/** An upload problem worth showing the person as-is. */
-export class AttachmentError extends Error {}
-
-/** The PDS turned the file away for its size, so retrying won't help. */
-export class TooLargeError extends AttachmentError {}
-
 const KIND_NOUN = { file: "file", image: "photo", video: "video" } as const;
-
-function limitsSentence() {
-  return `You can send videos up to ${formatBytes(MAX_UPLOAD_BYTES.video)}, photos up to ${formatBytes(MAX_UPLOAD_BYTES.image)}, and other files up to ${formatBytes(MAX_UPLOAD_BYTES.file)}.`;
-}
 
 /** The file's real length on disk; pickers sometimes report none. */
 async function sizeOf(uri: string, reported: number | null | undefined) {
@@ -281,12 +271,6 @@ export function stagePasted(images: readonly PastedImage[], limit: number) {
   return sendableOf(picked(files), limit);
 }
 
-function errorCode(data: unknown) {
-  return typeof data === "object" && data !== null && "code" in data
-    ? data.code
-    : undefined;
-}
-
 async function uploadOne(
   session: AccountSession,
   kind: Attachment["kind"],
@@ -302,15 +286,13 @@ async function uploadOne(
       size: file.size,
     })
     .catch((error: unknown) => {
-      if (
-        error instanceof ConvexError &&
-        errorCode(error.data) === "UPLOAD_TOO_LARGE"
-      ) {
-        throw new TooLargeError(limitsSentence());
-      }
-      throw error;
+      throw attachmentError(error);
     });
-  return sendUpload(convex, target, file, onBytesSent);
+  return sendUpload(convex, { file, kind, onBytesSent, target }).catch(
+    (error: unknown) => {
+      throw attachmentError(error);
+    },
+  );
 }
 
 /**

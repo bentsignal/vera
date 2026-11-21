@@ -113,7 +113,7 @@ export function spansOf(text: string, mentions: Message["mentions"]) {
 
 function isStuck(attachment: MessageAttachment) {
   const state = attachment.upload?.state;
-  return state === "failed" || state === "too-large";
+  return state === "failed" || state === "limited" || state === "too-large";
 }
 
 /** A photo's or video's size, square when its message doesn't say. */

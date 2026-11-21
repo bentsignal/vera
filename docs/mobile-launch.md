@@ -20,8 +20,9 @@ Vera's server stores media in the bunny.net Storage zone `vera-media` (New
 York) and serves it from the CDN pull zone at `media.vera.chat`. The app
 uploads straight to Storage's S3-compatible endpoint through a URL the PDS
 presigns for one object path (`dev/` or `prod/` prefix per deployment). Videos
-are capped at 2 minutes and served as plain files from the CDN; Bunny Stream
-is not used. File storage sits behind a provider interface in the backend, so
+are capped at 1 minute and 50 MB and served as plain files from the CDN;
+Bunny Stream is not used. A browser shows only pictures, video and audio
+from the CDN and downloads anything else (`infra/media-cdn`). File storage sits behind a provider interface in the backend, so
 a self-hoster can plug in another provider; without bunny.net variables the
 backend falls back to Convex file storage.
 
