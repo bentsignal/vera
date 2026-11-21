@@ -53,6 +53,39 @@ the passkey registration `context`; the server checks it when issuing
 registration options, checks again after the passkey is verified, then creates
 the account and starts a session.
 
+### One account per phone
+
+Each phone can sign up one account (`SIGN_UPS_PER_DEVICE`, up to 3). The app
+sends a proof of which phone it is with the sign-up context
+(`apps/mobile/modules/device-proof`), and both steps check it before the
+passkey is made and before the account is created (`sign-up-devices.ts`,
+`convex/signUpDevices.ts`):
+
+- **iPhone:** a DeviceCheck token. Apple keeps two bits per phone for Vera
+  that outlast reinstalls; they count its sign-ups. Needs `APPLE_TEAM_ID`,
+  `DEVICECHECK_KEY_ID`, and `DEVICECHECK_PRIVATE_KEY` (a `.p8` key with
+  DeviceCheck enabled).
+- **Android:** a Play Integrity token, whose nonce ties it to the phone's
+  Android ID and the username. Google decodes it and must say it's Vera
+  from Play on a real, unmodified phone; the PDS counts sign-ups by the
+  Android ID, hashed (the same for Vera across reinstalls, new after a
+  factory reset). Needs `PLAY_INTEGRITY_SERVICE_ACCOUNT`, a service
+  account key from the Cloud project linked in Play Console.
+
+`SIGN_UP_DEVICE_CHECK` is `required` or `off`. Unset, it's off on dev
+deployments (`DEV_TOOLS=true`, since simulators, emulators, and dev builds
+can't pass) and required everywhere else. A refusal comes back as
+`DEVICE_PROOF_REQUIRED` (no proof: an older binary), `DEVICE_LIMIT`,
+`DEVICE_PROOF_INVALID`, or `DEVICE_CHECK_UNAVAILABLE` (Apple or Google
+didn't answer; sign-ups wait rather than skip the check). For a test
+account on a phone that already has one, let its username past for a day:
+
+```sh
+npx convex run signUpDevices:allow '{"username":"shawn2"}'
+```
+
+### Reserved usernames
+
 Usernames that look official are reserved: `DEFAULT_RESERVED_USERNAMES` from
 `@decentralized-convex/address` (`admin`, `help`, `support`, `security`, and
 so on) plus Vera's own (`vera`, `vera_support`, ...) in `convex/auth.ts`. The
