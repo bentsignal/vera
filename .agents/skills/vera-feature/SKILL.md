@@ -354,7 +354,10 @@ Don't merge.
 ## Troubleshooting
 
 - **Simulator problems:** see the `vera-simulator` skill's troubleshooting.
-- **`signin` fails:** the backend must have `DEV_TOOLS=true` (both the shared
-  dev PDS and isolated ones do). Check `scripts/backend.sh status`.
+- **`signin` fails:** the backend must have `DEV_TOOLS=true` and
+  `DEV_TOOLS_SECRET` (`scripts/backend.sh push` copies the secret to an
+  isolated backend), and Metro must have been started by `scripts/sim.sh`
+  or `scripts/phone.sh`, which give the bundle the secret
+  (`scripts/dev-tools-secret.sh`). Check `scripts/backend.sh status`.
 - **Discovery errors after `isolate`:** DNS can take a minute. Wait,
   `scripts/sim.sh relaunch`, and try again.

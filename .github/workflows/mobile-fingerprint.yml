@@ -21,6 +21,9 @@ on:
       - pnpm-workspace.yaml
       - .github/workflows/mobile-fingerprint.yml
 
+# Nothing by default; the job asks for what it needs.
+permissions: {}
+
 concurrency:
   group: mobile-fingerprint-${{ github.event.pull_request.number }}
   cancel-in-progress: true

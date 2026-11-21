@@ -5,13 +5,21 @@ export const env = {
    */
   veraDomain: process.env.EXPO_PUBLIC_VERA_DOMAIN ?? "dev.vera.chat",
   /**
-   * Development builds talk to the dev PDS (or a worktree's own one,
-   * `<branch>.dev.vera.chat`), which enables test tools.
+   * What a dev PDS asks of every dev tools request
+   * (services/backend/dev-tools.ts). Only the bundles Shawn's Metro serves
+   * have it (scripts/lib/metro.sh); builds and updates made on EAS don't,
+   * since anyone can download a published update.
+   */
+  devToolsSecret: process.env.EXPO_PUBLIC_DEV_TOOLS_SECRET ?? "",
+  /**
+   * Development bundles that talk to the dev PDS (or a worktree's own one,
+   * `<branch>.dev.vera.chat`) and carry its secret have test tools.
    */
   get devTools() {
     return (
-      this.veraDomain === "dev.vera.chat" ||
-      this.veraDomain.endsWith(".dev.vera.chat")
+      this.devToolsSecret !== "" &&
+      (this.veraDomain === "dev.vera.chat" ||
+        this.veraDomain.endsWith(".dev.vera.chat"))
     );
   },
   /**

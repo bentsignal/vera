@@ -113,6 +113,15 @@ Dev clients are Debug builds: slower, with the dev menu, and no update
 channel. Real performance gets checked in TestFlight; updates and channels
 on an internal build.
 
+**Dev tools** (the passwordless dev sign-in, the seeds, bots that answer)
+work only in bundles Shawn's Metro serves (`scripts/sim.sh`,
+`scripts/phone.sh`): Metro gives them the dev PDS's dev tools secret
+(`scripts/dev-tools-secret.sh`, `src/env.ts`). Internal builds and their
+updates are made on EAS and published where anyone could download them,
+so they never carry it and have no dev tools; sign in there with a passkey.
+A store bundle refuses to build without `EXPO_PUBLIC_VERA_DOMAIN`, or with
+the secret (`plugins/build-environment.cjs`).
+
 ## EAS
 
 Project `@directedbyshawn/vera`. Profiles in `eas.json`:

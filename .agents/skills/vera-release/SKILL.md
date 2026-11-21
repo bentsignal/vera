@@ -119,7 +119,39 @@ Send Shawn the write-up with the list in two parts:
   camera and photo library, a real network dropping, two physical phones
   at once, and anything you ran but couldn't judge.
 
-Then go straight to step 2 unless he says otherwise.
+Then run the security audit (step 1b), and go on to step 2 unless he says
+otherwise.
+
+## 1b. Security audit by Mythos (required, every release)
+
+Before anything ships, Mythos (`claude-mythos-5-2`) audits everything
+changed since the last release, and every finding is settled. No release
+skips it, however small.
+
+1. The range: from the older of the newest production release tag
+   (`mobile/build/*`, `mobile/android/build/*`, `mobile/ota/production/*`)
+   and the newest `backend/deploy/*`, to `origin/main`. Backend changes can
+   ship alone, so the backend's own tag can be the older one.
+2. Run the audit on `claude-mythos-5-2`: a T3 `delegate_task` with that
+   model, in this checkout, or `claude -p --model claude-mythos-5-2` from
+   the repo root. Give it the range (`git diff <base>..origin/main` and
+   `git log <base>..origin/main`), point it at `docs/architecture.md`, and
+   ask for everything a stranger on the internet, another PDS, or a signed
+   in account could do that it shouldn't: auth and account checks, what
+   reaches a PDS from outside, secrets and settings (dev and production
+   apart), uploads, bug reports and other outside services, the app's
+   build settings, and the GitHub workflows. It reports each finding with
+   where it is, what someone could do, and how bad it is.
+3. Settle every finding before step 4: fixed in a PR that merges (then
+   audit that fix the same way), or Shawn decides it's not a problem. A
+   finding nobody settled blocks the release, like a failed step in
+   `docs/next-release.md`.
+4. The repo is public. Keep findings in the release thread until they're
+   fixed; PR titles, descriptions, and commits say what a fix does, not how
+   to abuse what it fixes.
+
+Tell Shawn in the step 1 write-up: the range audited, what it found, and
+how each finding was settled, in plain words.
 
 ## 2. Put main on his phone in the dev client
 
