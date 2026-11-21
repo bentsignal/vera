@@ -4,6 +4,7 @@ import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { domainOf } from "~/features/compose/people-match";
+import { verified } from "~/features/profile/verified";
 import { useAccount, useAccounts } from "./account";
 import { pdsResult, pdsResultOr } from "./results";
 
@@ -45,7 +46,7 @@ function shownProfile(
     return fallback;
   }
   const shown = shownProfiles.get(profile) ?? {
-    affiliated: profile.affiliated === true,
+    affiliated: verified(address, profile.affiliated),
     avatarUrl: profile.avatarUrl ?? null,
     displayName: profile.displayName ?? usernameOf(address),
   };
@@ -147,7 +148,7 @@ export function useProfile(address: string) {
     }),
   );
   return {
-    affiliated: data?.affiliated === true,
+    affiliated: verified(address, data?.affiliated),
     avatarUrl: data?.avatarUrl ?? null,
     displayName: data?.displayName ?? usernameOf(address),
     isLoading: data === undefined,

@@ -19,6 +19,13 @@ import {
   typist,
 } from "./shapes.ts";
 import { threadListQueries } from "./threadOperations.ts";
+import {
+  trustMessagePage,
+  trustReactions,
+  trustThreadPage,
+  trustThreadSummaries,
+  trustTypists,
+} from "./trust.ts";
 
 /** What the Messages protocol reads (see `messagesProtocol`). */
 export const queries = {
@@ -90,6 +97,7 @@ export const queries = {
       limit: v.optional(v.number()),
     }),
     returns: messagePage,
+    trust: trustMessagePage,
   }),
   /** A group's newest `MAX_MEMBER_EVENTS` joins and leaves, oldest first. */
   memberEvents: defineOperation({
@@ -110,6 +118,7 @@ export const queries = {
       since: v.optional(v.number()),
     }),
     returns: v.array(reaction),
+    trust: trustReactions,
   }),
   /**
    * Who else is typing in a conversation, or with `threadId`, in that
@@ -122,6 +131,7 @@ export const queries = {
       threadId: v.optional(v.string()),
     }),
     returns: v.array(typist),
+    trust: trustTypists,
   }),
   /**
    * A thread: its original message and one page of replies, oldest
@@ -138,6 +148,7 @@ export const queries = {
       threadId: v.string(),
     }),
     returns: threadPage,
+    trust: trustThreadPage,
   }),
   /**
    * The threads of the given messages that have replies, or with `since`
@@ -152,6 +163,7 @@ export const queries = {
       since: v.optional(v.number()),
     }),
     returns: v.array(threadSummary),
+    trust: trustThreadSummaries,
   }),
   ...threadListQueries,
   /** Your place in a thread: its bell, and how far you've read. */

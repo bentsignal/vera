@@ -25,13 +25,14 @@ export interface ResolvedRoute {
 }
 
 /**
- * The PDSes found for domains, by domain and by deployment URL. A lookup
- * that failed a moment ago stands for a while, so a domain that's gone
- * isn't looked up again on every update of a query that routes to it.
+ * The PDSes found for domains, by domain: the domain looked up, never one
+ * a manifest names, so one domain's manifest can't take another's place
+ * (a manifest for another domain is refused in discovery). A lookup that
+ * failed a moment ago stands for a while, so a domain that's gone isn't
+ * looked up again on every update of a query that routes to it.
  */
 export class PdsDirectory {
   readonly byDomain = new Map<string, DiscoveredPds>();
-  readonly byUrl = new Map<string, DiscoveredPds>();
   readonly #discover;
   readonly #failed = new Map<string, { at: number; error: Error }>();
   readonly #pending = new Map<string, Promise<DiscoveredPds>>();
@@ -42,7 +43,19 @@ export class PdsDirectory {
 
   remember(pds: DiscoveredPds) {
     this.byDomain.set(pds.domain, pds);
-    this.byUrl.set(normalizeFederationUrl(pds.manifest.deploymentUrl), pds);
+  }
+
+  /**
+   * The PDS at a deployment URL, when exactly one known domain names it.
+   * Any manifest can name any deployment, so when two do, neither is
+   * taken for it.
+   */
+  atUrl(url: string) {
+    const target = normalizeFederationUrl(url);
+    const found = [...this.byDomain.values()].filter(
+      (pds) => normalizeFederationUrl(pds.manifest.deploymentUrl) === target,
+    );
+    return found.length === 1 ? found[0] : undefined;
   }
 
   async resolve(addressOrDomain: string) {
@@ -59,6 +72,15 @@ export class PdsDirectory {
       throw failed.error;
     }
     const resolution = this.#discover(addressOrDomain)
+      .then((resolved) => {
+        if (
+          resolved.domain !== domain ||
+          resolved.manifest.accountDomain !== domain
+        ) {
+          throw new Error(`The PDS found for ${domain} is another domain's`);
+        }
+        return resolved;
+      })
       .then(
         (resolved) => {
           this.remember(resolved);

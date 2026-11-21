@@ -14,7 +14,7 @@ import { delayedConnection } from "~/features/dev/server-delay";
 import { forgetAccountNotifications } from "~/features/notifications/presented";
 import { forgetSaved } from "~/features/saved/saved-files";
 import { removeStoredAccount, storedAccounts } from "./account-store";
-import { createHomeAuthClient } from "./auth-client";
+import { createHomeAuthClient, forgetAuthStorage } from "./auth-client";
 import {
   createFederationAuthTokenFetcher,
   forgetHomeToken,
@@ -251,6 +251,7 @@ export function forgetUnreachableAccount(stored: StoredAccount) {
   suspendAccountSession(stored);
   removeStoredAccount(stored.address);
   forgetHomeToken(stored.storagePrefix);
+  forgetAuthStorage(stored.storagePrefix);
   forgetSaved(stored.storagePrefix);
   queryClient.removeQueries({ queryKey: pdsSessionQueryKey(stored.address) });
 }
@@ -259,6 +260,7 @@ export function forgetUnreachableAccount(stored: StoredAccount) {
 export function closeAccountSession(session: AccountSession) {
   removeStoredAccount(session.address);
   forgetHomeToken(session.storagePrefix);
+  forgetAuthStorage(session.storagePrefix);
   session.end();
   forgetSaved(session.storagePrefix);
   sessions.delete(session.storagePrefix);
