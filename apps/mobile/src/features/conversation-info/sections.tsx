@@ -15,9 +15,10 @@ import { useAccount } from "~/features/messaging/account";
 import { ALERT_CHOICES, conversationAlerts } from "~/features/messaging/alerts";
 import { showSetAlerts } from "~/features/messaging/channel-settings";
 import { useProfiles } from "~/features/messaging/profiles";
+import { memberCount } from "~/features/messaging/spaces";
 import { useOpenProfile } from "~/features/profile/use-open-profile";
 import { secondaryTextStyle } from "~/lib/colors";
-import { destructive } from "~/lib/ui-modifiers";
+import { destructive, linkButton } from "~/lib/ui-modifiers";
 
 /**
  * Everyone in a group or channel; tapping someone opens their profile.
@@ -25,15 +26,18 @@ import { destructive } from "~/lib/ui-modifiers";
  */
 export function MembersSection({
   members,
+  more,
   onAdd,
 }: {
   members: readonly string[];
+  /** A channel's: whether its space has more, and loading the next page. */
+  more?: { readonly hasMore: boolean; readonly loadMore: () => void };
   onAdd?: () => void;
 }) {
   const { address: self } = useAccount();
   const profileOf = useProfiles(members);
   const openProfile = useOpenProfile();
-  const title = `${members.length} Members`;
+  const title = `${memberCount(members.length, more?.hasMore === true)} Members`;
   return (
     <FieldGroup.Section title={onAdd === undefined ? title : undefined}>
       {onAdd !== undefined && (
@@ -64,6 +68,14 @@ export function MembersSection({
           </ListItem>
         );
       })}
+      {more?.hasMore === true && (
+        <Button
+          label="Show More"
+          variant="text"
+          modifiers={linkButton}
+          onPress={more.loadMore}
+        />
+      )}
     </FieldGroup.Section>
   );
 }

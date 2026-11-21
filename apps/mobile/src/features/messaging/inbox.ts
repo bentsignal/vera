@@ -112,7 +112,8 @@ function inboxesReady(inboxes: readonly InboxSnapshot[]) {
 /**
  * Conversations across the visible accounts (or just `account`), newest
  * first: direct messages, groups, and the space channels shown in the
- * inbox. Each summary says which account it belongs to.
+ * inbox, a page at a time (`loadMore` asks for the next). Each summary
+ * says which account it belongs to.
  *
  * It loads once: the first time, it waits for every name its rows show, so
  * rows never switch from usernames to names. (Every member's profile loads
@@ -125,7 +126,21 @@ export function useInbox({ account }: { account?: string } = {}) {
   const visible = useVisibleAccounts();
   const accounts =
     account === undefined ? visible.map((item) => item.address) : [account];
-  const inboxes = useInboxes(accounts);
+  // How many pages of each account's Inbox are loaded (one to start).
+  const [pages, setPages] = useState<Readonly<Record<string, number>>>({});
+  const inboxes = useInboxes(accounts, pages);
+  /** Loads the next page of each Inbox that has one (the list's end). */
+  function loadMore() {
+    const more = accounts.filter((_, index) => inboxes[index]?.more === true);
+    if (more.length === 0) return;
+    setPages((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        more.map((session) => [session, (current[session] ?? 1) + 1]),
+      ),
+    }));
+  }
+  const hasMore = inboxes.some((inbox) => inbox.more);
   const conversations = inboxes.flatMap((inbox, index) =>
     (inbox.data ?? []).map((conversation) => {
       const owner = accounts[index] ?? "";
@@ -165,11 +180,15 @@ export function useInbox({ account }: { account?: string } = {}) {
   if (known !== null && (shown === null || arrived.length > 0)) {
     setShown(new Set([...known, ...arrived]));
   }
-  if (known === null) return { conversations: undefined, isLoading: true };
+  if (known === null) {
+    return { conversations: undefined, hasMore, isLoading: true, loadMore };
+  }
   return {
     conversations: rows
       .filter(({ ready, summary }) => ready || known.has(summary.key))
       .map(({ summary }) => summary),
+    hasMore,
     isLoading: false,
+    loadMore,
   };
 }

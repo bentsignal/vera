@@ -29,6 +29,7 @@ import type * as devBots from "../devBots.js";
 import type * as devBusy from "../devBusy.js";
 import type * as devChanges from "../devChanges.js";
 import type * as devFullSeed from "../devFullSeed.js";
+import type * as devMany from "../devMany.js";
 import type * as devMixed from "../devMixed.js";
 import type * as devReleaseTest from "../devReleaseTest.js";
 import type * as devSeed from "../devSeed.js";
@@ -97,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   devBusy: typeof devBusy;
   devChanges: typeof devChanges;
   devFullSeed: typeof devFullSeed;
+  devMany: typeof devMany;
   devMixed: typeof devMixed;
   devReleaseTest: typeof devReleaseTest;
   devSeed: typeof devSeed;

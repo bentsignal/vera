@@ -1,22 +1,25 @@
 import type { Space } from "@decentralized-convex/messages";
 import { useRouter } from "expo-router";
-import { FieldGroup, Text } from "@expo/ui";
+import { Button, FieldGroup, Text } from "@expo/ui";
 
 import { Avatar } from "~/components/avatar";
 import { ListItem } from "~/components/list-item";
 import { SectionHeaderWithAdd } from "~/components/section-header";
 import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";
+import { memberCount, useSpaceMembers } from "~/features/messaging/spaces";
 import { useOpenProfile } from "~/features/profile/use-open-profile";
 import { secondaryTextStyle } from "~/lib/colors";
+import { linkButton } from "~/lib/ui-modifiers";
 import { useMemberPress } from "./member-press";
 
 export function MembersSection({ space }: { space: Space }) {
   const router = useRouter();
   const { address: account } = useAccount();
+  const { hasMore, loadMore, members } = useSpaceMembers(space);
   const invited = space.invited ?? [];
   const profileOf = useProfiles([
-    ...space.members.map((member) => member.accountId),
+    ...members.map((member) => member.accountId),
     ...invited,
   ]);
   const openProfile = useOpenProfile();
@@ -26,7 +29,7 @@ export function MembersSection({ space }: { space: Space }) {
     <FieldGroup.Section>
       <FieldGroup.SectionHeader>
         <SectionHeaderWithAdd
-          title={`Members (${space.members.length})`}
+          title={`Members (${memberCount(members.length, hasMore)})`}
           onAdd={() =>
             router.push({
               params: { account, spaceId: space.spaceId },
@@ -35,7 +38,7 @@ export function MembersSection({ space }: { space: Space }) {
           }
         />
       </FieldGroup.SectionHeader>
-      {space.members.map((member) => (
+      {members.map((member) => (
         <ListItem
           key={member.accountId}
           leading={
@@ -57,6 +60,14 @@ export function MembersSection({ space }: { space: Space }) {
           {profileOf(member.accountId).displayName}
         </ListItem>
       ))}
+      {hasMore && (
+        <Button
+          label="Show More"
+          variant="text"
+          modifiers={linkButton}
+          onPress={loadMore}
+        />
+      )}
       {invited.map((address) => (
         <ListItem
           key={address}
