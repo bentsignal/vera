@@ -207,6 +207,13 @@ export default defineSchema({
   })
     .index("by_url", ["url"])
     .index("by_message", ["messageId"]),
+  // Each account's allowance of link previews fetched ahead of a send
+  // (prefetchLimits.ts).
+  prefetchLimits: defineTable({
+    accountId: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+  }).index("by_account", ["accountId"]),
   // Reactions by this PDS's accounts, to messages stored on any PDS.
   reactions: defineTable({
     accountId: v.string(),

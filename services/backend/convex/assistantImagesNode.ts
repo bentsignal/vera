@@ -7,8 +7,10 @@ import jpeg from "jpeg-js";
 import {
   isJpeg,
   JPEG_QUALITY,
+  MAX_DOWNLOAD_BYTES,
   MAX_PIXELS,
   MAX_SIDE,
+  readCapped,
   shrink,
 } from "../assistant-images";
 import { internal } from "./_generated/api";
@@ -20,7 +22,8 @@ import { internalAction } from "./_generated/server";
 
 /**
  * Converts one photo and records the JPEG, or that it can't be shown. One
- * too large to decode (by the size the app sent with it) isn't tried.
+ * too large to decode (by the size the app sent with it) isn't tried, and
+ * one over 20 MB stops downloading there.
  */
 export const convert = internalAction({
   args: { pixels: v.optional(v.number()), source: v.string() },
@@ -32,7 +35,7 @@ export const convert = internalAction({
       }
       const response = await fetch(source);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const bytes = new Uint8Array(await response.arrayBuffer());
+      const bytes = await readCapped(response, MAX_DOWNLOAD_BYTES);
       const decoded = isJpeg(bytes)
         ? jpeg.decode(bytes, { useTArray: true })
         : await decode({ buffer: bytes });

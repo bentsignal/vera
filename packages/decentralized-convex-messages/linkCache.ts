@@ -1,3 +1,5 @@
+import { isPublicWebUrl } from "@decentralized-convex/address";
+
 import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { LinkCard, LinkPreview } from "./protocol.ts";
@@ -25,64 +27,11 @@ export interface Expiry {
   readonly url: string;
 }
 
-/** IPv4 ranges that aren't the public internet, as [first octets, bits]. */
-const PRIVATE_IPV4: readonly (readonly [number, number, number])[] = [
-  [0, 0, 8], // "this" network
-  [10, 0, 8], // private
-  [100, 64, 10], // carrier-grade NAT
-  [127, 0, 8], // loopback
-  [169, 254, 16], // link-local, including cloud metadata services
-  [172, 16, 12], // private
-  [192, 168, 16], // private
-  [224, 0, 3], // multicast and reserved
-];
-
-function isPrivateIpv4(host: string) {
-  const parts = host.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !(part >= 0 && part < 256))) {
-    return false;
-  }
-  const address = parts.reduce((value, part) => value * 256 + part, 0);
-  return PRIVATE_IPV4.some(([a, b, bits]) => {
-    const size = 2 ** (32 - bits);
-    const start = a * 2 ** 24 + b * 2 ** 16;
-    return address >= start && address < start + size;
-  });
-}
-
-function isPrivateIpv6(host: string) {
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(host)?.[1];
-  if (mapped !== undefined) return isPrivateIpv4(mapped);
-  return (
-    host === "::" ||
-    host === "::1" ||
-    host.startsWith("::ffff:") ||
-    /^f[cd]/.test(host) ||
-    /^fe[89ab]/.test(host)
-  );
-}
-
 /**
- * Whether the server may fetch a link: http(s) to a public host. Names on
- * the local network and private, loopback, and link-local addresses are
- * refused, so a link can't make the server reach what's beside it.
+ * Whether the server may fetch a link: http(s) on the standard port, to a
+ * public host (`fetchPublic` checks each hop's address too).
  */
-export function isPublicWebUrl(value: string) {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host.includes(":")) return !isPrivateIpv6(host);
-  if (/^[\d.]+$/.test(host)) return !isPrivateIpv4(host);
-  return (
-    host.includes(".") &&
-    !/(?:^|\.)(?:localhost|local|internal|lan|home\.arpa)\.?$/.test(host)
-  );
-}
+export { isPublicWebUrl };
 
 /** The links a prefetch may ask about: distinct ones, a few at most. */
 function askedUrls(urls: readonly string[]) {
@@ -93,7 +42,7 @@ function askedUrls(urls: readonly string[]) {
 
 /** The links of `urls` worth fetching. */
 export function fetchableUrls(urls: readonly string[]) {
-  return askedUrls(urls).filter(isPublicWebUrl);
+  return askedUrls(urls).filter((url) => isPublicWebUrl(url));
 }
 
 async function cacheEntry(ctx: QueryCtx, url: string) {
@@ -101,6 +50,11 @@ async function cacheEntry(ctx: QueryCtx, url: string) {
     .query("linkPreviewCache")
     .withIndex("by_url", (index) => index.eq("url", url))
     .unique();
+}
+
+/** Whether a link has a fresh cache entry (or a fetch under way). */
+export async function isFresh(ctx: QueryCtx, url: string, now: number) {
+  return (await freshEntry(ctx, url, now)) !== null;
 }
 
 /** The cached entry for a link, unless it has expired. */
@@ -161,17 +115,23 @@ export async function claimFetches(
 /**
  * The cards a new message starts with: cached previews where there are
  * some, and placeholders for the rest, which wait on fetches (`toFetch`).
+ * Without `fetches`, the rest are just their links.
  */
 export async function cardsForMessage(
   ctx: MutationCtx,
   messageId: string,
   links: readonly string[],
   now: number,
+  fetches = true,
 ) {
   const cards: LinkCard[] = [];
   const waiting: string[] = [];
   for (const link of links) {
-    const card = cardFor(link, await freshEntry(ctx, link, now));
+    const cached = cardFor(link, await freshEntry(ctx, link, now));
+    const card =
+      cached.preview === undefined && !fetches
+        ? { link, preview: null }
+        : cached;
     cards.push(card);
     if (card.preview === undefined) {
       waiting.push(link);

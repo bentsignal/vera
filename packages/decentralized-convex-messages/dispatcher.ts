@@ -22,7 +22,7 @@ import {
 } from "./includes.ts";
 import * as invites from "./invites.ts";
 import { cachedCards } from "./linkCache.ts";
-import { requireAccountId } from "./model.ts";
+import { isVisitor, requireAccountId } from "./model.ts";
 import { prefetch } from "./previews.ts";
 import { messagesProtocol } from "./protocol.ts";
 import * as push from "./pushTokens.ts";
@@ -87,11 +87,8 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           threads.markThreadRead(ctx, requireAccountId(identity), args),
         openDirect: (ctx, { args, identity }) =>
           conversations.openDirect(ctx, requireAccountId(identity), args),
-        prefetchLinkPreviews: async (ctx, { args, identity }) => {
-          requireAccountId(identity);
-          await prefetch(ctx, args.urls);
-          return null;
-        },
+        prefetchLinkPreviews: (ctx, { args, identity }) =>
+          prefetch(ctx, identity, args.urls),
         react: (ctx, { args, identity }) => {
           const self = requireAccountId(identity);
           const name = identity?.name?.trim() ?? self.split("@")[0] ?? self;
@@ -119,7 +116,9 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           const self = requireAccountId(identity);
           const authorName =
             identity?.name?.trim() ?? self.split("@")[0] ?? self;
-          return sending.send(ctx, self, authorName, args);
+          // A visitor's own server fetches their previews.
+          const fetchesLinks = !isVisitor(identity);
+          return sending.send(ctx, self, authorName, args, { fetchesLinks });
         },
         setAlerts: (ctx, { args, identity }) =>
           alerts.setAlerts(ctx, requireAccountId(identity), args),

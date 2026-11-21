@@ -1,3 +1,16 @@
+/**
+ * The protocol's account address format, `username@domain`, lowercase.
+ * Every PDS holds addresses to it, whichever server they belong to; a
+ * server's own sign-up rules (reserved names and the like) are its own.
+ */
+export const ADDRESS_PATTERN =
+  /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+
+/** Whether a value is an address in the protocol's format, as written. */
+export function isAddress(value: string) {
+  return value.length <= 286 && ADDRESS_PATTERN.test(value);
+}
+
 export interface DecentralizedAddress {
   domain: string;
   username: string;
