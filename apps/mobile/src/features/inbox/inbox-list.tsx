@@ -29,7 +29,7 @@ function Empty({ title, detail }: { title: string; detail: string }) {
  * you follow among them, as filtered.
  */
 export function InboxList() {
-  const { conversations, isLoading } = useInbox();
+  const { conversations, isLoading, loadMore } = useInbox();
   markShown("inbox", !isLoading);
   useSavedHome();
   const pill = useHomePill();
@@ -80,6 +80,9 @@ export function InboxList() {
       data={items}
       estimatedItemSize={INBOX_ROW_HEIGHT}
       keyExtractor={(item) => item.key}
+      // The next page loads before the end shows, so scrolling doesn't stop.
+      onEndReached={loadMore}
+      onEndReachedThreshold={1.5}
       ListEmptyComponent={empty()}
       renderItem={({ item }) =>
         item.kind === "conversation" ? (

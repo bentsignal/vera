@@ -15,7 +15,7 @@ import { ThreadsSection } from "~/features/conversation-info/thread-items";
 import { AccountScope, useAccount } from "~/features/messaging/account";
 import { useConversation } from "~/features/messaging/conversations";
 import { useProfileState } from "~/features/messaging/profiles";
-import { useSpace } from "~/features/messaging/spaces";
+import { useSpace, useSpaceMembers } from "~/features/messaging/spaces";
 import {
   threadPeople,
   useConversationThreads,
@@ -61,10 +61,13 @@ function Details({
   conversation,
   card,
   recent,
+  spaceMembers,
 }: {
   conversation: Conversation;
   card: CardProps;
   recent: RecentThreads;
+  /** A channel's: its space's members, a page at a time. */
+  spaceMembers?: ReturnType<typeof useSpaceMembers>;
 }) {
   const router = useRouter();
   const { address: account } = useAccount();
@@ -83,7 +86,11 @@ function Details({
           />
           {kind !== "direct" && (
             <MembersSection
-              members={members}
+              members={
+                spaceMembers?.members.map(({ accountId }) => accountId) ??
+                members
+              }
+              more={spaceMembers}
               // Anyone in a group can add people; a channel's members are
               // its space's.
               onAdd={
@@ -117,11 +124,13 @@ function ChannelDetails({
   recent: RecentThreads;
 }) {
   const { isLoading, space } = useSpace(conversation.spaceId ?? "");
+  const spaceMembers = useSpaceMembers(space);
   if (isLoading) return null;
   return (
     <Details
       conversation={conversation}
       recent={recent}
+      spaceMembers={spaceMembers}
       card={{
         glyph: CHANNEL_GLYPH,
         name: title,

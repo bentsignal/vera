@@ -2,11 +2,25 @@ import { useQueries } from "@tanstack/react-query";
 import { pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
+import type { InboxSnapshot } from "~/features/messaging/inbox-rows";
 import { useVisibleAccounts } from "~/features/messaging/account";
 import { useInboxes } from "~/features/messaging/inbox-rows";
 import { pdsResultOr } from "~/features/messaging/results";
 import { usePreference } from "~/features/preferences/store";
 import { homeCount } from "./home-count";
+
+/**
+ * The rows of each Inbox's first page and its pins: what Home's badge
+ * counts, as the PDS counts a push's badge, however far the Inbox has
+ * been scrolled.
+ */
+export function firstPages(inboxes: readonly InboxSnapshot[]) {
+  return inboxes.flatMap((inbox) =>
+    (inbox.data ?? []).filter((conversation) =>
+      inbox.first.includes(conversation.conversationId),
+    ),
+  );
+}
 
 /**
  * What Home's badge counts, for each of these accounts: its Inbox (null
@@ -37,7 +51,7 @@ export function useHomeQueries(accounts: readonly string[]) {
     (!threadsShown || threads.every((result) => result.data !== undefined));
   return {
     count: homeCount({
-      conversations: inboxes.flatMap((result) => result.data ?? []),
+      conversations: firstPages(inboxes),
       kinds,
       threads: threadsShown
         ? threads.flatMap((result) => result.data ?? [])

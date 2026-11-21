@@ -134,7 +134,7 @@ function inboxSaved(
   const rows = complete([...people].map((person) => profiles.get(person)));
   // The Inbox's list, and each of its rows.
   const list = inboxListQuery(address);
-  const ids = liveSelected(queryClient, list) ?? [];
+  const ids = liveSelected(queryClient, list)?.ids ?? [];
   const inbox = complete([
     entryOf(queryClient, list.queryKey),
     ...ids.map((conversationId) =>

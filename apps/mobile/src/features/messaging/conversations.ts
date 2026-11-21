@@ -146,6 +146,32 @@ function membersShown(
     : conversation.members;
 }
 
+/**
+ * A conversation with its members: a channel's are its space's, which
+ * its row doesn't carry, so the space's first page stands in (for
+ * @mentions).
+ */
+function useWithChannelMembers(
+  data: Conversation | null | undefined,
+  address: string,
+) {
+  const spaceId = data?.kind === "channel" ? data.spaceId : null;
+  const { data: space } = useQuery(
+    pdsQuery({
+      args: { spaceId: spaceId ?? "" },
+      options: {
+        enabled: spaceId != null,
+        select: (result) => pdsResult(result)?.[0],
+      },
+      query: pds.messages.space,
+      session: address,
+    }),
+  );
+  return data?.kind === "channel" && space != null
+    ? { ...data, members: space.members.map(({ accountId }) => accountId) }
+    : data;
+}
+
 export function useConversation(
   conversationId: string,
   messages: readonly ShownMessage[] = [],
@@ -160,7 +186,9 @@ export function useConversation(
       session: address,
     }),
   );
-  const known = data === undefined ? directConversation(conversationId) : data;
+  const found = useWithChannelMembers(data, address);
+  const known =
+    found === undefined ? directConversation(conversationId) : found;
   const members = known?.members ?? [];
   // Assistants too, for @mentions (mentionable.ts).
   const { isLoaded, profileOf } = useProfileState([
@@ -179,7 +207,7 @@ export function useConversation(
     ),
   );
   return {
-    conversation: data ?? undefined,
+    conversation: found ?? undefined,
     displayName,
     isLoading: data === undefined,
     /** Its kind, known before it loads for a direct conversation. */
