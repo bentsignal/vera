@@ -6,8 +6,24 @@ import {
   decodeDnsTxtData,
   discoverPds,
   parsePdsTxtRecord,
+  PdsDiscoveryDisagreementError,
   PdsNotFoundError,
 } from "./discovery.ts";
+
+function isDoh(url: string) {
+  return (
+    url.startsWith("https://cloudflare-dns.com/dns-query") ||
+    url.startsWith("https://dns.google/resolve")
+  );
+}
+
+function urlOf(input: string | URL | Request) {
+  return typeof input === "string"
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url;
+}
 
 void test("extracts and validates an account domain", () => {
   assert.equal(accountDomain(" Shawn@A.Vera.Chat. "), "a.vera.chat");
@@ -103,7 +119,7 @@ void test("uses browser-compatible DNS-over-HTTPS by default", async () => {
             : input.url;
       requested.push(url);
       return Promise.resolve(
-        url.startsWith("https://cloudflare-dns.com/dns-query")
+        isDoh(url)
           ? Response.json({
               Answer: [
                 {
@@ -127,6 +143,11 @@ void test("uses browser-compatible DNS-over-HTTPS by default", async () => {
   assert.equal(result.manifestUrl, "https://a.example/manifest");
   assert.match(requested[0] ?? "", /name=_pds\.a\.vera\.chat/);
   assert.match(requested[0] ?? "", /type=TXT/);
+  // Both resolvers are asked.
+  assert.ok(
+    requested.some((url) => url.startsWith("https://cloudflare-dns.com/")),
+  );
+  assert.ok(requested.some((url) => url.startsWith("https://dns.google/")));
 });
 
 void test("rejects ambiguous or insecure discovery records", async () => {
@@ -156,7 +177,7 @@ void test("tells a domain with no PDS from one that didn't answer", async () => 
             ? input.href
             : input.url;
       return Promise.resolve(
-        url.startsWith("https://cloudflare-dns.com/dns-query")
+        isDoh(url)
           ? Response.json(dns)
           : new Response(null, { status: manifestStatus }),
       );
@@ -182,4 +203,61 @@ void test("tells a domain with no PDS from one that didn't answer", async () => 
     discoverPds("a.vera.chat", { fetch: answering(record, 503) }),
     (error) => !(error instanceof PdsNotFoundError),
   );
+});
+
+void test("believes a record only when both DNS resolvers agree on it", async () => {
+  const manifests: string[] = [];
+  function resolvers(cloudflare: unknown, google: unknown) {
+    return (input: string | URL | Request) => {
+      const url = urlOf(input);
+      if (url.startsWith("https://cloudflare-dns.com/")) {
+        return Promise.resolve(Response.json(cloudflare));
+      }
+      if (url.startsWith("https://dns.google/")) {
+        return google instanceof Error
+          ? Promise.reject(google)
+          : Promise.resolve(Response.json(google));
+      }
+      manifests.push(url);
+      return Promise.resolve(new Response(null, { status: 500 }));
+    };
+  }
+  const real = {
+    Answer: [{ data: '"v=pds1;url=https://a.example/manifest"', type: 16 }],
+    Status: 0,
+  };
+  const other = {
+    Answer: [{ data: '"v=pds1;url=https://liar.example/manifest"', type: 16 }],
+    Status: 0,
+  };
+  // Different servers, one says there's none, or one doesn't answer:
+  // nothing is believed, and no manifest is fetched.
+  await assert.rejects(
+    discoverPds("a.vera.chat", { fetch: resolvers(real, other) }),
+    PdsDiscoveryDisagreementError,
+  );
+  await assert.rejects(
+    discoverPds("a.vera.chat", { fetch: resolvers({ Status: 3 }, other) }),
+    PdsDiscoveryDisagreementError,
+  );
+  await assert.rejects(
+    discoverPds("a.vera.chat", {
+      fetch: resolvers(real, new Error("offline")),
+    }),
+    /offline/,
+  );
+  assert.deepEqual(manifests, []);
+  // The same record, however each resolver writes it, is believed.
+  const split = {
+    Answer: [
+      { data: '"v=pds1;url=https://a.example/" "manifest"', type: 16 },
+      { data: '"unrelated=value"', type: 16 },
+    ],
+    Status: 0,
+  };
+  await assert.rejects(
+    discoverPds("a.vera.chat", { fetch: resolvers(real, split) }),
+    /manifest request failed \(500\)/,
+  );
+  assert.deepEqual(manifests, ["https://a.example/manifest"]);
 });

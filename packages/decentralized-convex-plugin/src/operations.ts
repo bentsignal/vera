@@ -9,6 +9,25 @@ export interface Operation<
 > {
   readonly args: Args;
   readonly returns: Result;
+  /**
+   * For a query gathered from several PDSs (one whose result has
+   * `routes`): what one PDS's answer is believed about. A PDS speaks only
+   * for its own accounts, so given its answer and which accounts are its
+   * own (`owns`), this returns the answer with everything about other
+   * accounts left out. Clients apply it to every PDS's answer, the home
+   * PDS's too, and leave out other PDSs' answers to a query without it.
+   */
+  trust?(
+    value: Infer<Result>,
+    source: PdsAnswerSource<Infer<Args>>,
+  ): Infer<Result>;
+}
+
+/** Whose answer `Operation.trust` is checking, and what was asked. */
+export interface PdsAnswerSource<Args> {
+  readonly args: Args;
+  /** Whether an account (an address such as `maya@vera.chat`) is this PDS's own. */
+  readonly owns: (accountId: string) => boolean;
 }
 
 export type AnyOperation = Operation<

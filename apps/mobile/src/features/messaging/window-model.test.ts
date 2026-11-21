@@ -303,3 +303,23 @@ void test("only a recent, current window under the page limit opens again", () =
   assert.equal(reusable(long, last, fresh), false);
   assert.equal(reusable(anchoredView("m1"), last, fresh), false);
 });
+
+void test("a message ID reused by another author never replaces the real message", () => {
+  const real = { authorId: "maya@vera.chat", messageId: "m1", sentAt: 10 };
+  const edited = { ...real, body: "edited" };
+  const reused = { authorId: "mallory@liar.test", messageId: "m1", sentAt: 20 };
+  const backdated = { ...reused, sentAt: 5 };
+  function page(messages: WindowMessage[]) {
+    return { hasNewer: false, hasOlder: false, messages };
+  }
+  // The same author's later copy is the newer version.
+  assert.deepEqual(mergePages([page([real]), page([edited])]), [edited]);
+  // Another author's copy arriving later doesn't take its place.
+  assert.deepEqual(mergePages([page([real]), page([reused])], "x.test"), [
+    real,
+  ]);
+  // Nor, for a reader on the real author's server, one claimed earlier.
+  assert.deepEqual(mergePages([page([real]), page([backdated])], "vera.chat"), [
+    real,
+  ]);
+});

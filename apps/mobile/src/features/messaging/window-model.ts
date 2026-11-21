@@ -17,6 +17,7 @@ export type PageCursor =
   | { readonly before: number };
 
 export interface WindowMessage {
+  readonly authorId?: string;
   readonly messageId: string;
   readonly sentAt: number;
   readonly threadId?: string;
@@ -130,15 +131,60 @@ export function threadAnchoredView(
   return asView({ ...anchoredView(messageId), initial: pages, pages });
 }
 
-/** Every loaded message once, oldest first. */
+function domainOf(address: string | undefined) {
+  return address?.slice(address.lastIndexOf("@") + 1);
+}
+
+/**
+ * Which of two copies of one message ID shows. The same author's later
+ * copy (an edit, say) replaces the earlier. Two authors can't both have
+ * written it: each PDS is believed only about its own accounts, so one of
+ * them is reusing the other's ID, and it never replaces the other. The
+ * copy by an account on the reader's own server (`home`) wins, then the
+ * one sent first.
+ */
+export function preferredCopy<Message extends WindowMessage>(
+  current: Message,
+  next: Message,
+  home?: string,
+) {
+  if (current.authorId === next.authorId) return next;
+  const currentHome = home !== undefined && domainOf(current.authorId) === home;
+  const nextHome = home !== undefined && domainOf(next.authorId) === home;
+  if (currentHome !== nextHome) return currentHome ? current : next;
+  const earlier =
+    next.sentAt - current.sentAt ||
+    (next.authorId ?? "").localeCompare(current.authorId ?? "");
+  return earlier < 0 ? next : current;
+}
+
+/** The one copy of a message to show of several (see `preferredCopy`). */
+export function oneCopy<Message extends WindowMessage>(
+  copies: readonly Message[],
+  home?: string,
+) {
+  return copies.reduce<Message | null>(
+    (shown, copy) => (shown === null ? copy : preferredCopy(shown, copy, home)),
+    null,
+  );
+}
+
+/**
+ * Every loaded message once, oldest first; `home` is the reader's
+ * server's domain (see `preferredCopy`).
+ */
 export function mergePages<Message extends WindowMessage>(
   pages: readonly (PageData<Message> | undefined)[],
+  home?: string,
 ) {
-  const byId = new Map(
-    pages
-      .flatMap((page) => page?.messages ?? [])
-      .map((message) => [message.messageId, message] as const),
-  );
+  const byId = new Map<string, Message>();
+  for (const message of pages.flatMap((page) => page?.messages ?? [])) {
+    const current = byId.get(message.messageId);
+    byId.set(
+      message.messageId,
+      current === undefined ? message : preferredCopy(current, message, home),
+    );
+  }
   return [...byId.values()].sort(
     (left, right) =>
       left.sentAt - right.sentAt ||

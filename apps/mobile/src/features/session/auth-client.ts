@@ -34,3 +34,32 @@ export function createHomeAuthClient(
 }
 
 export type HomeAuthClient = ReturnType<typeof createHomeAuthClient>;
+
+function storedItem(key: string) {
+  try {
+    return SecureStore.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deletes an account's Better Auth session from this device: its cookie and
+ * cached session, each of which may be split across several keys (Better
+ * Auth's Expo storage writes long values in chunks, `<key>.0`, `<key>.1`,
+ * and so on, with the count in `<key>`).
+ */
+export function forgetAuthStorage(storagePrefix: string) {
+  for (const key of [
+    `${storagePrefix}_cookie`,
+    `${storagePrefix}_session_data`,
+  ]) {
+    const chunks = Number(
+      /ba-chunks:(\d+)$/.exec(storedItem(key) ?? "")?.[1] ?? 0,
+    );
+    for (let index = 0; index < chunks; index += 1) {
+      void SecureStore.deleteItemAsync(`${key}.${index}`).catch(() => null);
+    }
+    void SecureStore.deleteItemAsync(key).catch(() => null);
+  }
+}

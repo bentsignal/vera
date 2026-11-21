@@ -12,7 +12,6 @@ import {
   anchoredView,
   follow,
   latestView,
-  mergePages,
   pageAfter,
   pageKey,
   reusable,
@@ -24,6 +23,7 @@ import {
   cachedPage,
   listPageQuery,
   pageQuery,
+  shownPages,
   usePagesAhead,
 } from "./window-pages";
 
@@ -320,24 +320,6 @@ function windowActions(
   };
 }
 
-/** What the window's loaded pages show. */
-function shownPages(view: View, pages: readonly { data?: Page }[]) {
-  const data = pages.map((page) => page.data);
-  return {
-    first: data[0],
-    last: data.at(-1),
-    /**
-     * At the latest messages and following new ones. Its newest page can
-     * be momentarily full while the next one loads; the window is still at
-     * the latest.
-     */
-    live: view.liveSince !== undefined,
-    messages: mergePages(data),
-    parts: windowParts(view, data),
-    root: data.find((page) => page?.root != null)?.root ?? null,
-  };
-}
-
 /**
  * A scrollable window over a conversation (or a thread's replies), oldest
  * first, that can open at the latest message or around a specific one and
@@ -357,7 +339,7 @@ export function useMessageWindow(
     anchorSentAt,
   );
   const { next, view } = state;
-  const shown = shownPages(view, results.slice(0, view.pages.length));
+  const shown = shownPages(session, view, results.slice(0, view.pages.length));
   usePagesAhead(session, source, view, results);
   return {
     ...windowActions(setState, windowKeyOf(session, source), shown),

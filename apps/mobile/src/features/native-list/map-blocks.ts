@@ -206,7 +206,6 @@ function previewOf(preview: LinkPreview | null | undefined) {
     imageHeight: preview.video?.height,
     imageUrl: preview.imageUrl,
     imageWidth: preview.video?.width,
-    site: preview.siteName,
     title: preview.title,
   };
 }
@@ -217,7 +216,9 @@ function linkCardBlocks(message: Message) {
     return {
       ...preview,
       part: linkPart(message, index),
-      site: preview.site ?? hostOf(card.link),
+      // The address the card opens, never the name the page gives itself:
+      // a page can call itself anything.
+      site: hostOf(card.link),
       type: "linkCard",
       url: card.link,
     };

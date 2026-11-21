@@ -44,6 +44,14 @@ export const accountsProtocol = definePluginProtocol({
     getProfile: defineOperation({
       args: v.object({ accountId: v.string() }),
       returns: v.union(v.null(), accountProfile),
+      // Believed only from the account's own PDS, and only as the profile
+      // asked for.
+      trust: (profile, { args, owns }) =>
+        profile !== null &&
+        owns(profile.accountId) &&
+        profile.accountId === args.accountId.trim().toLowerCase()
+          ? profile
+          : null,
     }),
   },
   requires: {},

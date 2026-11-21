@@ -76,3 +76,28 @@ void test("notices", () => {
     ],
   });
 });
+
+void test("a link card names the address it opens, whatever the page calls itself", () => {
+  const row = only(
+    messageRows(
+      rowsOf([
+        message("a", 0, {
+          body: "look",
+          linkPreviews: [
+            {
+              link: "https://www.login-example.test/account",
+              preview: {
+                siteName: "Your Bank",
+                title: "Sign in",
+                url: "https://bank.example",
+              },
+            },
+          ],
+        }),
+      ]),
+    ),
+  );
+  const card = blockAt(row, 1, "linkCard");
+  assert.equal(card.site, "login-example.test");
+  assert.equal(card.url, "https://www.login-example.test/account");
+});

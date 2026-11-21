@@ -11,6 +11,7 @@ import type {
   FederatedQuerySnapshot,
   FederationSourceSnapshot,
   FederationTarget,
+  FederationTargetGroup,
   IncludedPdsQuery,
 } from "./types.ts";
 import { PdsInitialResponseTimeoutError } from "./errors.ts";
@@ -18,7 +19,8 @@ import { includedOnHome } from "./included.ts";
 import { PdsClient } from "./pds.ts";
 import { resolvedTargets, unresolvedSources } from "./routes.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
-import { groupFederationTargets } from "./targets.ts";
+import { federationTargetKey, groupFederationTargets } from "./targets.ts";
+import { sourceDomains, tryTrustedAnswer } from "./trust.ts";
 
 export class RoutedPdsQueryObserver<
   Request extends AnyPdsQueryRequest,
@@ -35,6 +37,7 @@ export class RoutedPdsQueryObserver<
   #included: readonly IncludedPdsQuery[] = [];
   readonly #listeners = new Set<() => void>();
   readonly #request;
+  readonly #homeKey: string;
   readonly #homeTarget;
   readonly #knownPds;
   readonly #revealPartialResultsAfter;
@@ -53,7 +56,8 @@ export class RoutedPdsQueryObserver<
   readonly #startedAt = Date.now();
 
   constructor(options: {
-    getConnection: (url: string) => PdsConnection;
+    /** The connection to a deployment, for the domain that led to it. */
+    getConnection: (url: string, domain?: string) => PdsConnection;
     home: FederationTarget;
     /** False: watch without what the result includes (see `PdsClient`). */
     include?: boolean;
@@ -67,10 +71,12 @@ export class RoutedPdsQueryObserver<
     ) => Promise<readonly ResolvedRoute[]>;
   }) {
     this.#getConnection = options.getConnection;
+    const { id, ...home } = options.home;
     this.#home = groupFederationTargets([options.home])[0] ?? {
-      ids: [options.home.id],
-      url: options.home.url,
+      ...home,
+      ids: [id],
     };
+    this.#homeKey = federationTargetKey(this.#home);
     this.#include = options.include;
     this.#initialResponseTimeout = options.initialResponseTimeout;
     this.#request = options.request;
@@ -78,12 +84,12 @@ export class RoutedPdsQueryObserver<
     this.#knownPds = options.knownPds ?? new Map<string, DiscoveredPds>();
     this.#revealPartialResultsAfter = options.revealPartialResultsAfter;
     this.#resolveRoutes = options.resolveRoutes;
-    this.#sources.set(this.#home.url, {
+    this.#sources.set(this.#homeKey, {
       status: "pending",
       target: this.#home,
     });
     this.#snapshot = createFederatedSnapshot([...this.#sources.values()]);
-    this.#startInitialResponseTimer(this.#home.url);
+    this.#startInitialResponseTimer(this.#homeKey, this.#home.url);
     this.#watchHome();
   }
 
@@ -112,7 +118,7 @@ export class RoutedPdsQueryObserver<
 
   #watchHome() {
     const client = new PdsClient({
-      connection: this.#getConnection(this.#home.url),
+      connection: this.#getConnection(this.#home.url, this.#home.domain),
     });
     const unsubscribe = client.watchQueryWithRouting(
       this.#request,
@@ -125,15 +131,15 @@ export class RoutedPdsQueryObserver<
             this.#knownPds,
           );
         }
-        this.#update(this.#home.url, { data, status: "live" });
+        this.#update(this.#homeKey, { data, status: "live" });
         void this.#reconcileRoutes(routes).catch(() => {
           // The point query exposes route-discovery failures through its normal error result.
         });
       },
-      (error) => this.#update(this.#home.url, { error, status: "error" }),
+      (error) => this.#update(this.#homeKey, { error, status: "error" }),
       { include: this.#include },
     );
-    this.#unsubscribes.set(this.#home.url, unsubscribe);
+    this.#unsubscribes.set(this.#homeKey, unsubscribe);
   }
 
   async #reconcileRoutes(routes: readonly string[]) {
@@ -142,7 +148,7 @@ export class RoutedPdsQueryObserver<
     if (this.#closed || generation !== this.#routingGeneration) return;
 
     const targets = groupFederationTargets([
-      { id: this.#home.ids[0] ?? this.#home.url, url: this.#home.url },
+      { ...this.#homeTarget, id: this.#home.ids[0] ?? this.#home.url },
       ...resolvedTargets(resolved),
     ]);
     // A route whose PDS can't be found counts as failed rather than holding
@@ -163,44 +169,41 @@ export class RoutedPdsQueryObserver<
   }
 
   /** Stops asking PDSes no longer routed to; whether there were any. */
-  #removeStaleTargets(targets: readonly { readonly url: string }[]) {
-    const desiredUrls = new Set(targets.map(({ url }) => url));
+  #removeStaleTargets(targets: readonly FederationTargetGroup[]) {
+    const desired = new Set(targets.map(federationTargetKey));
     let removed = false;
-    for (const url of this.#sources.keys()) {
-      if (url === this.#home.url || desiredUrls.has(url)) continue;
-      this.#unsubscribes.get(url)?.();
-      this.#unsubscribes.delete(url);
-      this.#clearInitialResponseTimer(url);
-      this.#sources.delete(url);
+    for (const key of this.#sources.keys()) {
+      if (key === this.#homeKey || desired.has(key)) continue;
+      this.#unsubscribes.get(key)?.();
+      this.#unsubscribes.delete(key);
+      this.#clearInitialResponseTimer(key);
+      this.#sources.delete(key);
       removed = true;
     }
     return removed;
   }
 
-  #addTargets(
-    targets: readonly {
-      readonly ids: readonly string[];
-      readonly url: string;
-    }[],
-  ) {
-    const added = targets.filter(
-      (target) =>
-        target.url !== this.#home.url && !this.#unsubscribes.has(target.url),
-    );
+  #addTargets(targets: readonly FederationTargetGroup[]) {
+    const added = targets.filter((target) => {
+      const key = federationTargetKey(target);
+      return key !== this.#homeKey && !this.#unsubscribes.has(key);
+    });
     for (const target of added) {
-      this.#sources.set(target.url, { status: "pending", target });
-      this.#startInitialResponseTimer(target.url);
+      const key = federationTargetKey(target);
+      this.#sources.set(key, { status: "pending", target });
+      this.#startInitialResponseTimer(key, target.url);
     }
     for (const target of added) {
+      const key = federationTargetKey(target);
       const client = new PdsClient({
-        connection: this.#getConnection(target.url),
+        connection: this.#getConnection(target.url, target.domain),
       });
       this.#unsubscribes.set(
-        target.url,
+        key,
         client.watchQuery(
           this.#request,
-          (data) => this.#update(target.url, { data, status: "live" }),
-          (error) => this.#update(target.url, { error, status: "error" }),
+          (data) => this.#update(key, { data, status: "live" }),
+          (error) => this.#update(key, { error, status: "error" }),
           { include: this.#include },
         ),
       );
@@ -213,29 +216,41 @@ export class RoutedPdsQueryObserver<
     unresolved: readonly FederationSourceSnapshot<PdsRequestResult<Request>>[],
   ) {
     const failed = unresolved.filter(
-      ({ target }) => this.#sources.get(target.url)?.status !== "error",
+      ({ target }) =>
+        this.#sources.get(federationTargetKey(target))?.status !== "error",
     );
     for (const source of failed) {
-      this.#unsubscribes.get(source.target.url)?.();
-      this.#unsubscribes.delete(source.target.url);
-      this.#clearInitialResponseTimer(source.target.url);
-      this.#sources.set(source.target.url, source);
+      const key = federationTargetKey(source.target);
+      this.#unsubscribes.get(key)?.();
+      this.#unsubscribes.delete(key);
+      this.#clearInitialResponseTimer(key);
+      this.#sources.set(key, source);
     }
     return failed.length > 0;
   }
 
   #update(
-    url: string,
-    update:
+    key: string,
+    received:
       | { data: PdsRequestResult<Request>; status: "live" }
       | { error: Error; status: "error" },
   ) {
     if (this.#closed) return;
-    const source = this.#sources.get(url);
+    const source = this.#sources.get(key);
     if (source === undefined) return;
-    this.#clearInitialResponseTimer(url);
+    this.#clearInitialResponseTimer(key);
+    // What this PDS is believed about, before anything combines it.
+    const update =
+      received.status === "live"
+        ? tryTrustedAnswer(
+            this.#request,
+            received.data,
+            sourceDomains(source.target),
+            { home: key === this.#homeKey },
+          )
+        : received;
     this.#sources.set(
-      url,
+      key,
       update.status === "error" &&
         (source.status === "live" || source.status === "stale")
         ? {
@@ -296,12 +311,12 @@ export class RoutedPdsQueryObserver<
     this.#partialResultsTimer = undefined;
   }
 
-  #startInitialResponseTimer(url: string) {
+  #startInitialResponseTimer(key: string, url: string) {
     this.#initialResponseTimers.set(
-      url,
+      key,
       setTimeout(
         () =>
-          this.#update(url, {
+          this.#update(key, {
             error: new PdsInitialResponseTimeoutError(url),
             status: "error",
           }),
@@ -310,10 +325,10 @@ export class RoutedPdsQueryObserver<
     );
   }
 
-  #clearInitialResponseTimer(url: string) {
-    const timer = this.#initialResponseTimers.get(url);
+  #clearInitialResponseTimer(key: string) {
+    const timer = this.#initialResponseTimers.get(key);
     if (timer === undefined) return;
     clearTimeout(timer);
-    this.#initialResponseTimers.delete(url);
+    this.#initialResponseTimers.delete(key);
   }
 }

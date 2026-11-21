@@ -6,7 +6,7 @@ import { pds } from "@vera/backend/pds";
 
 import type { PageCursor, PageData, View } from "./window-model";
 import { cachedSelected, pdsResult } from "./results";
-import { pagesAhead } from "./window-model";
+import { mergePages, oneCopy, pagesAhead, windowParts } from "./window-model";
 
 // The queries for a window's pages (see `useMessageWindow`).
 
@@ -35,8 +35,38 @@ function mergeSources(
     hasNewer: sources.some((source) => source.hasNewer),
     hasOlder: sources.some((source) => source.hasOlder),
     messages: sources.flatMap((source) => source.messages),
-    root: sources.find((source) => source.root != null)?.root ?? null,
+    // Each PDS sends only its own accounts' messages, so a thread's
+    // original comes only from its author's; two that claim the same ID
+    // are settled as in `preferredCopy`.
+    root: oneCopy(sources.flatMap(({ root }) => (root == null ? [] : [root]))),
   } satisfies Page;
+}
+
+/** What the window's loaded pages show to `session`. */
+export function shownPages(
+  session: string,
+  view: View,
+  pages: readonly { data?: Page }[],
+) {
+  const data = pages.map((page) => page.data);
+  // The reader's server (see `preferredCopy`).
+  const home = session.slice(session.lastIndexOf("@") + 1);
+  return {
+    first: data[0],
+    last: data.at(-1),
+    /**
+     * At the latest messages and following new ones. Its newest page can
+     * be momentarily full while the next one loads; the window is still at
+     * the latest.
+     */
+    live: view.liveSince !== undefined,
+    messages: mergePages(data, home),
+    parts: windowParts(view, data),
+    root: oneCopy(
+      data.flatMap((page) => (page?.root == null ? [] : [page.root])),
+      home,
+    ),
+  };
 }
 
 export function listPageQuery(

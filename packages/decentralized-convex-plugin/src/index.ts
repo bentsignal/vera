@@ -31,6 +31,7 @@ export type {
   OperationResponse,
   OperationResult,
   OperationReturn,
+  PdsAnswerSource,
   PluginProtocol,
   PluginRequirements,
   ProtocolRequirements,
