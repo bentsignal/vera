@@ -6,6 +6,7 @@ import { Passkey } from "react-native-passkey";
 
 import type { HomeAuthClient } from "./auth-client";
 import type { PendingSignIn } from "./pending-sign-in";
+import { signUpProof } from "./device-proof";
 import { finishPendingSignIn } from "./pending-sign-in";
 
 /**
@@ -21,6 +22,10 @@ const ERRORS = new Map([
     "Usernames are 2–32 characters: letters, numbers, dots, dashes, or underscores.",
   ],
   ["USERNAME_TAKEN", "That username is taken."],
+  ["DEVICE_LIMIT", "This phone already has a Vera account."],
+  ["DEVICE_PROOF_REQUIRED", "Update Vera to create an account."],
+  ["DEVICE_PROOF_INVALID", "Vera couldn't confirm this phone."],
+  ["DEVICE_CHECK_UNAVAILABLE", "Try again in a few minutes."],
 ]);
 
 /** A message for the person, or null when they cancelled the passkey sheet. */
@@ -52,8 +57,9 @@ async function request<Result>(
 }
 
 /**
- * Passkey-first sign-up: the server checks the username, the
- * device creates a passkey, and verifying it creates the account and session.
+ * Passkey-first sign-up: the server checks the username and that this
+ * phone has room for another account, the device creates a passkey, and
+ * verifying it creates the account and session.
  * Returns an error message, or null when cancelled or successful.
  */
 export async function createAccount(
@@ -62,10 +68,12 @@ export async function createAccount(
 ) {
   const { authClient } = pending;
   try {
+    const username = details.username.trim();
+    const device = await signUpProof(username);
     const options = await request<PasskeyCreateRequest>(
       authClient,
       "/passkey/generate-register-options",
-      { query: { context: JSON.stringify(details) } },
+      { query: { context: JSON.stringify({ device, username }) } },
     );
     const response = await Passkey.create(options);
     await request(authClient, "/passkey/verify-registration", {

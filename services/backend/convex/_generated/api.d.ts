@@ -50,6 +50,7 @@ import type * as pds from "../pds.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as release from "../release.js";
 import type * as sendLimits from "../sendLimits.js";
+import type * as signUpDevices from "../signUpDevices.js";
 import type * as summonPrompt from "../summonPrompt.js";
 import type * as summonReply from "../summonReply.js";
 import type * as summonStart from "../summonStart.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   rateLimits: typeof rateLimits;
   release: typeof release;
   sendLimits: typeof sendLimits;
+  signUpDevices: typeof signUpDevices;
   summonPrompt: typeof summonPrompt;
   summonReply: typeof summonReply;
   summonStart: typeof summonStart;

@@ -170,6 +170,33 @@ export default defineSchema({
     tokens: v.number(),
     updatedAt: v.number(),
   }).index("by_account", ["accountId", "bot"]),
+  /** Accounts signed up on each Android phone (signUpDevices.ts). */
+  signUpDevices: defineTable({
+    accounts: v.number(),
+    /** The phone's Android ID, hashed (sign-up-devices.ts). */
+    deviceKey: v.string(),
+  }).index("by_device", ["deviceKey"]),
+  /**
+   * A sign-up whose phone passed the check, until its passkey is made and
+   * the account exists, or it expires (signUpDevices.ts).
+   */
+  signUpClaims: defineTable({
+    address: v.string(),
+    deviceKey: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_address", ["address"])
+    .index("by_device", ["deviceKey"]),
+  /** iPhone sign-ups finish one at a time (signUpDevices.ts). */
+  signUpLocks: defineTable({
+    expiresAt: v.number(),
+    name: v.string(),
+  }).index("by_name", ["name"]),
+  /** Usernames an operator let past the per-phone limit (signUpDevices.ts). */
+  signUpAllowances: defineTable({
+    address: v.string(),
+    expiresAt: v.number(),
+  }).index("by_address", ["address"]),
   /** Each person's allowance of messages to send (sendLimits.ts). */
   sendLimits: defineTable({
     accountId: v.string(),
