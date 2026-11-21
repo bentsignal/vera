@@ -11,10 +11,10 @@ import { clearBadge } from "./badgeClear.ts";
 import * as conversations from "./conversations.ts";
 import * as editing from "./editing.ts";
 import * as inbox from "./inbox.ts";
+import * as inboxQueries from "./inboxQueries.ts";
 import {
   conversationIncludes,
   inboxIncludes,
-  inboxRowIncludes,
   liveCursor,
   memberEventIncludes,
   pageIncludes,
@@ -30,7 +30,7 @@ import * as reactions from "./reactions.ts";
 import * as sending from "./sending.ts";
 import * as settings from "./settings.ts";
 import * as sightings from "./sightings.ts";
-import { spaceReads } from "./spaceReads.ts";
+import * as spaceQueries from "./spaceQueries.ts";
 import * as spaces from "./spaces.ts";
 import * as threadLists from "./threadLists.ts";
 import * as threads from "./threads.ts";
@@ -171,28 +171,14 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           const found = await inbox.inbox(ctx, self, args);
           return queryResult(found, { include: inboxIncludes(self, found) });
         },
-        inboxConversations: async (ctx, { args, identity }) => {
-          const self = requireAccountId(identity);
-          const spaces = spaceReads(ctx);
-          const accesses = await inbox.inboxAccess(
+        inboxConversations: (ctx, { args, identity }) =>
+          inboxQueries.inboxConversations(
             ctx,
-            self,
-            args.channels === true,
-            spaces,
-          );
-          return queryResult(
-            accesses.map(({ conversation }) => conversation.conversationId),
-            {
-              // Only for its first answer (see `include` on the router):
-              // its subscription follows just the list.
-              include: async () =>
-                inboxRowIncludes(
-                  self,
-                  await inbox.inboxRows(ctx, self, accesses, spaces),
-                ),
-            },
-          );
-        },
+            requireAccountId(identity),
+            args,
+          ),
+        inboxPage: (ctx, { args, identity }) =>
+          inboxQueries.inboxPage(ctx, requireAccountId(identity), args),
         inboxThreads: (ctx, { identity }) =>
           threadLists.inboxThreads(ctx, requireAccountId(identity)),
         list: async (ctx, { args, identity }) => {
@@ -235,7 +221,7 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
           return routedQueryResult(found.reactions, found.routes);
         },
         space: (ctx, { args, identity }) =>
-          spaces.space(ctx, requireAccountId(identity), args.spaceId),
+          spaceQueries.space(ctx, requireAccountId(identity), args.spaceId),
         thread: async (ctx, { args, identity }) => {
           const found = await threads.thread(
             ctx,
@@ -292,10 +278,14 @@ export const { dispatchMutation, dispatchQueries, dispatchQuery } =
             requireAccountId(identity),
             args.spaceId,
           ),
+        spaceChannels: (ctx, { args, identity }) =>
+          spaceQueries.spaceChannels(ctx, requireAccountId(identity), args),
+        spaceMembers: (ctx, { args, identity }) =>
+          spaceQueries.spaceMembers(ctx, requireAccountId(identity), args),
         spaceInvites: (ctx, { identity }) =>
           invites.spaceInvites(ctx, requireAccountId(identity)),
         spaces: (ctx, { identity }) =>
-          spaces.spaces(ctx, requireAccountId(identity)),
+          spaceQueries.spaces(ctx, requireAccountId(identity)),
       },
     },
     mutation,

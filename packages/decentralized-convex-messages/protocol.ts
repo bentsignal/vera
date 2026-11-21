@@ -19,6 +19,7 @@ import {
 } from "./shapes.ts";
 
 export * from "./activityShapes.ts";
+export * from "./inboxShapes.ts";
 export * from "./shapes.ts";
 
 export const messagesProtocol = definePluginProtocol({

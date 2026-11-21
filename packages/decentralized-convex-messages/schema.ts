@@ -36,7 +36,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_conversation", ["conversationId"])
-    .index("by_space", ["spaceId"]),
+    .index("by_space", ["spaceId"])
+    .index("by_space_position", ["spaceId", "position"]),
   // When a conversation's reactions, edits, or deletions last changed it
   // (see `markChanged`), apart from the conversation itself, which every
   // query reads to check access and which a busy conversation would
@@ -79,6 +80,46 @@ export default defineSchema({
   })
     .index("by_account", ["accountId"])
     .index("by_conversation_account", ["conversationId", "accountId"]),
+  // Each account's inbox, ordered by latest activity, so it's read a page
+  // at a time (see .plans/inbox-paging.md). One row per account and
+  // conversation it lists; only an ordering, as every read checks access.
+  // A message moves its conversation's rows up a moment later
+  // (inboxOrder.ts), never in the send itself.
+  inboxEntries: defineTable({
+    accountId: v.string(),
+    // Its conversation's latest activity, as `updatedAt` has it.
+    activityAt: v.number(),
+    conversationId: v.string(),
+    pinnedAt: v.optional(v.number()),
+    // `chats` (direct and group), `channels`, or `hidden` (a channel
+    // left out of the inbox).
+    section: v.union(
+      v.literal("chats"),
+      v.literal("channels"),
+      v.literal("hidden"),
+    ),
+    // A channel's space, so leaving the space removes its rows.
+    spaceId: v.optional(v.string()),
+  })
+    .index("by_account_section_activity", [
+      "accountId",
+      "section",
+      "activityAt",
+    ])
+    .index("by_account_pinned", ["accountId", "pinnedAt"])
+    .index("by_account_conversation", ["accountId", "conversationId"])
+    .index("by_account_space", ["accountId", "spaceId"])
+    .index("by_conversation", ["conversationId"]),
+  // How far each conversation has been moved up its members' inboxes
+  // (`inboxEntries`), and the pass under way, if one is.
+  inboxBumps: defineTable({
+    conversationId: v.string(),
+    // The pass under way: where it's got to, and what it's moving them to.
+    cursor: v.optional(v.number()),
+    target: v.optional(v.number()),
+    // Every entry has at least this activity.
+    through: v.number(),
+  }).index("by_conversation", ["conversationId"]),
   // People joining (added by `by`) and leaving groups, shown between
   // their messages.
   memberEvents: defineTable({

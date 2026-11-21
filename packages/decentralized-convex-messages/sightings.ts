@@ -52,14 +52,23 @@ export function threadKey(threadId: string) {
   return `thread:${threadId}`;
 }
 
-/** Every time the account saw an item, oldest first. */
-export function sightingsOf(ctx: QueryCtx, accountId: string, key: string) {
-  return ctx.db
+/** Sightings of one item read at most: each is a time it showed more. */
+const MAX_SIGHTINGS_READ = 50;
+
+/** The newest times the account saw an item, oldest first. */
+export async function sightingsOf(
+  ctx: QueryCtx,
+  accountId: string,
+  key: string,
+) {
+  const newest = await ctx.db
     .query("activitySightings")
     .withIndex("by_account_key", (index) =>
       index.eq("accountId", accountId).eq("key", key),
     )
-    .collect();
+    .order("desc")
+    .take(MAX_SIGHTINGS_READ);
+  return newest.reverse();
 }
 
 /**

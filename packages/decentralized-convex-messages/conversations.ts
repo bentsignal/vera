@@ -1,9 +1,11 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
+import type { Id } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import type { MessagePage } from "./paging.ts";
 import type { messagesProtocol } from "./protocol.ts";
 import { alertsFor } from "./alerts.ts";
+import { addEntries, removeEntry } from "./inboxEntries.ts";
 import {
   fail,
   findAccess,
@@ -54,6 +56,16 @@ async function insertMembers(
   }
 }
 
+/** Lists a new conversation in its members' inboxes. */
+async function listNew(
+  ctx: MutationCtx,
+  id: Id<"conversations">,
+  accountIds: readonly string[],
+) {
+  const conversation = await ctx.db.get(id);
+  if (conversation !== null) await addEntries(ctx, conversation, accountIds);
+}
+
 export async function openDirect(
   ctx: MutationCtx,
   self: string,
@@ -63,13 +75,14 @@ export async function openDirect(
   if (other === self) fail("INVALID_ADDRESS");
   const conversationId = directConversationId(self, other);
   if ((await getConversation(ctx, conversationId)) === null) {
-    await ctx.db.insert("conversations", {
+    const id = await ctx.db.insert("conversations", {
       conversationId,
       createdBy: self,
       kind: "direct",
       updatedAt: Date.now(),
     });
     await insertMembers(ctx, conversationId, [self, other]);
+    await listNew(ctx, id, [self, other]);
   }
   return { conversationId };
 }
@@ -88,7 +101,7 @@ export async function createGroup(
   if (isRetriedCreate(existing, self, ({ kind }) => kind === "group")) {
     return { conversationId };
   }
-  await ctx.db.insert("conversations", {
+  const id = await ctx.db.insert("conversations", {
     conversationId,
     createdBy: self,
     kind: "group",
@@ -97,6 +110,7 @@ export async function createGroup(
     updatedAt: Date.now(),
   });
   await insertMembers(ctx, conversationId, [self, ...members], self);
+  await listNew(ctx, id, [self, ...members]);
   return { conversationId };
 }
 
@@ -135,6 +149,7 @@ export async function addGroupMembers(
   }
   const { conversationId } = conversation;
   await insertMembers(ctx, conversationId, added);
+  await addEntries(ctx, conversation, added);
   const at = Date.now();
   for (const accountId of added) {
     await ctx.db.insert("memberEvents", {
@@ -155,6 +170,7 @@ export async function leaveConversation(
 ) {
   await forgetBadge(ctx, self);
   const { member } = await requireGroup(ctx, args.conversationId, self);
+  await removeEntry(ctx, self, args.conversationId);
   if (member !== null) {
     await ctx.db.delete(member._id);
     await ctx.db.insert("memberEvents", {

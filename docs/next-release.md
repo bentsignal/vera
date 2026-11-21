@@ -13,3 +13,30 @@ the heading and intro so the file stays in place for the next release).
 
 Adding steps: any PR whose release needs something beyond `pnpm release`
 adds a section here in that PR (see AGENTS.md → Releases).
+
+## Inbox paging: check the inbox order filled in (after the backend deploys)
+
+**What:** The backend adds a stored inbox order per person
+(`inboxEntries`, .plans/inbox-paging.md). It fills itself in for existing
+conversations after the deploy, starting with the first message anyone
+sends; nothing to run. Until it finishes, inboxes are listed the old way.
+
+**When:** Right after `pnpm release` deploys the backend to production.
+
+**Verify:** A few minutes after the deploy (once someone has sent a
+message), from `services/backend`:
+
+```sh
+npx convex data --prod --component messages sequencing
+```
+
+shows a row with key `inboxFill` and `done: true`, and
+
+```sh
+npx convex data --prod --component messages inboxEntries --limit 5
+```
+
+lists rows. If `inboxFill` isn't there after 15 minutes, send any message
+in the app (that starts it) and check again. If it's there with
+`done: false` for over 30 minutes, tell Shawn: inboxes still work, the
+old way, but the fix isn't in effect.

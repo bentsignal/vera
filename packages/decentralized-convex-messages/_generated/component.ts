@@ -672,6 +672,31 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 version: string;
               }>;
               routes?: Array<string>;
+              type: "inboxPage";
+              value: {
+                conversationIds: Array<string>;
+                next: null | number;
+                pinned: Array<string>;
+              };
+            }
+          | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
+              include?: Array<{
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              }>;
+              routes?: Array<string>;
               type: "inboxConversations";
               value: Array<string>;
             }
@@ -2590,6 +2615,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 invited?: Array<string>;
                 joinedAt?: number;
                 members: Array<{ accountId: string; role: "owner" | "member" }>;
+                moreChannels?: boolean;
+                moreInvited?: boolean;
+                moreMembers?: boolean;
                 muted?: boolean;
                 name: string;
                 role: "owner" | "member";
@@ -2630,11 +2658,70 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
                 invited?: Array<string>;
                 joinedAt?: number;
                 members: Array<{ accountId: string; role: "owner" | "member" }>;
+                moreChannels?: boolean;
+                moreInvited?: boolean;
+                moreMembers?: boolean;
                 muted?: boolean;
                 name: string;
                 role: "owner" | "member";
                 spaceId: string;
                 unreadCount: number;
+              };
+            }
+          | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
+              include?: Array<{
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              }>;
+              routes?: Array<string>;
+              type: "spaceMembers";
+              value: null | {
+                members: Array<{ accountId: string; role: "owner" | "member" }>;
+                next: null | string;
+              };
+            }
+          | {
+              answered?: Array<{
+                request: {
+                  lastChanged: string;
+                  operation: { args: any; type: string };
+                  plugin: string;
+                  version: string;
+                };
+                routes?: Array<string>;
+                value: any;
+              }>;
+              include?: Array<{
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              }>;
+              routes?: Array<string>;
+              type: "spaceChannels";
+              value: null | {
+                channels: Array<{
+                  alerts?: "all" | "mentions" | "none";
+                  conversationId: string;
+                  muted?: boolean;
+                  name: string;
+                  position: number;
+                  showInInbox?: boolean;
+                  unreadCount: number;
+                }>;
+                next: null | number;
               };
             }
           | {
@@ -2736,6 +2823,10 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           lastChanged: "0.1.0";
           operation:
             | { args: { channels?: boolean }; type: "inbox" }
+            | {
+                args: { before?: number; channels?: boolean; limit?: number };
+                type: "inboxPage";
+              }
             | { args: { channels?: boolean }; type: "inboxConversations" }
             | {
                 args: {
@@ -2806,6 +2897,14 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             | { args: { urls: Array<string> }; type: "linkPreviews" }
             | { args: {}; type: "spaces" }
             | { args: { spaceId: string }; type: "space" }
+            | {
+                args: { after?: string; spaceId: string };
+                type: "spaceMembers";
+              }
+            | {
+                args: { after?: number; spaceId: string };
+                type: "spaceChannels";
+              }
             | { args: {}; type: "spaceInvites" }
             | { args: { spaceId: string }; type: "spaceInviteLinks" }
             | { args: { code: string }; type: "spaceInviteLinkPreview" };
@@ -2915,6 +3014,31 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               unreadCount: number;
               updatedAt: number;
             }>;
+          }
+        | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
+            include?: Array<{
+              lastChanged: string;
+              operation: { args: any; type: string };
+              plugin: string;
+              version: string;
+            }>;
+            routes?: Array<string>;
+            type: "inboxPage";
+            value: {
+              conversationIds: Array<string>;
+              next: null | number;
+              pinned: Array<string>;
+            };
           }
         | {
             answered?: Array<{
@@ -4834,6 +4958,9 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               invited?: Array<string>;
               joinedAt?: number;
               members: Array<{ accountId: string; role: "owner" | "member" }>;
+              moreChannels?: boolean;
+              moreInvited?: boolean;
+              moreMembers?: boolean;
               muted?: boolean;
               name: string;
               role: "owner" | "member";
@@ -4874,11 +5001,70 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
               invited?: Array<string>;
               joinedAt?: number;
               members: Array<{ accountId: string; role: "owner" | "member" }>;
+              moreChannels?: boolean;
+              moreInvited?: boolean;
+              moreMembers?: boolean;
               muted?: boolean;
               name: string;
               role: "owner" | "member";
               spaceId: string;
               unreadCount: number;
+            };
+          }
+        | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
+            include?: Array<{
+              lastChanged: string;
+              operation: { args: any; type: string };
+              plugin: string;
+              version: string;
+            }>;
+            routes?: Array<string>;
+            type: "spaceMembers";
+            value: null | {
+              members: Array<{ accountId: string; role: "owner" | "member" }>;
+              next: null | string;
+            };
+          }
+        | {
+            answered?: Array<{
+              request: {
+                lastChanged: string;
+                operation: { args: any; type: string };
+                plugin: string;
+                version: string;
+              };
+              routes?: Array<string>;
+              value: any;
+            }>;
+            include?: Array<{
+              lastChanged: string;
+              operation: { args: any; type: string };
+              plugin: string;
+              version: string;
+            }>;
+            routes?: Array<string>;
+            type: "spaceChannels";
+            value: null | {
+              channels: Array<{
+                alerts?: "all" | "mentions" | "none";
+                conversationId: string;
+                muted?: boolean;
+                name: string;
+                position: number;
+                showInInbox?: boolean;
+                unreadCount: number;
+              }>;
+              next: null | number;
             };
           }
         | {

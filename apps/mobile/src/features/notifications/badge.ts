@@ -9,7 +9,7 @@ import { pds } from "@vera/backend/pds";
 
 import { ACTIVITY_ARGS, isUnseen } from "~/features/activity/activity";
 import { activityItems } from "~/features/activity/activity-result";
-import { useHomeQueries } from "~/features/home/home-badge";
+import { firstPages, useHomeQueries } from "~/features/home/home-badge";
 import { countedChats, countsOnItsOwn } from "~/features/home/home-count";
 import { useAccounts } from "~/features/messaging/account";
 import { pdsResultOr } from "~/features/messaging/results";
@@ -143,10 +143,7 @@ export function useAppBadge() {
     [...invites, ...activity].every((result) => result.data !== undefined);
   // A mention or reply in a chat Home counts message by message is one
   // of its unread messages already.
-  const counted = countedChats(
-    inboxes.flatMap((result) => result.data ?? []),
-    home.kinds,
-  );
+  const counted = countedChats(firstPages(inboxes), home.kinds);
   const unseen = activity
     .flatMap((result) => result.data ?? [])
     .filter((item) => isUnseen(item) && countsOnItsOwn(item, counted)).length;

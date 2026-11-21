@@ -2,6 +2,7 @@ import { defineOperation } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
 
 import { activityItem, compactActivity } from "./activityShapes.ts";
+import { inboxPage } from "./inboxShapes.ts";
 import {
   conversation,
   linkCard,
@@ -10,9 +11,11 @@ import {
   notificationSettings,
   reaction,
   space,
+  spaceChannelPage,
   spaceInvite,
   spaceInviteLink,
   spaceInviteLinkPreview,
+  spaceMemberPage,
   threadPage,
   threadState,
   threadSummary,
@@ -23,13 +26,32 @@ import { threadListQueries } from "./threadOperations.ts";
 /** What the Messages protocol reads (see `messagesProtocol`). */
 export const queries = {
   /**
-   * Your conversations. With `channels`, it also lists the channels of
-   * your spaces that you haven't left out of it; without, it lists only
-   * direct messages and groups (as apps before the unified inbox expect).
+   * Your conversations: your pinned ones and the newest
+   * `LEGACY_INBOX_ROWS` others (apps from before `inboxPage`). With
+   * `channels`, it also lists the channels of your spaces that you haven't
+   * left out of it; without, it lists only direct messages and groups (as
+   * apps before the unified inbox expect).
    */
   inbox: defineOperation({
     args: v.object({ channels: v.optional(v.boolean()) }),
     returns: v.array(conversation),
+  }),
+  /**
+   * One page of your inbox, newest first (see `inboxPage`): the newest
+   * `limit` (at most and by default `INBOX_PAGE_SIZE`) conversations with
+   * activity before `before`, and on the first page (no `before`), your
+   * pinned ones. Pass the page's `next` as `before` for the one after.
+   * `channels` as in `inbox`. Its first answer includes each row (its
+   * `conversation` query) and the people they show, so a page arrives in
+   * one round trip.
+   */
+  inboxPage: defineOperation({
+    args: v.object({
+      before: v.optional(v.number()),
+      channels: v.optional(v.boolean()),
+      limit: v.optional(v.number()),
+    }),
+    returns: inboxPage,
   }),
   /**
    * The conversations in your inbox (as `inbox` lists them), by ID, in no
@@ -176,6 +198,22 @@ export const queries = {
     returns: v.union(v.null(), space),
   }),
   /** Spaces you've been invited to and haven't answered, newest first. */
+  /**
+   * A page of a space's members, by address: those after `after` (the
+   * last page's `next`), `SPACE_PAGE_SIZE` at a time.
+   */
+  spaceMembers: defineOperation({
+    args: v.object({ after: v.optional(v.string()), spaceId: v.string() }),
+    returns: v.union(v.null(), spaceMemberPage),
+  }),
+  /**
+   * A page of a space's channels, by position: those after `after` (the
+   * last page's `next`), `SPACE_PAGE_SIZE` at a time.
+   */
+  spaceChannels: defineOperation({
+    args: v.object({ after: v.optional(v.number()), spaceId: v.string() }),
+    returns: v.union(v.null(), spaceChannelPage),
+  }),
   spaceInvites: defineOperation({
     args: v.object({}),
     returns: v.array(spaceInvite),

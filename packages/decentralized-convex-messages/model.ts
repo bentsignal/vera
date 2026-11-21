@@ -314,7 +314,11 @@ export async function toConversation(
   const [latest, space, members, unread, changedAt] = await Promise.all([
     latestMessage(ctx, conversation.conversationId),
     spaceOf(ctx, conversation.spaceId, spaces),
-    memberAddresses(ctx, conversation, spaces),
+    // A channel's are its whole space's, which no row draws: they're
+    // paged where they show (`spaceMembers`).
+    conversation.kind === "channel"
+      ? []
+      : memberAddresses(ctx, conversation, spaces),
     readPosition(ctx, access, accountId).then((readAt) =>
       unreadOf(ctx, conversation, accountId, readAt),
     ),

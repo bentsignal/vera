@@ -1,9 +1,18 @@
-// eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import type { Space } from "@decentralized-convex/messages";
+import { useState } from "react";
+/* eslint-disable no-restricted-imports -- Expo Router has no route loaders to preload suspense queries. */
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+/* eslint-enable no-restricted-imports */
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
 import { pds } from "@vera/backend/pds";
 
 import { useAccount, useAccounts, useVisibleAccounts } from "./account";
+import { cachedSelect, chainAfter, morePages } from "./cached";
 import * as optimistic from "./optimistic";
 import { pdsResult, pdsResultOr } from "./results";
 
@@ -48,6 +57,108 @@ export function useSpace(spaceId: string) {
     }),
   );
   return { isLoading: data === undefined, space: data ?? undefined };
+}
+
+/** How many of something a space has: "50+" when only some are loaded. */
+export function memberCount(loaded: number, more: boolean) {
+  return more ? `${loaded}+` : String(loaded);
+}
+
+/**
+ * The query for the page of a space's members after `after` (the page
+ * before's last).
+ */
+function memberPageQuery(session: string, spaceId: string, after: string) {
+  return pdsQuery({
+    args: { after, spaceId },
+    options: { select: (result) => pdsResultOr(result, null)?.[0] ?? null },
+    query: pds.messages.spaceMembers,
+    session,
+  });
+}
+
+/**
+ * The query for the page of a space's channels after the position
+ * `after`.
+ */
+function channelPageQuery(session: string, spaceId: string, after: number) {
+  return pdsQuery({
+    args: { after, spaceId },
+    options: { select: (result) => pdsResultOr(result, null)?.[0] ?? null },
+    query: pds.messages.spaceChannels,
+    session,
+  });
+}
+
+/**
+ * A space's members: the first page `space` lists, then `loadMore` asks
+ * for each next one.
+ */
+export function useSpaceMembers(space: Space | undefined) {
+  const { address } = useAccount();
+  const queryClient = useQueryClient();
+  const [count, setCount] = useState(0);
+  const start =
+    space?.moreMembers === true ? space.members.at(-1)?.accountId : undefined;
+  const chain = chainAfter({
+    count,
+    nextOf: (query) => cachedSelect(queryClient, query)?.next,
+    queryFor: (after: string) =>
+      memberPageQuery(address, space?.spaceId ?? "", after),
+    start,
+  });
+  const results = useQueries({ queries: chain });
+  const hasMore = morePages(start, results.at(-1));
+  return {
+    hasMore,
+    loadMore: () => {
+      if (hasMore && results.at(-1)?.isFetching !== true) {
+        setCount(chain.length + 1);
+      }
+    },
+    members: [
+      ...(space?.members ?? []),
+      ...results.flatMap((result) => result.data?.members ?? []),
+    ],
+  };
+}
+
+/**
+ * A space's channels: the first page `space` lists, then `loadMore` asks
+ * for each next one.
+ */
+export function useSpaceChannels(space: Space | undefined) {
+  const { address } = useAccount();
+  const queryClient = useQueryClient();
+  const [count, setCount] = useState(0);
+  const start =
+    space?.moreChannels === true ? space.channels.at(-1)?.position : undefined;
+  const chain = chainAfter({
+    count,
+    nextOf: (query) => cachedSelect(queryClient, query)?.next,
+    queryFor: (after: number) =>
+      channelPageQuery(address, space?.spaceId ?? "", after),
+    start,
+  });
+  const results = useQueries({ queries: chain });
+  const hasMore = morePages(start, results.at(-1));
+  const first = space?.channels ?? [];
+  const seen = new Set(first.map((channel) => channel.conversationId));
+  return {
+    // A page starts after the last position, so ties can repeat.
+    channels: [
+      ...first,
+      ...results
+        .flatMap((result) => result.data?.channels ?? [])
+        .filter((channel) => !seen.has(channel.conversationId)),
+    ],
+    hasMore,
+    loadMore: () => {
+      if (hasMore && results.at(-1)?.isFetching !== true) {
+        setCount(chain.length + 1);
+      }
+    },
+  };
 }
 
 /** Spaces the visible accounts are invited to, each tagged with its account. */
