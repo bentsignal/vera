@@ -18,6 +18,8 @@ import { requireEnvironment } from "./lib";
 
 /** How long a checked Android sign-up has to make its passkey. */
 const CLAIM_MS = 15 * 60 * 1000;
+/** How long the iPhone sign-up slot is held at most (sign-up-devices.ts). */
+const LOCK_MS = 30 * 1000;
 /** How long an operator's allowance lasts. */
 const ALLOWANCE_MS = 24 * 60 * 60 * 1000;
 
@@ -33,22 +35,16 @@ function store(ctx: ActionCtx): SignUpDeviceStore {
       }),
     finish: (address) =>
       ctx.runMutation(internal.signUpDevices.finish, { address }),
+    lock: () => ctx.runMutation(internal.signUpDevices.lock, {}),
+    unlock: async () => {
+      await ctx.runMutation(internal.signUpDevices.unlock, {});
+    },
     useAllowance: (address) =>
       ctx.runMutation(internal.signUpDevices.useAllowance, { address }),
   };
 }
 
 /** The sign-up's start (`check`) or finish, with this deployment's settings. */
-export function signUpDeviceStep(
-  ctx: ActionCtx,
-  step: "check",
-  signUp: SignUpAttempt,
-): Promise<void>;
-export function signUpDeviceStep(
-  ctx: ActionCtx,
-  step: "finish",
-  signUp: SignUpAttempt,
-): Promise<() => Promise<void>>;
 export function signUpDeviceStep(
   ctx: ActionCtx,
   step: "check" | "finish",
@@ -59,6 +55,41 @@ export function signUpDeviceStep(
     ? checkSignUpDevice(store(ctx), config, signUp)
     : finishSignUpDevice(store(ctx), config, signUp);
 }
+
+const LOCK = "apple";
+
+/** Takes the iPhone sign-up slot, unless another sign-up holds it. */
+export const lock = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const held = await ctx.db
+      .query("signUpLocks")
+      .withIndex("by_name", (q) => q.eq("name", LOCK))
+      .unique();
+    if (held !== null && held.expiresAt > now) return false;
+    if (held === null) {
+      await ctx.db.insert("signUpLocks", {
+        expiresAt: now + LOCK_MS,
+        name: LOCK,
+      });
+    } else {
+      await ctx.db.patch(held._id, { expiresAt: now + LOCK_MS });
+    }
+    return true;
+  },
+});
+
+export const unlock = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const held = await ctx.db
+      .query("signUpLocks")
+      .withIndex("by_name", (q) => q.eq("name", LOCK))
+      .unique();
+    if (held !== null) await ctx.db.patch(held._id, { expiresAt: 0 });
+  },
+});
 
 export const allowed = internalQuery({
   args: { address: v.string() },

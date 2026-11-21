@@ -103,7 +103,7 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
           },
           afterVerification: async ({ context, ctx: endpoint }) => {
             const request = await validateSignUp(endpoint, context);
-            const counted = await deviceStep(() =>
+            await deviceStep(() =>
               signUpDeviceStep(
                 actionCtx(ctx),
                 "finish",
@@ -118,7 +118,6 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
             const session =
               await endpoint.context.internalAdapter.createSession(user.id);
             await setSessionCookie(endpoint, { session, user });
-            await counted();
             return { userId: user.id };
           },
         },

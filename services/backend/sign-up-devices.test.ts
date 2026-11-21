@@ -158,3 +158,18 @@ void test("an operator's allowance lets one username past, once, uncounted", asy
     "DEVICE_LIMIT",
   );
 });
+
+void test("two sign-ups sent at once from one iPhone can't both get through", async () => {
+  const apple = fakeApple();
+  const { store } = memoryStore();
+  const results = await Promise.all([
+    signUp(store, apple.fetcher, iphone("first")),
+    signUp(store, apple.fetcher, iphone("second")),
+    signUp(store, apple.fetcher, iphone("third")),
+  ]);
+  assert.deepEqual(results.filter((result) => result === null).length, 1);
+  assert.deepEqual(
+    results.filter((result) => result === "DEVICE_LIMIT").length,
+    2,
+  );
+});
