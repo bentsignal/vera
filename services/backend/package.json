@@ -9,7 +9,8 @@
     "./dataModel": "./convex/_generated/dataModel.d.ts",
     "./upload-limits": "./upload-limits.ts",
     "./breaking-version": "./breaking-version.ts",
-    "./dev-mixed-lines": "./dev-mixed-lines.ts"
+    "./dev-mixed-lines": "./dev-mixed-lines.ts",
+    "./dev-tools": "./dev-tools.ts"
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo node_modules",

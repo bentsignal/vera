@@ -246,17 +246,23 @@ the release a PR removes the finished steps.
    first, in the iOS simulator and Android emulator, and fixes what fails.
    Then it sends Shawn the notes, what it checked (with evidence), and the
    steps left for him: what a simulator can't settle.
-2. **Test in the dev client.** Push `main`'s backend to the shared dev
+2. **Security audit.** Before every release, Mythos (`claude-mythos-5-2`)
+   audits everything changed since the last release (app and backend; the
+   `vera-release` skill has the range and the prompt). Every finding is
+   settled before shipping: fixed in a merged PR, or Shawn decides it isn't
+   a problem. An unsettled finding blocks the release. Findings stay out
+   of the public repo until they're fixed.
+3. **Test in the dev client.** Push `main`'s backend to the shared dev
    deployment (`pnpm release backend dev`; usually already current, since
    backend PRs push it when they merge), then serve `main` to Vera Dev
    on Shawn's phones (`scripts/phone.sh up`). This test is for how the
    changes work together: JavaScript fixes reach the phone without a build. The
    real app gets tested in TestFlight. An internal build or internal OTA is
    only for checking update or channel behavior, or when Shawn asks.
-3. **Shawn tests** the steps left for him, plus his own quick use of the
+4. **Shawn tests** the steps left for him, plus his own quick use of the
    app, and approves, or asks for fixes (straight to `main` when small, feature PRs
    when not, then back to step 1).
-4. **Ship.**
+5. **Ship.**
    - If the backend changed, ship it together with the app:
      `pnpm release ota production "<notes>" --with-backend` deploys it
      between building and publishing the update, so open apps wait seconds
@@ -282,7 +288,7 @@ the release a PR removes the finished steps.
      same runtime, so every later update reaches the old binaries and the
      new build alike. Only a raised runtime makes a store build required:
      then `plan` says so, and the update reaches only the new build.
-5. **App Store**, only when Shawn says so: `pnpm release appstore <build>`
+6. **App Store**, only when Shawn says so: `pnpm release appstore <build>`
    submits the TestFlight build for App Review. The first submission needs
    the store listing filled in first (see the skill).
 

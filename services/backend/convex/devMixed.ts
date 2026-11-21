@@ -76,10 +76,10 @@ async function fill(
 }
 
 export const seed = action({
-  args: {},
+  args: { secret: v.string() },
   returns: v.object({ direct: v.string(), group: v.string() }),
-  handler: async (ctx) => {
-    const caller = await requireCaller(ctx);
+  handler: async (ctx, { secret }) => {
+    const caller = await requireCaller(ctx, secret);
     await seedProfiles(ctx);
     const me = { address: caller.accountId, name: caller.name };
     const bots = BOTS.map(botIdentity);
