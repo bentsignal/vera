@@ -45,6 +45,9 @@ build
 # misc
 .DS_Store
 *.pem
+# The update signing certificate is public; its key is in the Keychain
+# (docs/releasing.md → Signed updates).
+!apps/mobile/certs/certificate.pem
 
 # debug
 npm-debug.log*

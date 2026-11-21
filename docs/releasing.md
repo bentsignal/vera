@@ -13,7 +13,7 @@ the release with the `vera-release` skill and
 | ---------------- | -------- | --------------------------------------- | --------------- | -------------- | ----------------------------------------------- |
 | Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
 | Play build       | Vera     | `production` (app bundle, Play signing) | `vera.chat`     | `production`   | Play internal testing ("Vera testers")          |
-| Private preview  | Vera     | `preview` (ad hoc iOS, signed APK)      | `vera.chat`     | `preview`      | Shawn only, installed from an install page     |
+| Private preview  | Vera     | `preview` (ad hoc iOS, signed APK)      | `vera.chat`     | `preview`      | Shawn only, installed from an install page      |
 | Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, for update and channel checks    |
 | Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone, the same                 |
 | Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
@@ -197,6 +197,81 @@ Native list in the JavaScript they already have: they're on an older
 runtime, so newer JavaScript never reaches them. The detailed acceptance and deferred Android camera preview cosmetics
 are recorded in
 [the native-list release record](../.plans/native-list-release-20261025.md).
+
+## Signed updates
+
+Every over-the-air update is signed on Shawn's Mac, and binaries built
+since signing began run only updates with that signature. Someone who gets
+hold of the Expo account or an Expo token can upload an update, but phones
+with a signing binary refuse it: they need the private key, which never
+leaves the Mac.
+
+- **The certificate** (public) is `apps/mobile/certs/certificate.pem`;
+  `app.config.ts` builds it into every binary
+  (`updates.codeSigningCertificate`, key ID `main`). It's valid until
+  November 2056.
+- **The private key** is in the Mac's login Keychain, as the item "Vera
+  update signing key" (service `chat.vera.update-signing-key`, account
+  `vera`, the PEM in base64). It's never in the repo, never in EAS, and
+  never on Expo's servers: `eas update` signs locally.
+- **`pnpm release ota`** reads the key from the Keychain, checks it
+  against the certificate, writes it to a private temporary file for
+  `eas update --private-key-path`, and deletes the file afterwards. It
+  refuses to run without the key, before anything ships (with
+  `--with-backend`, before the backend deploys).
+- **`pnpm release build`** refuses to upload a binary that doesn't carry
+  the certificate, since it would accept unsigned updates.
+- `pnpm release signing-key check` confirms the Keychain's key matches the
+  certificate.
+- EAS signs only on its Production plan or higher. On the Free plan
+  `eas update` refuses to sign, so `pnpm release ota` fails.
+
+### Binaries already in people's hands
+
+Binaries built before signing began (iOS build 12 and earlier on
+TestFlight, Play build 9 and earlier) have no certificate. They don't check
+signatures, so they keep getting every update, signed or not, on the same
+runtime version: nothing changes for them. They're also not protected:
+only a binary with the certificate refuses an unsigned update. Protection
+reaches each person when they install the first store build with the
+certificate. The runtime version stays the same, because every update from
+now on is signed, which both kinds of binary accept.
+
+### Backing up and restoring the key
+
+If the key is lost, binaries with the certificate can't get updates
+again: the fix is a new key and certificate, and a store build everyone
+has to install. So the key has a backup outside the Mac, in Shawn's
+password manager:
+
+```sh
+security find-generic-password -s chat.vera.update-signing-key -a vera -w | pbcopy
+```
+
+then paste it into a new secure note, "Vera update signing key", and clear
+the clipboard. On a new Mac, copy the note's text and run:
+
+```sh
+pbpaste | pnpm release signing-key restore
+```
+
+which checks it against the certificate before storing it.
+
+### Replacing the key
+
+Only if the key leaks (anyone with it can sign updates) or is lost. Delete
+the Keychain item and `apps/mobile/certs/certificate.pem`, run
+`pnpm release signing-key create`, back up the new key, raise both
+runtime versions (a binary with the old certificate rejects updates
+signed with the new key), and ship store builds. Until people install
+them, older binaries stay on their last update.
+
+### Rolling back
+
+Republishing or rolling back an update also needs the signature:
+`eas update:republish` and `eas update:rollback` take
+`--private-key-path`. Write the key to a temporary file the way
+`withSigningKey` in `scripts/release.ts` does, and delete it afterwards.
 
 ## Release history in git
 
