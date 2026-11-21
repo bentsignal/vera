@@ -28,6 +28,7 @@ export async function startLinkCards(
   messageId: string,
   body: string,
   now: number,
+  { fetchesLinks = true }: { fetchesLinks?: boolean } = {},
 ) {
   const links = previewedUrls(body);
   if (links.length === 0) return undefined;
@@ -36,6 +37,7 @@ export async function startLinkCards(
     messageId,
     links,
     now,
+    fetchesLinks,
   );
   if (waiting.length > 0) {
     await startFetches(ctx, toFetch);
@@ -46,11 +48,16 @@ export async function startLinkCards(
   return cards;
 }
 
+/**
+ * `fetchesLinks` false (a visitor's message) gives links missing from the
+ * cache a link-only card instead of fetching them.
+ */
 export async function send(
   ctx: MutationCtx,
   self: string,
   authorName: string,
   args: Args,
+  { fetchesLinks = true }: { fetchesLinks?: boolean } = {},
 ) {
   const access = await requireAccess(ctx, args.conversationId, self);
   const body = args.body.trim();
@@ -63,16 +70,20 @@ export async function send(
     args.threadId === undefined
       ? undefined
       : await replyTo(ctx, args.conversationId, args.threadId, args.threadOnly);
-  const message = await storeMessage(ctx, {
-    attachments: args.attachments,
-    authorId: self,
-    authorName,
-    body,
-    conversationId: args.conversationId,
-    mentions: await validMentions(ctx, access, self, body, args.mentions),
-    messageId: args.messageId,
-    reply,
-  });
+  const message = await storeMessage(
+    ctx,
+    {
+      attachments: args.attachments,
+      authorId: self,
+      authorName,
+      body,
+      conversationId: args.conversationId,
+      mentions: await validMentions(ctx, access, self, body, args.mentions),
+      messageId: args.messageId,
+      reply,
+    },
+    { fetchesLinks },
+  );
   // Nothing shared is written: the message itself moves the conversation
   // up the inbox and marks it changed (see `toConversation`), so sends to
   // a busy conversation never conflict, and only queries whose results
@@ -104,7 +115,7 @@ export async function storeMessage(
     | "mentions"
     | "messageId"
   > & { readonly reply: Awaited<ReturnType<typeof replyTo>> | undefined },
-  { joinsThread = true }: { joinsThread?: boolean } = {},
+  options: { fetchesLinks?: boolean; joinsThread?: boolean } = {},
 ) {
   const sentAt = Date.now();
   const linkPreviews = await startLinkCards(
@@ -112,6 +123,7 @@ export async function storeMessage(
     fields.messageId,
     fields.body,
     sentAt,
+    options,
   );
   const message = {
     ...fields,
@@ -133,7 +145,7 @@ export async function storeMessage(
     await addReply(
       ctx,
       { ...reply, authorId: fields.authorId, sentAt },
-      { authorJoins: joinsThread },
+      { authorJoins: options.joinsThread !== false },
     );
   }
   await ctx.scheduler.runAfter(0, internal.notifications.send, {

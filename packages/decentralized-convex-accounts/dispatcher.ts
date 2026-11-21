@@ -3,6 +3,7 @@ import type {
   OperationHandlers,
   QueryOperationHandlers,
 } from "@decentralized-convex/server";
+import { isAddress } from "@decentralized-convex/address";
 import {
   defineComponentDispatchers,
   routedQueryResult,
@@ -77,10 +78,33 @@ function requireAccountId(
   const accountId = (identity?.accountId ?? identity?.email)
     ?.trim()
     .toLowerCase();
-  if (accountId?.includes("@") !== true) {
+  if (accountId === undefined || !isAddress(accountId)) {
     throw new ConvexError({ code: "AUTHENTICATED_ACCOUNT_REQUIRED" });
   }
   return accountId;
+}
+
+const MAX_AVATAR_URL_LENGTH = 2048;
+
+/** A profile photo's address: an https web address, or null for none. */
+function requireAvatarUrl(value: string | null) {
+  if (value === null) return null;
+  let url: URL | null = null;
+  try {
+    url = new URL(value);
+  } catch {
+    // Reported below.
+  }
+  if (
+    url === null ||
+    value.length > MAX_AVATAR_URL_LENGTH ||
+    url.protocol !== "https:" ||
+    url.username !== "" ||
+    url.password !== ""
+  ) {
+    throw new ConvexError({ code: "INVALID_AVATAR_URL" });
+  }
+  return value;
 }
 
 async function findProfile(ctx: QueryCtx, accountId: string) {
@@ -115,7 +139,7 @@ function editedProfile(
     avatarUrl:
       args.avatarUrl === undefined
         ? (existing?.avatarUrl ?? null)
-        : args.avatarUrl,
+        : requireAvatarUrl(args.avatarUrl),
     displayName,
   };
 }

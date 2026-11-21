@@ -183,3 +183,26 @@ void test("tells a domain with no PDS from one that didn't answer", async () => 
     (error) => !(error instanceof PdsNotFoundError),
   );
 });
+
+void test("a server's discovery refuses a manifest that redirects into its network", async () => {
+  const requested: string[] = [];
+  await assert.rejects(
+    discoverPds("a.vera.chat", {
+      fetch: (input) => {
+        requested.push(input instanceof Request ? input.url : input.toString());
+        return Promise.resolve(
+          new Response(null, {
+            headers: { location: "https://127.0.0.1/manifest" },
+            status: 302,
+          }),
+        );
+      },
+      publicOnly: true,
+      resolveHost: () => Promise.resolve(["203.0.113.7"]),
+      resolveTxt: () =>
+        Promise.resolve(["v=pds1;url=https://a.example/manifest"]),
+    }),
+    /Refused/,
+  );
+  assert.deepEqual(requested, ["https://a.example/manifest"]);
+});

@@ -176,6 +176,15 @@ export default defineSchema({
     tokens: v.number(),
     updatedAt: v.number(),
   }).index("by_account", ["accountId"]),
+  /**
+   * Each other server's allowance for its visitors' messages, by domain
+   * (sendLimits.ts).
+   */
+  domainSendLimits: defineTable({
+    domain: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+  }).index("by_domain", ["domain"]),
   /** What each assistant reply cost, for keeping an eye on the bill (usage.ts). */
   assistantUsage: defineTable({
     accountId: v.string(),

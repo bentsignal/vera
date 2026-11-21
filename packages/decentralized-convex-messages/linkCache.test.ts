@@ -47,6 +47,11 @@ function fakeCtx() {
       rows(table).push(row);
       return Promise.resolve(row._id);
     },
+    replace: (id: string, value: Record<string, unknown>) => {
+      const found = find(id);
+      if (found !== undefined) found.table[found.index] = { _id: id, ...value };
+      return Promise.resolve();
+    },
     patch: (id: string, value: Record<string, unknown>) => {
       const found = find(id);
       const row = found?.table[found.index];
@@ -257,4 +262,17 @@ void test("expired entries are deleted, renewed ones kept", async () => {
   assert.equal(rows("linkPreviewCache").length, 1);
   await expire(ctx, A, MISSING_LIFETIME_MS - 1 + PREVIEW_LIFETIME_MS);
   assert.equal(rows("linkPreviewCache").length, 0);
+});
+
+void test("a visitor's message fetches nothing: missing links show as links", async () => {
+  const { ctx, rows } = fakeCtx();
+  await storeResult(ctx, A, PREVIEW_A, 0);
+  const linked = await cardsForMessage(ctx, "m1", [A, B], 1, false);
+  assert.deepEqual(linked.cards, [
+    { link: A, preview: PREVIEW_A },
+    { link: B, preview: null },
+  ]);
+  assert.deepEqual(linked.toFetch, []);
+  assert.deepEqual(linked.waiting, []);
+  assert.deepEqual(rows("linkPreviewWaits"), []);
 });

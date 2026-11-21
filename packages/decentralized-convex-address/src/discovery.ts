@@ -1,3 +1,6 @@
+import type { ResolveHost } from "./public-fetch.ts";
+import { fetchPublic } from "./public-fetch.ts";
+
 /** Stable DNS record format marker, not an ecosystem version. */
 export const PDS_DISCOVERY_RECORD_FORMAT = "pds1";
 export const PDS_DNS_LABEL = "_pds";
@@ -38,6 +41,13 @@ export class PdsNotFoundError extends Error {
 
 export interface DiscoverPdsOptions {
   fetch?: typeof fetch;
+  /**
+   * Fetch the manifest only from the public web (`fetchPublic`), as a
+   * server must when someone else's domain names it.
+   */
+  publicOnly?: boolean;
+  /** For `publicOnly`: how the manifest's host is looked up. */
+  resolveHost?: ResolveHost;
   resolveTxt?: (name: string) => Promise<readonly string[]>;
 }
 
@@ -51,9 +61,16 @@ export async function discoverPds(
     ? resolveTxtWithDoh(`${PDS_DNS_LABEL}.${domain}`, fetcher)
     : options.resolveTxt(`${PDS_DNS_LABEL}.${domain}`));
   const manifestUrl = selectManifestUrl(records);
-  const response = await fetcher(manifestUrl, {
-    headers: { accept: "application/json" },
-  });
+  const init = { headers: { accept: "application/json" } };
+  const response = await (options.publicOnly === true
+    ? fetchPublic(manifestUrl, init, {
+        fetch: fetcher,
+        httpsOnly: true,
+        ...(options.resolveHost === undefined
+          ? {}
+          : { resolveHost: options.resolveHost }),
+      })
+    : fetcher(manifestUrl, init));
   if (!response.ok) {
     const message = `PDS manifest request failed (${response.status})`;
     throw response.status === 404 || response.status === 410
