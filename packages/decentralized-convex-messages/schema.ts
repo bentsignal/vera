@@ -299,6 +299,12 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_space", ["spaceId"]),
+  // People an owner removed from a space: invite links made before the
+  // row was created don't let them back in (spaceRemovals.ts).
+  spaceRemovals: defineTable({
+    accountId: v.string(),
+    spaceId: v.string(),
+  }).index("by_space_account", ["spaceId", "accountId"]),
   // Kinds of pushes an account turned off; absent fields are on. Default
   // alerts for groups and channels are `groupAlerts`
   // and `channelAlerts`, or else `none` where `groups` or `channels` is
