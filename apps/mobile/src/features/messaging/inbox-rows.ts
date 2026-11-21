@@ -1,6 +1,7 @@
 import type { Conversation } from "@decentralized-convex/messages";
 import type { PdsOptimisticLocalStore } from "@decentralized-convex/tanstack-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   keepPreviousData,
   partialMatchKey,
@@ -102,20 +103,28 @@ export interface InboxSnapshot {
 /**
  * The page queries of an account's first `count` pages: each after the
  * first starts where the one before it ends now (its cached `next`), so
- * the chain follows the pages as they change.
+ * the chain follows the pages as they change. While a page's new answer
+ * loads, the one after it keeps its last start (`known`), so its rows
+ * stay up rather than blinking out.
  */
-function pageChain(queryClient: QueryClient, session: string, count: number) {
+function pageChain(
+  queryClient: QueryClient,
+  session: string,
+  count: number,
+  known: readonly number[],
+) {
   const chain = [inboxPageQuery(session)];
+  const starts = new Array<number>();
   for (let index = 1; index < count; index += 1) {
     const before = chain[index - 1];
-    const next =
-      before === undefined
-        ? undefined
-        : cachedSelect(queryClient, before)?.next;
+    const cached =
+      before === undefined ? undefined : cachedSelect(queryClient, before);
+    const next = cached === undefined ? known[index - 1] : cached?.next;
     if (next == null) break;
+    starts.push(next);
     chain.push(inboxPageQuery(session, next));
   }
-  return chain;
+  return { chain, starts };
 }
 
 /**
@@ -127,9 +136,27 @@ export function useInboxes(
   pages: Readonly<Record<string, number>> = {},
 ) {
   const queryClient = useQueryClient();
-  const chains = accounts.map((session) =>
-    pageChain(queryClient, session, pages[session] ?? 1),
+  // Where each account's pages after the first last started.
+  const [known, setKnown] = useState<Readonly<Record<string, number[]>>>({});
+  const built = accounts.map((session) =>
+    pageChain(queryClient, session, pages[session] ?? 1, known[session] ?? []),
   );
+  const changed = accounts.filter(
+    (session, index) =>
+      built[index]?.starts.join() !== (known[session] ?? []).join(),
+  );
+  if (changed.length > 0) {
+    setKnown({
+      ...known,
+      ...Object.fromEntries(
+        changed.map((session) => [
+          session,
+          built[accounts.indexOf(session)]?.starts ?? [],
+        ]),
+      ),
+    });
+  }
+  const chains = built.map(({ chain }) => chain);
   const results = useQueries({ queries: chains.flat() });
   // Each account's page results, from where its chain starts.
   const starts = chains.map((_, index) =>
