@@ -54,6 +54,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           identity: null | {
             accountId?: string;
             email?: string;
+            home?: string;
             issuer: string;
             name?: string;
             subject: string;
@@ -89,6 +90,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           identity: null | {
             accountId?: string;
             email?: string;
+            home?: string;
             issuer: string;
             name?: string;
             subject: string;
@@ -165,6 +167,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           identity: null | {
             accountId?: string;
             email?: string;
+            home?: string;
             issuer: string;
             name?: string;
             subject: string;

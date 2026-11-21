@@ -5,7 +5,7 @@ import { internal } from "./_generated/api.js";
 import { internalAction, internalQuery } from "./_generated/server.js";
 import { alertsOf } from "./alerts.ts";
 import { badgeCounts, badgeField, deliver, recipientOf } from "./delivery.ts";
-import { getConversation } from "./model.ts";
+import { findAccess } from "./model.ts";
 import {
   accountProfile,
   ANDROID_DELIVERY,
@@ -14,12 +14,6 @@ import {
 } from "./pushParts.ts";
 import { wantsPush } from "./settings.ts";
 
-/**
- * Who to tell about a reaction (the message's author, on each of their
- * devices), and what to show them. Null when nobody should hear about it:
- * the reaction is gone, the author reacted themselves, or they muted the
- * conversation or turned reaction pushes off.
- */
 /**
  * The message reacted to, unless it's the reactor's own or was deleted
  * since.
@@ -37,37 +31,62 @@ async function othersMessage(
   return message.authorId === reactorId ? null : message;
 }
 
+/**
+ * Who to tell about a reaction (the message's author, on each of their
+ * devices), and what to show them. Null when nobody should hear about it:
+ * the reaction is gone, was left in another conversation than the
+ * message's, the reactor has left the conversation, the author reacted
+ * themselves, or they muted the conversation or turned reaction pushes off.
+ */
+export async function findReactionTargets(
+  ctx: QueryCtx,
+  {
+    emoji,
+    messageId,
+    reactorId,
+  }: { emoji: string; messageId: string; reactorId: string },
+) {
+  const message = await othersMessage(ctx, messageId, reactorId);
+  if (message === null) return null;
+  const reaction = await ctx.db
+    .query("reactions")
+    .withIndex("by_message_account", (index) =>
+      index.eq("messageId", messageId).eq("accountId", reactorId),
+    )
+    .collect();
+  if (
+    !reaction.some(
+      (row) =>
+        row.emoji === emoji && row.conversationId === message.conversationId,
+    )
+  ) {
+    return null;
+  }
+  // Still a member: someone who left (or was removed) sends no pushes.
+  const access = await findAccess(ctx, message.conversationId, reactorId);
+  if (access === null) return null;
+  const { conversation } = access;
+  const author = message.authorId;
+  const level = await alertsOf(ctx, conversation.conversationId, author);
+  if (level === null || level === "none") return null;
+  if (!(await wantsPush(ctx, author, "reactions"))) return null;
+  const tokens = await ctx.db
+    .query("pushTokens")
+    .withIndex("by_account", (index) => index.eq("accountId", author))
+    .collect();
+  return {
+    conversationId: conversation.conversationId,
+    conversationName: await conversationName(ctx, conversation),
+    message: previewText(message),
+    // A reaction to a reply kept in its thread opens the thread.
+    threadId: message.threadOnly === true ? (message.threadId ?? null) : null,
+    recipients: tokens.map(recipientOf),
+  };
+}
+
 export const reactionTargets = internalQuery({
   args: { emoji: v.string(), messageId: v.string(), reactorId: v.string() },
-  handler: async (ctx, { emoji, messageId, reactorId }) => {
-    const reaction = await ctx.db
-      .query("reactions")
-      .withIndex("by_message_account", (index) =>
-        index.eq("messageId", messageId).eq("accountId", reactorId),
-      )
-      .collect();
-    if (!reaction.some((row) => row.emoji === emoji)) return null;
-    const message = await othersMessage(ctx, messageId, reactorId);
-    if (message === null) return null;
-    const conversation = await getConversation(ctx, message.conversationId);
-    if (conversation === null) return null;
-    const author = message.authorId;
-    const level = await alertsOf(ctx, conversation.conversationId, author);
-    if (level === null || level === "none") return null;
-    if (!(await wantsPush(ctx, author, "reactions"))) return null;
-    const tokens = await ctx.db
-      .query("pushTokens")
-      .withIndex("by_account", (index) => index.eq("accountId", author))
-      .collect();
-    return {
-      conversationId: conversation.conversationId,
-      conversationName: await conversationName(ctx, conversation),
-      message: previewText(message),
-      // A reaction to a reply kept in its thread opens the thread.
-      threadId: message.threadOnly === true ? (message.threadId ?? null) : null,
-      recipients: tokens.map(recipientOf),
-    };
-  },
+  handler: (ctx, args) => findReactionTargets(ctx, args),
 });
 
 /**

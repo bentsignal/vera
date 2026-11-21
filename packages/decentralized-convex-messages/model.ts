@@ -1,3 +1,4 @@
+import { isAddress } from "@decentralized-convex/address";
 import { ConvexError } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel.js";
@@ -19,7 +20,6 @@ import {
 
 export { getSpace, getSpaceMember };
 
-const ADDRESS_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 const MAX_NAME_LENGTH = 80;
 
 export function fail(code: string): never {
@@ -38,19 +38,32 @@ export async function isAssistant(ctx: QueryCtx, accountId: string) {
   return row !== null;
 }
 
+/** The caller's address, which must be in the protocol's format. */
 export function requireAccountId(
   identity: null | { accountId?: string; email?: string },
 ) {
   const accountId = (identity?.accountId ?? identity?.email)
     ?.trim()
     .toLowerCase();
-  if (accountId?.includes("@") !== true) fail("AUTHENTICATED_ACCOUNT_REQUIRED");
+  if (accountId === undefined || !isAddress(accountId)) {
+    fail("AUTHENTICATED_ACCOUNT_REQUIRED");
+  }
   return accountId;
+}
+
+/**
+ * Whether the caller is a visitor: an account of another PDS signed in
+ * here (the PDS router sets `home` to its domain). The PDS doesn't do work
+ * on a visitor's behalf that their own server does for them, such as
+ * fetching link previews.
+ */
+export function isVisitor(identity: null | { home?: string }) {
+  return identity?.home !== undefined;
 }
 
 export function normalizeAddress(value: string) {
   const address = value.trim().toLowerCase();
-  if (!ADDRESS_PATTERN.test(address)) fail("INVALID_ADDRESS");
+  if (!isAddress(address)) fail("INVALID_ADDRESS");
   return address;
 }
 

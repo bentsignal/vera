@@ -1,3 +1,4 @@
+import type { DispatcherIdentity } from "@decentralized-convex/server";
 import { v } from "convex/values";
 
 import type { MutationCtx } from "./_generated/server.js";
@@ -6,13 +7,13 @@ import type { LinkPreview } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
 import { internalAction, internalMutation } from "./_generated/server.js";
 import {
-  claimFetches,
   expire as expireEntry,
-  fetchableUrls,
   giveUp as giveUpWaits,
   storeResult,
 } from "./linkCache.ts";
+import { isVisitor, requireAccountId } from "./model.ts";
 import { fetchPreview } from "./opengraph.ts";
+import { claimPrefetches } from "./prefetchLimits.ts";
 import { linkPreview } from "./protocol.ts";
 
 /** Schedules the deletion of cache entries once they expire. */
@@ -36,12 +37,20 @@ export async function startFetches(
   await scheduleExpiries(ctx, claimed);
 }
 
-/** Starts fetching links someone is typing, unless they're cached. */
-export async function prefetch(ctx: MutationCtx, urls: readonly string[]) {
-  await startFetches(
-    ctx,
-    await claimFetches(ctx, fetchableUrls(urls), Date.now()),
-  );
+/**
+ * Starts fetching links someone is typing, unless they're cached or the
+ * account has used up its allowance (prefetchLimits.ts). A visitor's own
+ * server fetches their previews, so nothing starts for one.
+ */
+export async function prefetch(
+  ctx: MutationCtx,
+  identity: DispatcherIdentity | null,
+  urls: readonly string[],
+) {
+  const self = requireAccountId(identity);
+  if (isVisitor(identity)) return null;
+  await startFetches(ctx, await claimPrefetches(ctx, self, urls, Date.now()));
+  return null;
 }
 
 export const store = internalMutation({

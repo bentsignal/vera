@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { previewFromHtml } from "./opengraph.ts";
+import { fetchPreview, previewFromHtml } from "./opengraph.ts";
 
 const URL = "https://news.example.com/2026/10/12/story";
 
@@ -66,4 +66,42 @@ void test("previewFromHtml drops images not served over https", () => {
     URL,
   );
   assert.equal(result.preview?.imageUrl, undefined);
+});
+
+void test("a link that redirects into the server's network gets no preview", async (context) => {
+  const requested: string[] = [];
+  context.mock.method(
+    globalThis,
+    "fetch",
+    (input: Parameters<typeof fetch>[0]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.startsWith("https://cloudflare-dns.com/")) {
+        const type = new globalThis.URL(url).searchParams.get("type");
+        return Promise.resolve(
+          Response.json({
+            Answer: type === "A" ? [{ data: "93.184.216.34", type: 1 }] : [],
+            Status: 0,
+          }),
+        );
+      }
+      requested.push(url);
+      return Promise.resolve(
+        new Response(null, {
+          headers: { location: "http://169.254.169.254/latest/meta-data" },
+          status: 302,
+        }),
+      );
+    },
+  );
+  await assert.rejects(fetchPreview("https://short.example/abc"), /Refused/);
+  // The redirect itself was never requested.
+  assert.deepEqual(requested, ["https://short.example/abc"]);
+});
+
+void test("a link on another port gets no preview, and nothing is fetched", async (context) => {
+  const fetched = context.mock.method(globalThis, "fetch", () =>
+    Promise.resolve(new Response("")),
+  );
+  assert.equal(await fetchPreview("https://example.com:8080/"), null);
+  assert.equal(fetched.mock.callCount(), 0);
 });

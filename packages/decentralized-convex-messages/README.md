@@ -36,8 +36,17 @@ pauses and read the results with `messages.linkPreviews`. The PDS keeps
 fetched previews in a cache for six hours (ten minutes for a link with
 none), so a prefetched link's card is in the message when it's stored.
 `linkPreview` still carries the first link's preview for older apps. The
-server only fetches public http(s) hosts, with a 5 second timeout per
-try and at most 512 KB of each page's head. Sites let different link
+server only fetches public http(s) hosts on the standard ports, with a 5
+second timeout per try and at most 512 KB of each page's head. It checks
+every redirect before following it, and looks each name up first (DNS over
+HTTPS, since Convex's runtime has no DNS lookup of its own) to refuse one
+that points at a private address; see `fetchPublic` in
+`@decentralized-convex/address` for what that can't catch. Previews are
+fetched for the PDS's own accounts only: a visitor (`identity.home`) gets
+link-only cards for links not already cached, since their own server
+fetches their previews. Each account can start 20 prefetches at once,
+refilling one every 3 seconds (`prefetchLimits.ts`); cached links cost
+nothing. Sites let different link
 expanders through, so a page that comes back blocked or without Open
 Graph tags is tried again as the next of `PAGE_AGENTS` (iMessage's, then
 WhatsApp's, Slack's, Discord's, and a browser's; see `agents.ts`), for

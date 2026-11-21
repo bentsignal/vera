@@ -72,6 +72,38 @@ npx convex run affiliations:remove '{"address":"vera@vera.chat"}'
 npx convex run affiliations:list
 ```
 
+## Visitors
+
+An account of another PDS can sign in here as a visitor
+(`/api/auth/federation/exchange`) to read this PDS's members' messages in
+conversations they share. Its address must be in the protocol's format, and
+each sign-in assertion is accepted once (remembered in Better Auth's
+`verification` table until it expires). The router marks a visitor's
+identity with its home domain (`identity.home`, from `FEDERATION_DOMAIN`),
+and visitors get less than this PDS's own accounts:
+
+- No assistant: Vera and the other assistants answer this PDS's own
+  accounts only (`assistantHook.ts`).
+- No link previews fetched for them (their own server does that).
+- Their sends count against their own allowance and, together, against a
+  ceiling for their whole server: 300 at once, refilling 300 a minute
+  (`send-limits.ts`). Check or clear one with
+  `npx convex run sendLimits:domainStatus '{"domain":"example.com"}'` and
+  `sendLimits:domainReset`.
+
+## Self-hosting
+
+The server fetches addresses other people choose: link previews, and
+another PDS's manifest and keys when its accounts sign in as visitors
+(`fetchPublic` in `@decentralized-convex/address`). It refuses private,
+loopback, and link-local addresses, ports other than 80 and 443, and checks
+every redirect and each name's DNS answer before fetching. Convex's runtime
+has no DNS lookup of its own, so the name is looked up over DNS over HTTPS
+and `fetch` then looks it up again by itself: a name whose answer changes in
+between can still reach a private address. If you run the Convex backend
+yourself, also block its outgoing traffic to private networks (and to your
+cloud's metadata address, `169.254.169.254`) in your firewall.
+
 ## Vera, the assistant
 
 `vera@<account domain>` is a verified account that answers direct messages

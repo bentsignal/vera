@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { fetchableByGateway, isJpeg, shrink } from "./assistant-images.ts";
+import {
+  fetchableByGateway,
+  isJpeg,
+  readCapped,
+  shrink,
+} from "./assistant-images.ts";
 
 function solid(width: number, height: number, rgba: number[]) {
   const data = new Uint8Array(width * height * 4);
@@ -45,4 +50,38 @@ void test("a JPEG is known by its bytes, not its type", () => {
   const heic = new Uint8Array([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70]);
   assert.equal(isJpeg(heic), false);
   assert.equal(isJpeg(new Uint8Array()), false);
+});
+
+function streamOf(chunks: number, size: number) {
+  let sent = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent === chunks) controller.close();
+      else {
+        sent += 1;
+        controller.enqueue(new Uint8Array(size));
+      }
+    },
+  });
+}
+
+void test("a download stops at the limit, whatever its size claims", async () => {
+  // No content-length: it reads until it's over.
+  await assert.rejects(
+    readCapped(new Response(streamOf(1000, 1024)), 10 * 1024),
+    /Too large/,
+  );
+  // A size over the limit isn't read at all.
+  await assert.rejects(
+    readCapped(
+      new Response("x", { headers: { "content-length": "999999999" } }),
+      10 * 1024,
+    ),
+    /Too large/,
+  );
+});
+
+void test("a download under the limit comes back whole", async () => {
+  const bytes = await readCapped(new Response(streamOf(3, 100)), 1024);
+  assert.equal(bytes.length, 300);
 });

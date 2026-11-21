@@ -25,7 +25,7 @@ import { heardInThread, mentionedInThread } from "./threadFollow";
 const REPLY_DELAY = 1500;
 
 /**
- * The router's `afterMutation` (pds.ts): when someone on this PDS sends a
+ * The router's `afterMutation` (pds.ts): when an account of this PDS sends a
  * direct message to an assistant, its reply runs after a short pause, in
  * the thread when the message was kept there. A newer message moves the
  * reply later, so it answers them together. A message anywhere else that
@@ -35,7 +35,7 @@ export async function afterPdsMutation(
   ctx: MutationCtx,
   { identity, operation, plugin, value }: PdsRouterMutation,
 ) {
-  if (plugin !== "messages" || identity === null) return;
+  if (plugin !== "messages" || !isOwnAccount(identity)) return;
   const type = field(operation, "type");
   const args = field(operation, "args");
   const conversationId = field(args, "conversationId");
@@ -52,6 +52,17 @@ export async function afterPdsMutation(
   }
   if (type !== "send" || identity.accountId === undefined) return;
   await startReply(ctx, conversationId, sentThread(value), identity.accountId);
+}
+
+/**
+ * Vera's assistants work for this PDS's own accounts. A visitor (signed in
+ * from another PDS, which the router marks with `home`) gets no replies,
+ * summons, or memory.
+ */
+function isOwnAccount(
+  identity: PdsRouterMutation["identity"],
+): identity is NonNullable<PdsRouterMutation["identity"]> {
+  return identity !== null && identity.home === undefined;
 }
 
 /**
