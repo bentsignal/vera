@@ -102,8 +102,8 @@ The phone holds one Vera Dev at a time:
   `scripts/phone.sh list` shows every cached dev client and marks main's.
   Main's fingerprint comes from a checkout of `origin/main` kept in
   `~/Library/Caches/vera/main-checkout`.
-- **An internal build, for release tests** (`pnpm release build
-internal`, `--android`): a Release build of `main` with the JavaScript
+- **An internal build, for release tests:** a Release build of `main`
+  (`pnpm release build internal`, `--android`) with the JavaScript
   bundled in and the `internal` update channel. Shawn tests each release
   on it (docs/releasing.md), and it checks update and channel behavior.
   It installs over the dev client and keeps the sign-in; Shawn reinstalls
