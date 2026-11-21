@@ -31,6 +31,8 @@ const native =
  */
 const CLOUD_PROJECT_NUMBER = "863019500780";
 
+const PROOF_TIMEOUT_MS = 10_000;
+
 /**
  * This phone's proof for signing up as `username`, or null where there's
  * none (an older binary, a simulator or emulator, a phone without Play).
@@ -38,9 +40,15 @@ const CLOUD_PROJECT_NUMBER = "863019500780";
  */
 export async function signUpProof(username: string) {
   if (native === null) return null;
-  try {
-    return await native.signUpProofAsync(username, CLOUD_PROJECT_NUMBER);
-  } catch {
-    return null;
-  }
+  const proof = native
+    .signUpProofAsync(username, CLOUD_PROJECT_NUMBER)
+    .catch(() => null);
+  // Google can be slow to answer (seconds on an emulator); sign-up goes on
+  // without a proof rather than spin, and the PDS decides.
+  const giveUp = new Promise<null>((resolve) => {
+    setTimeout(() => {
+      resolve(null);
+    }, PROOF_TIMEOUT_MS);
+  });
+  return Promise.race([proof, giveUp]);
 }
