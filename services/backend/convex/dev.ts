@@ -32,13 +32,15 @@ import {
 // Development only. Bots are ordinary accounts on the dev deployment that
 // post through the Messages plugin as themselves, so screens show other
 // people without anyone making accounts by hand. Every entry point refuses to
-// run unless DEV_TOOLS is "true", which production never sets.
+// run unless DEV_TOOLS is "true" and DEV_TOOLS_SECRET is set, which
+// production never does, and the public ones also take that secret as an
+// argument (../dev-tools.ts).
 
 /** Creates bot profiles and conversations with the signed-in account. */
 export const seed = action({
-  args: {},
-  handler: async (ctx) => {
-    const caller = await requireCaller(ctx);
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    const caller = await requireCaller(ctx, secret);
     const me = { address: caller.accountId, name: caller.name };
     const bots = BOTS.map(botIdentity);
     const authors = BOTS.map((bot) => ({
@@ -58,9 +60,9 @@ export const seed = action({
  * measuring what that costs and trying the app offline (devFullSeed.ts).
  */
 export const seedFull = action({
-  args: {},
-  handler: async (ctx) => {
-    const caller = await requireCaller(ctx);
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    const caller = await requireCaller(ctx, secret);
     await seedProfiles(ctx);
     return seedFullConversations(ctx, {
       address: caller.accountId,
@@ -92,9 +94,9 @@ export const releaseTest = internalAction({
  * which the app opens at so paging both ways can be tried.
  */
 export const longThreadMiddle = action({
-  args: {},
-  handler: async (ctx) => {
-    const caller = await requireCaller(ctx);
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    const caller = await requireCaller(ctx, secret);
     return longThreadAnchor(ctx, caller, {
       address: caller.accountId,
       name: caller.name,
@@ -111,9 +113,13 @@ export const longThreadMiddle = action({
  */
 export const replyToMe = action({
   // With `threadId`, the bots answer in that thread.
-  args: { conversationId: v.string(), threadId: v.optional(v.string()) },
-  handler: async (ctx, { conversationId, threadId }) => {
-    const me = await requireCaller(ctx);
+  args: {
+    conversationId: v.string(),
+    threadId: v.optional(v.string()),
+    secret: v.string(),
+  },
+  handler: async (ctx, { conversationId, threadId, secret }) => {
+    const me = await requireCaller(ctx, secret);
     const conversation = await queryAs(ctx, me, {
       args: { conversationId },
       type: "conversation",

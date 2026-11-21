@@ -95,13 +95,12 @@ why when you close one.
 
 Without `GITHUB_TOKEN` and `GITHUB_REPOSITORY` on a deployment, reports
 are kept on the PDS only and logged instead of filed. They're still known
-bugs there, so duplicates are caught the same way. Production and the
-shared dev deployment have both, and an isolated deployment copies them
-from shared dev, so Vera files real public issues on `bentsignal/vera`
-from all of them. Before testing bug reports on an isolated backend, remove
-them there (`npx convex env remove GITHUB_TOKEN` and `GITHUB_REPOSITORY`,
-from `services/backend` in that worktree). A dev bot (maya, jonah, priya,
-leo) can then write to Vera without a device:
+bugs there, so duplicates are caught the same way. Production files real
+public issues on `bentsignal/vera`. The shared dev deployment, and every
+isolated one (which copy it), file on the private dummy repo
+`bentsignal/vera-dev-reports` instead, with a token that can reach only
+that repo, so testing bug reports never touches the real one. A dev bot
+(maya, jonah, priya, leo) can write to Vera without a device:
 
 ```sh
 npx convex run devVera:write '{"username":"maya","body":"<message>"}'

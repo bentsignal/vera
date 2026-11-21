@@ -4,7 +4,7 @@ import { ConvexError } from "convex/values";
 
 import type { ActionCtx } from "./_generated/server";
 import { components } from "./_generated/api";
-import { devToolsEnabled } from "./devSignIn";
+import { devToolsEnabled, devToolsSecretMatches } from "./devSignIn";
 import { requireEnvironment } from "./lib";
 
 // Development only: bot accounts that act through the PDS plugins as
@@ -150,8 +150,16 @@ export function channelsOf(space: unknown) {
   });
 }
 
-export async function requireCaller(ctx: ActionCtx) {
+/**
+ * The signed-in account calling a public dev action, which must also carry
+ * the dev tools secret (../dev-tools.ts): a dev PDS takes sign-ups from
+ * anyone.
+ */
+export async function requireCaller(ctx: ActionCtx, secret: string) {
   requireDevTools();
+  if (!devToolsSecretMatches(secret)) {
+    throw new ConvexError({ code: "DEV_TOOLS_SECRET_REQUIRED" });
+  }
   const identity = await ctx.auth.getUserIdentity();
   const accountId =
     typeof identity?.accountId === "string" ? identity.accountId : null;

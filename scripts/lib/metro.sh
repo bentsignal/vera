@@ -34,11 +34,23 @@ metro_running() {
 # keys miss some dependency and config changes, and a stale cache can break
 # startup ("Maximum call stack size exceeded" after a dependency update), so
 # Metro clears it when these change.
-# A profile bundle (see start_metro) inlines different env, so it counts.
-cache_inputs() { { cat "$ROOT/pnpm-lock.yaml" "$MOBILE/metro.config.cjs"; echo "profile=${VERA_METRO_PROFILE:-}"; } | cksum | cut -d' ' -f1; }
+# A profile bundle (see start_metro) inlines different env, so it counts, and
+# so does a new dev tools secret (only its hash reaches the state file).
+cache_inputs() {
+  {
+    cat "$ROOT/pnpm-lock.yaml" "$MOBILE/metro.config.cjs"
+    echo "profile=${VERA_METRO_PROFILE:-}"
+    printf '%s' "${EXPO_PUBLIC_DEV_TOOLS_SECRET:-}" | shasum -a 256
+  } | cksum | cut -d' ' -f1
+}
 
 start_metro() {
   local inputs clear=()
+  # The dev PDSs ask every dev sign-in and bot action for it
+  # (services/backend/dev-tools.ts); Metro inlines it into the bundles it
+  # serves to Vera Dev, and only to those (apps/mobile/plugins/build-environment.cjs).
+  EXPO_PUBLIC_DEV_TOOLS_SECRET="$("$ROOT/scripts/dev-tools-secret.sh")"
+  export EXPO_PUBLIC_DEV_TOOLS_SECRET
   PORT=$((8100 + $(hash_of "$ROOT") % 800))
   while port_in_use "$PORT"; do PORT=$((PORT + 1)); done
   inputs="$(cache_inputs)"

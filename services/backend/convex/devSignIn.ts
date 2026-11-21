@@ -4,12 +4,18 @@ import { APIError, createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 
+import {
+  DEV_TOOLS_SECRET_HEADER,
+  devToolsOn,
+  devToolsSecretAccepted,
+} from "../dev-tools";
 import { optionalEnvironment, requireEnvironment } from "./lib";
 
 /**
  * Development only: signs in as any username without a passkey, because iOS
  * Simulator builds cannot use passkeys. Installed only when `DEV_TOOLS` is
- * "true", which is never set on production.
+ * "true" and `DEV_TOOLS_SECRET` is set, which production never does, and
+ * each request must carry that secret (../dev-tools.ts).
  */
 export function devSignIn(): BetterAuthPlugin {
   return {
@@ -18,6 +24,13 @@ export function devSignIn(): BetterAuthPlugin {
         "/dev/sign-in",
         { body: z.object({ username: z.string().min(1) }), method: "POST" },
         async (ctx) => {
+          if (
+            !devToolsSecretMatches(ctx.headers?.get(DEV_TOOLS_SECRET_HEADER))
+          ) {
+            throw new APIError("FORBIDDEN", {
+              code: "DEV_TOOLS_SECRET_REQUIRED",
+            });
+          }
           let address: string;
           try {
             address = formatAddress(
@@ -46,6 +59,17 @@ export function devSignIn(): BetterAuthPlugin {
   };
 }
 
+function devToolsEnvironment() {
+  return {
+    DEV_TOOLS: optionalEnvironment("DEV_TOOLS") ?? undefined,
+    DEV_TOOLS_SECRET: optionalEnvironment("DEV_TOOLS_SECRET") ?? undefined,
+  };
+}
+
 export function devToolsEnabled() {
-  return optionalEnvironment("DEV_TOOLS") === "true";
+  return devToolsOn(devToolsEnvironment());
+}
+
+export function devToolsSecretMatches(given: unknown) {
+  return devToolsSecretAccepted(devToolsEnvironment(), given);
 }
