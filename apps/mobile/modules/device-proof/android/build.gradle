@@ -1,0 +1,19 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'chat.vera'
+version = '1.0.0'
+
+android {
+  namespace "chat.vera.deviceproof"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  implementation 'com.google.android.play:integrity:1.6.0'
+}
