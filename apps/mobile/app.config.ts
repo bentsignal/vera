@@ -67,6 +67,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
     checkAutomatically: "ON_LOAD",
     fallbackToCacheTimeout: 0,
+    // Binaries built with this certificate run only updates signed with
+    // its private key, which stays on Shawn's Mac (`pnpm release ota` signs
+    // each one), so an Expo login or token can't ship code to phones.
+    // Replacing it cuts these binaries off from updates. See
+    // docs/releasing.md → Signed updates.
+    codeSigningCertificate: "./certs/certificate.pem",
+    codeSigningMetadata: { alg: "rsa-v1_5-sha256", keyid: "main" },
   },
   ios: {
     // Liquid Glass icon from Icon Composer; see assets/icons/README.md. The

@@ -21,13 +21,30 @@
 //   testflight <build> <notes.md>  What to Test, Friends group, Beta App Review
 //   appstore <build>               attach a build to the App Store version and submit it
 //   asc <METHOD> <path> [json]     raw App Store Connect API call
+//   signing-key check              the update signing key is in the Keychain and matches the app's certificate
+//   signing-key create             once: a new update signing key (Keychain) and certificate (apps/mobile/certs)
+//   signing-key restore            puts the key back in the Keychain from Shawn's backup (base64 on stdin)
 //
 // Secrets stay outside the repo: the App Store Connect key and its IDs come
-// from ~/.appstoreconnect/vera.env, and the Play service account key is
-// ~/.config/vera/play-service-account.json.
+// from ~/.appstoreconnect/vera.env, the Play service account key is
+// ~/.config/vera/play-service-account.json, and the update signing key is
+// in this Mac's login Keychain (docs/releasing.md → Signed updates).
 import { execFileSync, spawnSync } from "node:child_process";
-import { createSign } from "node:crypto";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import {
+  createPrivateKey,
+  createPublicKey,
+  createSign,
+  X509Certificate,
+} from "node:crypto";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -459,6 +476,163 @@ function tag(name: string, lines: string[]) {
   console.log(`tagged ${name}`);
 }
 
+// Every update is signed (docs/releasing.md → Signed updates). Binaries
+// built with apps/mobile/certs/certificate.pem (app.config.ts) accept only
+// updates signed by its private key, which lives in this Mac's login
+// Keychain, never in the repo or on Expo's servers: eas signs on this Mac.
+// So an Expo login or token alone can't put code on those phones.
+const SIGNING_CERTIFICATE = join(MOBILE, "certs/certificate.pem");
+const SIGNING_KEY_ITEM = ["-s", "chat.vera.update-signing-key", "-a", "vera"];
+const SIGNING_KEY_HELP =
+  "see docs/releasing.md → Signed updates to restore it from Shawn's backup";
+
+/** The private key from the Keychain, checked against the certificate. */
+function signingKey() {
+  const found = spawnSync(
+    "security",
+    ["find-generic-password", ...SIGNING_KEY_ITEM, "-w"],
+    { encoding: "utf8" },
+  );
+  if (found.status !== 0) {
+    throw new Error(
+      `the update signing key isn't in this Mac's Keychain; ${SIGNING_KEY_HELP}`,
+    );
+  }
+  // Stored as base64: the Keychain hex-encodes values with line breaks.
+  const pem = Buffer.from(found.stdout.trim(), "base64").toString("utf8");
+  requireKeyMatchesCertificate(pem);
+  return pem;
+}
+
+/**
+ * Refuses a key that isn't the certificate's: binaries would reject every
+ * update it signs. Warns when the certificate nears its end, after which
+ * binaries with it reject every update (docs/releasing.md).
+ */
+function requireKeyMatchesCertificate(pem: string) {
+  if (!existsSync(SIGNING_CERTIFICATE)) {
+    throw new Error(`${SIGNING_CERTIFICATE} is missing`);
+  }
+  const certificate = new X509Certificate(readFileSync(SIGNING_CERTIFICATE));
+  const spki = { format: "der", type: "spki" } as const;
+  const key = createPublicKey(createPrivateKey(pem)).export(spki);
+  if (!key.equals(certificate.publicKey.export(spki))) {
+    throw new Error(
+      `the Keychain's update signing key doesn't match ${SIGNING_CERTIFICATE}; binaries would reject its updates`,
+    );
+  }
+  const yearsLeft =
+    (new Date(certificate.validTo).getTime() - Date.now()) /
+    (365 * 24 * 60 * 60 * 1000);
+  if (yearsLeft < 1) {
+    console.warn(
+      `warning: the update signing certificate ends ${certificate.validTo}; binaries with it reject updates after that (docs/releasing.md → Signed updates)`,
+    );
+  }
+  return certificate;
+}
+
+/** Runs `use` with the key in a private temporary file, then deletes it. */
+function withSigningKey<Result>(use: (path: string) => Result) {
+  const pem = signingKey();
+  const directory = mkdtempSync(join(tmpdir(), "vera-signing-"));
+  const path = join(directory, "private-key.pem");
+  try {
+    writeFileSync(path, pem, { mode: 0o600 });
+    return use(path);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+}
+
+function requireNoSigningKey() {
+  const existing = spawnSync("security", [
+    "find-generic-password",
+    ...SIGNING_KEY_ITEM,
+  ]);
+  if (existing.status === 0) {
+    throw new Error("an update signing key is already in the Keychain");
+  }
+}
+
+function storeSigningKey(pem: string) {
+  // `security -i` reads the command from stdin, so the key never shows up
+  // in a process list.
+  const added = spawnSync("security", ["-i"], {
+    input: `add-generic-password ${SIGNING_KEY_ITEM.join(" ")} -l "Vera update signing key" -j "Signs Vera's over-the-air updates. Keep a backup; see docs/releasing.md." -w ${Buffer.from(pem).toString("base64")}\n`,
+    stdio: ["pipe", "inherit", "inherit"],
+  });
+  if (added.status !== 0) {
+    throw new Error("couldn't add the key to the Keychain");
+  }
+}
+
+function signingKeyCommand(action: string | undefined) {
+  if (action === "check") {
+    const certificate = requireKeyMatchesCertificate(signingKey());
+    console.log(
+      `the Keychain's update signing key matches ${SIGNING_CERTIFICATE} (valid until ${certificate.validTo})`,
+    );
+    return;
+  }
+  if (action === "restore") {
+    // From Shawn's backup: the Keychain value, base64, on stdin.
+    const pem = Buffer.from(readFileSync(0, "utf8").trim(), "base64").toString(
+      "utf8",
+    );
+    requireKeyMatchesCertificate(pem);
+    requireNoSigningKey();
+    storeSigningKey(pem);
+    signingKeyCommand("check");
+    return;
+  }
+  if (action !== "create") {
+    throw new Error("usage: signing-key check|create|restore");
+  }
+  // A new certificate cuts every binary built with the old one off from
+  // updates until people install a store build with the new one.
+  if (existsSync(SIGNING_CERTIFICATE)) {
+    throw new Error(
+      `${SIGNING_CERTIFICATE} already exists; replacing it cuts every binary built with it off from updates (docs/releasing.md → Signed updates)`,
+    );
+  }
+  requireNoSigningKey();
+  const directory = mkdtempSync(join(tmpdir(), "vera-signing-"));
+  try {
+    run(
+      "pnpm",
+      [
+        "exec",
+        "expo-updates",
+        "codesigning:generate",
+        "--key-output-directory",
+        join(directory, "keys"),
+        "--certificate-output-directory",
+        join(directory, "certificate"),
+        "--certificate-validity-duration-years",
+        "30",
+        "--certificate-common-name",
+        "Vera updates",
+      ],
+      { cwd: MOBILE },
+    );
+    storeSigningKey(
+      readFileSync(join(directory, "keys/private-key.pem"), "utf8"),
+    );
+    mkdirSync(join(MOBILE, "certs"), { recursive: true });
+    copyFileSync(
+      join(directory, "certificate/certificate.pem"),
+      SIGNING_CERTIFICATE,
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+  requireKeyMatchesCertificate(signingKey());
+  console.log(
+    `New update signing key in the Keychain ("Vera update signing key") and certificate at ${SIGNING_CERTIFICATE}. Back up the key now: docs/releasing.md → Signed updates.`,
+  );
+}
+
 function requireCleanMain() {
   git("fetch", "--quiet", "origin", "main");
   if (git("status", "--porcelain") !== "")
@@ -512,6 +686,13 @@ function build(profile: string | undefined, flags: string[]) {
       },
     );
   const runtime = requireRuntime(ipaRuntime(ipa), "ios");
+  requireSigningCertificate(
+    ipa,
+    output("sh", [
+      "-c",
+      `unzip -p "${ipa}" 'Payload/*.app/Expo.plist' | plutil -extract EXUpdatesCodeSigningCertificate raw - || true`,
+    ]),
+  );
   const buildNumber = output("sh", [
     "-c",
     `unzip -p "${ipa}" 'Payload/*.app/Info.plist' | plutil -extract CFBundleVersion raw -`,
@@ -557,6 +738,32 @@ function installPage(artifact: string, prefix: string, description: string) {
     description,
   ]);
   console.log(`install page: ${url}`);
+}
+
+/**
+ * Fails before anything is uploaded if the build doesn't carry the update
+ * signing certificate: it would accept unsigned updates. `embedded` is the
+ * iOS Expo.plist value, or an Android manifest, whose binary XML holds the
+ * certificate's text as UTF-8 or UTF-16, so one of its lines is looked for.
+ */
+function requireSigningCertificate(archive: string, embedded: string | Buffer) {
+  const certificate = readFileSync(SIGNING_CERTIFICATE, "utf8").trim();
+  const found =
+    typeof embedded === "string"
+      ? embedded.trim() === certificate
+      : certificate
+          .split("\n")
+          .slice(1, -1)
+          .every(
+            (line) =>
+              embedded.includes(Buffer.from(line, "utf8")) ||
+              embedded.includes(Buffer.from(line, "utf16le")),
+          );
+  if (!found) {
+    throw new Error(
+      `${archive} doesn't carry ${SIGNING_CERTIFICATE}, so it would accept unsigned updates; check updates.codeSigningCertificate in app.config.ts`,
+    );
+  }
 }
 
 /** Fails before anything is uploaded if updates could never reach the build. */
@@ -622,6 +829,20 @@ function buildAndroid(profile: Channel, artifact: string | undefined) {
   const { runtime: declared, versionCode } =
     profile === "internal" ? apkInfo(archive) : bundleInfo(archive);
   const runtime = requireRuntime(declared, "android");
+  requireSigningCertificate(
+    archive,
+    execFileSync(
+      "unzip",
+      [
+        "-p",
+        archive,
+        profile === "internal"
+          ? "AndroidManifest.xml"
+          : "base/manifest/AndroidManifest.xml",
+      ],
+      { maxBuffer: 64 * 1024 * 1024 },
+    ),
+  );
   const name = binaryTagPattern("android", profile).replace("*", versionCode);
   requireNewTag(name);
   if (profile === "internal") {
@@ -774,6 +995,9 @@ function ota(channel: string | undefined, message: string | undefined) {
   if (message === undefined) throw new Error("an update needs a message");
   requireCleanMain();
   if (channel === "production") requireNextReleaseSteps();
+  // Before anything ships (with --with-backend, the backend deploys before
+  // the update is signed).
+  signingKey();
   // An update only reaches binaries with the same runtime: publish for the
   // platforms whose latest binary on this channel matches, and refuse when
   // none does.
@@ -796,7 +1020,9 @@ function ota(channel: string | undefined, message: string | undefined) {
   const withBackend = process.argv.includes("--with-backend");
   if (withBackend) {
     if (channel !== "production") {
-      throw new Error("--with-backend deploys production; use it with ota production");
+      throw new Error(
+        "--with-backend deploys production; use it with ota production",
+      );
     }
     // Bundle first (the slow part, as eas update would), then deploy the
     // backend and publish the update straight after it, so an open app on
@@ -817,25 +1043,29 @@ function ota(channel: string | undefined, message: string | undefined) {
     );
     backend("production");
   }
-  const json = output(
-    "eas",
-    [
-      "update",
-      ...(withBackend ? ["--skip-bundler", "--input-dir", "dist"] : []),
-      "--channel",
-      channel,
-      "--environment",
-      channel === "production" ? "production" : "development",
-      "--platform",
-      targets.length === PLATFORMS.length ? "all" : only,
-      "--message",
-      message,
-      "--non-interactive",
-      "--json",
-    ],
-    // The same app config as the channel's binaries: their PDS, the
-    // extension, and on internal the dev variant.
-    { cwd: MOBILE, env },
+  const json = withSigningKey((privateKey) =>
+    output(
+      "eas",
+      [
+        "update",
+        "--private-key-path",
+        privateKey,
+        ...(withBackend ? ["--skip-bundler", "--input-dir", "dist"] : []),
+        "--channel",
+        channel,
+        "--environment",
+        channel === "production" ? "production" : "development",
+        "--platform",
+        targets.length === PLATFORMS.length ? "all" : only,
+        "--message",
+        message,
+        "--non-interactive",
+        "--json",
+      ],
+      // The same app config as the channel's binaries: their PDS, the
+      // extension, and on internal the dev variant.
+      { cwd: MOBILE, env },
+    ),
   );
   const updates = JSON.parse(json) as {
     group: string;
@@ -1019,6 +1249,9 @@ switch (command) {
   case "appstore":
     await appstore(args[0]);
     break;
+  case "signing-key":
+    signingKeyCommand(args[0]);
+    break;
   case "asc":
     console.log(
       JSON.stringify(
@@ -1034,10 +1267,7 @@ switch (command) {
     break;
   default:
     console.log(
-      readFileSync(new URL(import.meta.url), "utf8")
-        .split("\n")
-        .slice(0, 20)
-        .join("\n"),
+      readFileSync(new URL(import.meta.url), "utf8").split("\nimport ")[0],
     );
     process.exitCode = 2;
 }
