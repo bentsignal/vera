@@ -343,3 +343,18 @@ export async function toConversation(
     updatedAt: Math.max(conversation.updatedAt, latest.newestSentAt ?? 0),
   };
 }
+
+/** The space and the account's membership, if it has at least `role`. */
+export async function requireSpaceRole(
+  ctx: QueryCtx,
+  spaceId: string,
+  accountId: string,
+  role: "member" | "owner",
+) {
+  const space = await getSpace(ctx, spaceId);
+  const member =
+    space === null ? null : await getSpaceMember(ctx, spaceId, accountId);
+  if (space === null || member === null) fail("SPACE_NOT_FOUND");
+  if (role === "owner" && member.role !== "owner") fail("SPACE_OWNER_REQUIRED");
+  return { member, space };
+}
