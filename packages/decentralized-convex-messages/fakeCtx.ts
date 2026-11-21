@@ -64,10 +64,12 @@ const INDEXES: Record<string, Record<string, string[]>> = {
   readStates: {
     by_conversation_account: ["conversationId", "accountId"],
   },
+  spaceInviteLinks: { by_code: ["code"], by_space: ["spaceId"] },
   spaceInvites: {
     by_account: ["accountId"],
     by_space_account: ["spaceId", "accountId"],
   },
+  spaceRemovals: { by_space_account: ["spaceId", "accountId"] },
   spaceMembers: {
     by_account: ["accountId"],
     by_space_account: ["spaceId", "accountId"],

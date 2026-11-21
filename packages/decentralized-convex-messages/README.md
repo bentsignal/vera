@@ -82,7 +82,11 @@ through it. `messages.spaceInviteLinks` lists a space's live links (owners see
 all, members their own). Its maker or an owner can change how long one
 lasts with `messages.setSpaceInviteLinkExpiry` (measured from when it was
 made) or delete it with `messages.revokeSpaceInviteLink`. `messages.addSpaceMembers`, which adds people
-without asking, remains for apps from before invitations.
+without asking, remains for apps from before invitations. When an owner removes someone
+(`messages.removeSpaceMember`), every link made before then stops working
+for that account: its preview is `null` and joining fails with
+`SPACE_INVITE_LINK_NOT_FOUND`. Links made afterwards work, and someone who
+left on their own can rejoin with any live link.
 
 Mentions: `messages.send` takes `mentions`, each an `accountId` and the
 `name` written after its `@` in the body (the display name at the time).

@@ -16,12 +16,14 @@ import {
   normalizeAddress,
   normalizeMembers,
   normalizeName,
+  requireSpaceRole,
 } from "./model.ts";
 import { channelName } from "./naming.ts";
-import { clearInvite } from "./pendingInvites.ts";
+import { clearOnJoin } from "./pendingInvites.ts";
 import { forgetBadge } from "./pushBadges.ts";
 import { readAt } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
+import { noteRemoval } from "./spaceRemovals.ts";
 import { deleteThreads } from "./threads.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
@@ -106,12 +108,15 @@ export async function addSpaceMembers(
       });
     }
     // In the space, they've nothing left to answer.
-    await clearInvite(ctx, args.spaceId, accountId);
+    await clearOnJoin(ctx, args.spaceId, accountId);
   }
   return null;
 }
 
-/** Anyone may leave; only owners remove others. Owners cannot leave. */
+/**
+ * Anyone may leave; only owners remove others. Owners cannot leave.
+ * Someone removed can't rejoin with a link made before (spaceRemovals.ts).
+ */
 export async function removeSpaceMember(
   ctx: MutationCtx,
   self: string,
@@ -131,6 +136,7 @@ export async function removeSpaceMember(
   if (removed === null) return null;
   if (removed.role === "owner") fail("SPACE_OWNER_CANNOT_LEAVE");
   await ctx.db.delete(removed._id);
+  if (target !== self) await noteRemoval(ctx, args.spaceId, target);
   return null;
 }
 
@@ -302,18 +308,4 @@ export async function toSpace(
       0,
     ),
   };
-}
-
-export async function requireSpaceRole(
-  ctx: QueryCtx,
-  spaceId: string,
-  accountId: string,
-  role: "member" | "owner",
-) {
-  const space = await getSpace(ctx, spaceId);
-  const member =
-    space === null ? null : await getSpaceMember(ctx, spaceId, accountId);
-  if (space === null || member === null) fail("SPACE_NOT_FOUND");
-  if (role === "owner" && member.role !== "owner") fail("SPACE_OWNER_REQUIRED");
-  return { member, space };
 }
