@@ -4,6 +4,7 @@ import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx } from "./_generated/server.js";
 import type { messagesProtocol } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
+import { scheduleBump } from "./inboxOrder.ts";
 import { cardsForMessage, GIVE_UP_AFTER_MS } from "./linkCache.ts";
 import { previewedUrls } from "./links.ts";
 import { recordMentions, validMentions } from "./mentions.ts";
@@ -125,6 +126,8 @@ export async function storeMessage(
   // (sequences.ts); a reply kept in its thread doesn't count there.
   if (reply?.threadOnly !== true) {
     await scheduleNumbering(ctx, fields.conversationId);
+    // It moves up its members' inboxes a moment later (inboxOrder.ts).
+    await scheduleBump(ctx, fields.conversationId);
   }
   // In the same write as the message, so no reader sees both at once.
   await stopTyping(ctx, fields.authorId, fields.conversationId);

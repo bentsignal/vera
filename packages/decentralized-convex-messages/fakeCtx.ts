@@ -22,6 +22,15 @@ const INDEXES: Record<string, Record<string, string[]>> = {
   conversations: {
     by_conversation: ["conversationId"],
     by_space: ["spaceId"],
+    by_space_position: ["spaceId", "position"],
+  },
+  inboxBumps: { by_conversation: ["conversationId"] },
+  inboxEntries: {
+    by_account_conversation: ["accountId", "conversationId"],
+    by_account_pinned: ["accountId", "pinnedAt"],
+    by_account_section_activity: ["accountId", "section", "activityAt"],
+    by_account_space: ["accountId", "spaceId"],
+    by_conversation: ["conversationId"],
   },
   linkPreviewWaits: {
     by_message: ["messageId"],
@@ -61,6 +70,7 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_message: ["messageId"],
     by_message_account: ["messageId", "accountId"],
   },
+  sequencing: { by_key: ["key"] },
   readStates: {
     by_conversation_account: ["conversationId", "accountId"],
   },
@@ -100,11 +110,29 @@ function valueAt(row: Record<string, unknown>, path: string) {
   return value;
 }
 
+/** Whether an index value is past a bound; a missing one never is. */
+function inRange(
+  value: unknown,
+  bound: number | string,
+  op: "gt" | "gte" | "lt" | "lte",
+) {
+  if (value === undefined) return op === "lt" || op === "lte";
+  const order = compare(value, bound);
+  if (op === "gt") return order > 0;
+  if (op === "gte") return order >= 0;
+  if (op === "lt") return order < 0;
+  return order <= 0;
+}
+
 function compare(left: unknown, right: unknown) {
+  // Convex orders a missing field before any value.
+  if (left === undefined || right === undefined) {
+    return (left === undefined ? 0 : 1) - (right === undefined ? 0 : 1);
+  }
   if (typeof left === "number" && typeof right === "number") {
     return left - right;
   }
-  return String(left).localeCompare(String(right));
+  return JSON.stringify(left).localeCompare(JSON.stringify(right));
 }
 
 /** Documents read, as Convex counts them: each one a query returns. */
@@ -127,12 +155,67 @@ function results(found: Row[], count: ReadCount) {
     },
     collect: () => Promise.resolve(read(found)),
     first: () => Promise.resolve(read(found.slice(0, 1))[0] ?? null),
+    paginate: ({
+      cursor,
+      numItems,
+    }: {
+      cursor: string | null;
+      numItems: number;
+    }) => {
+      const start = cursor === null ? 0 : Number(cursor);
+      const page = read(found.slice(start, start + numItems));
+      const end = start + page.length;
+      return Promise.resolve({
+        continueCursor: String(end),
+        isDone: end >= found.length,
+        page,
+      });
+    },
     order: (direction: "asc" | "desc") =>
       results(direction === "desc" ? [...found].reverse() : found, count),
     take: (most: number) => Promise.resolve(read(found.slice(0, most))),
     unique: () => {
       if (found.length > 1) throw new Error("Not unique");
       return Promise.resolve(read(found)[0] ?? null);
+    },
+  };
+}
+
+/** An index range, as a list of filters. */
+function range() {
+  const filters: Filter[] = [];
+  const builder = {
+    eq: (field: string, value: unknown) => {
+      filters.push((row) => valueAt(row, field) === value);
+      return builder;
+    },
+    gt: (field: string, value: number | string) => {
+      filters.push((row) => inRange(valueAt(row, field), value, "gt"));
+      return builder;
+    },
+    gte: (field: string, value: number | string) => {
+      filters.push((row) => inRange(valueAt(row, field), value, "gte"));
+      return builder;
+    },
+    lt: (field: string, value: number | string) => {
+      filters.push((row) => inRange(valueAt(row, field), value, "lt"));
+      return builder;
+    },
+    lte: (field: string, value: number | string) => {
+      filters.push((row) => inRange(valueAt(row, field), value, "lte"));
+      return builder;
+    },
+    filters,
+  };
+  return builder;
+}
+
+/** A scheduler that notes each call rather than running it. */
+function recorder(scheduled: { args: unknown; delay: number }[]) {
+  return {
+    runAfter: (delay: number, _fn: unknown, args: unknown) => {
+      scheduled.push({ args, delay });
+      return Promise.resolve();
     },
   };
 }
@@ -147,6 +230,7 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
   // Every write after setup, as "<table> <insert|patch|delete>".
   const writes: string[] = [];
   const reads: ReadCount = { documents: 0 };
+  const scheduled: { args: unknown; delay: number }[] = [];
   function insert(table: string, value: Record<string, unknown>) {
     const row = { _creationTime: (clock += 1), _id: `${table}:${clock}` };
     (rows[table] ??= []).push({ ...row, ...value });
@@ -170,43 +254,22 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
       });
   }
 
-  function range() {
-    const filters: Filter[] = [];
-    const builder = {
-      eq: (field: string, value: unknown) => {
-        filters.push((row) => valueAt(row, field) === value);
-        return builder;
-      },
-      gt: (field: string, value: number) => {
-        filters.push((row) => Number(valueAt(row, field)) > value);
-        return builder;
-      },
-      gte: (field: string, value: number) => {
-        filters.push((row) => Number(valueAt(row, field)) >= value);
-        return builder;
-      },
-      lt: (field: string, value: number) => {
-        filters.push((row) => Number(valueAt(row, field)) < value);
-        return builder;
-      },
-      lte: (field: string, value: number) => {
-        filters.push((row) => Number(valueAt(row, field)) <= value);
-        return builder;
-      },
-      filters,
-    };
-    return builder;
-  }
-
   const ctx = {
-    // Scheduled work (pushes, link previews) doesn't run in tests.
-    scheduler: { runAfter: () => Promise.resolve() },
+    // Scheduled work (pushes, link previews) doesn't run in tests; it's
+    // noted, so tests can see what would.
+    scheduler: recorder(scheduled),
     db: {
       delete: (id: string) => {
         const table = id.slice(0, id.indexOf(":"));
         writes.push(`${table} delete`);
         rows[table] = (rows[table] ?? []).filter((row) => row._id !== id);
         return Promise.resolve();
+      },
+      get: (id: string) => {
+        const table = id.slice(0, id.indexOf(":"));
+        return Promise.resolve(
+          (rows[table] ?? []).find((row) => row._id === id) ?? null,
+        );
       },
       patch: (id: string, value: Record<string, unknown>) => {
         const table = id.slice(0, id.indexOf(":"));
@@ -221,6 +284,9 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
         return Promise.resolve(insert(table, value));
       },
       query: (table: string) => ({
+        // The whole table, in insertion order.
+        paginate: (options: { cursor: string | null; numItems: number }) =>
+          results([...(rows[table] ?? [])], reads).paginate(options),
         withIndex: (
           index: string,
           build: (builder: ReturnType<typeof range>) => unknown,
@@ -239,6 +305,13 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
     rows: (table: string) => rows[table] ?? [],
     /** The writes made since setup, as "<table> <insert|patch|delete>". */
     writes: () => [...writes],
+    /** Deletes a row by its ID, as `ctx.db.delete` does. */
+    deleteRow: (id: string) => ctx.db.delete(id),
+    /** Patches a row by its ID, as `ctx.db.patch` does. */
+    patchRow: (id: string, value: Record<string, unknown>) =>
+      ctx.db.patch(id, value),
+    /** Scheduled work, in order: each call's arguments and delay. */
+    scheduled: () => [...scheduled],
     /** How many documents have been read since setup. */
     documentsRead: () => reads.documents,
   };

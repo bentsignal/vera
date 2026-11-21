@@ -8,6 +8,7 @@ import type {
   SpaceInviteLink,
 } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
+import { scheduleJoin } from "./inboxMembers.ts";
 import { fail, getSpace, getSpaceMember, normalizeMembers } from "./model.ts";
 import { pendingInvites } from "./pendingInvites.ts";
 import { MAX_INVITE_LINK_LIFETIME } from "./protocol.ts";
@@ -45,11 +46,14 @@ function isExpired(link: Doc<"spaceInviteLinks">, now = Date.now()) {
   return link.expiresAt !== undefined && link.expiresAt <= now;
 }
 
+/** Members counted for an invitation; a bigger space says this many. */
+const MAX_MEMBERS_COUNTED = 1_000;
+
 function memberCount(ctx: QueryCtx, spaceId: string) {
   return ctx.db
     .query("spaceMembers")
     .withIndex("by_space_account", (index) => index.eq("spaceId", spaceId))
-    .collect()
+    .take(MAX_MEMBERS_COUNTED)
     .then((members) => members.length);
 }
 
@@ -61,6 +65,7 @@ async function join(ctx: MutationCtx, spaceId: string, self: string) {
       role: "member",
       spaceId,
     });
+    await scheduleJoin(ctx, spaceId, self);
   }
   const invite = await getInvite(ctx, spaceId, self);
   if (invite !== null) await ctx.db.delete(invite._id);

@@ -41,6 +41,10 @@ function fakeCtx() {
   }
 
   const db = {
+    get: (id: string) =>
+      Promise.resolve(
+        [...tables.values()].flat().find((row) => row._id === id) ?? null,
+      ),
     insert: (table: string, value: Record<string, unknown>) => {
       clock += 1;
       const row = { _creationTime: clock, _id: `${table}:${clock}`, ...value };
@@ -77,8 +81,9 @@ function fakeCtx() {
       },
     }),
   };
+  const scheduler = { runAfter: () => Promise.resolve() };
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- A partial fake of the Convex database.
-  return { ctx: { db } as unknown as MutationCtx, rows };
+  return { ctx: { db, scheduler } as unknown as MutationCtx, rows };
 }
 
 function codeOf(error: unknown) {

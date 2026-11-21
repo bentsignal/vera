@@ -2,7 +2,8 @@ import type { MutationCtx } from "./_generated/server.js";
 import { activity, isUnseen } from "./activity.ts";
 import { accessFinder, isHeard } from "./activityScope.ts";
 import { alertsFor } from "./alerts.ts";
-import { inboxAccess } from "./inbox.ts";
+import { listedAccess } from "./inboxPages.ts";
+import { INBOX_PAGE_SIZE } from "./protocol.ts";
 import { forgetBadge } from "./pushBadges.ts";
 import { markReadUpTo } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
@@ -14,7 +15,7 @@ const MAX_THREADS_CLEARED = 500;
 
 /**
  * Marks read, through now, everything the badge counts for any app (see
- * `countBadge`): the conversations the Inbox lists that alert about every
+ * `countBadge`): the conversations it counts that alert about every
  * message, the threads you follow in conversations you hear from, and
  * every Activity item not yet seen (whatever it's about, so what an older
  * app counts goes too). Pending space invitations aren't something to
@@ -25,7 +26,13 @@ export async function clearBadge(ctx: MutationCtx, self: string) {
   const now = Date.now();
   const spaces = spaceReads(ctx);
   const settings = await notificationSettings(ctx, self);
-  for (const access of await inboxAccess(ctx, self, true, spaces)) {
+  const listed = await listedAccess(
+    ctx,
+    self,
+    { channels: true, limit: INBOX_PAGE_SIZE },
+    spaces,
+  );
+  for (const access of listed) {
     if (alertsFor(access, settings) !== "all") continue;
     await markReadUpTo(ctx, access, self, now);
   }
