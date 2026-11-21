@@ -15,14 +15,18 @@ import { APIError } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { betterAuth } from "better-auth/minimal";
 
+import type { DeviceProof } from "../sign-up-devices";
 import type { DataModel } from "./_generated/dataModel";
+import type { ActionCtx } from "./_generated/server";
 import { pdsAuth } from "../pds-auth";
+import { DeviceRefused, parseDeviceProof } from "../sign-up-devices";
 import { components, internal } from "./_generated/api";
 import { query } from "./_generated/server";
 import authConfig from "./auth.config";
 import betterAuthSchema from "./betterAuth/schema";
 import { devSignIn, devToolsEnabled } from "./devSignIn";
 import { actorFromEmail, requireEnvironment } from "./lib";
+import { signUpDeviceStep } from "./signUpDevices";
 
 export const authComponent = createClient<DataModel, typeof betterAuthSchema>(
   components.betterAuth,
@@ -45,6 +49,10 @@ const RESERVED_USERNAMES = [
 /** Client-supplied context for passkey-first sign-up. */
 interface SignUpRequest {
   readonly address: string;
+  /** The phone's proof for the one-account-per-phone check (signUpDevices.ts). */
+  readonly device: DeviceProof | null;
+  /** As the app sent it, which its Android proof is tied to. */
+  readonly requestedUsername: string;
   readonly username: string;
 }
 
@@ -84,6 +92,9 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
           requireSession: false,
           resolveUser: async ({ context, ctx: endpoint }) => {
             const request = await validateSignUp(endpoint, context);
+            await deviceStep(() =>
+              signUpDeviceStep(actionCtx(ctx), "check", deviceAttempt(request)),
+            );
             return {
               displayName: request.username,
               id: crypto.randomUUID(),
@@ -92,6 +103,13 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
           },
           afterVerification: async ({ context, ctx: endpoint }) => {
             const request = await validateSignUp(endpoint, context);
+            const counted = await deviceStep(() =>
+              signUpDeviceStep(
+                actionCtx(ctx),
+                "finish",
+                deviceAttempt(request),
+              ),
+            );
             const user = await endpoint.context.internalAdapter.createUser({
               email: request.address,
               emailVerified: false,
@@ -100,6 +118,7 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
             const session =
               await endpoint.context.internalAdapter.createSession(user.id);
             await setSessionCookie(endpoint, { session, user });
+            await counted();
             return { userId: user.id };
           },
         },
@@ -127,11 +146,42 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
   });
 }
 
+function deviceAttempt(request: SignUpRequest) {
+  return {
+    address: request.address,
+    device: request.device,
+    username: request.requestedUsername,
+  };
+}
+
+/** Sign-up routes run in an HTTP action, which can call functions. */
+function actionCtx(ctx: GenericCtx<DataModel>): ActionCtx {
+  if (!isActionCtx(ctx)) {
+    throw new DeviceRefused("DEVICE_CHECK_UNAVAILABLE", "not an action");
+  }
+  return ctx;
+}
+
+function isActionCtx(ctx: GenericCtx<DataModel>): ctx is ActionCtx {
+  return "runAction" in ctx;
+}
+
+/** Runs a device check, turning its refusal into the app's error code. */
+async function deviceStep<Result>(step: () => Promise<Result>) {
+  try {
+    return await step();
+  } catch (error) {
+    if (!(error instanceof DeviceRefused)) throw error;
+    console.warn(`sign-up refused: ${error.message}`);
+    throw new APIError("BAD_REQUEST", { code: error.code });
+  }
+}
+
 async function validateSignUp(
   endpoint: GenericEndpointContext,
   context: string | null | undefined,
 ): Promise<SignUpRequest> {
-  const username = parseSignUpContext(context);
+  const { device, username } = parseSignUpContext(context);
   let address: string;
   try {
     address = formatAddress(
@@ -147,12 +197,17 @@ async function validateSignUp(
   ) {
     throw new APIError("BAD_REQUEST", { code: "USERNAME_TAKEN" });
   }
-  return { address, username: normalizedUsername };
+  return {
+    address,
+    device,
+    requestedUsername: username,
+    username: normalizedUsername,
+  };
 }
 
 /**
- * The username from the sign-up context. Older app versions also send an
- * invite code, which is ignored.
+ * The username, and the phone's proof, from the sign-up context. Older app
+ * versions send no proof, and some an invite code, which is ignored.
  */
 function parseSignUpContext(context: string | null | undefined) {
   try {
@@ -163,7 +218,10 @@ function parseSignUpContext(context: string | null | undefined) {
       "username" in value &&
       typeof value.username === "string"
     ) {
-      return value.username.trim();
+      return {
+        device: parseDeviceProof("device" in value ? value.device : null),
+        username: value.username.trim(),
+      };
     }
   } catch {
     // Fall through to the shared error below.
