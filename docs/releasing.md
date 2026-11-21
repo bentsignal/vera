@@ -14,16 +14,18 @@ the release with the `vera-release` skill and
 | Store build      | Vera     | `production` (App Store signing)        | `vera.chat`     | `production`   | TestFlight (Team, Friends), later the App Store |
 | Play build       | Vera     | `production` (app bundle, Play signing) | `vera.chat`     | `production`   | Play internal testing ("Vera testers")          |
 | Private preview  | Vera     | `preview` (ad hoc iOS, signed APK)      | `vera.chat`     | `preview`      | Shawn only, installed from an install page     |
-| Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's phone, for update and channel checks    |
+| Internal build   | Vera Dev | `eas.json` `internal` (Release, ad hoc) | `dev.vera.chat` | `internal`     | Shawn's iPhone, for the release test            |
 | Android internal | Vera Dev | `internal` (APK)                        | `dev.vera.chat` | `internal`     | Shawn's Android phone, the same                 |
 | Dev client       | Vera Dev | `development` (`scripts/phone.sh`)      | worktree's      | none           | Shawn's phones between releases                 |
 
 Vera and Vera Dev are separate apps (`chat.vera.app`, `chat.vera.app.dev`;
 see [apps/mobile/README.md](../apps/mobile/README.md#vera-dev)), so Shawn's
 phone keeps the TestFlight app on production through a release test. Vera
-Dev holds one binary at a time: an internal build replaces the dev client,
-and Shawn reinstalls main's dev client from its link (`scripts/phone.sh main`)
-afterwards.
+Dev holds one binary at a time. An internal build installs over the dev
+client and keeps its sign-in, and after the release Shawn reinstalls
+main's dev client from its link (`scripts/phone.sh main`, or
+`scripts/phone.sh --android main`). Internal builds also check update and
+channel behavior, which a dev client can't show.
 
 Android testers use Google Play internal testing
 ([android.md](android.md#getting-builds-to-android-testers)). They join
@@ -246,16 +248,20 @@ the release a PR removes the finished steps.
    first, in the iOS simulator and Android emulator, and fixes what fails.
    Then it sends Shawn the notes, what it checked (with evidence), and the
    steps left for him: what a simulator can't settle.
-2. **Test in the dev client.** Push `main`'s backend to the shared dev
+2. **Test on internal builds.** Push `main`'s backend to the shared dev
    deployment (`pnpm release backend dev`; usually already current, since
-   backend PRs push it when they merge), then serve `main` to Vera Dev
-   on Shawn's phones (`scripts/phone.sh up`). This test is for how the
-   changes work together: JavaScript fixes reach the phone without a build. The
-   real app gets tested in TestFlight. An internal build or internal OTA is
-   only for checking update or channel behavior, or when Shawn asks.
+   backend PRs push it when they merge), then build `main` for both of
+   Shawn's phones (`pnpm release build internal`, then `--android`; about
+   20 to 30 minutes for the pair) and send him the install pages. An
+   internal build bundles its JavaScript like the store build, so launch
+   times, animations, and notification opens match what people get, and
+   Shawn's notes on load times are the baseline for the next release
+   test. A dev client loads its JavaScript from Metro and runs slower.
 3. **Shawn tests** the steps left for him, plus his own quick use of the
-   app, and approves, or asks for fixes (straight to `main` when small, feature PRs
-   when not, then back to step 1).
+   app, and approves, or asks for fixes. Every fix lands on `main` (straight
+   there when small, feature PRs on the dev client when not), then reaches
+   the internal builds with `pnpm release ota internal "<summary>"`, or new
+   internal builds when it changed native code. Then back to step 1.
 4. **Ship.**
    - If the backend changed, ship it together with the app:
      `pnpm release ota production "<notes>" --with-backend` deploys it
@@ -282,6 +288,8 @@ the release a PR removes the finished steps.
      same runtime, so every later update reaches the old binaries and the
      new build alike. Only a raised runtime makes a store build required:
      then `plan` says so, and the update reaches only the new build.
+   - After it's out, Shawn reinstalls main's dev clients for feature work
+     (`scripts/phone.sh main`, `scripts/phone.sh --android main`).
 5. **App Store**, only when Shawn says so: `pnpm release appstore <build>`
    submits the TestFlight build for App Review. The first submission needs
    the store listing filled in first (see the skill).

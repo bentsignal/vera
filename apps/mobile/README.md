@@ -94,7 +94,6 @@ The phone holds one Vera Dev at a time:
   opening `<site>/dev/sign-in?username=ios` on the iPhone and
   `username=android` on Android in any browser (`scripts/backend.sh status`
   prints both).
-  Release testing uses it too, serving `main`.
 
 - **Main's dev client is the one the phone keeps.** It runs every worktree
   that hasn't changed native code. `up` says whether a worktree uses it or
@@ -103,27 +102,28 @@ The phone holds one Vera Dev at a time:
   `scripts/phone.sh list` shows every cached dev client and marks main's.
   Main's fingerprint comes from a checkout of `origin/main` kept in
   `~/Library/Caches/vera/main-checkout`.
-- **An internal build, when asked for** (`pnpm release build internal`):
-  Release JavaScript bundled in and the `internal` update channel, for
-  checking update or channel behavior. Installing it replaces the dev
-  client; Shawn reinstalls main's dev client from its link afterwards
-  (`scripts/phone.sh main`).
+- **An internal build, for release tests** (`pnpm release build
+internal`, `--android`): a Release build of `main` with the JavaScript
+  bundled in and the `internal` update channel. Shawn tests each release
+  on it (docs/releasing.md), and it checks update and channel behavior.
+  It installs over the dev client and keeps the sign-in; Shawn reinstalls
+  main's dev client after the release (`scripts/phone.sh main`).
 
 Dev clients are Debug builds: slower, with the dev menu, and no update
-channel. Real performance gets checked in TestFlight; updates and channels
-on an internal build.
+channel. Load times and notification opens get judged on an internal
+build.
 
 ## EAS
 
 Project `@directedbyshawn/vera`. Profiles in `eas.json`:
 
-| Profile                 | App      | Use                                        | `EXPO_PUBLIC_VERA_DOMAIN` |
-| ----------------------- | -------- | ------------------------------------------ | ------------------------- |
-| `development`           | Vera Dev | Phone dev client (`scripts/phone.sh`)      | `dev.vera.chat`           |
-| `development-simulator` | Vera Dev | Dev client for the iOS simulator (EAS)     | `dev.vera.chat`           |
-| `internal`              | Vera Dev | Update and channel checks (`pnpm release`) | `dev.vera.chat`           |
-| `preview`               | Vera     | Private ad hoc iOS and Android APK tests   | `vera.chat`               |
-| `production`            | Vera     | TestFlight and store builds                | `vera.chat`               |
+| Profile                 | App      | Use                                      | `EXPO_PUBLIC_VERA_DOMAIN` |
+| ----------------------- | -------- | ---------------------------------------- | ------------------------- |
+| `development`           | Vera Dev | Phone dev client (`scripts/phone.sh`)    | `dev.vera.chat`           |
+| `development-simulator` | Vera Dev | Dev client for the iOS simulator (EAS)   | `dev.vera.chat`           |
+| `internal`              | Vera Dev | Release tests, update and channel checks | `dev.vera.chat`           |
+| `preview`               | Vera     | Private ad hoc iOS and Android APK tests | `vera.chat`               |
+| `production`            | Vera     | TestFlight and store builds              | `vera.chat`               |
 
 Each profile has the update channel of the same name; releases (internal
 builds, store builds, and over-the-air updates) go through `pnpm release`.

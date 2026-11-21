@@ -227,9 +227,9 @@ scripts/phone.sh list           # every cached dev client, marking main's
 - Leave it up while you work on his feedback. If this worktree has its own
   dev client, `down` at close-out prints main's install link: send it so
   he can put main's dev client back.
-- Never make an internal build for this. Those are only for when Shawn
-  asks for one by name, or to check update or channel behavior, which a
-  dev client can't show.
+- Never make an internal build for this. Those are for the release test
+  (the `vera-release` skill), when Shawn asks for one by name, or to check
+  update or channel behavior, which a dev client can't show.
 
 ## 5. Capture evidence
 
