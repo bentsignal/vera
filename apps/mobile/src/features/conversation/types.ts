@@ -22,7 +22,7 @@ export interface ThreadInfo {
 export interface AttachmentUpload {
   readonly messageId: string;
   readonly itemId: string;
-  readonly state: "failed" | "too-large" | "uploaded" | "uploading";
+  readonly state: "failed" | "limited" | "too-large" | "uploaded" | "uploading";
 }
 
 /** An attachment as the conversation shows it. */

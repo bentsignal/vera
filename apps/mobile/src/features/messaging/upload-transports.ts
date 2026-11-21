@@ -1,4 +1,5 @@
 import type { Id } from "@vera/backend/dataModel";
+import type { UploadKind } from "@vera/backend/upload-limits";
 import type { ConvexHttpClient } from "convex/browser";
 import type { FunctionReturnType } from "convex/server";
 import {
@@ -71,8 +72,7 @@ async function sendBinary({
 async function sendToConvex(
   convex: ConvexHttpClient,
   url: string,
-  file: LocalUpload,
-  onBytesSent?: OnBytesSent,
+  { file, kind, onBytesSent }: Omit<Parameters<typeof sendUpload>[1], "target">,
 ) {
   const storageId = storageIdOf(
     JSON.parse(
@@ -81,6 +81,7 @@ async function sendToConvex(
   );
   if (storageId === undefined) throw new Error("Upload failed");
   const result = await convex.mutation(api.files.completeUpload, {
+    kind,
     // The server's v.id("_storage") validator checks the format.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     storageId: storageId as Id<"_storage">,
@@ -91,13 +92,21 @@ async function sendToConvex(
 /** Sends a local file to wherever the server said, returning its URL. */
 export async function sendUpload(
   convex: ConvexHttpClient,
-  target: UploadTarget,
-  file: LocalUpload,
-  onBytesSent?: OnBytesSent,
+  {
+    file,
+    kind,
+    onBytesSent,
+    target,
+  }: {
+    file: LocalUpload;
+    kind: UploadKind;
+    onBytesSent?: OnBytesSent;
+    target: UploadTarget;
+  },
 ) {
   switch (target.protocol) {
     case "convex":
-      return sendToConvex(convex, target.url, file, onBytesSent);
+      return sendToConvex(convex, target.url, { file, kind, onBytesSent });
     case "put": {
       // bunny.net Storage, through a URL presigned for this one object.
       await sendBinary({

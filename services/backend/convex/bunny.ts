@@ -7,7 +7,7 @@ import { optionalEnvironment } from "./lib";
 // served from the pull zone's CDN hostname. A host without these variables
 // falls back to Convex file storage (see files.ts).
 
-const UPLOAD_URL_LIFETIME_SECONDS = 15 * 60;
+export const UPLOAD_URL_LIFETIME_SECONDS = 15 * 60;
 
 export function bunnyStorageConfig() {
   const endpoint = optionalEnvironment("BUNNY_S3_ENDPOINT");
@@ -38,8 +38,9 @@ export type BunnyStorageConfig = NonNullable<
 
 /**
  * A presigned PUT for one object path. bunny.net enforces the signature and
- * path, but not the signed length or content type, so the size limits in
- * files.ts are advisory for a malicious client. A `size` of 0 (unknown)
+ * path, but not the signed length or content type (checked 2026-11), so
+ * files.ts checks each upload's size after it lands, and the CDN decides
+ * what a browser may show by the type served (infra/media-cdn). A `size` of 0 (unknown)
  * leaves the length out of the signed headers.
  */
 export async function presignStorageUpload(
@@ -70,4 +71,44 @@ export async function presignStorageUpload(
     publicUrl: `${config.cdnUrl}/${path}`,
     url: signed.url.toString(),
   };
+}
+
+async function storageRequest(
+  config: BunnyStorageConfig,
+  method: "DELETE" | "HEAD",
+  path: string,
+) {
+  const signer = new AwsV4Signer({
+    accessKeyId: config.zone,
+    method,
+    region: config.region,
+    secretAccessKey: config.secret,
+    service: "s3",
+    url: `${config.endpoint}/${config.zone}/${path}`,
+  });
+  const signed = await signer.sign();
+  return fetch(signed.url, { headers: signed.headers, method });
+}
+
+/** An object's size in bytes, or null when there's none at `path`. */
+export async function storageObjectSize(
+  config: BunnyStorageConfig,
+  path: string,
+) {
+  const response = await storageRequest(config, "HEAD", path);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`bunny.net Storage HEAD failed (${response.status})`);
+  }
+  return Number(response.headers.get("content-length") ?? 0);
+}
+
+export async function deleteStorageObject(
+  config: BunnyStorageConfig,
+  path: string,
+) {
+  const response = await storageRequest(config, "DELETE", path);
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`bunny.net Storage DELETE failed (${response.status})`);
+  }
 }
