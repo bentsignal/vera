@@ -187,7 +187,17 @@ export function memoryStore() {
   const claims: { address: string; deviceKey: string; expiresAt: number }[] =
     [];
   const allowances = new Set<string>();
+  let locked = false;
   const store: SignUpDeviceStore = {
+    lock: () => {
+      const free = !locked;
+      locked = true;
+      return Promise.resolve(free);
+    },
+    unlock: () => {
+      locked = false;
+      return Promise.resolve();
+    },
     allowed: (address) => Promise.resolve(allowances.has(address)),
     claim: (address, deviceKey, limit) => {
       const room = hasRoom({
@@ -238,8 +248,5 @@ export async function signUp(
     checkSignUpDevice(store, config, attempt, fetcher),
   );
   if (started !== null) return started;
-  return refusal(async () => {
-    const counted = await finishSignUpDevice(store, config, attempt, fetcher);
-    await counted();
-  });
+  return refusal(() => finishSignUpDevice(store, config, attempt, fetcher));
 }

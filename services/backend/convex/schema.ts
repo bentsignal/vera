@@ -187,6 +187,11 @@ export default defineSchema({
   })
     .index("by_address", ["address"])
     .index("by_device", ["deviceKey"]),
+  /** iPhone sign-ups finish one at a time (signUpDevices.ts). */
+  signUpLocks: defineTable({
+    expiresAt: v.number(),
+    name: v.string(),
+  }).index("by_name", ["name"]),
   /** Usernames an operator let past the per-phone limit (signUpDevices.ts). */
   signUpAllowances: defineTable({
     address: v.string(),

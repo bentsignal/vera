@@ -109,6 +109,13 @@ export interface SignUpDeviceStore {
   ) => Promise<boolean>;
   /** Counts the address's claim as an account: false when it has none. */
   readonly finish: (address: string) => Promise<boolean>;
+  /**
+   * Takes the PDS's one iPhone sign-up slot for a while: false when another
+   * sign-up holds it. Apple can't check and set a phone's bits in one step,
+   * so iPhone sign-ups finish one at a time.
+   */
+  readonly lock: () => Promise<boolean>;
+  readonly unlock: () => Promise<void>;
 }
 
 export interface SignUpAttempt {
@@ -165,53 +172,61 @@ export async function checkSignUpDevice(
   }
 }
 
-/** Counts an iPhone's sign-up at Apple, once its account exists. */
-function countAtApple(
-  config: DeviceCheckConfig,
-  token: string,
-  device: Awaited<ReturnType<typeof appleDevice>>,
-  fetcher: typeof fetch,
-) {
-  return async () => {
-    try {
-      await recordAppleSignUp(config, token, device, fetcher);
-    } catch (error) {
-      // The account exists; refusing now would only strand it.
-      console.error("couldn't count the sign-up at Apple", error);
-    }
-  };
+/** How often, and how long apart, an iPhone sign-up tries for the slot. */
+const LOCK_TRIES = 20;
+const LOCK_WAIT_MS = 500;
+
+async function takeSlot(store: SignUpDeviceStore) {
+  for (let attempt = 0; attempt < LOCK_TRIES; attempt += 1) {
+    if (await store.lock()) return;
+    await new Promise((resolve) => setTimeout(resolve, LOCK_WAIT_MS));
+  }
+  throw new DeviceRefused("DEVICE_CHECK_UNAVAILABLE", "sign-ups are busy");
 }
 
-function nothingMore() {
-  return Promise.resolve();
+/**
+ * Counts an iPhone's sign-up at Apple, holding the slot so two sign-ups
+ * from one phone at once can't both see it empty.
+ */
+async function countAtApple(
+  store: SignUpDeviceStore,
+  config: DeviceCheckConfig,
+  token: string,
+  fetcher: typeof fetch,
+) {
+  await takeSlot(store);
+  try {
+    const apple = await appleDevice(config, token, fetcher);
+    if (apple.count >= config.limit) throw new DeviceRefused("DEVICE_LIMIT");
+    await recordAppleSignUp(config, token, apple, fetcher);
+  } finally {
+    await store.unlock();
+  }
 }
 
 /**
  * When the passkey is made, just before the account is: counts the sign-up
- * against its phone. Returns what to run once the account exists (an
- * iPhone's count is kept at Apple).
+ * against its phone, or refuses it. (If creating the account fails after
+ * this, the phone has used a sign-up; that's rare and errs on the safe
+ * side.)
  */
 export async function finishSignUpDevice(
   store: SignUpDeviceStore,
   config: DeviceCheckConfig,
   signUp: SignUpAttempt,
   fetcher: typeof fetch = fetch,
-): Promise<() => Promise<void>> {
-  if (!config.required || (await store.useAllowance(signUp.address))) {
-    return nothingMore;
-  }
+) {
+  if (!config.required || (await store.useAllowance(signUp.address))) return;
   const device = requireProof(signUp.device);
-  if (device.platform === "android") {
-    // The start checked this phone with Google and left a claim.
-    if (!(await store.finish(signUp.address))) {
-      throw new DeviceRefused(
-        "DEVICE_PROOF_INVALID",
-        "no claim for this sign-up",
-      );
-    }
-    return nothingMore;
+  if (device.platform === "ios") {
+    await countAtApple(store, config, device.token, fetcher);
+    return;
   }
-  const apple = await appleDevice(config, device.token, fetcher);
-  if (apple.count >= config.limit) throw new DeviceRefused("DEVICE_LIMIT");
-  return countAtApple(config, device.token, apple, fetcher);
+  // The start checked this phone with Google and left a claim.
+  if (!(await store.finish(signUp.address))) {
+    throw new DeviceRefused(
+      "DEVICE_PROOF_INVALID",
+      "no claim for this sign-up",
+    );
+  }
 }
