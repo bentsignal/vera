@@ -359,9 +359,19 @@ Environment variables on each deployment:
 | `GITHUB_REPOSITORY`           | `bentsignal/vera`                    | Where Vera files bug reports                  |
 | `PARALLEL_API_KEY`            | secret                               | Vera's web search (Parallel)                  |
 
-Attachment size limits (videos 500 MB, photos 50 MB, other files 100 MB) and
-the 2-minute video cap live in `upload-limits.ts`. The app imports the same
-file to turn away a file when it's picked, so change them there.
+Attachment size limits (videos 50 MB, photos 10 MB, other files 20 MB), the
+1-minute video cap, and each account's upload allowance (2 GB in any 24
+hours) live in `upload-limits.ts`. The app imports the same file to turn
+away a file when it's picked, so change them there.
+
+Only this PDS's own accounts can upload (`convex/files.ts`). bunny.net
+doesn't hold an upload to the size it was signed for, so the PDS checks
+each one after it lands and deletes it if it's over its kind's limit; an
+account caught doing that can't upload again for a day. Operators can give
+someone their allowance back with
+`npx convex run files:reset '{"accountId":"someone@vera.chat"}'`. What a
+browser may do with an uploaded file is set at the CDN
+(`infra/media-cdn`).
 
 ## Passkey domain
 

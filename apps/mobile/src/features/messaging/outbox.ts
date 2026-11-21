@@ -10,16 +10,18 @@ import { Image } from "expo-image";
 import { pds } from "@vera/backend/pds";
 
 import type { StagedFile } from "./attachments";
+import type { FailedUploadState } from "./upload-errors";
 import type { AccountSession } from "~/features/session/account-session";
-import { TooLargeError, uploadStaged } from "./attachments";
+import { uploadStaged } from "./attachments";
 import { enqueueSend, sendPatiently } from "./send-limit";
+import { failedUploadState, retriable } from "./upload-errors";
 import { setUploadProgress } from "./upload-progress";
 
 // Messages this device sent that the PDS hasn't confirmed yet, with their
 // uploads. They live outside React, so leaving the conversation doesn't
 // stop an upload, and the message is still there when you come back.
 
-export type UploadState = "failed" | "too-large" | "uploaded" | "uploading";
+export type UploadState = FailedUploadState | "uploaded" | "uploading";
 
 export interface OutgoingItem {
   readonly id: string;
@@ -186,7 +188,7 @@ async function upload(
     ),
   ).catch((error: unknown) => {
     updateItem(messageId, item.id, {
-      state: error instanceof TooLargeError ? "too-large" : "failed",
+      state: failedUploadState(error),
     });
     return undefined;
   });
@@ -277,7 +279,7 @@ async function deliver(messageId: string) {
   update(messageId, (message) => ({
     ...message,
     items: message.items.map((item) =>
-      item.state === "failed" ? { ...item, state: "uploading" } : item,
+      retriable(item.state) ? { ...item, state: "uploading" } : item,
     ),
     status: "sending",
   }));

@@ -24,6 +24,19 @@ export function showUploadProblem({
     );
     return;
   }
+  if (state === "limited") {
+    Alert.alert(
+      "Upload Limit Reached",
+      "You've uploaded a lot today. Try again later, or remove it to send the rest.",
+      [
+        cancel,
+        remove,
+        { onPress: () => retryOutgoing(messageId), text: "Try Again" },
+      ],
+      { cancelable: true },
+    );
+    return;
+  }
   Alert.alert(
     "Couldn't Upload",
     "Check your connection and try again.",

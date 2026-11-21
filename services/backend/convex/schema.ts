@@ -170,6 +170,20 @@ export default defineSchema({
     tokens: v.number(),
     updatedAt: v.number(),
   }).index("by_account", ["accountId", "bot"]),
+  /**
+   * Each attachment upload started in the last day, for the per-account
+   * cap and the size check after it lands (files.ts).
+   */
+  uploads: defineTable({
+    accountId: v.string(),
+    /** The real size once checked; until then, what it may grow to. */
+    bytes: v.number(),
+    checked: v.boolean(),
+    kind: v.union(v.literal("image"), v.literal("video"), v.literal("file")),
+    oversize: v.optional(v.boolean()),
+    /** The object's path in bunny.net Storage; none for Convex storage. */
+    path: v.optional(v.string()),
+  }).index("by_account", ["accountId"]),
   /** Each person's allowance of messages to send (sendLimits.ts). */
   sendLimits: defineTable({
     accountId: v.string(),

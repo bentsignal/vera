@@ -28,7 +28,11 @@ type HoldEvent = Extract<ListEvent, { type: "hold" }>;
 /** Retries or removes an attachment that didn't upload; true if it was one. */
 function handledStuck(attachment: MessageAttachment | undefined) {
   const upload = attachment?.upload;
-  if (upload?.state !== "failed" && upload?.state !== "too-large") {
+  if (
+    upload?.state !== "failed" &&
+    upload?.state !== "limited" &&
+    upload?.state !== "too-large"
+  ) {
     return false;
   }
   showUploadProblem(upload);
