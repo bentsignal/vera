@@ -1,14 +1,17 @@
 import type { OperationArgs } from "@decentralized-convex/plugin";
 
-import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import type { messagesProtocol, Space } from "./protocol.ts";
-import { chosenAlerts } from "./alertChoice.ts";
-import { unreadCount } from "./chatMessages.ts";
+import type { messagesProtocol } from "./protocol.ts";
+import { upsertEntry } from "./inboxEntries.ts";
+import {
+  scheduleChannelEntries,
+  scheduleForget,
+  scheduleJoin,
+  scheduleLeave,
+} from "./inboxMembers.ts";
 import {
   fail,
   getConversation,
-  getMember,
   getSpace,
   getSpaceMember,
   isRetriedCreate,
@@ -21,8 +24,6 @@ import {
 import { channelName } from "./naming.ts";
 import { clearOnJoin } from "./pendingInvites.ts";
 import { forgetBadge } from "./pushBadges.ts";
-import { readAt } from "./readStates.ts";
-import { notificationSettings } from "./settings.ts";
 import { noteRemoval } from "./spaceRemovals.ts";
 import { deleteThreads } from "./threads.ts";
 
@@ -70,7 +71,7 @@ export async function createSpace(
     role: "owner",
     spaceId,
   });
-  await ctx.db.insert("conversations", {
+  const id = await ctx.db.insert("conversations", {
     conversationId: generalId,
     createdBy: self,
     kind: "channel",
@@ -79,6 +80,10 @@ export async function createSpace(
     spaceId,
     updatedAt: Date.now(),
   });
+  const general = await ctx.db.get(id);
+  if (general !== null) {
+    await upsertEntry(ctx, self, general, { activityAt: general.updatedAt });
+  }
   return { spaceId };
 }
 
@@ -106,6 +111,7 @@ export async function addSpaceMembers(
         role: "member",
         spaceId: args.spaceId,
       });
+      await scheduleJoin(ctx, args.spaceId, accountId);
     }
     // In the space, they've nothing left to answer.
     await clearOnJoin(ctx, args.spaceId, accountId);
@@ -137,6 +143,7 @@ export async function removeSpaceMember(
   if (removed.role === "owner") fail("SPACE_OWNER_CANNOT_LEAVE");
   await ctx.db.delete(removed._id);
   if (target !== self) await noteRemoval(ctx, args.spaceId, target);
+  await scheduleLeave(ctx, args.spaceId, removed.accountId);
   return null;
 }
 
@@ -157,20 +164,24 @@ export async function createChannel(
   ) {
     return { conversationId };
   }
-  const channels = await ctx.db
+  // The last by position (from before positions, none counts as 0).
+  const last = await ctx.db
     .query("conversations")
-    .withIndex("by_space", (index) => index.eq("spaceId", args.spaceId))
-    .collect();
+    .withIndex("by_space_position", (index) =>
+      index.eq("spaceId", args.spaceId),
+    )
+    .order("desc")
+    .first();
   await ctx.db.insert("conversations", {
     conversationId,
     createdBy: self,
     kind: "channel",
     name: normalizeChannelName(args.name),
-    position:
-      Math.max(-1, ...channels.map(({ position }) => position ?? 0)) + 1,
+    position: (last?.position ?? -1) + 1,
     spaceId: args.spaceId,
     updatedAt: Date.now(),
   });
+  await scheduleChannelEntries(ctx, conversationId);
   return { conversationId };
 }
 
@@ -206,106 +217,6 @@ export async function deleteChannel(
   for (const row of [...messages, ...members]) await ctx.db.delete(row._id);
   await deleteThreads(ctx, conversationId);
   await ctx.db.delete(channel._id);
+  await scheduleForget(ctx, conversationId);
   return null;
-}
-
-export async function spaces(ctx: QueryCtx, self: string) {
-  const memberships = await ctx.db
-    .query("spaceMembers")
-    .withIndex("by_account", (index) => index.eq("accountId", self))
-    .collect();
-  const found = await Promise.all(
-    memberships.map(async ({ spaceId }) => {
-      const space = await getSpace(ctx, spaceId);
-      return space === null ? null : toSpace(ctx, space, self);
-    }),
-  );
-  return found
-    .filter((space) => space !== null)
-    .sort((left, right) => left.name.localeCompare(right.name));
-}
-
-export async function space(ctx: QueryCtx, self: string, spaceId: string) {
-  const found = await getSpace(ctx, spaceId);
-  return found === null ? null : toSpace(ctx, found, self);
-}
-
-export async function toSpace(
-  ctx: QueryCtx,
-  space: Doc<"spaces">,
-  accountId: string,
-): Promise<Space | null> {
-  const self = await getSpaceMember(ctx, space.spaceId, accountId);
-  if (self === null) return null;
-  const [members, invites, conversations, settings] = await Promise.all([
-    ctx.db
-      .query("spaceMembers")
-      .withIndex("by_space_account", (index) =>
-        index.eq("spaceId", space.spaceId),
-      )
-      .collect(),
-    ctx.db
-      .query("spaceInvites")
-      .withIndex("by_space_account", (index) =>
-        index.eq("spaceId", space.spaceId),
-      )
-      .collect(),
-    ctx.db
-      .query("conversations")
-      .withIndex("by_space", (index) => index.eq("spaceId", space.spaceId))
-      .collect(),
-    notificationSettings(ctx, accountId),
-  ]);
-  const alerts = chosenAlerts(self) ?? settings.channelAlerts;
-  const channels = await Promise.all(
-    conversations.map(async (conversation) => {
-      const member = await getMember(
-        ctx,
-        conversation.conversationId,
-        accountId,
-      );
-      const chosen = chosenAlerts(member);
-      return {
-        alerts: chosen,
-        conversationId: conversation.conversationId,
-        muted: chosen === "none",
-        name: conversation.name ?? "",
-        position: conversation.position ?? 0,
-        showInInbox: member?.hiddenFromInbox !== true,
-        unreadCount: await unreadCount(
-          ctx,
-          conversation.conversationId,
-          accountId,
-          await readAt(
-            ctx,
-            conversation.conversationId,
-            accountId,
-            member?.lastReadAt ?? self._creationTime,
-          ),
-        ),
-      };
-    }),
-  );
-  channels.sort(
-    (left, right) =>
-      left.position - right.position || left.name.localeCompare(right.name),
-  );
-  return {
-    alerts,
-    channels,
-    invited: invites.map((invite) => invite.accountId),
-    joinedAt: self._creationTime,
-    members: members.map((member) => ({
-      accountId: member.accountId,
-      role: member.role,
-    })),
-    muted: alerts === "none",
-    name: space.name,
-    role: self.role,
-    spaceId: space.spaceId,
-    unreadCount: channels.reduce(
-      (total, channel) => total + channel.unreadCount,
-      0,
-    ),
-  };
 }

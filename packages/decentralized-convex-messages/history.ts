@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 import type { Id, TableNames } from "./_generated/dataModel.js";
 import { mutation } from "./_generated/server.js";
+import { scheduleBump } from "./inboxOrder.ts";
 import { getConversation } from "./model.ts";
 import { attachment, linkCard, linkPreview } from "./protocol.ts";
 import { scheduleNumbering } from "./sequences.ts";
@@ -38,6 +39,7 @@ export const importHistory = mutation({
     }
     await ctx.db.patch(conversation._id, { updatedAt: latest });
     await scheduleNumbering(ctx, conversationId, 0);
+    await scheduleBump(ctx, conversationId);
     return null;
   },
 });

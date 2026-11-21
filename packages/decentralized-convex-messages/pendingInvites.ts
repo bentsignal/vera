@@ -23,8 +23,12 @@ export async function clearOnJoin(
   await forgetRemoval(ctx, spaceId, accountId);
 }
 
+/** The newest invitations looked at: the badge and the list stay small. */
+const MAX_PENDING_INVITES = 50;
+
 /**
- * The account's invitations to spaces that still exist, with the space.
+ * The account's newest invitations to spaces that still exist, with the
+ * space.
  * One to a space it's in already (added by a member after being invited)
  * isn't pending: there's nothing to answer, and it would count on the
  * badge for good.
@@ -33,7 +37,8 @@ export async function pendingInvites(ctx: QueryCtx, accountId: string) {
   const invites = await ctx.db
     .query("spaceInvites")
     .withIndex("by_account", (index) => index.eq("accountId", accountId))
-    .collect();
+    .order("desc")
+    .take(MAX_PENDING_INVITES);
   const pending = [];
   for (const invite of invites) {
     const [space, member] = await Promise.all([
