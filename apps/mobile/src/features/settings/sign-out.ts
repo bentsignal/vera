@@ -13,28 +13,37 @@ import {
   removeStoredAccount,
   storedAccounts,
 } from "~/features/session/account-store";
+import { forgetHomeToken } from "~/features/session/federation-auth";
+import { endSessionWithin } from "./end-session";
 
 /**
  * Forgets the account here right away, so the accounts list is already
  * updated when the screen that signed out closes. Then, in the
  * background, stops this device's notifications for it and ends its
- * session. Other signed-in accounts stay signed in.
+ * session on its server, and forgets its session on this device whether
+ * or not the server could be reached (`endSessionWithin`). Other
+ * signed-in accounts stay signed in.
  */
 export function signOutAccount(session: AccountSession) {
   removeStoredAccount(session.address);
   forgetDrafts(session.address);
-  void endSession(session);
+  // The connection keeps the token it has, so the saved one can go now.
+  forgetHomeToken(session.storagePrefix);
+  void endSessionWithin(
+    [
+      unregisterPush(session),
+      // Better Auth forgets its saved session as the request starts, even
+      // with no connection.
+      session.authSignOut(),
+    ],
+    () => closeAccountSession(session),
+  );
 }
 
-async function endSession(session: AccountSession) {
+async function unregisterPush(session: AccountSession) {
   const token = await getPushToken().catch(() => null);
-  if (token !== null) {
-    await session.pds
-      .mutate(pds.messages.unregisterPushToken({ token }))
-      .catch(() => null);
-  }
-  await session.authSignOut().catch(() => null);
-  closeAccountSession(session);
+  if (token === null) return;
+  await session.pds.mutate(pds.messages.unregisterPushToken({ token }));
 }
 
 /**

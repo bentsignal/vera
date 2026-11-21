@@ -4,7 +4,20 @@ import type { FederationTarget, FederationTargetGroup } from "./types.ts";
 
 /** A PDS as the target of a route (an account or domain on it). */
 export function pdsTarget(id: string, pds: DiscoveredPds): FederationTarget {
-  return { id, url: pds.manifest.deploymentUrl };
+  return { domain: pds.domain, id, url: pds.manifest.deploymentUrl };
+}
+
+/**
+ * What tells sources apart: their deployment, and the domain that led to
+ * it, so a domain whose manifest names another's deployment is asked (and
+ * believed) apart from it.
+ */
+export function federationTargetKey(target: {
+  readonly domain?: string;
+  readonly url: string;
+}) {
+  const url = normalizeFederationUrl(target.url);
+  return target.domain === undefined ? url : `${url}#${target.domain}`;
 }
 
 export function normalizeFederationUrl(value: string) {
@@ -22,20 +35,32 @@ export function normalizeFederationUrl(value: string) {
 export function groupFederationTargets(
   targets: readonly FederationTarget[],
 ): readonly FederationTargetGroup[] {
-  const idsByUrl = new Map<string, Set<string>>();
+  const groups = new Map<
+    string,
+    { domain?: string; ids: Set<string>; url: string }
+  >();
   for (const target of targets) {
     const id = target.id.trim();
     if (id.length === 0)
       throw new Error("Federation target IDs cannot be empty");
     const url = normalizeFederationUrl(target.url);
-    const ids = idsByUrl.get(url) ?? new Set<string>();
-    ids.add(id);
-    idsByUrl.set(url, ids);
+    const key = federationTargetKey({ domain: target.domain, url });
+    const group = groups.get(key) ?? {
+      ...(target.domain === undefined ? {} : { domain: target.domain }),
+      ids: new Set<string>(),
+      url,
+    };
+    group.ids.add(id);
+    groups.set(key, group);
   }
 
-  return [...idsByUrl]
-    .map(([url, ids]) => ({ ids: [...ids].sort(), url }))
-    .sort((a, b) => a.url.localeCompare(b.url));
+  return [...groups.values()]
+    .map(({ ids, ...group }) => ({ ...group, ids: [...ids].sort() }))
+    .sort(
+      (a, b) =>
+        a.url.localeCompare(b.url) ||
+        (a.domain ?? "").localeCompare(b.domain ?? ""),
+    );
 }
 
 function isLocalHttp(url: URL) {

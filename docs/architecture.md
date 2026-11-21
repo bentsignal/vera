@@ -97,6 +97,55 @@ A write follows the same path through `pds:dispatchMutation`, targeting only the
 author's home PDS. The root router resolves identity once and passes the small
 identity value across one Component boundary.
 
+### A PDS speaks only for its own accounts
+
+**Invariant: a PDS is believed only about its own accounts.** Its own
+accounts are those on the domain whose discovery (`_pds` DNS record, then
+manifest) led to it. Everything a PDS answers about any other account is
+left out before an app sees it, whichever PDS it is, the home PDS
+included.
+
+The client library enforces it, so no app built on it can skip it:
+
+- A query gathered from several PDSs (one whose result has `routes`)
+  declares `trust` on its operation (`defineOperation({ args, returns,
+  trust })`): given one PDS's answer and `owns(accountId)`, it returns the
+  answer with everything about other accounts removed.
+  `@decentralized-convex/client` runs it on every PDS's answer before
+  anything combines them, and on included results the home PDS answers.
+- A query without `trust` is believed only from the home PDS. Other PDSs'
+  answers to it become errored sources (`UntrustedPdsAnswerError`), as
+  does an answer its `trust` can't read.
+- Each PDS is asked, signed in to, and believed per domain: a manifest that
+  names another domain's deployment gets its own connection, signed in for
+  its own domain, and its answers count only for its own accounts.
+- Discovery believes a `_pds` record only when Cloudflare's and Google's
+  DNS-over-HTTPS resolvers agree on it, and only a manifest for the domain
+  looked up.
+
+Because each PDS sends only its own accounts' rows, a copy from a PDS that
+isn't the author's never reaches the app, so it can't overwrite the
+author's. Two authors claiming one message ID can't both be right; the
+Vera app never lets the later one replace the other
+(`apps/mobile/src/features/messaging/window-model.ts` → `preferredCopy`).
+
+What the Messages and Accounts plugins believe from whom:
+
+| Data                                          | Believed from                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Messages, edits, deletions, link previews     | The author's PDS                                                                                                          |
+| A reply's quote of another server's account   | Who and which message, from the replier's PDS; not the quoted words                                                       |
+| A thread's original message                   | Its author's PDS                                                                                                          |
+| Reactions, typing                             | The reacting or typing account's PDS                                                                                      |
+| Thread summaries and lists (counts, repliers) | Each PDS for the replies it stores, naming only its own repliers; a count with none of its own repliers is dropped        |
+| Profiles (names, photos, `affiliated`)        | The account's own PDS, and only as the profile asked for                                                                  |
+| Conversations, inbox, members, names, spaces  | The home PDS only (these queries aren't gathered from other PDSs)                                                         |
+| The verified check                            | Only `@vera.chat` accounts show it in the Vera app, whatever another PDS says (`apps/mobile/src/features/profile/verified.ts`) |
+
+Not checkable this way: a PDS can still overstate how many replies it
+stores, or its own accounts' place in a thread; both only change counts and
+dots, never who said what.
+
 ### Function bundles
 
 Convex loads all the code a function's module imports each time the

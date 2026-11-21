@@ -3,21 +3,15 @@ import test from "node:test";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
-import {
-  defineOperation,
-  definePluginProtocol,
-} from "@decentralized-convex/plugin";
 import { makeFunctionReference } from "convex/server";
-import { v } from "convex/values";
 
-import type { PdsRequest } from "./pds.ts";
 import type {
   FederationConnection,
   FederationMutationReference,
   FederationQueryReference,
 } from "./types.ts";
 import { DecentralizedConvexClient } from "./client.ts";
-import { definePdsApi } from "./pds.ts";
+import { listNotesRequest, note, notesApi } from "./notes.testing.ts";
 
 const listItems = makeFunctionReference<
   "query",
@@ -56,24 +50,7 @@ void test("groups identities by deployment and combines native query results", a
 });
 
 void test("federates typed PDS requests without a generated backend API", async () => {
-  const notes = definePluginProtocol({
-    lastChanged: corePackage.lastChanged,
-    name: "notes",
-    mutations: {
-      create: defineOperation({
-        args: v.object({ body: v.string() }),
-        returns: v.object({ id: v.string() }),
-      }),
-    },
-    queries: {
-      list: defineOperation({
-        args: v.object({}),
-        returns: v.array(v.object({ body: v.string() })),
-      }),
-    },
-    requires: {},
-  });
-  const api = definePdsApi(notes);
+  const api = notesApi;
   const client = new DecentralizedConvexClient({
     connectionFactory: (url) => new MemoryConnection(url),
   });
@@ -88,8 +65,8 @@ void test("federates typed PDS requests without a generated backend API", async 
 
   assert.equal(snapshot.status, "success");
   assert.deepEqual(snapshot.data, [
-    { body: "https://a.test" },
-    { body: "https://b.test" },
+    note("https://a.test", "a.test"),
+    note("https://b.test", "b.test"),
   ]);
   await client.close();
 });
@@ -112,21 +89,21 @@ void test("reveals initial partial PDS data after the grace period and retains s
   });
   const unsubscribe = observer.subscribe(() => undefined);
 
-  connections.get("https://a.test")?.emit([{ body: "a" }], ["b.test"]);
+  connections.get("https://a.test")?.emit([note("a")], ["b.test"]);
   await nextTask();
   assert.equal(observer.getSnapshot().status, "pending");
 
   await wait(25);
   assert.equal(observer.getSnapshot().status, "partial");
-  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }]);
+  assert.deepEqual(observer.getSnapshot().data, [note("a")]);
 
-  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  connections.get("https://b.test")?.emit([note("b")]);
   assert.equal(observer.getSnapshot().status, "success");
-  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }, { body: "b" }]);
+  assert.deepEqual(observer.getSnapshot().data, [note("a"), note("b")]);
 
   connections.get("https://b.test")?.fail(new Error("temporarily offline"));
   assert.equal(observer.getSnapshot().status, "success");
-  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }, { body: "b" }]);
+  assert.deepEqual(observer.getSnapshot().data, [note("a"), note("b")]);
   assert.equal(
     observer
       .getSnapshot()
@@ -134,15 +111,10 @@ void test("reveals initial partial PDS data after the grace period and retains s
     "stale",
   );
 
-  connections
-    .get("https://a.test")
-    ?.emit([{ body: "a2" }], ["b.test", "c.test"]);
+  connections.get("https://a.test")?.emit([note("a2")], ["b.test", "c.test"]);
   await nextTask();
   assert.equal(observer.getSnapshot().status, "success");
-  assert.deepEqual(observer.getSnapshot().data, [
-    { body: "a2" },
-    { body: "b" },
-  ]);
+  assert.deepEqual(observer.getSnapshot().data, [note("a2"), note("b")]);
   assert.equal(
     observer
       .getSnapshot()
@@ -172,22 +144,15 @@ void test("returns complete PDS data immediately during the partial grace period
     revealPartialResultsAfter: 60_000,
   });
 
-  connections.get("https://a.test")?.emit([{ body: "a" }], ["b.test"]);
+  connections.get("https://a.test")?.emit([note("a")], ["b.test"]);
   await nextTask();
   assert.equal(observer.getSnapshot().status, "pending");
-  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  connections.get("https://b.test")?.emit([note("b")]);
   assert.equal(observer.getSnapshot().status, "success");
 
   observer.close();
   await client.close();
 });
-
-const listNotesRequest = {
-  lastChanged: corePackage.lastChanged,
-  operation: { args: {}, type: "list" },
-  plugin: "notes",
-  version: DECENTRALIZED_CONVEX_VERSION,
-} satisfies PdsRequest<readonly { body: string }[], "query">;
 
 class MemoryConnection implements FederationConnection {
   readonly #url;
@@ -211,7 +176,7 @@ class MemoryConnection implements FederationConnection {
     args: FunctionArgs<Query>,
   ): Promise<FunctionReturnType<Query>> {
     const result = isPdsRequest(args)
-      ? { routes: [], value: [{ body: this.#url }] }
+      ? { routes: [], value: [note(this.#url, new URL(this.#url).host)] }
       : [{ id: this.#url, value: getScope(args) }];
     // The fake connection cannot derive a concrete return type from an arbitrary test reference.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -231,7 +196,7 @@ class MemoryConnection implements FederationConnection {
 class ControlledConnection implements FederationConnection {
   #fail?: (error: Error) => void;
   #publish?: (
-    value: readonly { body: string }[],
+    value: readonly { author: string; body: string }[],
     routes: readonly string[],
   ) => void;
 
@@ -270,7 +235,10 @@ class ControlledConnection implements FederationConnection {
     };
   }
 
-  emit(value: readonly { body: string }[], routes: readonly string[] = []) {
+  emit(
+    value: readonly { author: string; body: string }[],
+    routes: readonly string[] = [],
+  ) {
     this.#publish?.(value, routes);
   }
 

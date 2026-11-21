@@ -132,8 +132,60 @@ function selectManifestUrl(records: readonly string[]) {
   return match;
 }
 
+/**
+ * The DNS-over-HTTPS resolvers a `_pds` record is looked up with. Each is
+ * asked, and the record is believed only when they agree, so one resolver
+ * (or the network path to it) can't send the app to another server.
+ */
+const DOH_RESOLVERS = [
+  "https://cloudflare-dns.com/dns-query",
+  "https://dns.google/resolve",
+] as const;
+
+/** The two resolvers gave different answers for a `_pds` record. */
+export class PdsDiscoveryDisagreementError extends Error {
+  constructor(name: string) {
+    super(`DNS resolvers gave different answers for ${name}`);
+    this.name = "PdsDiscoveryDisagreementError";
+  }
+}
+
+/** What one resolver says: the name's TXT records, or that it doesn't exist. */
+type DohAnswer =
+  | { readonly records: readonly string[] }
+  | { readonly missing: true };
+
 async function resolveTxtWithDoh(name: string, fetcher: typeof fetch) {
-  const url = new URL("https://cloudflare-dns.com/dns-query");
+  const answers = await Promise.all(
+    DOH_RESOLVERS.map((resolver) => askResolver(resolver, name, fetcher)),
+  );
+  const [first, ...others] = answers;
+  if (first === undefined) throw new Error("PDS discovery failed");
+  const key = answerKey(first);
+  if (others.some((answer) => answerKey(answer) !== key)) {
+    throw new PdsDiscoveryDisagreementError(name);
+  }
+  if ("missing" in first) {
+    throw new PdsNotFoundError("The PDS DNS record does not exist");
+  }
+  return first.records;
+}
+
+/** What resolvers must agree on: whether the name exists, and its PDS records. */
+function answerKey(answer: DohAnswer) {
+  if ("missing" in answer) return "missing";
+  const pdsRecords = answer.records
+    .filter((record) => parsePdsTxtRecord(record) !== null)
+    .sort();
+  return JSON.stringify(pdsRecords);
+}
+
+async function askResolver(
+  resolver: string,
+  name: string,
+  fetcher: typeof fetch,
+): Promise<DohAnswer> {
+  const url = new URL(resolver);
   url.searchParams.set("name", name);
   url.searchParams.set("type", "TXT");
   const response = await fetcher(url, {
@@ -144,18 +196,18 @@ async function resolveTxtWithDoh(name: string, fetcher: typeof fetch) {
   }
   const payload: unknown = await response.json();
   // NXDOMAIN: the name doesn't exist.
-  if (isRecord(payload) && payload.Status === 3) {
-    throw new PdsNotFoundError("The PDS DNS record does not exist");
-  }
+  if (isRecord(payload) && payload.Status === 3) return { missing: true };
   if (!isRecord(payload) || payload.Status !== 0) {
     throw new Error("The PDS DNS record could not be resolved");
   }
-  if (!Array.isArray(payload.Answer)) return [];
-  return payload.Answer.flatMap((answer) =>
-    isRecord(answer) && answer.type === 16 && typeof answer.data === "string"
-      ? [decodeDnsTxtData(answer.data)]
-      : [],
-  );
+  if (!Array.isArray(payload.Answer)) return { records: [] };
+  return {
+    records: payload.Answer.flatMap((answer) =>
+      isRecord(answer) && answer.type === 16 && typeof answer.data === "string"
+        ? [decodeDnsTxtData(answer.data)]
+        : [],
+    ),
+  };
 }
 
 /** Checks that a value is a well-formed PDS manifest, such as a saved one. */

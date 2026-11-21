@@ -2,6 +2,7 @@ import { defineOperation } from "@decentralized-convex/plugin";
 import { v } from "convex/values";
 
 import { inboxThread, threadListingPage } from "./shapes.ts";
+import { trustThreadListings } from "./trust.ts";
 
 /** The queries that list threads, part of `messagesProtocol`. */
 export const threadListQueries = {
@@ -18,6 +19,7 @@ export const threadListQueries = {
       mine: v.optional(v.boolean()),
     }),
     returns: threadListingPage,
+    trust: trustThreadListings,
   }),
   /**
    * The threads you follow, newest reply first, at most

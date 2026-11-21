@@ -10,7 +10,8 @@ import type {
 } from "./types.ts";
 import { PdsClient } from "./pds.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
-import { groupFederationTargets } from "./targets.ts";
+import { federationTargetKey, groupFederationTargets } from "./targets.ts";
+import { sourceDomains, tryTrustedAnswer } from "./trust.ts";
 
 export class FederatedPdsQueryObserver<
   Request extends AnyPdsQueryRequest,
@@ -28,12 +29,15 @@ export class FederatedPdsQueryObserver<
 
   constructor(
     options: FederatedPdsQueryOptions<Request, Combined>,
-    getConnection: (url: string) => PdsConnection,
+    getConnection: (url: string, domain?: string) => PdsConnection,
   ) {
     this.#options = options;
     const targets = groupFederationTargets(options.targets);
     for (const target of targets) {
-      this.#sources.set(target.url, { status: "pending", target });
+      this.#sources.set(federationTargetKey(target), {
+        status: "pending",
+        target,
+      });
     }
     this.#snapshot = createFederatedSnapshot(
       [...this.#sources.values()],
@@ -45,11 +49,19 @@ export class FederatedPdsQueryObserver<
         typeof options.request === "function"
           ? options.request(target)
           : options.request;
-      const client = new PdsClient({ connection: getConnection(target.url) });
+      const key = federationTargetKey(target);
+      const client = new PdsClient({
+        connection: getConnection(target.url, target.domain),
+      });
       const unsubscribe = client.watchQuery(
         request,
-        (data) => this.#update(target.url, { data, status: "live" }),
-        (error) => this.#update(target.url, { error, status: "error" }),
+        (data) =>
+          this.#update(key, {
+            ...tryTrustedAnswer(request, data, sourceDomains(target), {
+              home: false,
+            }),
+          }),
+        (error) => this.#update(key, { error, status: "error" }),
       );
       this.#unsubscribes.push(unsubscribe);
     }
@@ -71,16 +83,16 @@ export class FederatedPdsQueryObserver<
   }
 
   #update(
-    url: string,
+    key: string,
     update:
       | { data: PdsRequestResult<Request>; status: "live" }
       | { error: Error; status: "error" },
   ) {
     if (this.#closed) return;
-    const source = this.#sources.get(url);
+    const source = this.#sources.get(key);
     if (source === undefined) return;
     this.#sources.set(
-      url,
+      key,
       update.status === "error" &&
         (source.status === "live" || source.status === "stale")
         ? {

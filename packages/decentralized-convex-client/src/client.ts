@@ -36,10 +36,12 @@ import { RoutedPdsQueryObserver } from "./routed-pds-observer.ts";
 import { PdsDirectory, resolvedTargets, unresolvedSources } from "./routes.ts";
 import { createFederatedSnapshot } from "./snapshot.ts";
 import {
+  federationTargetKey,
   groupFederationTargets,
   normalizeFederationUrl,
   pdsTarget,
 } from "./targets.ts";
+import { sourceDomains, tryTrustedAnswer } from "./trust.ts";
 
 export class DecentralizedConvexClient {
   readonly #connectionFactory;
@@ -69,8 +71,8 @@ export class DecentralizedConvexClient {
     Request extends AnyPdsQueryRequest,
     Combined = DefaultCombinedPdsResult<Request>,
   >(options: FederatedPdsQueryOptions<Request, Combined>) {
-    return new FederatedPdsQueryObserver(options, (url) =>
-      this.#getConnection(url),
+    return new FederatedPdsQueryObserver(options, (url, domain) =>
+      this.#getConnection(url, domain),
     );
   }
 
@@ -81,7 +83,7 @@ export class DecentralizedConvexClient {
     const home = this.#requireHome();
     assertPdsSupportsRequest(home, request);
     return new RoutedPdsQueryObserver({
-      getConnection: (url) => this.#getConnection(url),
+      getConnection: (url, domain) => this.#getConnection(url, domain),
       home: pdsTarget(home.domain, home),
       include: options.include,
       initialResponseTimeout: initialResponseTimeout(options),
@@ -136,9 +138,14 @@ export class DecentralizedConvexClient {
             : options.request;
         try {
           const data = await new PdsClient({
-            connection: this.#getConnection(target.url),
+            connection: this.#getConnection(target.url, target.domain),
           }).query(request);
-          return { data, status: "live" as const, target };
+          return {
+            ...tryTrustedAnswer(request, data, sourceDomains(target), {
+              home: false,
+            }),
+            target,
+          };
         } catch (error) {
           return {
             error: toError(error),
@@ -185,18 +192,22 @@ export class DecentralizedConvexClient {
     );
     const answered = await Promise.all(
       targets.map(async (target) => {
-        if (target.url === homeGroup.url) {
-          return { data: homeResult.data, status: "live" as const, target };
-        }
+        const home =
+          federationTargetKey(target) === federationTargetKey(homeGroup);
         try {
-          const data = await withInitialResponseTimeout(
-            new PdsClient({
-              connection: this.#getConnection(target.url),
-            }).query(request),
-            responseTimeout,
-            target.url,
-          );
-          return { data, status: "live" as const, target };
+          const data = home
+            ? homeResult.data
+            : await withInitialResponseTimeout(
+                new PdsClient({
+                  connection: this.#getConnection(target.url, target.domain),
+                }).query(request),
+                responseTimeout,
+                target.url,
+              );
+          return {
+            ...tryTrustedAnswer(request, data, sourceDomains(target), { home }),
+            target,
+          };
         } catch (error) {
           return {
             error: toError(error),
@@ -279,21 +290,30 @@ export class DecentralizedConvexClient {
     this.#connections.clear();
   }
 
-  #getConnection(inputUrl: string) {
+  /**
+   * The connection to a deployment, for the domain whose discovery led to
+   * it. Each domain other than home gets its own, signed in for that
+   * domain's PDS, so a manifest that names another domain's deployment
+   * can't change how that one is signed in to.
+   */
+  #getConnection(inputUrl: string, domain?: string) {
     const url = normalizeFederationUrl(inputUrl);
-    const existing = this.#connections.get(url);
+    const shared = domain === undefined || domain === this.#home?.domain;
+    const key = shared ? url : federationTargetKey({ domain, url });
+    const existing = this.#connections.get(key);
     if (existing !== undefined) return existing;
     const fetchAuthToken = this.#getAuthToken;
+    const pds = () =>
+      domain === undefined
+        ? this.#pds.atUrl(url)
+        : this.#pds.byDomain.get(domain);
     const getAuthToken =
       fetchAuthToken === undefined
         ? undefined
         : (request: Parameters<typeof fetchAuthToken>[0]) =>
-            fetchAuthToken({
-              ...request,
-              pds: this.#pds.byUrl.get(url),
-            });
+            fetchAuthToken({ ...request, pds: pds() });
     const connection = this.#connectionFactory(url, getAuthToken);
-    this.#connections.set(url, connection);
+    this.#connections.set(key, connection);
     return connection;
   }
 
