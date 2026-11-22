@@ -92,6 +92,21 @@ void test("someone who left on their own rejoins with any link", async () => {
   assert.equal(isMember(fake, MAYA), true);
 });
 
+void test("someone who joined by link and left uses the same link again", async () => {
+  const fake = space();
+  const PRIYA = "priya@vera.chat";
+  const code = await newLink(fake, MAYA);
+  assert.deepEqual(await join(fake, PRIYA, code), { spaceId: SPACE });
+  await remove(fake, PRIYA, PRIYA);
+  assert.equal(isMember(fake, PRIYA), false);
+  assert.notEqual(await spaceInviteLinkPreview(fake.ctx, PRIYA, code), null);
+  assert.deepEqual(await join(fake, PRIYA, code), { spaceId: SPACE });
+  assert.equal(isMember(fake, PRIYA), true);
+  // Only an owner's removal stops it.
+  await remove(fake, OWNER, PRIYA);
+  await assert.rejects(join(fake, PRIYA, code), /SPACE_INVITE_LINK_NOT_FOUND/);
+});
+
 void test("an owner adding someone back clears their removal", async () => {
   const fake = space();
   const old = await newLink(fake, OWNER);

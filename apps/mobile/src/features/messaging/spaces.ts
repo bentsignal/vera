@@ -1,3 +1,4 @@
+import { useState } from "react";
 // eslint-disable-next-line no-restricted-imports -- Expo Router has no route loaders to preload suspense queries.
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { pdsMutation, pdsQuery } from "@decentralized-convex/tanstack-query";
@@ -100,6 +101,10 @@ export function useSpaceInviteLinks(spaceId: string) {
  */
 export function useInviteLinkPreview(code: string) {
   const accounts = useAccounts().map((account) => account.address);
+  // A preview cached from an earlier look can be out of date (the link
+  // deleted, or the account removed from its space since), so it waits
+  // for one the PDS sent after the sheet opened.
+  const [openedAt] = useState(() => Date.now());
   const results = useQueries({
     queries: accounts.map((session) =>
       pdsQuery({
@@ -117,7 +122,9 @@ export function useInviteLinkPreview(code: string) {
     ),
   });
   return {
-    isLoading: results.some((result) => result.data === undefined),
+    isLoading: results.some(
+      (result) => result.data === undefined || result.dataUpdatedAt < openedAt,
+    ),
     previews: results.flatMap((result, index) =>
       result.data == null
         ? []
