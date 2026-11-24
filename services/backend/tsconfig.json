@@ -19,6 +19,8 @@
     "./issue-closures.ts",
     "./known-bugs.ts",
     "./known-bugs.test.ts",
+    "./memory-fallback.ts",
+    "./memory-fallback.test.ts",
     "./pds.ts",
     "./reply-outcome.ts",
     "./reply-outcome.test.ts",
