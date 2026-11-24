@@ -9,6 +9,7 @@ import type { ActionCtx } from "./_generated/server";
 import type { Turn } from "./agentTools";
 import type { BotAccount } from "./bots";
 import type { Tally } from "./usage";
+import { unlessMemoryFails } from "../memory-fallback";
 import { internal } from "./_generated/api";
 import { internalAction, internalQuery } from "./_generated/server";
 import { botAddress } from "./bots";
@@ -63,9 +64,14 @@ export function memoryTools(turn: Turn) {
       }),
       execute: async ({ query }) => {
         turn.counted("memory");
-        const found = distinct(
-          await recall(turn.ctx, turn.conversationId, query, CANDIDATES),
-        ).slice(0, RESULTS);
+        const found = await unlessMemoryFails(
+          async () =>
+            distinct(
+              await recall(turn.ctx, turn.conversationId, query, CANDIDATES),
+            ).slice(0, RESULTS),
+          null,
+        );
+        if (found === null) return "Memory search isn't working right now.";
         if (found.length === 0) return "Nothing found.";
         return found
           .sort((a, b) => a.lastSentAt - b.lastSentAt)
@@ -196,7 +202,10 @@ export async function recallOlder(
     .join("\n");
   if (newMessages.trim().length === 0) return [];
   tally.memoryLookups += 1;
-  return recallFor(ctx, conversationId, newMessages, visibleFrom);
+  return unlessMemoryFails(
+    () => recallFor(ctx, conversationId, newMessages, visibleFrom),
+    [],
+  );
 }
 
 /** Operator/testing: `npx convex run memory:probe '{"conversationId":"…","query":"…"}'`. */
