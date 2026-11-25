@@ -11,6 +11,7 @@ import {
   usePushRegistration,
 } from "~/features/notifications/push";
 import { ShortcutChats, useShortcuts } from "~/features/shortcuts/shortcuts";
+import { useRemovedFromSpace } from "~/features/spaces/use-removed-from-space";
 
 export const unstable_settings = { anchor: "(tabs)" };
 
@@ -51,6 +52,7 @@ export default function AppLayout() {
   useNotificationRouting();
   useShortcuts();
   useAppBadge();
+  useRemovedFromSpace();
   return (
     <>
       {accounts.map((account) => (

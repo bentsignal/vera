@@ -20,6 +20,11 @@ export function FieldList({
    * bar, on screens outside the tabs. iOS insets the list itself.
    */
   clearsNavigationBar?: boolean;
+  /**
+   * Android only: keeps the end of the list clear of the tab bar, on
+   * Home's screens. iOS insets the list itself.
+   */
+  clearsTabBar?: boolean;
   children: ReactNode;
 }) {
   return <FieldGroup modifiers={modifiers}>{children}</FieldGroup>;

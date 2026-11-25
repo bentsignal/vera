@@ -8,11 +8,17 @@ import type {
   SpaceInviteLink,
 } from "./protocol.ts";
 import { internal } from "./_generated/api.js";
-import { fail, getSpace, getSpaceMember, normalizeMembers } from "./model.ts";
-import { pendingInvites } from "./pendingInvites.ts";
+import {
+  fail,
+  getSpace,
+  getSpaceMember,
+  normalizeMembers,
+  requireSpaceRole,
+} from "./model.ts";
+import { clearOnJoin, pendingInvites } from "./pendingInvites.ts";
 import { MAX_INVITE_LINK_LIFETIME } from "./protocol.ts";
 import { forgetBadge } from "./pushBadges.ts";
-import { requireSpaceRole } from "./spaces.ts";
+import { isLinkRevokedFor } from "./spaceRemovals.ts";
 
 type Mutations = (typeof messagesProtocol)["mutations"];
 type Args<Operation extends keyof Mutations> = OperationArgs<
@@ -53,7 +59,7 @@ function memberCount(ctx: QueryCtx, spaceId: string) {
     .then((members) => members.length);
 }
 
-/** Adds the caller to a space and clears their invitation to it, if any. */
+/** Adds the caller to a space and clears what that settles. */
 async function join(ctx: MutationCtx, spaceId: string, self: string) {
   if ((await getSpaceMember(ctx, spaceId, self)) === null) {
     await ctx.db.insert("spaceMembers", {
@@ -62,8 +68,7 @@ async function join(ctx: MutationCtx, spaceId: string, self: string) {
       spaceId,
     });
   }
-  const invite = await getInvite(ctx, spaceId, self);
-  if (invite !== null) await ctx.db.delete(invite._id);
+  await clearOnJoin(ctx, spaceId, self);
 }
 
 export async function inviteToSpace(
@@ -265,6 +270,8 @@ export async function spaceInviteLinkPreview(
 ) {
   const link = await getLink(ctx, code);
   if (link === null || isExpired(link)) return null;
+  // To someone removed since it was made, it's a dead link.
+  if (await isLinkRevokedFor(ctx, link, self)) return null;
   const space = await getSpace(ctx, link.spaceId);
   if (space === null) return null;
   return {
@@ -283,7 +290,12 @@ export async function joinSpaceWithLink(
 ) {
   await forgetBadge(ctx, self);
   const link = await getLink(ctx, args.code);
-  if (link === null || (await getSpace(ctx, link.spaceId)) === null) {
+  if (
+    link === null ||
+    (await getSpace(ctx, link.spaceId)) === null ||
+    // An owner removed them after the link was made.
+    (await isLinkRevokedFor(ctx, link, self))
+  ) {
     fail("SPACE_INVITE_LINK_NOT_FOUND");
   }
   if (isExpired(link)) fail("SPACE_INVITE_LINK_EXPIRED");

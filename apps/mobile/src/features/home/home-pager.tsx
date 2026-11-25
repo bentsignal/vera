@@ -13,11 +13,9 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 
 import { ScreenListInsets } from "~/components/screen-list-insets";
+import { ANDROID_TAB_BAR } from "~/components/tab-bar";
 
 export type PagerRef = RefObject<Animated.ScrollView | null>;
-
-/** Material's navigation bar, the Android tab bar, without the system's. */
-const ANDROID_TAB_BAR = 80;
 
 /**
  * Hands the screen's insets, measured outside the pager, to its lists:

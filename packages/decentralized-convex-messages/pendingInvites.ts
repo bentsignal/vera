@@ -1,10 +1,14 @@
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { getSpace, getSpaceMember } from "./spaceReads.ts";
+import { forgetRemoval } from "./spaceRemovals.ts";
 
 // Space invitations: those still waiting for an answer, and clearing one.
 
-/** Deletes the account's invitation to a space, if it has one. */
-export async function clearInvite(
+/**
+ * Clears what an account joining a space settles: its invitation, if it has
+ * one, and an owner's earlier removal of it (spaceRemovals.ts).
+ */
+export async function clearOnJoin(
   ctx: MutationCtx,
   spaceId: string,
   accountId: string,
@@ -16,6 +20,7 @@ export async function clearInvite(
     )
     .unique();
   if (invite !== null) await ctx.db.delete(invite._id);
+  await forgetRemoval(ctx, spaceId, accountId);
 }
 
 /**

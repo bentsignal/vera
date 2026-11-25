@@ -9,6 +9,7 @@ import { useAccount } from "~/features/messaging/account";
 import { useProfiles } from "~/features/messaging/profiles";
 import { useOpenProfile } from "~/features/profile/use-open-profile";
 import { secondaryTextStyle } from "~/lib/colors";
+import { useMemberPress } from "./member-press";
 
 export function MembersSection({ space }: { space: Space }) {
   const router = useRouter();
@@ -19,6 +20,8 @@ export function MembersSection({ space }: { space: Space }) {
     ...invited,
   ]);
   const openProfile = useOpenProfile();
+  const onMemberPress = useMemberPress(space, openProfile);
+
   return (
     <FieldGroup.Section>
       <FieldGroup.SectionHeader>
@@ -49,7 +52,7 @@ export function MembersSection({ space }: { space: Space }) {
                 : member.accountId}
             </Text>
           }
-          onPress={() => openProfile(member.accountId)}
+          onPress={() => onMemberPress(member)}
         >
           {profileOf(member.accountId).displayName}
         </ListItem>
