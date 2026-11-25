@@ -84,8 +84,8 @@ main, as above). When Shawn asks for a release, follow the
 model): list what changed since the last release, and what to test where
 those changes overlap (each one was already tested on its own before it
 merged), run those tests yourself first in the iOS simulator and Android
-emulator, get main onto his phone for what only he can check, and ship
-only after he approves.
+emulator, put main on his phones as internal builds for what only he
+can check, and ship only after he approves.
 Over-the-air updates are the default, and they reach every binary on the
 same runtime version (`RUNTIME_VERSION` in `apps/mobile/app.config.ts`),
 so everyone runs JavaScript that matches the newest backend. Native
@@ -135,15 +135,18 @@ See [apps/mobile/README.md](apps/mobile/README.md#vera-dev).
   with the install link `phone.sh` prints (a list item too, labeled by
   phone); otherwise he only taps the open link. `phone.sh list` shows every
   cached dev client.
-- **Releases are tested in the dev client too**, serving `main` (the
-  `vera-release` skill), so fixes reach his phone without a build. The real
-  app gets tested in TestFlight.
+- **Releases are tested on internal builds** of `main`
+  (`pnpm release build internal`, and `--android`; the `vera-release`
+  skill). They're Release builds with the JavaScript bundled in, so load
+  times and notification opens match the shipped app and give Shawn a
+  baseline from one release to the next. Fixes during the release test
+  reach them with `pnpm release ota internal`. They replace the dev
+  client in the Vera Dev slot; after the release ships, he gets main's
+  back from `scripts/phone.sh main` and `scripts/phone.sh --android main`.
 - When Shawn asks for a "build on his phone" or a "development build",
-  that means `scripts/phone.sh up`, not an internal build. Make an internal
-  build (`pnpm release build internal`) only when he asks for one by name,
-  or to check update or channel behavior, which a dev client can't show.
-  It replaces the dev client in the Vera Dev slot; he reinstalls main's
-  from `scripts/phone.sh main`.
+  that means `scripts/phone.sh up`, not an internal build. Outside a
+  release, make an internal build only when he asks for one by name, or
+  to check update or channel behavior, which a dev client can't show.
 - Keep it up until the PR merges or Shawn drops the work, then
   `scripts/phone.sh down`. A server the phone hasn't loaded from in 24
   hours stops on its own (any worktree's `phone.sh up`, `sim.sh up`, or

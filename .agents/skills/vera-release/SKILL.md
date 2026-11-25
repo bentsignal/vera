@@ -1,6 +1,6 @@
 ---
 name: vera-release
-description: Run a Vera mobile release end to end, covering changes since the last release, the interactions between them worth testing, a first pass of those tests in the iOS simulator and Android emulator, testing main in the Vera Dev dev client on Shawn's phone, then the over-the-air update or TestFlight store build, and an App Store submission when asked. Use when Shawn asks to release, ship, cut a build, push an update, put something on TestFlight, or submit to the App Store, or asks what changed since the last release.
+description: Run a Vera mobile release end to end, covering changes since the last release, the interactions between them worth testing, a first pass of those tests in the iOS simulator and Android emulator, testing main on internal builds on Shawn's phones, then the over-the-air update or TestFlight store build, and an App Store submission when asked. Use when Shawn asks to release, ship, cut a build, push an update, put something on TestFlight, or submit to the App Store, or asks what changed since the last release.
 ---
 
 # Releasing Vera
@@ -121,35 +121,46 @@ Send Shawn the write-up with the list in two parts:
 
 Then go straight to step 2 unless he says otherwise.
 
-## 2. Put main on his phone in the dev client
+## 2. Put main on his phones as internal builds
 
-The release test checks that the features work together and smooths out
-rough edges, so it runs in the Vera Dev dev client, where JavaScript fixes
-reach his phone without a build. The real app gets tested in TestFlight
-(step 4). The dev client runs against the dev PDS, so update it to `main`
-first. This refuses to run from a worktree with an isolated backend:
+Shawn's last look at main before a release is on internal builds, not the
+dev client. An internal build is a Release build with the JavaScript
+bundled in, so launches, animations, and opening from a notification take
+as long as they will in the app people get. A dev client is a Debug build
+that loads its bundle from Metro: slower, and a notification open
+sometimes waits on the bundle. Release tests on internal builds also give
+Shawn a baseline, so slower load times in a later release test point at
+the release, not at the dev client.
+
+Internal builds run against the dev PDS, so push `main`'s backend there
+first (this refuses to run from a worktree with an isolated backend). Then
+build both, one after the other, from the release checkout (`HEAD` at
+`origin/main`, clean tree, or they refuse):
 
 ```sh
 pnpm release backend dev
-scripts/phone.sh up             # and again with --android for his Android phone
+pnpm release build internal             # iPhone
+pnpm release build internal --android   # Android
 ```
 
-Run `phone.sh up` from the release checkout (detached at `origin/main`, no
-isolated backend). It builds a dev client only when `main`'s native
-fingerprint has none yet (about 15 minutes); otherwise Shawn just taps the
-open link. Send him the block `phone.sh up` prints, first and exactly as
-printed: the two open links (home and Tailscale) as a Markdown list of
-clickable links, then the home and Tailscale addresses, each in its own
-code block so he can copy it (on Android he pastes one into Vera Dev). Add
-the install link when he needs one. Never put a link in backticks, send it
-bare, or send the `vera-dev://` URL (the `vera-feature` skill, step 4b). No
-QR codes unless he asks.
+They're local builds and take about 20 to 30 minutes for the pair. Start
+them right after you send the step 1 write-up. Each prints an install
+page. Send Shawn both, as Markdown list items labeled by phone:
 
-Make an internal build (`pnpm release build internal`, `--android`) or an
-internal OTA (`pnpm release ota internal "<summary>"`) only when Shawn asks
-for one by name, or when the release changes update or channel behavior,
-which a dev client can't show. Installing one replaces the dev client in the
-Vera Dev slot; he gets main's dev client back from `scripts/phone.sh main`.
+```md
+- [Install Vera Dev internal build 13 on iPhone](https://vera-evidence.b-cdn.net/internal/ios/13/index.html)
+- [Install Vera Dev internal build 4 on Android](https://vera-evidence.b-cdn.net/internal/android/4/index.html)
+```
+
+Never put the links in backticks or send them bare. Each one replaces the
+dev client in the Vera Dev slot and installs over it without an uninstall
+(the Android APK has the dev clients' signing certificate, and the iOS ad
+hoc build installs over the dev client too), so he stays signed in. Tell
+him so.
+
+Ask him to note how long the app takes to launch cold, to open a chat, and
+to open from a notification. That's the baseline for the next release
+test; put what he reports in the step 4 report.
 
 ## 3. Wait for Shawn
 
@@ -158,16 +169,42 @@ He tests the "For you" part of the list and either approves ("ship it",
 the list at his own pace; don't send it again item by item.
 
 Fixes found during the release test happen in the release thread, not new
-T3 threads. Small batches go straight to `main` from the release checkout:
-fix, run the required validation, review the diff, commit, push. Metro
-hot-reloads it on his phones. Use PRs (the `vera-feature` skill) when the
-fixes are many or large; subagents in their own worktrees can take
-independent pieces in parallel. A fix that changes native code needs new
-dev clients (`phone.sh up` builds them). A backend fix goes to the dev PDS
-(`pnpm release backend dev`) before he retests. Once the fixes are in,
-update the release notes and the list (step 1), running new or changed
-steps in the simulators first. Don't ship without an explicit approval of
-this release. `scripts/phone.sh down` once he's done.
+T3 threads. Every fix lands on `main` first, and his final look is always
+on an internal build running `main`:
+
+- **Small JavaScript fixes.** Fix them in the release checkout, run
+  the required validation, review the diff, commit, and push to `main`.
+  Then publish them to his internal builds:
+
+  ```sh
+  git fetch origin && git checkout --detach origin/main
+  pnpm release ota internal "<what the fix changes>"
+  ```
+
+  `ota internal` publishes on the `internal` channel for each platform
+  whose latest internal build has the current runtime. Internal OTAs don't
+  count as releases: `plan` compares against production tags only. Tell
+  him to open Vera Dev; it restarts into the update within a few seconds.
+- **Many or large fixes.** These get a PR each, following the
+  `vera-feature` skill, and so does a fix that needs several rounds of
+  feel on his phone (an animation, a gesture). The dev client is for
+  that iteration: `phone.sh up` serves the PR's worktree and edits
+  hot-reload. Subagents in their own worktrees can take independent
+  fixes in parallel. For that round he installs a dev client over the
+  internal build: main's from `scripts/phone.sh main`, or the PR's own
+  from `phone.sh up` when it changed native code. Once the PRs merge, run
+  `ota internal` from `origin/main` and send him the install pages from
+  step 2 again. Reinstalling the internal build puts him back on bundled
+  JavaScript, and the OTA brings the fixes. An install page stays up for
+  30 days.
+- **A fix that changes native code** needs new internal builds (step 2)
+  after it merges. An OTA can't carry it.
+- **A backend fix** goes to the dev PDS (`pnpm release backend dev`)
+  before he retests.
+
+Once the fixes are in, update the release notes and the list (step 1),
+running new or changed steps in the simulators first. Don't ship without
+an explicit approval of this release.
 
 ## 4. Ship
 
@@ -247,8 +284,19 @@ Shawn: `pnpm release build internal --android`.
 
 Every command tags the release (`mobile/build/<n>`,
 `mobile/android/build/<versionCode>`, `mobile/ota/production/...`) and pushes
-the tag. Report what shipped, the tag, and anything that didn't
-work.
+the tag.
+
+Then give him main's dev clients back, for feature work:
+
+```sh
+scripts/phone.sh main             # iPhone
+scripts/phone.sh --android main   # Android
+```
+
+Report what shipped, the tag, anything that didn't work, the load times
+he noted on the internal builds (step 2), and both install links as
+Markdown list items labeled by phone. Installing them replaces the
+internal builds in the Vera Dev slot.
 
 Then make sure the people who reported what shipped hear about it. Bug
 reports Vera filed itself (GitHub issues labeled "user report")
