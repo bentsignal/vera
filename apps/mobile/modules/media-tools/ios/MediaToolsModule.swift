@@ -35,5 +35,17 @@ public class MediaToolsModule: Module {
       self.preview.show(fileURL(uri), from: presenter)
       promise.resolve(true)
     }.runOnQueue(.main)
+
+    AsyncFunction("beginPreviewAsync") { (title: String) -> Bool in
+      guard let presenter = self.appContext?.utilities?.currentViewController() else {
+        return false
+      }
+      self.preview.begin(title: title, from: presenter)
+      return true
+    }.runOnQueue(.main)
+
+    AsyncFunction("cancelPreviewAsync") {
+      self.preview.cancel()
+    }.runOnQueue(.main)
   }
 }

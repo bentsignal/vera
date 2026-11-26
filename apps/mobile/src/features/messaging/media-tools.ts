@@ -37,6 +37,9 @@ type ToolEvents = Record<
 >;
 
 type MediaToolsModule = InstanceType<typeof EventEmitter<ToolEvents>> & {
+  /** iOS: opens Quick Look at once, loading, for `previewFileAsync`. */
+  beginPreviewAsync?: (title: string) => Promise<boolean>;
+  cancelPreviewAsync?: () => Promise<void>;
   previewFileAsync: (uri: string) => Promise<boolean>;
   shrinkImageAsync: (options: {
     maxSide: number;
@@ -199,4 +202,20 @@ export function previewFile(uri: string) {
   return tools === null
     ? Promise.resolve(false)
     : tools.previewFileAsync(uri).catch(() => false);
+}
+
+/**
+ * Opens the system's viewer straight away, loading, so a tap answers
+ * before the file is on the device; `previewFile` fills it in. True when
+ * it did (iOS builds that have it).
+ */
+export function beginPreview(title: string) {
+  return tools?.beginPreviewAsync === undefined
+    ? Promise.resolve(false)
+    : tools.beginPreviewAsync(title).catch(() => false);
+}
+
+/** Closes a viewer `beginPreview` opened, when its file can't be had. */
+export function cancelPreview() {
+  return tools?.cancelPreviewAsync?.().catch(() => undefined);
 }

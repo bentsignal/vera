@@ -144,7 +144,9 @@ function mediaItem(
     durationSeconds: durationOf(attachment),
     id: attachment.localUrl ?? attachment.url,
     kind: attachment.kind === "video" ? "video" : "image",
-    localUrl: attachment.localUrl,
+    // The list draws `localUrl` as a picture, which a video file isn't on
+    // iOS: a video shows its poster (`thumbnailUrl`) instead.
+    localUrl: attachment.kind === "video" ? undefined : attachment.localUrl,
     part,
     reactions: reactionsFor(message.reactions, new Set([part])),
     thumbnailUrl: posterOf(attachment),
