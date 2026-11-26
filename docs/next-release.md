@@ -80,3 +80,36 @@ npx convex env list --prod | cut -d= -f1 | grep -E '^DEV_TOOLS' || echo none
 **Verify:** the first prints `none`, the second `0`. No EAS environment
 should hold `EXPO_PUBLIC_DEV_TOOLS_SECRET` (only Shawn's Metro gives it to
 bundles).
+
+## Media CDN: show only pictures, video, audio and PDFs in a browser
+
+**When:** before the backend deploy (any time before is fine; it changes
+nothing the app relies on).
+
+From the repo root, with the bunny CLI logged in:
+
+```sh
+node infra/media-cdn/rules.mjs vera-media               # read the plan
+node infra/media-cdn/rules.mjs vera-media --apply
+bunny api POST /pullzone/6728657/purgeCache             # vera-media's id
+```
+
+It adds four edge rules to the `vera-media` pull zone (`media.vera.chat`):
+no type guessing on any file, no scripts on any file but PDFs, and a
+forced download for anything that isn't a picture, video, audio or PDF
+(infra/media-cdn/README.md).
+Tested on a throwaway zone before the PR, and already set on the dev zone
+(`vera-media-dev`); the purge makes files already cached pick up the new
+headers.
+
+**Verify:** a photo in a recent message still shows in the app, and its
+URL serves `content-security-policy: sandbox; default-src 'none'` and no
+`content-disposition`:
+
+```sh
+curl -sI https://media.vera.chat/<path of a recent photo> | grep -i 'content-\|nosniff'
+```
+
+A PDF attachment's URL answers with no `content-disposition` and no
+`content-security-policy`, and opens in a browser. Any other file (a
+`.txt`, say) answers with `content-disposition: attachment`.

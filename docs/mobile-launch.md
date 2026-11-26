@@ -21,9 +21,13 @@ York) and serves it from the CDN pull zone at `media.vera.chat`. The app
 uploads straight to Storage's S3-compatible endpoint through a URL the PDS
 presigns for one object path (`prod/` prefix). Dev deployments use their own
 zone, `vera-media-dev` (served at `vera-media-dev.b-cdn.net`), so dev and
-production share no storage or secret. Videos
-are capped at 2 minutes and served as plain files from the CDN; Bunny Stream
-is not used. File storage sits behind a provider interface in the backend, so
+production share no storage or secret. Videos are capped at 1 minute and
+50 MB. The app caps what it sends (`modules/media-tools`): videos at about
+1080p and 6 Mbps, photos at 2048 pixels on the long side as JPEG; anything
+already within that goes as it is. Media is served as plain files from the
+CDN; Bunny Stream is not used. A browser shows only pictures, video, audio
+and PDFs from the CDN and downloads
+anything else (`infra/media-cdn`). File storage sits behind a provider interface in the backend, so
 a self-hoster can plug in another provider; without bunny.net variables the
 backend falls back to Convex file storage.
 
@@ -90,18 +94,18 @@ separate design.
 
 ## Current setup (2026-10-01)
 
-| Thing                        | Value                                                                                         |
-| ---------------------------- | --------------------------------------------------------------------------------------------- |
-| Convex production            | `disciplined-hyena-211`, account domain `vera.chat`                                           |
-| Convex development           | `perceptive-magpie-29`, account domain `dev.vera.chat`                                        |
-| Bare domain                  | `vera.chat` → Vercel project `vera-chat-domain`, which proxies `/.well-known/*` to production |
-| App Store Connect            | App "Vera Chat" (Apple ID `6818656155`, SKU `vera-ios`, bundle `chat.vera.app`); "Vera" was taken |
-| App Store Connect API key    | Team key "Vera EAS" (Admin), `~/.appstoreconnect/` on Shawn's Mac; EAS uses it for credentials and submits |
+| Thing                        | Value                                                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Convex production            | `disciplined-hyena-211`, account domain `vera.chat`                                                                   |
+| Convex development           | `perceptive-magpie-29`, account domain `dev.vera.chat`                                                                |
+| Bare domain                  | `vera.chat` → Vercel project `vera-chat-domain`, which proxies `/.well-known/*` to production                         |
+| App Store Connect            | App "Vera Chat" (Apple ID `6818656155`, SKU `vera-ios`, bundle `chat.vera.app`); "Vera" was taken                     |
+| App Store Connect API key    | Team key "Vera EAS" (Admin), `~/.appstoreconnect/` on Shawn's Mac; EAS uses it for credentials and submits            |
 | TestFlight                   | Internal group "Team" (Shawn); external group "Friends" with public link `https://testflight.apple.com/join/CqpKDW25` |
-| Discovery records            | `_pds.vera.chat`, `_pds.dev.vera.chat` (Vercel DNS)                                           |
-| Apple team                   | `39K6A9FP99` (bundle `chat.vera.app`)                                                         |
-| EAS project                  | `@directedbyshawn/vera`, `5680db13-57a8-4b74-ae41-1f52abbda0b1`                               |
-| Android dev keystore SHA-256 | `E6:A1:C5:45:…:44:5F` (in `PASSKEY_ANDROID_CERT_SHA256`)                                      |
+| Discovery records            | `_pds.vera.chat`, `_pds.dev.vera.chat` (Vercel DNS)                                                                   |
+| Apple team                   | `39K6A9FP99` (bundle `chat.vera.app`)                                                                                 |
+| EAS project                  | `@directedbyshawn/vera`, `5680db13-57a8-4b74-ae41-1f52abbda0b1`                                                       |
+| Android dev keystore SHA-256 | `E6:A1:C5:45:…:44:5F` (in `PASSKEY_ANDROID_CERT_SHA256`)                                                              |
 
 Store builds signed by Google Play App Signing need that key's fingerprint
 added to `PASSKEY_ANDROID_CERT_SHA256` and `PASSKEY_ORIGINS` too.

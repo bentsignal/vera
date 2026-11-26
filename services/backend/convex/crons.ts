@@ -20,4 +20,12 @@ crons.daily(
   {},
 );
 
+// The per-account upload allowance only looks back a day (files.ts).
+crons.hourly(
+  "clear old uploads",
+  { minuteUTC: 20 },
+  internal.files.clearOld,
+  {},
+);
+
 export default crons;

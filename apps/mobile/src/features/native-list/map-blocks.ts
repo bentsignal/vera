@@ -113,7 +113,7 @@ export function spansOf(text: string, mentions: Message["mentions"]) {
 
 function isStuck(attachment: MessageAttachment) {
   const state = attachment.upload?.state;
-  return state === "failed" || state === "too-large";
+  return state === "failed" || state === "limited" || state === "too-large";
 }
 
 /** A photo's or video's size, square when its message doesn't say. */
@@ -144,7 +144,9 @@ function mediaItem(
     durationSeconds: durationOf(attachment),
     id: attachment.localUrl ?? attachment.url,
     kind: attachment.kind === "video" ? "video" : "image",
-    localUrl: attachment.localUrl,
+    // The list draws `localUrl` as a picture, which a video file isn't on
+    // iOS: a video shows its poster (`thumbnailUrl`) instead.
+    localUrl: attachment.kind === "video" ? undefined : attachment.localUrl,
     part,
     reactions: reactionsFor(message.reactions, new Set([part])),
     thumbnailUrl: posterOf(attachment),
