@@ -18,6 +18,7 @@ import { useAccount } from "./account";
 import { cropPhoto, cropsAfterPicking, cropsInPicker } from "./crop-photo";
 import { attachmentError, limitsSentence } from "./upload-errors";
 import { sendUpload } from "./upload-transports";
+import { fitForUpload, needsShrinking, shrinksVideos } from "./video-shrink";
 
 /** The most attachments one message can carry (the PDS's limit too). */
 export const MAX_ATTACHMENTS = 10;
@@ -205,7 +206,9 @@ async function pickFiles() {
 
 /** Why a picked file can't be sent, in words for the person. */
 function problemWith(file: StagedFile) {
-  if (file.size > MAX_UPLOAD_BYTES[file.kind]) {
+  // A video that's too big shrinks to fit as it sends, if this build can.
+  const shrinks = file.kind === "video" && shrinksVideos;
+  if (!shrinks && file.size > MAX_UPLOAD_BYTES[file.kind]) {
     return {
       message: `This ${KIND_NOUN[file.kind]} is ${formatBytes(file.size)}. ${limitsSentence()}`,
       title: "Too Big to Send",
@@ -302,9 +305,17 @@ async function uploadOne(
  */
 export async function uploadStaged(
   session: AccountSession,
-  file: StagedFile,
-  onProgress: (fraction: number) => void = () => undefined,
+  staged: StagedFile,
+  reportProgress: (fraction: number) => void = () => undefined,
 ) {
+  // A video over the limit spends the first half of its progress shrinking.
+  const shrinks = needsShrinking(staged);
+  const file = await fitForUpload(staged, (fraction) =>
+    reportProgress(fraction / 2),
+  );
+  function onProgress(fraction: number) {
+    reportProgress(shrinks ? 0.5 + fraction / 2 : fraction);
+  }
   const posterSize = file.poster?.size ?? 0;
   const total = Math.max(1, file.size + posterSize);
   const url = await uploadOne(session, file.kind, file, (bytes) =>

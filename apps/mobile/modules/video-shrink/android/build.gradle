@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'chat.vera'
+version = '1.0.0'
+
+android {
+  namespace "chat.vera.videoshrink"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // The same Media3 as expo-video, so the app carries one copy.
+  def media3Version = "1.9.0"
+  implementation "androidx.media3:media3-transformer:${media3Version}"
+  implementation "androidx.media3:media3-effect:${media3Version}"
+  implementation "androidx.media3:media3-common:${media3Version}"
+}

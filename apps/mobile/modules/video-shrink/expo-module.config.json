@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["VideoShrinkModule"]
+  },
+  "android": {
+    "modules": ["chat.vera.videoshrink.VideoShrinkModule"]
+  }
+}
