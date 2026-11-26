@@ -1,7 +1,7 @@
 import { useAccounts } from "~/features/messaging/account";
 import { useInbox } from "~/features/messaging/inbox";
 import { useDisplayNames } from "~/features/messaging/profiles";
-import { useSpaces } from "~/features/messaging/spaces";
+import { memberCount, useSpaces } from "~/features/messaging/spaces";
 import { normalizeSearch } from "./debounce";
 
 function matches(needle: string, ...values: readonly string[]) {
@@ -60,7 +60,7 @@ export function useSearchResults(query: string) {
       .map((space) => ({
         id: `space:${space.key}`,
         kind: "space" as const,
-        subtitle: `${space.members.length} members`,
+        subtitle: `${memberCount(space.members.length, space.moreMembers === true)} members`,
         target: {
           account: space.account,
           name: space.name,

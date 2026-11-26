@@ -13,7 +13,7 @@ import {
   undescribed,
 } from "./activityScope.ts";
 import { alerts, alertsFor } from "./alerts.ts";
-import { inboxAccess } from "./inbox.ts";
+import { recentAccess } from "./inboxPages.ts";
 import { toMessage } from "./model.ts";
 import { mentionItems, reactionItems, replyItems } from "./personalActivity.ts";
 import { ACTIVITY_HORIZON, MAX_ACTIVITY_MESSAGES } from "./protocol.ts";
@@ -23,6 +23,8 @@ import { spaceReads } from "./spaceReads.ts";
 
 /** Messages read to fill one conversation's item, the caller's included. */
 const MAX_MESSAGES_SCANNED = 300;
+/** The conversations with the newest activity that are looked at. */
+const MAX_ACTIVITY_CONVERSATIONS = 100;
 /** The threads with the newest replies that are looked at. */
 const MAX_THREADS_SCANNED = 200;
 
@@ -117,11 +119,18 @@ async function messagesItem(
   };
 }
 
-/** Messages others sent, an item per conversation in the inbox. */
+/**
+ * Messages others sent, an item per conversation in the inbox, of the
+ * `MAX_ACTIVITY_CONVERSATIONS` with the newest activity.
+ */
 async function messagesItems(ctx: QueryCtx, scope: Scope) {
-  const conversations = (
-    await inboxAccess(ctx, scope.self, true, scope.spaces)
-  ).flatMap((access) => {
+  const recent = await recentAccess(
+    ctx,
+    scope.self,
+    { limit: MAX_ACTIVITY_CONVERSATIONS, since: scope.now - ACTIVITY_HORIZON },
+    scope.spaces,
+  );
+  const conversations = recent.flatMap((access) => {
     const level = alertsFor(access, scope.settings);
     return isHeard(access, level) ? [{ access, level }] : [];
   });

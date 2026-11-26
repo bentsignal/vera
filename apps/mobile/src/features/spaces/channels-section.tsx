@@ -1,12 +1,14 @@
 import type { Space } from "@decentralized-convex/messages";
 import { useRouter } from "expo-router";
-import { FieldGroup } from "@expo/ui";
+import { Button, FieldGroup } from "@expo/ui";
 
 import { SectionHeaderWithAdd } from "~/components/section-header";
 import { SectionTitle } from "~/components/section-title";
 import { useAccount } from "~/features/messaging/account";
 import { useChannelSettings } from "~/features/messaging/channel-settings";
 import { usePrefetchConversation } from "~/features/messaging/prefetch";
+import { useSpaceChannels } from "~/features/messaging/spaces";
+import { linkButton } from "~/lib/ui-modifiers";
 import { channelMenuActions } from "./channel-actions";
 import { ChannelRow } from "./channel-row";
 
@@ -19,6 +21,7 @@ export function ChannelsSection({ space }: { space: Space }) {
   const { address: account } = useAccount();
   const settings = useChannelSettings();
   const prefetch = usePrefetchConversation();
+  const { channels, hasMore, loadMore } = useSpaceChannels(space);
   return (
     <FieldGroup.Section>
       <FieldGroup.SectionHeader>
@@ -36,7 +39,7 @@ export function ChannelsSection({ space }: { space: Space }) {
           <SectionTitle>Text Channels</SectionTitle>
         )}
       </FieldGroup.SectionHeader>
-      {space.channels.map((channel) => (
+      {channels.map((channel) => (
         <ChannelRow
           key={channel.conversationId}
           channel={channel}
@@ -68,6 +71,14 @@ export function ChannelsSection({ space }: { space: Space }) {
           }}
         />
       ))}
+      {hasMore && (
+        <Button
+          label="Show More"
+          variant="text"
+          modifiers={linkButton}
+          onPress={loadMore}
+        />
+      )}
     </FieldGroup.Section>
   );
 }

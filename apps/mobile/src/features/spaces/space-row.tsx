@@ -4,6 +4,7 @@ import { Link } from "expo-router";
 import type { AccountSpace } from "~/features/messaging/spaces";
 import { SymbolIcon } from "~/components/symbol-icon";
 import { usernameOf } from "~/features/messaging/profiles";
+import { memberCount } from "~/features/messaging/spaces";
 
 export function SpaceRow({
   space,
@@ -41,8 +42,8 @@ export function SpaceRow({
             </Text>
             <Text numberOfLines={1} className="text-subhead text-muted">
               {[
-                `${space.members.length} members`,
-                `${space.channels.length} channels`,
+                `${memberCount(space.members.length, space.moreMembers === true)} members`,
+                `${memberCount(space.channels.length, space.moreChannels === true)} channels`,
                 ...(showAccount ? [usernameOf(space.account)] : []),
               ].join(" · ")}
             </Text>

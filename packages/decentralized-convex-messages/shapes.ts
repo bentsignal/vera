@@ -190,6 +190,10 @@ export const conversation = v.object({
   conversationId: v.string(),
   kind: conversationKind,
   lastMessage: v.union(v.null(), message),
+  /**
+   * Who's in a direct message or a group. Empty for a channel, whose
+   * members are its space's: `spaceMembers` pages through them.
+   */
   members: v.array(v.string()),
   /** Whether it alerts the caller about nothing (`alerts` is `none`). */
   muted: v.boolean(),
@@ -233,6 +237,37 @@ export type Channel = Infer<typeof channel>;
 
 export const spaceRole = v.union(v.literal("owner"), v.literal("member"));
 
+/** One person in a space. */
+export const spaceMember = v.object({
+  accountId: v.string(),
+  role: spaceRole,
+});
+
+/**
+ * How many of a space's members, channels, or invited people `space`
+ * lists (a first page), and `spaceMembers` and `spaceChannels` answer
+ * at a time.
+ */
+export const SPACE_PAGE_SIZE = 50;
+/** How many of each `spaces` lists for each space. */
+export const SPACE_PREVIEW_SIZE = 20;
+/** The most spaces `spaces` lists. */
+export const MAX_SPACES_LISTED = 50;
+
+/** A page of a space's members, by address (see `spaceMembers`). */
+export const spaceMemberPage = v.object({
+  members: v.array(spaceMember),
+  /** The `after` for the next page, or null at the end. */
+  next: v.union(v.null(), v.string()),
+});
+
+/** A page of a space's channels, by position (see `spaceChannels`). */
+export const spaceChannelPage = v.object({
+  channels: v.array(channel),
+  /** The `after` for the next page, or null at the end. */
+  next: v.union(v.null(), v.number()),
+});
+
 export const space = v.object({
   /**
    * What its channels alert the caller about, unless a channel has its
@@ -245,7 +280,15 @@ export const space = v.object({
   invited: v.optional(v.array(v.string())),
   /** When the caller joined or created it (absent from older PDSs). */
   joinedAt: v.optional(v.number()),
-  members: v.array(v.object({ accountId: v.string(), role: spaceRole })),
+  members: v.array(spaceMember),
+  // `channels`, `invited` and `members` are each a first page (see
+  // `SPACE_PAGE_SIZE`); these say there are more (absent: none).
+  /** More channels than `channels` lists: `spaceChannels` pages them. */
+  moreChannels: v.optional(v.boolean()),
+  /** More people invited than `invited` lists. */
+  moreInvited: v.optional(v.boolean()),
+  /** More members than `members` lists: `spaceMembers` pages them. */
+  moreMembers: v.optional(v.boolean()),
   /**
    * Whether the caller hid alerts for the whole space, every channel in it
    * (absent from older PDSs: no).

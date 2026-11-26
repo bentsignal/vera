@@ -11,7 +11,7 @@ import { pds } from "@vera/backend/pds";
 
 import { useAccount } from "./account";
 import { removeFromInboxLists } from "./inbox-rows";
-import { updateSpace } from "./optimistic";
+import { updateSpace } from "./space-cache";
 
 // A channel's own settings (Show in Inbox, its alerts, its name, deleting
 // it) and a space's alerts, each shown the moment it's changed.

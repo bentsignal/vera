@@ -6,8 +6,9 @@ import type { AccountSettings } from "./settings.ts";
 import { activity, isUnseen } from "./activity.ts";
 import { alertsFor } from "./alerts.ts";
 import { hasUnread, unreadCount } from "./chatMessages.ts";
-import { inboxAccess } from "./inbox.ts";
+import { listedAccess } from "./inboxPages.ts";
 import { pendingInvites } from "./pendingInvites.ts";
+import { INBOX_PAGE_SIZE } from "./protocol.ts";
 import { readPosition } from "./readStates.ts";
 import { notificationSettings } from "./settings.ts";
 import { unreadThreadCount } from "./threadLists.ts";
@@ -52,8 +53,8 @@ export async function rowCount(
 
 /**
  * Home's part of the badge, counted the way the app counts its Home
- * tab's: every unread message in the direct messages and groups (`chats`)
- * the Inbox lists, one for each channel with anything unread, and (with
+ * tab's, over the Inbox's pinned conversations and its first page: every
+ * unread message in the direct messages and groups (`chats`) among them, one for each channel with anything unread, and (with
  * `threads`) one for each thread you're in with unread replies. Only the
  * rows `countsRow` says count; `rows` is what each of those adds.
  * `counted` are the chats counted message by message.
@@ -64,8 +65,12 @@ async function homeCount(
   kinds: readonly InboxKind[],
 ) {
   const settings = await notificationSettings(ctx, accountId);
+  // The rows the app's Home badge counts: the pinned and the first page.
   const listed = (
-    await inboxAccess(ctx, accountId, kinds.includes("channels"))
+    await listedAccess(ctx, accountId, {
+      channels: true,
+      limit: INBOX_PAGE_SIZE,
+    })
   ).filter((access) => countsRow(access, settings, kinds));
   const [unread, threads] = await Promise.all([
     Promise.all(listed.map((access) => rowCount(ctx, access, accountId))),
