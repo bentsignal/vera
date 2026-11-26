@@ -39,23 +39,18 @@ npx convex env set BUNNY_S3_SECRET '<new password>' --prod
 app): it uploads and shows for the other person. Dev uploads still work
 too (they use `vera-media-dev`, which this doesn't touch).
 
-### New GitHub tokens for bug reports (Shawn)
+### New GitHub token for production bug reports (Shawn)
 
-Shawn makes these at github.com → Settings → Developer settings →
+Shawn makes it at github.com → Settings → Developer settings →
 Fine-grained tokens; an agent can't.
 
 1. A production token: only repository `bentsignal/vera`; Issues read and
    write, Pull requests read, Contents read. Set it:
    `npx convex env set GITHUB_TOKEN '<token>' --prod`.
-2. A dev token: only repository `bentsignal/vera-dev-reports` (private,
-   the dummy repo dev reports go to), same permissions. Set it on the
-   shared dev deployment:
-   `npx convex env set GITHUB_TOKEN '<token>' --deployment perceptive-magpie-29`.
-   Isolated backends get it on their next `scripts/backend.sh push`.
-3. Delete the old token both used to share.
-
-Until step 2, dev bug reports stay on the dev server and aren't filed
-anywhere, which is fine.
+2. The dev token (only `bentsignal/vera-dev-reports`) is already made and
+   set on the shared dev deployment; nothing to do.
+3. Delete the old token both used to share, and the first dev token
+   (it could reach `bentsignal/vera` too, so it was never used).
 
 **Verify:** on production, the support inbox still shows issue status
 (`npx convex logs --prod` shows no GitHub 401s after a report). On dev,
