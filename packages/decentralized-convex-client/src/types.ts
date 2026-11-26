@@ -24,11 +24,19 @@ export type FederationMutationReference = FunctionReference<
 >;
 
 export interface FederationTarget {
+  /**
+   * The domain whose discovery led to this PDS. The PDS is believed only
+   * about that domain's accounts (see `Operation.trust`), and is asked
+   * apart from any other domain that names the same deployment.
+   */
+  domain?: string;
   id: string;
   url: string;
 }
 
 export interface FederationTargetGroup {
+  /** As on `FederationTarget`. */
+  domain?: string;
   ids: readonly string[];
   url: string;
 }

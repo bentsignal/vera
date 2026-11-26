@@ -4,13 +4,13 @@ import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
 
-import type { PdsRequest } from "./pds.ts";
 import type {
   FederationConnection,
   FederationMutationReference,
   FederationQueryReference,
 } from "./types.ts";
 import { DecentralizedConvexClient } from "./client.ts";
+import { listNotesRequest, note } from "./notes.testing.ts";
 
 void test("times out an initial live source and recovers when it later responds", async () => {
   const connections = new Map<string, ControlledConnection>();
@@ -30,7 +30,7 @@ void test("times out an initial live source and recovers when it later responds"
     revealPartialResultsAfter: 0,
   });
 
-  connections.get("https://a.test")?.emit([{ body: "a" }], ["b.test"]);
+  connections.get("https://a.test")?.emit([note("a")], ["b.test"]);
   await wait(0);
   await wait(25);
   assert.equal(observer.getSnapshot().status, "partial");
@@ -41,9 +41,9 @@ void test("times out an initial live source and recovers when it later responds"
     "error",
   );
 
-  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  connections.get("https://b.test")?.emit([note("b")]);
   assert.equal(observer.getSnapshot().status, "success");
-  assert.deepEqual(observer.getSnapshot().data, [{ body: "a" }, { body: "b" }]);
+  assert.deepEqual(observer.getSnapshot().data, [note("a"), note("b")]);
 
   observer.close();
   await client.close();
@@ -73,7 +73,7 @@ void test("passes on included results the home PDS answers completely", async ()
   };
 
   connections.get("https://a.test")?.emit(
-    [{ body: "a" }],
+    [note("a")],
     [],
     [
       { request: local, routes: ["someone@a.test"], value: { body: "one" } },
@@ -114,15 +114,15 @@ void test("publishes each update from home once while its routes stay the same",
   const shown: unknown[] = [];
   observer.subscribe(() => shown.push(observer.getSnapshot().data));
   const home = connections.get("https://a.test");
-  home?.emit([{ body: "a" }], []);
+  home?.emit([note("a")], []);
   await wait(0);
   const settled = shown.length;
-  home?.emit([{ body: "a" }, { body: "b" }], []);
+  home?.emit([note("a"), note("a2")], []);
   await wait(0);
-  home?.emit([{ body: "a" }, { body: "b" }, { body: "c" }], []);
+  home?.emit([note("a"), note("a2"), note("a3")], []);
   await wait(0);
   assert.equal(shown.length - settled, 2);
-  assert.deepEqual(shown.at(-1), [{ body: "a" }, { body: "b" }, { body: "c" }]);
+  assert.deepEqual(shown.at(-1), [note("a"), note("a2"), note("a3")]);
 
   observer.close();
   await client.close();
@@ -153,42 +153,32 @@ void test("answers from the PDSes it can find when a route's PDS is gone", async
   });
 
   const home = connections.get("https://a.test");
-  home?.emit([{ body: "a" }], ["someone@gone.test", "someone@b.test"]);
+  home?.emit([note("a")], ["someone@gone.test", "someone@b.test"]);
   await wait(0);
-  connections.get("https://b.test")?.emit([{ body: "b" }]);
+  connections.get("https://b.test")?.emit([note("b")]);
   await wait(0);
 
   const snapshot = observer.getSnapshot();
   assert.equal(snapshot.status, "partial");
-  assert.deepEqual(snapshot.data, [{ body: "a" }, { body: "b" }]);
+  assert.deepEqual(snapshot.data, [note("a"), note("b")]);
   const gone = snapshot.sources.find(
     (source) => source.target.url === "https://gone.test",
   );
   assert.equal(gone?.status, "error");
 
   // Another update from home doesn't look the gone domain up again.
-  home?.emit([{ body: "a2" }], ["someone@gone.test", "someone@b.test"]);
+  home?.emit([note("a2")], ["someone@gone.test", "someone@b.test"]);
   await wait(0);
-  assert.deepEqual(observer.getSnapshot().data, [
-    { body: "a2" },
-    { body: "b" },
-  ]);
+  assert.deepEqual(observer.getSnapshot().data, [note("a2"), note("b")]);
   assert.equal(lookups.filter((domain) => domain === "gone.test").length, 1);
 
   observer.close();
   await client.close();
 });
 
-const listNotesRequest = {
-  lastChanged: corePackage.lastChanged,
-  operation: { args: {}, type: "list" },
-  plugin: "notes",
-  version: DECENTRALIZED_CONVEX_VERSION,
-} satisfies PdsRequest<readonly { body: string }[], "query">;
-
 class ControlledConnection implements FederationConnection {
   #publish?: (
-    value: readonly { body: string }[],
+    value: readonly { author: string; body: string }[],
     routes: readonly string[],
     included: readonly unknown[],
   ) => void;
@@ -226,7 +216,7 @@ class ControlledConnection implements FederationConnection {
   }
 
   emit(
-    value: readonly { body: string }[],
+    value: readonly { author: string; body: string }[],
     routes: readonly string[] = [],
     included: readonly unknown[] = [],
   ) {

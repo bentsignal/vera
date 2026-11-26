@@ -12,6 +12,7 @@ import type {
   FederationTargetGroup,
   SuccessfulFederationSource,
 } from "./types.ts";
+import { registerTrust } from "./trust.ts";
 
 declare const PdsResultType: unique symbol;
 
@@ -138,6 +139,7 @@ export function definePdsApi<
 >(...protocols: Protocols): PdsApi<ProtocolsByName<Protocols>> {
   const api = Object.fromEntries(
     protocols.map((protocol) => {
+      registerTrust(protocol);
       const mutations = defineRequestBuilders(
         protocol.lastChanged,
         protocol.name,

@@ -9,6 +9,7 @@ export {
   parsePdsManifest,
   parsePdsTxtRecord,
   PDS_DISCOVERY_RECORD_FORMAT,
+  PdsDiscoveryDisagreementError,
   PdsNotFoundError,
   PDS_DNS_LABEL,
 } from "./discovery.ts";

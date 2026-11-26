@@ -6,9 +6,13 @@ import type {
   PdsRequest,
 } from "@decentralized-convex/client";
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
-import { DecentralizedConvexClient } from "@decentralized-convex/client";
+import {
+  DecentralizedConvexClient,
+  definePdsApi,
+} from "@decentralized-convex/client";
 import { DECENTRALIZED_CONVEX_VERSION } from "@decentralized-convex/core";
 import { decentralizedConvexPackage as corePackage } from "@decentralized-convex/core/metadata";
+import { v } from "convex/values";
 
 // In-memory PDSs for tests. a.test routes queries to itself and b.test.
 // Asked for the owner "with-included", a.test also answers the owner
@@ -18,6 +22,31 @@ export interface Note {
   body: string;
   id: string;
 }
+
+const note = v.object({ body: v.string(), id: v.optional(v.string()) });
+
+// Registers what each PDS's notes are believed about. These tests are
+// about caching, not trust (the client's trust.test.ts covers that), so
+// every PDS's notes are believed.
+definePdsApi({
+  lastChanged: corePackage.lastChanged,
+  mutations: {
+    create: {
+      args: v.object({ body: v.string() }),
+      returns: note,
+    },
+  },
+  name: "notes",
+  queries: {
+    list: {
+      args: v.object({ owner: v.string() }),
+      returns: v.array(note),
+      trust: (notes) => notes,
+    },
+  },
+  requires: {},
+  version: DECENTRALIZED_CONVEX_VERSION,
+});
 
 export function listNotes(args: {
   owner: string;

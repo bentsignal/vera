@@ -216,7 +216,8 @@ void test("link cards and a thread's count", () => {
   assert.deepEqual(typesOf(row), ["linkCard", "linkCard"]);
   const first = blockAt(row, 0, "linkCard");
   const second = blockAt(row, 1, "linkCard");
-  assert.equal(first.site, "YouTube");
+  // The address it opens, not the name the page gives itself.
+  assert.equal(first.site, "youtube.com");
   // Its text is only the link, so the first card is the message.
   assert.equal(first.part, "message");
   assert.equal(second.site, "example.com");
