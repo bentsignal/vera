@@ -1,3 +1,5 @@
+import { fetchPublic, PublicFetchRefused } from "@decentralized-convex/address";
+
 import type { LinkPreview } from "./shapes.ts";
 import { LINK_PREVIEW_USER_AGENT, PAGE_AGENTS } from "./agents.ts";
 import { isPublicWebUrl } from "./linkCache.ts";
@@ -63,17 +65,20 @@ async function fetchPage(
   const none = { preview: null, tagged: false };
   let response: Response;
   try {
-    response = await fetch(url, {
+    // Each redirect is checked before it's followed, so a link can't lead
+    // the server into the network beside it.
+    response = await fetchPublic(url, {
       headers: {
         Accept: "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.9",
         "User-Agent": agent,
       },
-      redirect: "follow",
       signal: AbortSignal.timeout(timeout),
     });
-  } catch {
-    // Timed out or refused: the next agent may do better.
+  } catch (error) {
+    // Refused: no agent gets further.
+    if (error instanceof PublicFetchRefused) throw error;
+    // Timed out or turned away: the next agent may do better.
     return none;
   }
   return readPage(response, url);

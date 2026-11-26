@@ -3,9 +3,14 @@ import test from "node:test";
 
 import type { SendBucket } from "./send-limits.ts";
 import {
+  currentDomainSends,
   currentSends,
+  DOMAIN_SEND_BURST,
+  DOMAIN_SEND_REFILL_MS,
   SEND_BURST,
   SEND_REFILL_MS,
+  sendKey,
+  takeDomainSend,
   takeSend,
 } from "./send-limits.ts";
 
@@ -62,4 +67,40 @@ void test("the bucket refills up to a burst, never past it", () => {
     0,
   );
   assert.equal(back.tokens, 5);
+});
+
+void test("writing an address differently doesn't give a fresh allowance", () => {
+  assert.equal(sendKey(" Me@Vera.Chat "), ME);
+  assert.equal(sendKey("ME@VERA.CHAT"), sendKey(ME));
+});
+
+/** Sends from many accounts of one server, `apart` ms apart; refused. */
+function domainBurst(count: number, apart: number) {
+  let bucket: { tokens: number; updatedAt: number } | null = null;
+  let refused = 0;
+  for (let index = 0; index < count; index += 1) {
+    const result = takeDomainSend(currentDomainSends(bucket, index * apart));
+    if (result.ok) bucket = result.bucket;
+    else refused += 1;
+  }
+  return refused;
+}
+
+void test("a small server's visitors never reach their server's ceiling", () => {
+  // Ten people each at their own limit, together.
+  assert.equal(domainBurst(600, SEND_REFILL_MS / 10), 0);
+  assert.ok(DOMAIN_SEND_BURST >= 10 * SEND_BURST);
+});
+
+void test("a server with thousands of accounts can't multiply the limit", () => {
+  // A thousand fresh accounts each sending their burst at once.
+  assert.equal(
+    domainBurst(1000 * SEND_BURST, 0),
+    1000 * SEND_BURST - DOMAIN_SEND_BURST,
+  );
+  const empty = { tokens: 0, updatedAt: 0 };
+  assert.deepEqual(takeDomainSend(empty), {
+    ok: false,
+    retryAfterMs: DOMAIN_SEND_REFILL_MS,
+  });
 });

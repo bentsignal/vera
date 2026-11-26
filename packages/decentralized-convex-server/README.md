@@ -39,11 +39,17 @@ export default definePdsPluginComponent(
 
 ```ts
 export const { dispatchMutation, dispatchQuery } = definePdsRouter({
+  accountDomain: () => process.env.FEDERATION_DOMAIN!,
   components,
   mutation,
   query,
 });
 ```
+
+`accountDomain` is the domain of the PDS's own accounts. Anyone else signed
+in (a visitor from another PDS) reaches the plugins with `identity.home` set
+to their home domain, so a plugin can leave out work that the visitor's own
+server does for them.
 
 This is the stable `pds:dispatchMutation` / `pds:dispatchQuery` pair. The router
 authenticates once, selects the installed plugin, and crosses one Component

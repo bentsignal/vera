@@ -23,6 +23,7 @@ const INDEXES: Record<string, Record<string, string[]>> = {
     by_conversation: ["conversationId"],
     by_space: ["spaceId"],
   },
+  linkPreviewCache: { by_url: ["url"] },
   linkPreviewWaits: {
     by_message: ["messageId"],
     by_url: ["url"],
@@ -50,6 +51,8 @@ const INDEXES: Record<string, Record<string, string[]>> = {
   },
   notificationSettings: { by_account: ["accountId"] },
   pushBadges: { by_account: ["accountId"] },
+  prefetchLimits: { by_account: ["accountId"] },
+  pushTokens: { by_account: ["accountId"] },
   reactions: {
     by_author_conversation_reacted: [
       "messageAuthorId",
@@ -200,24 +203,29 @@ export function fakeCtx(tables: Record<string, Record<string, unknown>[]>) {
     return builder;
   }
 
+  /** Changes a row, or with null, deletes it. */
+  function update(id: string, kind: string, change: (row: Row) => Row | null) {
+    const table = id.slice(0, id.indexOf(":"));
+    writes.push(`${table} ${kind}`);
+    rows[table] = (rows[table] ?? []).flatMap((row) =>
+      row._id === id ? (change(row) ?? []) : [row],
+    );
+    return Promise.resolve();
+  }
+
   const ctx = {
     // Scheduled work (pushes, link previews) doesn't run in tests.
     scheduler: { runAfter: () => Promise.resolve() },
     db: {
-      delete: (id: string) => {
-        const table = id.slice(0, id.indexOf(":"));
-        writes.push(`${table} delete`);
-        rows[table] = (rows[table] ?? []).filter((row) => row._id !== id);
-        return Promise.resolve();
-      },
-      patch: (id: string, value: Record<string, unknown>) => {
-        const table = id.slice(0, id.indexOf(":"));
-        writes.push(`${table} patch`);
-        rows[table] = (rows[table] ?? []).map((row) =>
-          row._id === id ? { ...row, ...value } : row,
-        );
-        return Promise.resolve();
-      },
+      delete: (id: string) => update(id, "delete", () => null),
+      patch: (id: string, value: Record<string, unknown>) =>
+        update(id, "patch", (row) => ({ ...row, ...value })),
+      replace: (id: string, value: Record<string, unknown>) =>
+        update(id, "replace", (row) => ({
+          ...value,
+          _creationTime: row._creationTime,
+          _id: id,
+        })),
       insert: (table: string, value: Record<string, unknown>) => {
         writes.push(`${table} insert`);
         return Promise.resolve(insert(table, value));

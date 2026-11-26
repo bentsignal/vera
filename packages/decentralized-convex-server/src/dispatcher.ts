@@ -34,6 +34,11 @@ export interface DispatcherIdentity {
   readonly [key: string]: string | undefined;
   readonly accountId?: string;
   readonly email?: string;
+  /**
+   * Set only for a visitor, an account of another PDS signed in here: its
+   * home PDS's domain. The PDS router sets it (`accountDomain`).
+   */
+  readonly home?: string;
   readonly issuer: string;
   readonly name?: string;
   readonly subject: string;
@@ -43,6 +48,7 @@ export interface DispatcherIdentity {
 const dispatcherIdentity = v.object({
   accountId: v.optional(v.string()),
   email: v.optional(v.string()),
+  home: v.optional(v.string()),
   issuer: v.string(),
   name: v.optional(v.string()),
   subject: v.string(),

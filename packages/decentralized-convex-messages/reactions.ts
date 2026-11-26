@@ -109,7 +109,13 @@ export async function react(
     reactedAt: Date.now(),
   });
   await markChanged(ctx, access);
-  if (message !== null && message.authorId !== self) {
+  // A push only for a message of this conversation: a reaction can't tell
+  // the author about a message elsewhere.
+  if (
+    message !== null &&
+    message.conversationId === args.conversationId &&
+    message.authorId !== self
+  ) {
     await ctx.scheduler.runAfter(
       REACTION_PUSH_DELAY_MS,
       internal.reactionPush.sendReaction,

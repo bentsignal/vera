@@ -42,6 +42,7 @@ import type * as opengraph from "../opengraph.js";
 import type * as paging from "../paging.js";
 import type * as pendingInvites from "../pendingInvites.js";
 import type * as personalActivity from "../personalActivity.js";
+import type * as prefetchLimits from "../prefetchLimits.js";
 import type * as previews from "../previews.js";
 import type * as protocol from "../protocol.js";
 import type * as pushBadges from "../pushBadges.js";
@@ -108,6 +109,7 @@ const fullApi: ApiFromModules<{
   paging: typeof paging;
   pendingInvites: typeof pendingInvites;
   personalActivity: typeof personalActivity;
+  prefetchLimits: typeof prefetchLimits;
   previews: typeof previews;
   protocol: typeof protocol;
   pushBadges: typeof pushBadges;

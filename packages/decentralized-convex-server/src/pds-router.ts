@@ -23,6 +23,7 @@ export interface PdsRouterMutationRequest {
 export type PdsRouterMutation = PdsRouterMutationRequest & { value: unknown };
 
 export function definePdsRouter<DataModel extends GenericDataModel>({
+  accountDomain,
   afterMutation,
   beforeMutation,
   components,
@@ -30,6 +31,12 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
   query,
   trace,
 }: {
+  /**
+   * The domain of this PDS's own accounts. Anyone else signed in is a
+   * visitor, and their identity carries their home domain (`home`), so
+   * plugins and hooks can tell them apart.
+   */
+  readonly accountDomain: () => string;
   /**
    * Runs in the same transaction before each plugin write a client asks
    * for, so the host can refuse it (by throwing) before the plugin works.
@@ -72,7 +79,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
         if (trace?.() === true) logOperation("mutation", request);
-        const identity = await resolveIdentity(ctx);
+        const identity = await resolveIdentity(ctx, accountDomain);
         await beforeMutation?.(ctx, {
           identity,
           operation: request.operation,
@@ -113,7 +120,7 @@ export function definePdsRouter<DataModel extends GenericDataModel>({
       handler: async (ctx, request) => {
         const component = getDispatcherComponent(installed, request.plugin);
         if (trace?.() === true) logOperation("query", request);
-        const identity = await resolveIdentity(ctx);
+        const identity = await resolveIdentity(ctx, accountDomain);
         const include = request.include !== false;
         const response = await ctx.runQuery(component.query, {
           identity,
@@ -179,20 +186,42 @@ function getDispatcherComponent(
   };
 }
 
-async function resolveIdentity(ctx: {
-  readonly auth: Auth;
-}): Promise<DispatcherIdentity | null> {
+async function resolveIdentity(
+  ctx: { readonly auth: Auth },
+  accountDomain: () => string,
+): Promise<DispatcherIdentity | null> {
   const identity = await ctx.auth.getUserIdentity();
-  return identity === null
-    ? null
-    : {
-        ...(typeof identity.accountId === "string"
-          ? { accountId: identity.accountId }
-          : {}),
-        issuer: identity.issuer,
-        ...(identity.email === undefined ? {} : { email: identity.email }),
-        ...(identity.name === undefined ? {} : { name: identity.name }),
-        subject: identity.subject,
-        tokenIdentifier: identity.tokenIdentifier,
-      };
+  if (identity === null) return null;
+  const accountId =
+    typeof identity.accountId === "string" ? identity.accountId : undefined;
+  const home = visitorHome(accountId ?? identity.email, accountDomain());
+  return {
+    ...(accountId === undefined ? {} : { accountId }),
+    ...(home === undefined ? {} : { home }),
+    issuer: identity.issuer,
+    ...(identity.email === undefined ? {} : { email: identity.email }),
+    ...(identity.name === undefined ? {} : { name: identity.name }),
+    subject: identity.subject,
+    tokenIdentifier: identity.tokenIdentifier,
+  };
+}
+
+/**
+ * A visitor's home domain: the domain of an address not of this PDS's
+ * `accountDomain` (lowercase, "" for no address). Undefined for one of
+ * this PDS's own accounts.
+ */
+export function visitorHome(
+  address: string | undefined,
+  accountDomain: string,
+) {
+  const separator = address?.lastIndexOf("@") ?? -1;
+  const home =
+    address === undefined || separator === -1
+      ? ""
+      : address
+          .slice(separator + 1)
+          .trim()
+          .toLowerCase();
+  return home === accountDomain.trim().toLowerCase() ? undefined : home;
 }

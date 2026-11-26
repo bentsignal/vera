@@ -303,6 +303,9 @@ importers:
 
   packages/decentralized-convex-accounts:
     dependencies:
+      '@decentralized-convex/address':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-address
       '@decentralized-convex/core':
         specifier: workspace:0.1.0
         version: link:../decentralized-convex-core
@@ -478,6 +481,9 @@ importers:
       '@decentralized-convex/accounts':
         specifier: workspace:0.1.0
         version: link:../decentralized-convex-accounts
+      '@decentralized-convex/address':
+        specifier: workspace:0.1.0
+        version: link:../decentralized-convex-address
       '@decentralized-convex/core':
         specifier: workspace:0.1.0
         version: link:../decentralized-convex-core

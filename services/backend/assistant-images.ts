@@ -90,3 +90,40 @@ export function shrink(image: Pixels, maxSide: number): Pixels {
   }
   return { data, height, width };
 }
+
+/** The most of a photo downloaded for an assistant: 20 MB. */
+export const MAX_DOWNLOAD_BYTES = 20 * 1024 * 1024;
+
+/**
+ * A response's body, stopping with an error as soon as it passes
+ * `maxBytes` (whatever its `content-length` says), so a huge or endless
+ * file can't fill the function's memory.
+ */
+export async function readCapped(response: Response, maxBytes: number) {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    throw new Error(`Too large: ${declared} bytes`);
+  }
+  const reader = response.body?.getReader();
+  if (reader === undefined) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    length += chunk.value.byteLength;
+    if (length > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Too large: over ${maxBytes} bytes`);
+    }
+    chunks.push(chunk.value);
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}

@@ -165,3 +165,47 @@ void test("invalid name edits and unauthenticated writes leave the photo alone",
   assert.equal(profile.avatarUrl, PHOTO);
   assert.equal(profile.displayName, "My name");
 });
+
+void test("a photo must be an https web address", async () => {
+  const ctx = database({
+    accountId: ACCOUNT,
+    avatarUrl: PHOTO,
+    displayName: "My name",
+  });
+  for (const avatarUrl of [
+    "http://media.example/photo.jpg",
+    "javascript:alert(1)",
+    "data:image/png;base64,AAAA",
+    "file:///etc/passwd",
+    "not a url",
+    `https://media.example/${"a".repeat(3000)}`,
+  ]) {
+    await assert.rejects(
+      profileHandlers.mutations.upsertMyProfile(ctx, {
+        args: { avatarUrl },
+        identity,
+      }),
+      /INVALID_AVATAR_URL/,
+      avatarUrl,
+    );
+  }
+  const profile = await profileHandlers.queries.getMyProfile(ctx, {
+    args: {},
+    identity,
+  });
+  assert.equal(profile?.avatarUrl, PHOTO);
+});
+
+void test("an account ID outside the protocol's address format is refused", async () => {
+  const ctx = database();
+  for (const accountId of ["me", "x@vera.chat", "me@localhost", "a b@c.d"]) {
+    await assert.rejects(
+      profileHandlers.queries.getMyProfile(ctx, {
+        args: {},
+        identity: { ...identity, accountId },
+      }),
+      /AUTHENTICATED_ACCOUNT_REQUIRED/,
+      accountId,
+    );
+  }
+});
