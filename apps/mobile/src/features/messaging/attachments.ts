@@ -5,20 +5,18 @@ import * as DocumentPicker from "expo-document-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import { api } from "@vera/backend/api";
 import {
   MAX_UPLOAD_BYTES,
   MAX_VIDEO_SECONDS,
 } from "@vera/backend/upload-limits";
 
-import type { AccountSession } from "~/features/session/account-session";
 import type { PastedImage } from "~/lib/paste-images";
 import { formatBytes } from "~/lib/format";
 import { useAccount } from "./account";
 import { cropPhoto, cropsAfterPicking, cropsInPicker } from "./crop-photo";
-import { attachmentError, limitsSentence } from "./upload-errors";
-import { sendUpload } from "./upload-transports";
-import { fitForUpload, needsShrinking, shrinksVideos } from "./video-shrink";
+import { needsShrinking } from "./media-tools";
+import { limitsSentence } from "./upload-errors";
+import { uploadStaged } from "./upload-staged";
 
 /** The most attachments one message can carry (the PDS's limit too). */
 export const MAX_ATTACHMENTS = 10;
@@ -26,7 +24,7 @@ export const MAX_ATTACHMENTS = 10;
 export type AttachmentSource = "camera" | "files" | "library";
 
 /** A local file, sized and ready to upload. */
-interface LocalFile {
+export interface LocalFile {
   readonly mimeType: string;
   readonly name: string;
   readonly size: number;
@@ -206,9 +204,9 @@ async function pickFiles() {
 
 /** Why a picked file can't be sent, in words for the person. */
 function problemWith(file: StagedFile) {
-  // A video that's too big shrinks to fit as it sends, if this build can.
-  const shrinks = file.kind === "video" && shrinksVideos;
-  if (!shrinks && file.size > MAX_UPLOAD_BYTES[file.kind]) {
+  // A photo or video that's too big shrinks to fit as it sends, if this
+  // build can.
+  if (!needsShrinking(file) && file.size > MAX_UPLOAD_BYTES[file.kind]) {
     return {
       message: `This ${KIND_NOUN[file.kind]} is ${formatBytes(file.size)}. ${limitsSentence()}`,
       title: "Too Big to Send",
@@ -272,73 +270,6 @@ export function stagePasted(images: readonly PastedImage[], limit: number) {
       }) satisfies StagedFile,
   );
   return sendableOf(picked(files), limit);
-}
-
-async function uploadOne(
-  session: AccountSession,
-  kind: Attachment["kind"],
-  file: LocalFile,
-  onBytesSent: (bytes: number) => void,
-) {
-  const convex = await session.convex();
-  const target = await convex
-    .action(api.files.createUpload, {
-      kind,
-      mimeType: file.mimeType,
-      name: file.name,
-      size: file.size,
-    })
-    .catch((error: unknown) => {
-      throw attachmentError(error);
-    });
-  return sendUpload(convex, { file, kind, onBytesSent, target }).catch(
-    (error: unknown) => {
-      throw attachmentError(error);
-    },
-  );
-}
-
-/**
- * Uploads a staged file (and a video's poster), reporting progress from 0
- * to 1, and returns the attachment to send. A poster that fails to upload
- * is left off; the conversation draws one from the video instead.
- */
-export async function uploadStaged(
-  session: AccountSession,
-  staged: StagedFile,
-  reportProgress: (fraction: number) => void = () => undefined,
-) {
-  // A video over the limit spends the first half of its progress shrinking.
-  const shrinks = needsShrinking(staged);
-  const file = await fitForUpload(staged, (fraction) =>
-    reportProgress(fraction / 2),
-  );
-  function onProgress(fraction: number) {
-    reportProgress(shrinks ? 0.5 + fraction / 2 : fraction);
-  }
-  const posterSize = file.poster?.size ?? 0;
-  const total = Math.max(1, file.size + posterSize);
-  const url = await uploadOne(session, file.kind, file, (bytes) =>
-    onProgress(Math.min(bytes, file.size) / total),
-  );
-  const thumbnailUrl =
-    file.poster === undefined
-      ? undefined
-      : await uploadOne(session, "image", file.poster, (bytes) =>
-          onProgress((file.size + Math.min(bytes, posterSize)) / total),
-        ).catch(() => undefined);
-  onProgress(1);
-  return {
-    durationMs: file.durationMs,
-    height: file.height,
-    kind: file.kind,
-    mimeType: file.mimeType,
-    name: file.name,
-    size: file.size,
-    thumbnailUrl,
-    url,
-    width: file.width,
-  } satisfies Attachment;
 }
 
 /** Picks and uploads right away, for a profile photo. */

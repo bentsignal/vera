@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
-  s.name           = 'VideoShrink'
+  s.name           = 'MediaTools'
   s.version        = '1.0.0'
-  s.summary        = 'Re-encodes a video smaller, to fit an upload limit.'
+  s.summary        = 'Shrinks photos and videos to send, and previews files.'
   s.author         = 'Vera'
   s.homepage       = 'https://vera.chat'
   s.platforms      = { :ios => '16.4' }
@@ -10,6 +10,7 @@ Pod::Spec.new do |s|
   s.swift_version  = '5.9'
 
   s.dependency 'ExpoModulesCore'
+  s.frameworks = 'QuickLook'
 
   s.source_files = '**/*.swift'
   s.pod_target_xcconfig = {

@@ -13,6 +13,7 @@ import type { MessageLayout } from "~/features/preferences/store";
 import { groupParam } from "~/features/conversation/media-group";
 import { linkCardsOf, visibleBody } from "~/features/conversation/message-text";
 import { showNotSent } from "~/features/conversation/not-sent";
+import { openFileAttachment } from "~/features/conversation/open-file";
 import { showUploadProblem } from "~/features/conversation/upload-problem";
 import { markPhoto } from "~/features/dev/photo-timing";
 import { useOpenProfile } from "~/features/profile/use-open-profile";
@@ -67,7 +68,7 @@ function openFile(message: Message, event: PressEvent) {
   if (attachment === undefined || handledStuck(attachment)) return;
   const { upload } = attachment;
   if (upload === undefined || upload.state === "uploaded") {
-    openLink(attachment.url);
+    openFileAttachment(attachment);
   }
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Sets the edge rules on a bunny.net pull zone that serves Vera's media, so
-// a browser shows only pictures, video and audio from it and downloads
-// everything else as a file. The app uploads straight to bunny Storage,
+// a browser shows only pictures, video, audio and PDFs from it and
+// downloads everything else as a file. The app uploads straight to bunny Storage,
 // which keeps whatever Content-Type the upload sent, so the rules go by the
 // type the CDN serves, and fail safe: a type not on the list downloads.
 //
@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 
 /** Types a browser may show inline. SVG is left out: it can run scripts. */
 export const INLINE_TYPES = [
+  "application/pdf",
   "image/jpeg",
   "image/png",
   "image/gif",
@@ -43,33 +44,43 @@ const TAG = "vera-media:";
 const CONTENT_TYPE = { Parameter1: "Content-Type", Type: TRIGGER.responseHeader };
 const SANDBOX = "sandbox; default-src 'none'";
 
+const DOWNLOAD = {
+  ActionParameter1: "",
+  ActionParameter2: "",
+  ActionType: ACTION.forceDownload,
+  Enabled: true,
+};
+
 export const RULES = [
   {
-    // Whatever a browser shows from here runs no scripts and can't act as
-    // a Vera page, and a file's type is never guessed from its contents.
-    ActionParameter1: "Content-Security-Policy",
-    ActionParameter2: SANDBOX,
+    // A file's type is never guessed from its contents.
+    ActionParameter1: "X-Content-Type-Options",
+    ActionParameter2: "nosniff",
     ActionType: ACTION.setResponseHeader,
-    Description: `${TAG} no scripts, no type guessing`,
+    Description: `${TAG} no type guessing`,
     Enabled: true,
-    ExtraActions: [
-      {
-        ActionParameter1: "X-Content-Type-Options",
-        ActionParameter2: "nosniff",
-        ActionType: ACTION.setResponseHeader,
-      },
-    ],
     TriggerMatchingType: MATCH.any,
     Triggers: [
       { PatternMatches: ["*"], PatternMatchingType: MATCH.any, Type: TRIGGER.url },
     ],
   },
   {
-    ActionParameter1: "",
-    ActionParameter2: "",
-    ActionType: ACTION.forceDownload,
-    Description: `${TAG} download anything but pictures, video and audio`,
+    // Whatever a browser shows from here runs no scripts and can't act as
+    // a Vera page. PDFs are left out: Chrome won't show a sandboxed PDF,
+    // and its viewer keeps a PDF's own scripts away from the page.
+    ActionParameter1: "Content-Security-Policy",
+    ActionParameter2: SANDBOX,
+    ActionType: ACTION.setResponseHeader,
+    Description: `${TAG} no scripts`,
     Enabled: true,
+    TriggerMatchingType: MATCH.any,
+    Triggers: [
+      { ...CONTENT_TYPE, PatternMatches: ["application/pdf*"], PatternMatchingType: MATCH.none },
+    ],
+  },
+  {
+    ...DOWNLOAD,
+    Description: `${TAG} download anything but pictures, video, audio and PDFs`,
     // None of the types in any trigger: every trigger must hold.
     TriggerMatchingType: MATCH.all,
     Triggers: chunks(
@@ -84,12 +95,16 @@ export const RULES = [
   },
   {
     // A browser reads a list of types and takes the last one, so a list
-    // that starts with a picture's type isn't one.
-    ActionParameter1: "",
-    ActionParameter2: "",
-    ActionType: ACTION.forceDownload,
+    // that starts with an allowed type isn't one.
+    ...DOWNLOAD,
     Description: `${TAG} download a list of types`,
-    Enabled: true,
+    ExtraActions: [
+      {
+        ActionParameter1: "Content-Security-Policy",
+        ActionParameter2: SANDBOX,
+        ActionType: ACTION.setResponseHeader,
+      },
+    ],
     TriggerMatchingType: MATCH.any,
     Triggers: [
       { ...CONTENT_TYPE, PatternMatches: ["*,*"], PatternMatchingType: MATCH.any },

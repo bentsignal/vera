@@ -7,7 +7,7 @@ group = 'chat.vera'
 version = '1.0.0'
 
 android {
-  namespace "chat.vera.videoshrink"
+  namespace "chat.vera.mediatools"
   defaultConfig {
     versionCode 1
     versionName "1.0.0"
@@ -20,4 +20,6 @@ dependencies {
   implementation "androidx.media3:media3-transformer:${media3Version}"
   implementation "androidx.media3:media3-effect:${media3Version}"
   implementation "androidx.media3:media3-common:${media3Version}"
+  // FileProvider, to hand a downloaded file to a viewer app.
+  implementation "androidx.core:core:1.13.1"
 }

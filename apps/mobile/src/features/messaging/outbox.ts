@@ -11,11 +11,14 @@ import { pds } from "@vera/backend/pds";
 
 import type { StagedFile } from "./attachments";
 import type { FailedUploadState } from "./upload-errors";
+import type { TimingLog } from "./upload-staged";
 import type { AccountSession } from "~/features/session/account-session";
-import { uploadStaged } from "./attachments";
 import { enqueueSend, sendPatiently } from "./send-limit";
+import { sendTimer } from "./send-timing";
 import { failedUploadState, retriable } from "./upload-errors";
 import { setUploadProgress } from "./upload-progress";
+import { withUploadSlot } from "./upload-slots";
+import { uploadStaged } from "./upload-staged";
 
 // Messages this device sent that the PDS hasn't confirmed yet, with their
 // uploads. They live outside React, so leaving the conversation doesn't
@@ -74,8 +77,6 @@ export interface OutgoingDraft {
   readonly reply?: OutgoingReply;
 }
 
-/** How many uploads run at once across every message. */
-const UPLOAD_CONCURRENCY = 3;
 /** Sent messages kept for their local media, newest first. */
 const KEEP_SENT = 50;
 /** How long a send may take before it shows as not sent. */
@@ -149,44 +150,25 @@ export function hasUnsentMessages() {
   return outbox.some((message) => message.status !== "sent");
 }
 
-// A small queue, so ten videos don't all fight for the connection.
-
-let active = 0;
-const waiting = new Array<() => void>();
-
-function releaseUploadSlot() {
-  active -= 1;
-  waiting.shift()?.();
-}
-
-async function withUploadSlot<T>(work: () => Promise<T>) {
-  if (active >= UPLOAD_CONCURRENCY) {
-    await new Promise<void>((resolve) => waiting.push(resolve));
-  }
-  active += 1;
-  return work().then(
-    (value) => {
-      releaseUploadSlot();
-      return value;
-    },
-    (error: unknown) => {
-      releaseUploadSlot();
-      throw error;
-    },
-  );
-}
-
 async function upload(
   session: AccountSession,
   messageId: string,
   item: OutgoingItem,
+  log: TimingLog,
 ) {
   setUploadProgress(item.id, 0);
-  const attachment = await withUploadSlot(() =>
-    uploadStaged(session, item.file, (fraction) =>
-      setUploadProgress(item.id, fraction),
-    ),
-  ).catch((error: unknown) => {
+  const queued = Date.now();
+  const attachment = await withUploadSlot(() => {
+    log(
+      `${item.file.kind} ${item.file.name}: slot after ${((Date.now() - queued) / 1000).toFixed(1)}s`,
+    );
+    return uploadStaged(
+      session,
+      item.file,
+      (fraction) => setUploadProgress(item.id, fraction),
+      log,
+    );
+  }).catch((error: unknown) => {
     updateItem(messageId, item.id, {
       state: failedUploadState(error),
     });
@@ -276,6 +258,7 @@ async function deliver(messageId: string) {
   const session = sessions.get(messageId);
   if (session === undefined || running.has(messageId)) return;
   running.add(messageId);
+  const log = sendTimer(messageId);
   update(messageId, (message) => ({
     ...message,
     items: message.items.map((item) =>
@@ -285,14 +268,18 @@ async function deliver(messageId: string) {
   }));
   const toUpload =
     find(messageId)?.items.filter((item) => item.state === "uploading") ?? [];
-  await Promise.all(toUpload.map((item) => upload(session, messageId, item)));
+  await Promise.all(
+    toUpload.map((item) => upload(session, messageId, item, log)),
+  );
 
   const message = find(messageId);
   const attachments = message?.items.flatMap((item) =>
     item.attachment === undefined ? [] : [item.attachment],
   );
   if (message !== undefined && attachments?.length === message.items.length) {
+    const confirming = Date.now();
     await send(session, message, attachments);
+    log(`confirm ${((Date.now() - confirming) / 1000).toFixed(1)}s`);
   } else if (message !== undefined) {
     update(messageId, failed);
   }

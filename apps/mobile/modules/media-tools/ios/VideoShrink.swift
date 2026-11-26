@@ -2,7 +2,7 @@ import AVFoundation
 import ExpoModulesCore
 import VideoToolbox
 
-struct ShrinkOptions: Record {
+struct VideoOptions: Record {
   /// Names this job in its `onProgress` events.
   @Field var id: String = ""
   @Field var uri: String = ""
@@ -13,36 +13,13 @@ struct ShrinkOptions: Record {
   @Field var maxShortSide: Int = 1080
 }
 
-enum ShrinkError: Error {
+enum MediaToolsError: Error {
   case noVideo
+  case noImage
   case failed(String)
 }
 
-/// Re-encodes a video smaller so it fits an upload limit: HEVC at the
-/// bitrate asked for, no bigger than 1080p, keeping HDR, rotation and the
-/// sound as they are. The app sends a video as it was recorded when it
-/// already fits, so this only runs on the ones that don't.
-public class VideoShrinkModule: Module {
-  public func definition() -> ModuleDefinition {
-    Name("VeraVideoShrink")
-    Events("onProgress")
-
-    AsyncFunction("shrinkAsync") { (options: ShrinkOptions, promise: Promise) in
-      Task {
-        do {
-          let result = try await shrink(options) { [weak self] fraction in
-            self?.sendEvent("onProgress", ["id": options.id, "fraction": fraction])
-          }
-          promise.resolve(result)
-        } catch {
-          promise.reject("ERR_VIDEO_SHRINK", "\(error)")
-        }
-      }
-    }
-  }
-}
-
-private func fileURL(_ uri: String) -> URL {
+func fileURL(_ uri: String) -> URL {
   if let url = URL(string: uri), url.scheme != nil { return url }
   return URL(fileURLWithPath: uri)
 }
@@ -51,13 +28,15 @@ private func even(_ value: CGFloat) -> Int {
   max(2, Int((value / 2).rounded()) * 2)
 }
 
-private func shrink(
-  _ options: ShrinkOptions,
+/// Re-encodes a video smaller: HEVC at the bitrate asked for, no bigger
+/// than 1080p, keeping HDR, rotation and the sound as they are.
+func shrinkVideo(
+  _ options: VideoOptions,
   onProgress: @escaping (Double) -> Void
 ) async throws -> [String: Any] {
   let asset = AVURLAsset(url: fileURL(options.uri))
   guard let video = try await asset.loadTracks(withMediaType: .video).first else {
-    throw ShrinkError.noVideo
+    throw MediaToolsError.noVideo
   }
   let (naturalSize, transform, frameRate, formats) = try await video.load(
     .naturalSize, .preferredTransform, .nominalFrameRate, .formatDescriptions)
@@ -143,10 +122,10 @@ private func shrink(
   }
 
   guard reader.startReading() else {
-    throw ShrinkError.failed(reader.error?.localizedDescription ?? "reader")
+    throw MediaToolsError.failed(reader.error?.localizedDescription ?? "reader")
   }
   guard writer.startWriting() else {
-    throw ShrinkError.failed(writer.error?.localizedDescription ?? "writer")
+    throw MediaToolsError.failed(writer.error?.localizedDescription ?? "writer")
   }
   writer.startSession(atSourceTime: .zero)
 
@@ -189,13 +168,13 @@ private func shrink(
   if reader.status == .failed || writer.status == .failed {
     writer.cancelWriting()
     try? FileManager.default.removeItem(at: output)
-    throw ShrinkError.failed(
+    throw MediaToolsError.failed(
       (writer.error ?? reader.error)?.localizedDescription ?? "unknown")
   }
   await writer.finishWriting()
   guard writer.status == .completed else {
     try? FileManager.default.removeItem(at: output)
-    throw ShrinkError.failed(writer.error?.localizedDescription ?? "unfinished")
+    throw MediaToolsError.failed(writer.error?.localizedDescription ?? "unfinished")
   }
 
   let size = (try? FileManager.default.attributesOfItem(atPath: output.path)[.size] as? Int) ?? 0
