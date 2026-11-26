@@ -14,6 +14,7 @@ import {
 import { pds } from "@vera/backend/pds";
 
 import { addToInboxLists, removeFromInboxLists } from "./inbox-rows";
+import { dropFromMemberPages, updateSpace } from "./space-cache";
 
 // Optimistic updates: what each action changes in the home PDS's query
 // results the moment it starts, until the PDS's own result arrives (or rolls
@@ -92,26 +93,6 @@ function findSpace(store: Store, spaceId: string) {
     .getAllQueries(pds.messages.spaces)
     .flatMap(({ value }) => value ?? [])
     .find((item) => item.spaceId === spaceId);
-}
-
-/** Changes a space wherever it's loaded: on its own and in lists. */
-export function updateSpace(
-  store: Store,
-  spaceId: string,
-  change: (space: Space) => Space,
-) {
-  const request = pds.messages.space({ spaceId });
-  const space = store.getQuery(request);
-  if (space != null) store.setQuery(request, change(space));
-  for (const { request: list, value } of store.getAllQueries(
-    pds.messages.spaces,
-  )) {
-    if (value === undefined) continue;
-    store.setQuery(
-      list,
-      value.map((item) => (item.spaceId === spaceId ? change(item) : item)),
-    );
-  }
 }
 
 function withoutInvite(store: Store, spaceId: string) {
@@ -314,6 +295,7 @@ export function removeSpaceMember(self: string) {
           (member) => member.accountId !== accountId,
         ),
       }));
+      dropFromMemberPages(store, spaceId, accountId);
       return;
     }
     for (const { request, value } of store.getAllQueries(pds.messages.spaces)) {
