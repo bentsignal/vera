@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Every job only reads the repository.
+permissions:
+  contents: read
+
 # You can leverage Vercel Remote Caching with Turbo to speed up your builds
 # @link https://turborepo.com/docs/core-concepts/remote-caching#remote-caching-on-vercel-builds
 env:

@@ -19,7 +19,9 @@ Decided with Shawn on 2026-10-01. Goal: a working app on Shawn's phone within
 Vera's server stores media in the bunny.net Storage zone `vera-media` (New
 York) and serves it from the CDN pull zone at `media.vera.chat`. The app
 uploads straight to Storage's S3-compatible endpoint through a URL the PDS
-presigns for one object path (`dev/` or `prod/` prefix per deployment). Videos
+presigns for one object path (`prod/` prefix). Dev deployments use their own
+zone, `vera-media-dev` (served at `vera-media-dev.b-cdn.net`), so dev and
+production share no storage or secret. Videos
 are capped at 2 minutes and served as plain files from the CDN; Bunny Stream
 is not used. File storage sits behind a provider interface in the backend, so
 a self-hoster can plug in another provider; without bunny.net variables the

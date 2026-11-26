@@ -358,6 +358,17 @@ Environment variables on each deployment:
 | `GITHUB_TOKEN`                | secret                               | Files and follows Vera's bug reports          |
 | `GITHUB_REPOSITORY`           | `bentsignal/vera`                    | Where Vera files bug reports                  |
 | `PARALLEL_API_KEY`            | secret                               | Vera's web search (Parallel)                  |
+| `DEV_TOOLS`                   | `true`                               | Dev deployments only: dev sign-in and bots    |
+| `DEV_TOOLS_SECRET`            | random                               | Dev deployments only: what dev tools ask for  |
+
+Dev and production never share a secret. The shared dev deployment has its
+own storage zone (`vera-media-dev`, served at `vera-media-dev.b-cdn.net`),
+files bug reports on the private `bentsignal/vera-dev-reports`, and has
+its own web search key. Isolated backends copy these from it
+(`scripts/backend.sh`). Its dev tools (`convex/dev*.ts`) work only with
+`DEV_TOOLS_SECRET` (`dev-tools.ts`), which `scripts/dev-tools-secret.sh`
+fetches for the scripts and Metro; production sets neither `DEV_TOOLS`
+variable.
 
 Attachment size limits (videos 500 MB, photos 50 MB, other files 100 MB) and
 the 2-minute video cap live in `upload-limits.ts`. The app imports the same

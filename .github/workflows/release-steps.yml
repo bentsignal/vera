@@ -10,6 +10,9 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
+# Nothing by default; the job asks for what it needs.
+permissions: {}
+
 concurrency:
   group: release-steps-${{ github.event.pull_request.number }}
   cancel-in-progress: true

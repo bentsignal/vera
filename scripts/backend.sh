@@ -19,6 +19,13 @@ MOBILE_ENV="$ROOT/apps/mobile/.env.local"
 STATE="$BACKEND/.isolated-backend"
 SHARED_DOMAIN="dev.vera.chat"
 EXPIRATION="in 14 days"
+# Settings an isolated backend keeps in step with the shared dev deployment.
+DEV_SETTINGS=(
+  DEV_TOOLS_SECRET
+  BUNNY_CDN_URL BUNNY_S3_ENDPOINT BUNNY_S3_REGION BUNNY_S3_SECRET BUNNY_STORAGE_ZONE
+  GITHUB_REPOSITORY GITHUB_TOKEN
+  PARALLEL_API_KEY
+)
 
 slug() {
   git -C "$ROOT" branch --show-current | sed 's|^t3code/||' |
@@ -78,6 +85,7 @@ isolate() {
   fi
   domain="$name.dev.vera.chat"
   settings="$(mktemp)"
+  chmod 600 "$settings"
   trap 'rm -f "$settings"' RETURN
 
   # Copy the shared dev deployment's settings before switching away from it.
@@ -114,7 +122,44 @@ isolate() {
   echo "restart Metro (scripts/sim.sh up) so the app picks up @$domain"
 }
 
-push() { convex dev --once; }
+main_checkout() {
+  dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)"
+}
+
+shared_deployment() {
+  local deployment
+  deployment="$(env_value CONVEX_DEPLOYMENT "$(main_checkout)/services/backend/.env.local")"
+  echo "${deployment#*:}"
+}
+
+# Copies DEV_SETTINGS from the shared dev deployment to this isolated one:
+# sets what differs, removes what the shared one no longer has.
+sync_dev_settings() {
+  local shared mine changes name want have
+  shared="$(mktemp)" mine="$(mktemp)" changes="$(mktemp)"
+  chmod 600 "$shared" "$mine" "$changes"
+  convex env list --deployment "$(shared_deployment)" >"$shared"
+  convex env list >"$mine"
+  for name in "${DEV_SETTINGS[@]}"; do
+    want="$(grep -E "^$name=" "$shared" | tail -1 | cut -d= -f2- || true)"
+    have="$(grep -E "^$name=" "$mine" | tail -1 | cut -d= -f2- || true)"
+    [ "$want" = "$have" ] && continue
+    if [ -z "$want" ]; then
+      convex env remove "$name" >/dev/null
+      echo "removed $name (the shared dev deployment has none)"
+    else
+      printf '%s=%s\n' "$name" "$want" >>"$changes"
+      echo "updated $name from the shared dev deployment"
+    fi
+  done
+  if [ -s "$changes" ]; then convex env set --from-file "$changes" --force >/dev/null; fi
+  rm -f "$shared" "$mine" "$changes"
+}
+
+push() {
+  if [ -f "$STATE" ]; then sync_dev_settings; fi
+  convex dev --once
+}
 
 teardown() {
   if [ ! -f "$STATE" ]; then
@@ -134,9 +179,7 @@ teardown() {
     "https://api.convex.dev/v1/deployments/$DEPLOYMENT/delete" >/dev/null ||
     echo "warning: could not delete $DEPLOYMENT; it expires on its own" >&2
 
-  local main
-  main="$(dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)")"
-  cp "$main/services/backend/.env.local" "$BACKEND/.env.local"
+  cp "$(main_checkout)/services/backend/.env.local" "$BACKEND/.env.local"
   rm -f "$STATE" "$MOBILE_ENV"
   status
   # Vera Dev keeps one account list for every worktree, so an account on

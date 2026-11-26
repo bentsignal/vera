@@ -237,9 +237,17 @@ interface Scenario {
 }
 
 async function signIn(site: string, username: string) {
+  // The dev PDS asks for its dev tools secret (services/backend/dev-tools.ts).
+  const secret = execFileSync(path.join(ROOT, "scripts/dev-tools-secret.sh"), {
+    encoding: "utf8",
+  }).trim();
   const response = await fetch(`${site}/api/auth/dev/sign-in`, {
     body: JSON.stringify({ username }),
-    headers: { "content-type": "application/json", origin: site },
+    headers: {
+      "content-type": "application/json",
+      origin: site,
+      "x-vera-dev-tools-secret": secret,
+    },
     method: "POST",
   });
   const cookie = response.headers
